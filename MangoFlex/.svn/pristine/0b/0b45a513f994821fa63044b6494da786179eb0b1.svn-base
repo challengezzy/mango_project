@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:degrafa="http://www.degrafa.com/2007" left="0" right="3"  
+	implements="mx.controls.listClasses.IDropInListItemRenderer"
+	 creationComplete="initListener()"
+	 xmlns:collections="com.degrafa.core.collections.*"
+	 xmlns:flash.filters="flash.filters.*"
+	 horizontalScrollPolicy="off" xmlns:repeaters="com.degrafa.geometry.repeaters.*">
+	
+	<mx:Script>
+		<![CDATA[
+			
+			private function initListener():void{
+				addEventListener(FlexEvent.DATA_CHANGE,initChange);
+			}
+			
+			private function initChange(event:FlexEvent):void{
+				dataValue = data[dataField];
+				capacity = data.capacity;
+				this.toolTip = String(dataValue);
+			} 
+			
+			override public function set width(value:Number):void{
+				super.width = value;
+			}
+			
+			import mx.events.FlexEvent;
+			import mx.controls.listClasses.BaseListData;
+			    		
+    		[Bindable]
+    		private var dataValue:Number;
+			
+			[Bindable]
+    		private var capacity:Number;
+    		
+			//Data is set after listData so we need to reset the value.
+			override public function set data(value:Object):void{
+				//dataValue = value[dataField];
+				//capacity = value.capacity;
+				super.data = value;
+			}
+			    		
+    		[Bindable]
+    		private var dataField:String;
+    					
+			private var _listData:BaseListData;
+    		
+		    [Bindable("dataChange")]
+		    public function get listData():BaseListData{
+		      return _listData;
+		    }
+		    public function set listData(value:BaseListData):void{
+		      _listData = value;
+		      dataField =_listData["dataField"];
+		    }
+											
+		]]>
+	</mx:Script>
+	
+	<mx:filters>
+		<flash.filters:GlowFilter
+				color="#666666"
+				alpha=".3"
+				blurX="3"
+				blurY="3"
+				quality="6"/>
+	</mx:filters>
+
+	<degrafa:RegularRectangle y="1" id="bar1" graphicsTarget="{[circlesSurface]}"  
+    	height="{ height }" width="{width * (dataValue / capacity)}">
+        <degrafa:fill>
+        	<degrafa:LinearGradientFill angle="90">
+        	    <degrafa:GradientStop alpha="1"  color="{(dataField=='used')? 0xFF0000:0x00FF00}"/>
+	        	<degrafa:GradientStop alpha="1" color="#333333"/>
+	        </degrafa:LinearGradientFill>
+        </degrafa:fill>
+    	
+    	<degrafa:RegularRectangle x="2" y="2" id="wash"	width="{bar1.width-2}" height="{bar1.height/2}">
+			<degrafa:fill>
+            	<degrafa:LinearGradientFill height="{wash.height}" 
+            		width="{wash.width}" angle="90">
+            	    <degrafa:GradientStop alpha="1" color="#FFF"/>
+		        	<degrafa:GradientStop alpha="0" color="#FFF"/>
+		        </degrafa:LinearGradientFill>
+            </degrafa:fill>
+		</degrafa:RegularRectangle>
+    	
+	</degrafa:RegularRectangle>	
+	
+	<degrafa:Surface
+		id="circlesSurface"
+		x="2"
+		mask="{circlesGroup}"
+		width="{bar1.width+2}">
+		<degrafa:fills>
+			<degrafa:SolidFill
+				id="maskFill"
+				color="#000"
+				alpha="1"/>
+			<degrafa:LinearGradientFill
+				id="greyGrad"
+				height="{wash.height}" 
+        		width="{wash.width}"
+        		angle="90">
+        	    <degrafa:GradientStop
+        	    	color="#666"
+        	    	alpha=".5"/>
+	        	<degrafa:GradientStop
+	        		color="#666"
+	        		alpha=".1"/>
+	        </degrafa:LinearGradientFill>
+		</degrafa:fills>
+		<degrafa:strokes>
+			<degrafa:SolidStroke
+				id="greyStroke"
+				color="#AAA"
+				weight="1"/>
+		</degrafa:strokes>
+		<degrafa:GeometryGroup
+			id="circlesGroup">
+			<repeaters:CircleRepeater
+				id="circles"
+				radius="8"
+				count="5"
+				centerX="8"
+				centerY="9"
+				offsetX="18"
+				fill="{maskFill}"/>
+		</degrafa:GeometryGroup>
+		
+		<degrafa:GeometryGroup>
+			<repeaters:CircleRepeater
+				radius="8"
+				count="5"
+				centerY="9"
+				centerX="8"
+				offsetX="18"
+				fill="{greyGrad}"
+				stroke="{greyStroke}"/>
+			<degrafa:filters>
+				<flash.filters:GlowFilter
+						color="#666666"
+						alpha=".3"
+						blurX="2"
+						blurY="2"
+						strength="3"
+						quality="6"/>
+			</degrafa:filters>
+		</degrafa:GeometryGroup>
+	</degrafa:Surface>
+	
+</mx:Canvas>

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   xmlns:ext="smartx.flex.components.itemcomponent.ext.*"
+		   creationComplete="init()" width="100">
+	<fx:Metadata>
+		[Event(name='realValueChange',type='smartx.flex.components.event.UIComponentEvent')]
+	</fx:Metadata>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.DataGrid;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			
+			public var refDialog:RefDialog;
+			
+			public var dataGridItemkey:String;
+			
+			public var refInputIsEdit:Boolean = false;
+			
+			private var dataValue:SimpleRefItemVO;
+			
+			private var isClearButtonUnderMouse:Boolean = false;
+			
+			private function init():void{
+				if(refInputIsEdit)
+					refInput.editable = true;
+				refButton.addEventListener(MouseEvent.CLICK,refButton_clickHandler);
+			}
+			
+			private function refButton_clickHandler(event:MouseEvent):void{
+				refDialog = new RefDialog();
+				refDialog.addEventListener(FlexEvent.CREATION_COMPLETE,refDialog_CreationCompleteHandler);
+				refDialog.title = getRefTitle();
+				refDialog.addEventListener(CloseEvent.CLOSE,refDialog_closeHandler);
+				PopUpManager.addPopUp(refDialog,this.owner,true);
+				PopUpManager.centerPopUp(refDialog);
+			}
+			
+			private function refDialog_CreationCompleteHandler(event:FlexEvent):void{
+				refDialog.init3(getHeaders(),getTableBody());
+			}
+			
+			private function refDialog_closeHandler(event:CloseEvent):void{
+				if(refDialog != null && refDialog.closeByConfirm){
+					dataValue = new SimpleRefItemVO();
+					dataValue.code = refDialog.refCode;
+					dataValue.name = refDialog.refPK;
+					refInput.text = refDialog.refPK;
+					var parent:UIComponent = owner as UIComponent;
+					while(parent){
+						if(parent is DataGrid && dataGridItemkey){
+							var dataGrid:DataGrid = parent as DataGrid;
+							var dataarray:ArrayCollection = dataGrid.dataProvider as ArrayCollection;
+							dataarray.getItemAt(dataGrid.selectedIndex)[dataGridItemkey] = dataValue;
+							dataGrid.invalidateList();
+							parent = null;
+						}else
+							parent = parent.owner as UIComponent;					
+					}
+					dispatchEvent(new UIComponentEvent(UIComponentEvent.REAL_VALUE_CHANGE));
+				}
+			}
+			//参照标题
+			protected function getRefTitle():String{return "";}
+			//参照表头
+			protected function getHeaders():Array{return [];}
+			//参照数据
+			protected function getTableBody():Array{return [];}
+			
+			public function get value():Object{
+				return dataValue;
+			}
+			
+			public function set value(obj:Object):void{
+				if(obj is SimpleRefItemVO){
+					dataValue = obj as SimpleRefItemVO;
+					refInput.text = dataValue.name;
+				}
+			}
+			
+			override public function set data(obj:Object):void{
+				super.data = obj;
+				if(obj == null || obj[dataGridItemkey] == "")
+					return;
+				dataValue = obj[dataGridItemkey];
+				if(obj[dataGridItemkey])
+					refInput.text = obj[dataGridItemkey].name;
+				else
+					refInput.text = null;
+				
+			}
+			
+			protected function clearButton_clickHandler(event:MouseEvent):void{
+				refInput.text = null;
+				dataValue = null;
+				dispatchEvent(new UIComponentEvent(UIComponentEvent.REAL_VALUE_CHANGE));
+			}
+			
+			private function inputFocusIn(event:FocusEvent):void{
+				clearButton.setVisible(true);
+			}
+			
+			private function inputFocusOut(event:FocusEvent):void{
+				if(!isClearButtonUnderMouse)
+					clearButton.setVisible(false);
+			}
+			
+			private function clearButtonMouseOver(event:MouseEvent):void{
+				isClearButtonUnderMouse = true;
+			}
+			
+			private function clearButtonMouseOut(event:MouseEvent):void{
+				isClearButtonUnderMouse = false;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%" horizontalGap="0" verticalAlign="middle">
+		<mx:TextInput width="100%" id="refInput" height="20" borderStyle="solid" editable="false" 
+					  focusIn="inputFocusIn(event)" focusOut="inputFocusOut(event)"/>
+		<mx:Button  id="refButton" width="20" height="20" icon="{AssetsFileLib.refsearchIcon}"
+					tabFocusEnabled="false"/>
+		<mx:Button id="clearButton" width="20" height="20" icon="{AssetsFileLib.clearIcon}" toolTip="清除输入的内容"
+				   click="clearButton_clickHandler(event)" mouseOver="clearButtonMouseOver(event)" 
+				   mouseOut="clearButtonMouseOut(event)" visible="false" />
+	</mx:HBox>
+</mx:Canvas>

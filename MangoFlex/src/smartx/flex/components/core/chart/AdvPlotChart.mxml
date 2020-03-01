@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AdvXYChart xmlns="smartx.flex.components.core.chart.*" 
+		  xmlns:mx="http://www.adobe.com/2006/mxml" 
+		  width="100%" height="100%" initialize="init()" >
+	<mx:Script>
+		<![CDATA[
+			import mx.charts.series.PlotSeries;
+			import mx.collections.ArrayCollection;
+			
+			private function init():void{
+				initXYAxis(plotChart);
+			}
+			
+			public override function refreshData(_dataProvider:ArrayCollection):void{
+				axisDataProvider = _dataProvider;
+				
+				refreshUserDefindAxis(plotChart);
+				
+				var datas:Array = _dataProvider.toArray();
+				
+				var columnsName:Array = new Array();
+				
+				var dataMap:Object = new Object();
+				
+				for(var i:int=0;i<datas.length;i++){
+					var tempXField:String = "xfield"+i;
+					var tempYField:String = "yfield"+i;
+					
+					var tempData:Object = datas[i] as Object;
+					
+					var xData:Object = tempData[xField];
+					var yData:Object = tempData[yField];
+					
+					if(xData is Date){
+						var xdate:Date = xData as Date;
+						dataMap[tempXField] = xdate.getTime();
+					}else{
+						dataMap[tempXField] = tempData[xField];
+					}
+					
+					if(yData is Date){
+						var ydate:Date = yData as Date;
+						dataMap[tempYField] = ydate.getTime();
+					}else{
+						dataMap[tempYField] = tempData[yField];
+					}
+					
+					var columnName:Object = new Object();
+					columnName["xfield"] = tempXField;
+					columnName["yfield"] = tempYField;
+					columnName["displayname"] = tempData[displayname];
+					columnsName.push(columnName);
+					
+				}
+				dataProvider.removeAll();
+				dataProvider.addItem(dataMap);
+				
+				var  series:Array = new Array();
+				for each (var o:Object in columnsName){
+					var s:PlotSeries = new PlotSeries();
+					s.xField = o["xfield"];
+					s.yField = o["yfield"];
+					s.displayName = o["displayname"];
+					series.push(s);
+				}
+				plotChart.series = series;
+				
+				if(isShowLabels){
+					if(isHorizontalLegend)
+						legend.direction = "horizontal";
+					legend.dataProvider = plotChart;
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:VBox width="100%" height="100%">
+		<mx:VBox width="100%" height="100%">
+			<mx:PlotChart id="plotChart" dataProvider="{dataProvider}" height="100%" width="100%" 
+						  paddingLeft="5" paddingRight="5" fontSize="12" showDataTips="true" />
+			<mx:Legend id ="legend" />
+		</mx:VBox>
+	</mx:VBox>
+
+</AdvXYChart>

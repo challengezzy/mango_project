@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								 xmlns:s="library://ns.adobe.com/flex/spark" 
+								 xmlns:mx="library://ns.adobe.com/flex/mx" 
+								 creationComplete="creationCompleteHandler()" width="100%" height="100%"
+								 xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*" 
+								 xmlns:components="smartx.bam.flex.modules.dashboardobject.designer.components.*">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.XMLListCollection;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.ResultEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			[Bindable]
+			private var dataProvider:XMLListCollection = new XMLListCollection();
+			
+			private function creationCompleteHandler():void{
+				
+			}
+			
+			private function addField():void{
+				dataProvider.addItem(<item dataField="" type="textarea" ishiden="false" height="200" width="200" alias="aliasField" />);
+			}
+			
+			private function addFieldTextInput():void{
+				dataProvider.addItem(<item dataField="" type="textinput" ishiden="false" alias="aliasField" />);
+			}
+			
+			private function deleteField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				
+				dataProvider.removeItemAt(selectedIndex);
+			}
+			
+			private function deleteFieldTextInput():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				
+				dataProvider.removeItemAt(selectedIndex);
+			}
+			
+			private function columnTypeComboBox_changeHandler(isClear:Boolean = true):void{
+				if(columnTypeComboBox.selectedIndex == 0)
+					currentState = "textarea";
+				else
+					currentState = "textinput";
+				if(isClear)
+					dataProvider.removeAll();
+			}
+
+			override public function showHandler():void{
+				dataProvider.source = contentXml.extend.items.item;
+				for each(var item:XML in contentXml.extend.items.item){
+					if(item.@type == "textinput"){
+						columnTypeComboBox.selectedIndex =1;
+						break;
+					}
+				}
+				columnTypeComboBox_changeHandler(false);
+			}
+			
+		]]>
+	</fx:Script>
+	<designer:states>
+		<s:State name="textinput" />
+		<s:State name="textarea" />
+	</designer:states>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%" >
+			<mx:ComboBox id="columnTypeComboBox" change="columnTypeComboBox_changeHandler()">
+				<mx:dataProvider>
+					["多行文本框","文本框"]
+				</mx:dataProvider>
+			</mx:ComboBox>
+			<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" 
+						   click.textarea="addField()" click.textinput="addFieldTextInput()"/>
+			<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" 
+						   click.textarea="deleteField()" click.textinput="deleteFieldTextInput()"/>
+		</mx:HBox>
+		<mx:DataGrid id="dataGrid" width="100%" height="100%" editable="true" dataProvider="{dataProvider}" 
+					 dragEnabled="true" dragMoveEnabled="true" dropEnabled="true">
+			<mx:columns>
+				<mx:DataGridColumn headerText="数据字段" editable="true" dataField="@dataField" 
+								   rendererIsEditor="true" width="160">
+					<mx:itemRenderer>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off" 
+									 creationComplete="init()">
+								<fx:Script>
+									<![CDATA[
+										import mx.events.CollectionEvent;
+										public function get text():String{
+											return String(data.@dataField);
+										}
+										
+										override public function set data(value:Object):void{
+											super.data = value;
+											if(value){
+												dataFieldCbo.selectedIndex = -1;
+												dataFieldCbo.text = value.@dataField;
+											}
+										}
+										
+										private function init():void{
+											outerDocument.fieldList.addEventListener(CollectionEvent.COLLECTION_CHANGE
+												,function(e:CollectionEvent):void{
+													dataFieldCbo.selectedIndex = -1;
+													dataFieldCbo.text = data.@dataField;
+												},false,0,true);
+										}
+									]]>
+								</fx:Script>
+								<mx:ComboBox id="dataFieldCbo" dataProvider="{outerDocument.fieldList}"
+											 change="{data.@dataField=dataFieldCbo.text}" width="100%"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemRenderer>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="是否为隐藏列" dataField="@ishiden" editable="false">
+					<mx:itemRenderer>
+						<fx:Component>
+							<mx:HBox horizontalAlign="center" width="100%">
+								<mx:CheckBox paddingLeft="10" selected="{data.@ishiden=='false'?false:true}" 
+											 click="{data.@ishiden = data.@ishiden=='false'?'true':'false'}"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemRenderer>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="高度" editable="true" width="80" dataField="@height" includeIn="textarea"/>
+				<mx:DataGridColumn headerText="宽度" editable="true" width="80" dataField="@width" includeIn="textarea"/>
+				<mx:DataGridColumn headerText="别名" editable="true" width="80" dataField="@alias" />
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+</designer:BaseDesigner>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml" 
+		   layout="vertical" width="100%" height="100%" 
+		   xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+		   initialize="init()">
+	<mx:Script>
+		<![CDATA[
+			import smartx.flex.components.basic.ClientEnviorment;
+			[Bindable]
+			private var endpoint:String;
+			
+			private function init():void
+			{
+				endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			}
+		]]>
+	</mx:Script>
+	<styletemplate:StyleTemplate09 endpoint="{endpoint}" templetCode="T_PUB_TEMPLET_1" debugMode="true" height="100%" width="100%" editable="true">
+		<styletemplate:childTemplates>
+			<mx:Array>
+				<mx:Object label="模板项" templetCode="T_PUB_TEMPLET_1_ITEM" forienKey="PK_PUB_TEMPLET_1"/>
+			</mx:Array>
+		</styletemplate:childTemplates>
+	</styletemplate:StyleTemplate09>
+</mx:Module>

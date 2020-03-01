@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 verticalScrollPolicy="off" horizontalScrollPolicy="off" verticalAlign="middle"
+		 xmlns:util="myreport.util.*">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	
+	<mx:Script>
+		<![CDATA[
+			import hlib.StringUtil;
+			import myreport.res.Asset;
+			private var _Pagingable:IPagingable;
+			private var _TotalLabel:String = "共{0}页";
+			public function get Pagingable():IPagingable
+			{
+				return _Pagingable;
+			}
+			public function set Pagingable(value:IPagingable):void
+			{
+				_Pagingable = value;
+				if(_Pagingable)
+					_Pagingable.addEventListener(PagingEvent.PAGE_CHANGED, OnPagingEvent);
+				_Current.text = PageNumber.toString();
+				RefreshTotalLabel();
+			}
+			private function OnPagingEvent(e:PagingEvent):void
+			{
+				_Current.text = PageNumber.toString();
+				RefreshTotalLabel();
+			}
+			private function RefreshTotalLabel():void
+			{
+				if(Pagingable)
+					_Total.text = StringUtil.Format(_TotalLabel, Pagingable.Total);
+				else
+					_Total.text = StringUtil.Format(_TotalLabel, 0);
+			}
+			public function set TotalLabel(value:String):void
+			{
+				_TotalLabel = value;
+				RefreshTotalLabel();
+			}
+			
+			private function get Total():int
+			{
+				if(Pagingable)
+					return Pagingable.Total;
+				return 0;
+			}
+			private function get PageNumber():int
+			{
+				if(Pagingable)
+					return Pagingable.Current + 1;
+				return 0;
+			}
+			private function GotoPage(pageNumber:int):void
+			{
+				if (pageNumber < 1)
+					pageNumber = 1;
+				if (pageNumber > Total)
+					pageNumber = Total;
+				//_Current.text = pageNumber.toString();
+				if(Pagingable)
+				{
+					Pagingable.GotoPage(pageNumber-1);
+				}
+			}
+			public function set Enabled(value:Boolean):void
+			{
+				_Current.enabled = 
+					FirstPageButton.enabled = 
+					PreviousPageButton.enabled =
+					NextPageButton.enabled = 
+					LastPageButton.enabled = value;
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox verticalAlign="middle" horizontalGap="3">
+		<mx:Label id="CurrentLabel1" text="第"/>
+		<mx:TextInput width="32" id="_Current" enter="GotoPage(uint(_Current.text))"/>
+		<mx:Label id="CurrentLabel2" text="页"/>		
+	</mx:HBox>
+	<mx:Label text="共10页" id="_Total"/>
+	<util:ToolButton id="FirstPageButton" icon="{Asset.ICON_FIRST}" toolTip="首页" click="GotoPage(1)" width="23"/>
+	<util:ToolButton id="PreviousPageButton" icon="{Asset.ICON_PREV}" toolTip="上一页" click="GotoPage(PageNumber-1)" width="23"/>
+	<util:ToolButton id="NextPageButton" icon="{Asset.ICON_NEXT}" toolTip="下一页" click="GotoPage(PageNumber+1)" width="23"/>
+	<util:ToolButton id="LastPageButton" icon="{Asset.ICON_LAST}" toolTip="末页" click="GotoPage(Total)" width="23"/>
+</mx:HBox>

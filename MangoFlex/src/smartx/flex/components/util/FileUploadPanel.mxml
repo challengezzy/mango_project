@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="300" height="120" creationComplete="init()" title="导入" >
+	
+	<fx:Metadata>		       
+		[Event(name='loadDataSuccessful',type='smartx.flex.components.event.BasicEvent')]
+	</fx:Metadata>
+	
+	<fx:Script>   
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.core.IFlexDisplayObject;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Banable]
+			public var datasource:String;
+			
+			[Banable]
+			public var flagName:String;
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			private var formService:RemoteObject;
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private var fileReference:FileReference = new FileReference();
+			
+			private var filterArray:Array = new Array();
+
+			
+			protected function ro_resultHandler(event:ResultEvent):void{
+				
+				Alert.show("文件上传成功!");
+				
+			}
+			
+			protected function init():void{
+				
+				var MDfilter:FileFilter = new FileFilter("SmartX平台文件", "*.MD");
+				var Allfilter:FileFilter = new FileFilter("所有文件", "*.*");
+				
+				filterArray.push(MDfilter);
+				filterArray.push(Allfilter);
+				
+				formService = new RemoteObject(destination);
+				
+				if(endpoint != null)
+					formService.endpoint = endpoint;
+				
+				formService.importXMLFromMDFile.addEventListener(ResultEvent.RESULT,importXMLFromMDFileHandler);
+				formService.importXMLFromMDFile.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				//选择文件后，加载文件
+				
+				fileReference.addEventListener(Event.SELECT, selectHandler);
+				
+			}
+			
+			private function selectHandler(event:Event):void {
+				
+				fileReference.load();  //加载文件
+				
+				fileNameField.text = fileReference.name;
+				
+			}
+			
+			protected function btnBrows_clickHandler(event:MouseEvent):void{
+				
+				fileReference.browse(filterArray);
+				
+			}
+			protected function btnUpload_clickHandler(event:MouseEvent):void{
+				if(fileReference.data != null){
+					var fileType:String = fileReference.type;
+					if(fileType.toLocaleUpperCase()==".MD"){
+						startImport();
+						formService.importXMLFromMDFile(fileReference.data,datasource,flagName);
+					}else{
+						Alert.show("文件不合法,无法上传导入!必须是'.MD'类型的文件!","提示");
+					}
+				}else{
+					Alert.show("没有可上传的文件!","提示");
+				}
+
+				
+				
+			}
+			
+			protected function importXMLFromMDFileHandler(event:ResultEvent):void{
+				endImport();
+				Alert.show("导入成功!");
+				PopUpManager.removePopUp(this)
+				dispatchEvent(new BasicEvent(BasicEvent.LOADDATA_SUCCESSFUL));
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endImport();
+				Alert.show(event.fault.faultString, '导入失败');
+			}
+			
+			private function startImport():void{
+				
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在导入……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,this,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endImport():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+			
+		]]>   
+	</fx:Script>       
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+		<mx:HBox width="100%" height="100%" horizontalAlign="left">
+			<mx:Label text="文件:" />
+			<mx:TextInput id="fileNameField" width="150" editable="false"/>
+			<mx:Button id="btnBrows" click="btnBrows_clickHandler(event)" x="57" y="60" icon="{AssetsFileLib.browseIcon}" toolTip="选择文件" />
+		</mx:HBox>
+		<mx:HBox width="100%" height="100%" horizontalAlign="center">
+			<mx:Button id="btnUpload" click="btnUpload_clickHandler(event)" label="确定" x="145" y="60" icon="{AssetsFileLib.uploadIcon}" />
+			<mx:Button id="cancelButton" label="取消" click="PopUpManager.removePopUp(this)" icon="{AssetsFileLib.closeIcon}" />
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 xmlns:containers="flexlib.containers.*"
+		 width="100%"
+		 mouseOut="canvas1_mouseOutHandler(event)"
+		 mouseOver="canvas1_mouseOverHandler(event)"
+		 creationComplete="init()" >
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.Menu;
+			import mx.controls.VRule;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.MenuEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillListItemPanel;
+			import smartx.flex.components.styletemplate.ifc.ListItemButtonListenerIFC;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleComboxItemVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			
+			private var formService:RemoteObject;
+			
+			[Bindable]
+			public var imgUrl:String;
+			
+			[Bindable]
+			public var titleField:String;
+			
+			[Bindable]
+			public var subTitleField:String;
+			
+			[Bindable]
+			public var contentField:String;
+			
+			[Bindable]
+			public var iconField:String;
+			
+			[Bindalbe]
+			public var buttonCol:Array;
+			
+			[Bindable]
+			public var dataValue:Object;
+			
+			[Bindable]
+			public var showDeleteButton:Boolean = false;
+			
+			[Bindable]
+			public var endpoint:String;
+			
+			[Bindable]
+			public var billListItemPanel:BillListItemPanel;
+			
+			[Bindable]
+			private var titleStr:String;
+			
+			[Bindable]
+			private var subTitleStr:String;
+			
+			[Bindable]
+			private var contentStr:String;
+			
+			[Bindable]
+			private var listenerMap:Object = new Object();
+			
+			private function init():void{
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.updateBatchDataByTempletVO.addEventListener(ResultEvent.RESULT,updateBatchDataByTempletVOHandler);
+				formService.updateBatchDataByTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				titleStr = getValueStr(titleField);
+				subTitleStr = getValueStr(subTitleField);
+				contentStr = getValueStr(contentField);
+				
+				if(iconField != null && iconField != ""){
+					var tempImgUrl:String = getValueStr(iconField);
+					if( tempImgUrl != null && tempImgUrl != "" ){
+						imgUrl = tempImgUrl;
+					}
+				}
+				
+				
+				for each(var btnItem:Object in buttonCol){
+					var btn:LinkButton = new LinkButton();
+					btn.id = btnItem["id"];
+					btn.label =btnItem["label"];
+					btn.toolTip = btnItem["toolTip"];
+					if(btnItem["icon"] != null && btnItem["icon"] != ""){
+						var cardIcon:Class = IconUtility.getClass(btn,btnItem["icon"],16,16);
+						btn.setStyle("icon",cardIcon);
+					}
+					
+					listenerMap[btn.id]=btnItem["listener"];
+						
+					btn.data = dataValue;
+					
+					
+					btn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+						var tempBtn:Button = event.target as Button;
+						var listener:String = listenerMap[tempBtn.id];
+						if(listener != null && listener !="" ){
+							var classReference:Class = getDefinitionByName(listener) as Class;
+							var listenerClass:ListItemButtonListenerIFC = new classReference() as ListItemButtonListenerIFC;
+							listenerClass.handler(dataValue,billListItemPanel);
+						}
+					});
+					
+					btnHbox.addChild(btn);
+				}
+			}
+			
+			private function updateBatchDataByTempletVOHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("删除成功!",SmartXMessage.MESSAGE_INFO,"",billListItemPanel);
+				billListItemPanel.query();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("执行操作时发生错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString, billListItemPanel);
+			}
+			
+			private function getValueStr(fieldName:String):String{
+				var value:String = "";
+				var obj:Object = dataValue[fieldName];
+				if(obj is SimpleComboxItemVO){
+					var tempVo:SimpleComboxItemVO = obj as SimpleComboxItemVO;
+					value = tempVo.name
+				}else if(obj is SimpleRefItemVO){
+					var tempRefVo:SimpleRefItemVO = obj as SimpleRefItemVO;
+					value = tempRefVo.name;
+				}else{
+					value = obj as String;
+				}
+				return value;
+			}
+			
+			protected function delBtn_clickHandler(event:MouseEvent):void
+			{
+				var dataValueList:Array = new Array();
+				dataValue[GlobalConst.KEYNAME_MODIFYFLAG] = "delete";
+				dataValue[GlobalConst.KEYNAME_TEMPLETCODE] = billListItemPanel.templetCode;
+				dataValueList.push(dataValue);
+				SmartXMessage.show("是否确认删除该记录?",SmartXMessage.MESSAGE_CONFIRM,"",billListItemPanel,function(event:CloseEvent):void{
+					if(event.detail == Alert.YES){
+						OperatingTipUtil.startOperat("正在删除...",this.root);
+						formService.updateBatchDataByTempletVO(billListItemPanel.templetVO, dataValueList,billListItemPanel.bfInterceptor,billListItemPanel.afInterceptor);
+					}
+				});
+			}
+			
+			protected function canvas1_mouseOutHandler(event:MouseEvent):void
+			{
+				sprite.graphics.clear();
+				
+			}
+			
+			protected function canvas1_mouseOverHandler(event:MouseEvent):void
+			{
+				sprite.graphics.clear();
+				sprite.graphics.beginFill(0x6495ED,0.2);
+				sprite.graphics.drawRect(0,0,this.width,this.height);
+				sprite.graphics.endFill();
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:UIComponent id="sprite" />
+	<mx:HBox id="menuBox" width="100%" height="100%" paddingBottom="3"
+			 paddingLeft="3"
+			 paddingRight="3"
+			 paddingTop="3">
+		<mx:Image source="{imgUrl}"/>
+		<mx:VBox id="rightVbox" width="100%" height="100%" >
+			<mx:HBox width="100%" horizontalAlign="right" >
+				<mx:Label id="titleLb" fontSize="14" fontWeight="bold" text="{titleStr}" toolTip="{titleStr}" width="100%" />
+				<mx:Label id="subTitleLb" text="{subTitleStr}" toolTip="{subTitleStr}" />
+				<mx:LinkButton id="delBtn" visible="{showDeleteButton}" click="delBtn_clickHandler(event)" icon="{AssetsFileLib.delete2Icon}" toolTip="删除" />
+			</mx:HBox>
+			<mx:Text id="contentLb" text="{contentStr}" toolTip="{contentStr}" width="100%" />
+			<mx:HBox id="btnHbox" width="100%" horizontalAlign="right" />
+		</mx:VBox>
+	</mx:HBox>
+</mx:Canvas>

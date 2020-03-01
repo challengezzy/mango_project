@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HDividedBox xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:util="myreport.util.*"
+				width="100%" height="100%" horizontalGap="6">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.MsgUtil;
+			
+			import mx.collections.ArrayCollection;
+			
+			import myreport.data.chart.DataSourceData;
+			import myreport.data.chart.SeriesData;
+			import myreport.design.InputNameForm;
+			import myreport.res.Asset;
+			private var _Data:DataSourceData;
+			
+			private var _Source:ArrayCollection;
+			public function set Data(value:DataSourceData):void
+			{
+				_Data = value;
+				
+				_Source = new ArrayCollection();
+				for each(var s:SeriesData in _Data.Serieses)
+				{
+					var item:Object = {};
+					item.Name = s.Name;
+					var values:ArrayCollection = new ArrayCollection();
+					item.Values = values;
+					for each(var val:String in s.Values)
+					{
+						values.addItem({Value:val});
+					}
+					_Source.addItem(item);
+				}
+ 
+				_Names.dataProvider = _Source;
+				NamesSelectionChanged();
+			}
+			public function SetValues():void
+			{
+				_Data.Serieses = new Array();
+				for each(var item:Object in _Source)
+				{
+					var s:SeriesData = new SeriesData();
+					_Data.Serieses.push(s);
+					s.Name = item.Name;
+					var values:ArrayCollection = item.Values;
+					for each(var v:Object in values)
+					{
+						s.Values.push(v.Value);
+					}
+				}
+				
+			}
+			private function AddSeries():void
+			{
+				NewSeriesForm.Instance.Show("新序列",
+					function(n:String):void
+					{
+						var item:Object = {};
+						item.Name = n;
+						item.Values = new ArrayCollection();
+						_Source.addItem(item);
+						_Names.selectedItem = item;
+						NamesSelectionChanged();
+					});
+			}
+			private function DeleteSeries():void
+			{
+				if(!_Names.selectedItem)
+					return;
+				hlib.MsgUtil.ShowQuestion("确定要删除序列“"+_Names.selectedItem.Name+"”吗？",
+					function():void
+					{
+						var index:int = _Names.dataProvider.getItemIndex(_Names.selectedItem);
+						if(index>=0)
+						{
+							_Source.removeItemAt(index);
+							_Names.selectedItem = null;
+							NamesSelectionChanged();
+						}
+					});
+			}
+			private function RenameSeries():void
+			{
+				if(!_Names.selectedItem)
+					return;
+				myreport.design.InputNameForm.Instance.Show("重命名序列", _Names.selectedItem.Name, 
+					function(n:String):void
+					{
+						_Names.selectedItem.Name = n;
+						var index:int = _Names.dataProvider.getItemIndex(_Names.selectedItem);
+						if(index>=0)
+						{
+							_Names.dataProvider.setItemAt(_Names.selectedItem, index);
+						}
+					});
+			}
+			private function AddValue():void
+			{
+				var values:ArrayCollection = _Values.dataProvider as ArrayCollection;
+				if(values)
+					values.addItem({Value:""});
+			}
+			private function DeleteValue():void
+			{
+				if(!_Values.selectedItem)
+					return;
+				var values:ArrayCollection = _Values.dataProvider as ArrayCollection;
+				var index:int = values.getItemIndex(_Values.selectedItem);
+				if(index>=0)
+					values.removeItemAt(index);
+			}
+			private function NamesSelectionChanged():void
+			{
+				_DeleteSeries.enabled =
+				_RenameSeries.enabled = 
+				_MoveUp.enabled = 
+				_MoveDown.enabled = 
+					_Names.selectedItem!=null;
+	 
+				if(_Names.selectedItem)
+					_Values.dataProvider = _Names.selectedItem.Values;
+				else
+					_Values.dataProvider = null;
+				ValuesSelectionChanged();
+			}
+	 
+			private function ValuesSelectionChanged():void
+			{
+				_DeleteValue.enabled = _Values.selectedItem!=null;
+			}
+			
+			private function IndexColumnFunc(item:Object, column:DataGridColumn):String
+			{
+				var values:ArrayCollection = _Values.dataProvider as ArrayCollection;
+				if(!values)
+					return "";
+				var index:int = values.getItemIndex(item) + 1;
+				return index.toString();
+			}
+			private function MoveUp():void
+			{
+				if(!_Values.selectedItem)
+					return;
+				
+				var values:ArrayCollection = _Values.dataProvider as ArrayCollection;
+				var index:int = values.getItemIndex(_Values.selectedItem);
+				if(index>0)
+				{
+					var item:Object = values[index-1];
+					values.setItemAt(_Values.selectedItem, index-1);
+					values.setItemAt(item, index);
+					_Values.selectedItem = values[index-1];
+				}
+			}
+			private function MoveDown():void
+			{
+				if(!_Values.selectedItem)
+					return;
+				
+				var values:ArrayCollection = _Values.dataProvider as ArrayCollection;
+				var index:int = values.getItemIndex(_Values.selectedItem);
+				if(index<values.length - 1)
+				{
+					var item:Object = values[index+1];
+					values.setItemAt(_Values.selectedItem, index+1);
+					values.setItemAt(item, index);
+					_Values.selectedItem = values[index+1];
+				}
+			}
+		]]>
+	</mx:Script>
+	<mx:VBox width="100" height="100%" verticalGap="0" horizontalScrollPolicy="off">
+		<util:ToolBar width="100%" height="28" paddingLeft="8" paddingRight="8" verticalAlign="middle">
+			<util:ToolButton icon="{Asset.ICON_ADD16}" width="23" click="AddSeries()" toolTip="添加序列"/>
+			<util:ToolButton id="_DeleteSeries" icon="{Asset.ICON_DELETE16}" width="23" click="DeleteSeries()" toolTip="删除序列"/>
+			<util:ToolButton id="_RenameSeries" icon="{Asset.ICON_EDIT16}" width="23" click="RenameSeries()" toolTip="重命名序列"/>
+		</util:ToolBar>
+		<mx:List id="_Names" width="100%" height="100%" labelField="Name" change="NamesSelectionChanged()"/>
+		
+	</mx:VBox>
+	<mx:HBox width="100%" height="100%">
+		<mx:VBox width="100%" height="100%">
+			 <mx:DataGrid id="_Values" editable="true" width="100%" height="100%" change="ValuesSelectionChanged()">
+				 <mx:columns>
+					 <mx:DataGridColumn width="36" headerText="序号" editable="false" sortable="false" labelFunction="IndexColumnFunc"/>
+					 <mx:DataGridColumn headerText="数据值" dataField="Value" editable="true" sortable="false"/>
+				 </mx:columns>
+			 </mx:DataGrid>
+		</mx:VBox>
+		<mx:VBox height="100%">
+			<mx:Button label="添加" click="AddValue()"/>
+			<mx:Button id="_DeleteValue" label="删除" click="DeleteValue()"/>
+			<mx:Button id="_MoveUp" label="上移" click="MoveUp()"/>
+			<mx:Button id="_MoveDown" label="下移" click="MoveDown()"/>
+		</mx:VBox>
+	</mx:HBox>
+</mx:HDividedBox>

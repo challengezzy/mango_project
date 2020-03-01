@@ -1,0 +1,554 @@
+<mx:VBox xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="25" 
+		 xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+		 xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+		 xmlns:core="smartx.flex.components.core.*"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:s="library://ns.adobe.com/flex/spark"
+		 >
+	
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			[Bindable]
+			public var itemXml:XML;
+			
+			[Bindable]
+			public var allFieldsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			public var flp:EntityListFilterPanel;
+			
+			[Bindable]
+			public var formService:RemoteObject;
+			
+			[Bindable]
+			public var dicValues:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var filterFieldsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var logicalOptCol:ArrayCollection = new ArrayCollection(
+				[
+					{name:"AND",value:"AND"},
+					{name:"OR",value:"OR"}
+				]
+			);
+			
+			[Bindable]
+			private var relationalOptCol:ArrayCollection = new ArrayCollection(
+				[
+					{name:"=",value:"="},
+					{name:">",value:">"},
+					{name:"<",value:"<"},
+					{name:">=",value:">="},
+					{name:"<=",value:"<="},
+					{name:"<>",value:"<>"},
+					{name:"IS",value:"IS"},
+					{name:"IS NOT",value:"IS NOT"},
+					{name:"IN",value:"IN"},
+					{name:"NOT IN",value:"NOT IN"},
+					{name:"LIKE",value:"LIKE"}
+				]
+			);
+			
+			[Bindable]
+			private var currRelationalOptCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var filterTypeCol:ArrayCollection = new ArrayCollection(
+				[
+					{name:"字典过滤",value:"dictionary"},
+					{name:"比较过滤",value:"equalValue"},
+					{name:"空值过滤",value:"nullValue"},
+					{name:"数值范围过滤",value:"numberScope"},
+					{name:"字符长度过滤",value:"stringLength"},
+					{name:"字符模糊匹配",value:"stringSimilar"},
+					{name:"返回行数上限",value:"rowCount"}
+				]
+			);
+			
+			[Bindable]
+			private var isEdit:Boolean  = true;
+			
+			[Bindable]
+			private var isVisible:Boolean  = false;
+			
+			private var metadataTemplet:MetadataTemplet;
+			
+			[Bindable]
+			private var refHeadProvider:Array = new Array();
+			
+			[Bindable]
+			private var refProvider:Array = new Array();
+			
+			private function init():void{
+				
+				refHeadProvider.push("ID#");
+				refHeadProvider.push("名称");
+				refHeadProvider.push("字典值");
+				
+				metadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(GlobalConst.MTCODE_SYNONYMS);
+				
+				if(metadataTemplet != null ){
+					for each(var synonymsXml:XML in metadataTemplet.contentXML.synonyms){
+						var values:String ="";
+						for each( var valuesXml:XML in synonymsXml.variable){
+							var value:String = valuesXml.@value;
+							if(values == ""){
+								values = value;
+							}else{
+								values = values+","+value;
+							}
+						}
+						var row:Array = [String(synonymsXml.@code),String(synonymsXml.@name),values];
+						refProvider.push(row);
+					}
+				}
+				
+				filterFieldsCol.removeAll();
+				for each(var obj:Object in allFieldsCol){
+					filterFieldsCol.addItem(obj);
+				}
+				
+				initDate();
+				
+			}
+			
+			private function initDate():void{
+				
+				if(itemXml != null ){
+					
+					var typeStr:String = itemXml.@type;
+					var columnName:String = itemXml.@column;
+					var logicalOperator:String = itemXml.@logicalOperator;
+					var relationalOperator:String = itemXml.@relationalOperator;
+					var value:String = itemXml.@value;
+					
+					if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_DICTIONARY.toLowerCase()){
+						filterTypeCob.selectedIndex = 0;
+						isEdit = false;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_EQUALVALUE.toLowerCase()){
+						filterTypeCob.selectedIndex = 1;
+						isEdit = true;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_NULLVALUE.toLowerCase()){
+						filterTypeCob.selectedIndex = 2;
+						valueInput.text = "NULL";
+						valueInput_changeHandler(null);
+						isEdit = false;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_NUMBERSCOPE.toLowerCase()){
+						filterTypeCob.selectedIndex = 3;
+						isEdit = true;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_STRINGLENGTH.toLowerCase()){
+						filterTypeCob.selectedIndex = 4;
+						isEdit = true;
+					}else if(typeStr.toLowerCase() == GlobalConst.FILTER_TYPE_STRINGSIMILAR.toLowerCase()){
+						filterTypeCob.selectedIndex = 5;
+						isEdit = true;
+					}else if(typeStr.toLowerCase() == GlobalConst.FILTER_TYPE_ROWCOUNT.toLowerCase()){
+						filterTypeCob.selectedIndex = 6;
+						isEdit = true;
+					}
+					
+					filterTypeCob_changeHandler(null);
+					
+					var item:Object = findFieldObjByName(columnName);
+					if( item != null ){
+						fieldNameCob.selectedItem = item;
+						fieldNameCob_changeHandler(null);
+					}
+					
+					
+					if(logicalOperator == "AND" ){
+						logicalOptCob.selectedIndex = 0;
+					}else if(logicalOperator == "OR"){
+						logicalOptCob.selectedIndex = 1;
+					}
+					
+					
+					var optItme:Object = findRelationOptObjByValue(relationalOperator);
+					if(optItme != null ){
+						relationalOptCob.selectedItem = optItme;
+						relationalOptCob_changeHandler(null);
+					}
+					
+				}
+			}
+			
+			private function findFieldObjByName(fieldName:String):Object{
+				var item:Object = null;
+				for each(var obj:Object in filterFieldsCol){
+					var tempFieldName:String = obj["fieldName"] as String;
+					if(tempFieldName != null && StringUtil.trim(tempFieldName) != "" 
+						&& fieldName != null && StringUtil.trim(fieldName) != "" && tempFieldName==fieldName){
+						item = obj;
+						break;
+					}
+				}
+				return item;
+			}
+			
+			private function findRelationOptObjByValue(value:String):Object{
+				var item:Object = null;
+				for each(var obj:Object in currRelationalOptCol){
+					var tempValue:String = obj["value"] as String;
+					if(tempValue != null && StringUtil.trim(tempValue) != "" 
+						&& value != null && StringUtil.trim(value) != "" && tempValue==value){
+						item = obj;
+						break;
+					}
+				}
+				return item;
+			}
+			
+			protected function isAddCheckBox_changeHandler(event:Event):void
+			{
+				itemXml.@isAdd = isAddCheckBox.selected?"true":"false";
+				
+			}
+			
+			protected function logicalOptCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = logicalOptCob.selectedItem;
+				if( item != null ){
+					var value:String = item["value"] as String;
+					itemXml.@logicalOperator = value;
+				}
+				
+			}
+			
+			protected function filterTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = filterTypeCob.selectedItem;
+				if( item != null ){
+					
+					var value:String = item["value"] as String;
+					itemXml.@type = value;
+					
+					filterFieldsCol.removeAll();
+					currRelationalOptCol.removeAll();
+					if(value == GlobalConst.FILTER_TYPE_DICTIONARY){
+						
+						for each(var objStr:Object in allFieldsCol){
+							var fieldTypeStr:String = objStr["fieldType"] as String;
+							if(fieldTypeStr.toLowerCase()=="string"||fieldTypeStr.toLowerCase()=="varchar"||fieldTypeStr.toLowerCase()=="varchar2"||fieldTypeStr.toLowerCase()=="number"){
+								filterFieldsCol.addItem(objStr);
+							}
+						}
+						isVisible = true;
+						isEdit = false;
+						
+						for each(var currRltOpt:Object in relationalOptCol){
+							var optValue:String = currRltOpt["value"] as String;
+							
+							if(optValue == "IN"
+								|| optValue =="NOT IN"){
+								
+								currRelationalOptCol.addItem(currRltOpt);
+							}
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_EQUALVALUE){
+						
+						for each(var objNum:Object in allFieldsCol){
+							filterFieldsCol.addItem(objNum);
+						}
+						isVisible = false;
+						isEdit = true;
+						
+						for each(var currRltOptE:Object in relationalOptCol){
+							var  currRltOptEValue:String = currRltOptE["value"] as String;
+							if(currRltOptEValue == "="
+								|| currRltOptEValue == ">"
+								|| currRltOptEValue == "<"
+								|| currRltOptEValue == ">="
+								|| currRltOptEValue == "<="
+								|| currRltOptEValue == "<>"
+								|| currRltOptEValue == "LIKE"
+								|| currRltOptEValue == "IN"
+								|| currRltOptEValue == "NOT IN"){
+								
+								currRelationalOptCol.addItem(currRltOptE);
+								
+							}
+							
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_NULLVALUE){
+						
+						for each(var objBool:Object in allFieldsCol){
+							filterFieldsCol.addItem(objBool);
+						}
+						
+						valueInput.text = "NULL";
+						isVisible = false;
+						isEdit = false;
+						valueInput_changeHandler(null);
+						
+						for each(var currNULLRltOpt:Object in relationalOptCol){
+							var optNULLValue:String = currNULLRltOpt["value"] as String;
+							
+							if(optNULLValue == "IS"
+								|| optNULLValue =="IS NOT"){
+								
+								currRelationalOptCol.addItem(currNULLRltOpt);
+							}
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_NUMBERSCOPE ){
+						
+						for each(var objDate:Object in allFieldsCol){
+							var fieldTypeNum:String = objDate["fieldType"] as String;
+							if(fieldTypeNum.toLowerCase()=="number"||fieldTypeNum.toLowerCase()=="int"||fieldTypeNum.toLowerCase()=="integer"||fieldTypeNum.toLowerCase()=="float"||fieldTypeNum.toLowerCase()=="double"){
+								filterFieldsCol.addItem(objDate);
+							}
+						}
+						isVisible = false;
+						isEdit = true;
+						
+						for each(var currScopeRltOpt:Object in relationalOptCol){
+							var optScopeValue:String = currScopeRltOpt["value"] as String;
+							
+							if(optScopeValue == "="
+								|| optScopeValue == ">"
+								|| optScopeValue == "<"
+								|| optScopeValue == ">="
+								|| optScopeValue == "<="
+								|| optScopeValue == "<>"){
+								
+								currRelationalOptCol.addItem(currScopeRltOpt);
+							}
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_STRINGLENGTH || value == GlobalConst.FILTER_TYPE_STRINGSIMILAR ){
+						
+						for each(var objLengthStr:Object in allFieldsCol){
+							var fieldLengthStr:String = objLengthStr["fieldType"] as String;
+							if(fieldLengthStr.toLowerCase()=="string"||fieldLengthStr.toLowerCase()=="varchar"||fieldLengthStr.toLowerCase()=="varchar2"){
+								filterFieldsCol.addItem(objLengthStr);
+							}
+						}
+						isVisible = false;
+						isEdit = true;
+						
+						if(value == GlobalConst.FILTER_TYPE_STRINGLENGTH){
+							
+							for each(var currLengthRltOpt:Object in relationalOptCol){
+								var optlengthValue:String = currLengthRltOpt["value"] as String;
+								
+								if(optlengthValue == "="
+									|| optlengthValue == ">"
+									|| optlengthValue == "<"
+									|| optlengthValue == ">="
+									|| optlengthValue == "<="
+									|| optlengthValue == "<>"){
+									
+									currRelationalOptCol.addItem(currLengthRltOpt);
+								}
+							}
+						}else if(value == GlobalConst.FILTER_TYPE_STRINGSIMILAR){
+							for each(var currSimilerRltOpt:Object in relationalOptCol){
+								var optsimilerValue:String = currSimilerRltOpt["value"] as String;
+								
+								if(optsimilerValue == "LIKE"){
+									
+									currRelationalOptCol.addItem(currSimilerRltOpt);
+								}
+							}
+						}
+						
+					}else if( value == GlobalConst.FILTER_TYPE_ROWCOUNT){
+						
+						var rowNum:Object = new Object();
+						rowNum["fieldName"] = "ROWNUM";
+						rowNum["fieldType"] = "number";
+						rowNum["fieldLabel"] = "行数";
+						rowNum["columnDesc"] = "";
+						filterFieldsCol.addItem(rowNum);
+						
+						isVisible = false;
+						isEdit = true;
+						
+						for each(var currRowRltOpt:Object in relationalOptCol){
+							var optRowValue:String = currRowRltOpt["value"] as String;
+							
+							if(optRowValue == "<="){
+								currRelationalOptCol.addItem(currRowRltOpt);
+							}
+						}
+						
+					}
+					
+					fieldNameCob_changeHandler(null);
+					relationalOptCob_changeHandler(null);
+				}
+				
+			}
+			
+			protected function fieldNameCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = fieldNameCob.selectedItem;
+				if( item != null ){
+					var value:String = item["fieldName"] as String;
+					itemXml.@column = value;
+				}
+				
+			}
+			
+			protected function relationalOptCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = relationalOptCob.selectedItem;
+				if( item != null ){
+					var value:String = item["value"] as String;
+					itemXml.@relationalOperator = value;
+				}
+				
+			}
+			
+			protected function valueInput_changeHandler(event:Event):void
+			{
+				
+				itemXml.@value = valueInput.text;
+				
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = filterTypeCob.selectedItem;
+				if( item != null ){
+					
+					var value:String = item["value"] as String;
+					itemXml.@type = value;
+					
+					if(value == GlobalConst.FILTER_TYPE_DICTIONARY){
+						
+						var refDialog:RefDialog = new RefDialog();
+						refDialog.title = "选择字典值";
+						refDialog.allowMultipleSelection = false;
+						refDialog.addEventListener(FlexEvent.CREATION_COMPLETE,function(event:FlexEvent):void{
+							refDialog.init3(refHeadProvider,refProvider);
+						});
+						refDialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+							if(refDialog.closeByConfirm){
+								
+								valueInput.text  = refDialog.refName;
+								valueInput_changeHandler(null);
+								
+							}
+						});
+						
+						PopUpManager.addPopUp(refDialog,this,true);
+						PopUpManager.centerPopUp(refDialog);
+						
+					}else{
+						
+						var fieldItem:Object = fieldNameCob.selectedItem;
+						if( fieldItem != null ){
+							var desc:String = fieldItem["columnDesc"] as String;
+							if( desc != null && desc != "" ){
+								desc = desc.replace("TREE:","");
+								desc = desc.replace("tree:","");
+								var infoAr:Array = desc.split(";");
+								var sql:String = "";
+								var dsInfo:String = null;
+								if(infoAr != null && infoAr.length >0 ){
+									var index:int = 0;
+									for each(var obj:Object in infoAr){
+										if(index == 0){
+											sql = obj as String;
+										}else if(index != 0 && index == (infoAr.length-1)){
+											dsInfo = obj as String;
+										}
+										index++;
+									}
+								}
+								var datasource:String = null;
+								if(dsInfo != null ){
+									var dsAr:Array = dsInfo.split("=");
+									if(dsAr != null && dsAr.length ==2){
+										var dsFlag:String = dsAr[0] as String;
+										var dsName:Object = dsAr[1];
+										if(dsFlag.toLowerCase() == "ds"){
+											datasource = dsName as String;
+											datasource = qs.utils.StringUtils.trim(datasource);
+										}
+									}
+								}
+								
+								var refDialog2:RefDialog = new RefDialog();
+								refDialog2.title = "选择相关数值";
+								refDialog2.allowMultipleSelection = false;
+								refDialog2.init2(formService,sql,datasource);
+								refDialog2.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+									if(refDialog2.closeByConfirm){
+										
+										var refValue:String = refDialog2.refPK;
+										
+										var item:Object = relationalOptCob.selectedItem;
+										if( item != null ){
+											var optValue:String = item["value"] as String;
+											if(optValue == "IN" || optValue == "NOT IN"){
+												var textValue:String = valueInput.text;
+												if(textValue != null && textValue != ""){
+													refValue = textValue+","+refValue;
+												}
+											}
+										}
+										
+										valueInput.text  = refValue
+										valueInput_changeHandler(null);
+										
+									}
+								});
+								
+								PopUpManager.addPopUp(refDialog2,this,true);
+								PopUpManager.centerPopUp(refDialog2);
+							}else{
+								SmartXMessage.show("该字段没有可选项,请手动填写!");
+							}
+						}
+					}
+				}	
+				
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				if( itemXml != null ){
+					CEPUtils.xmlDeleteNode(itemXml);
+					if(flp != null ){
+						flp.remove(this);
+					}
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox id="cti" width="100%" horizontalAlign="left">
+		<mx:CheckBox id="isAddCheckBox" width="25" selected="{itemXml.@isAdd=='true'}" change="isAddCheckBox_changeHandler(event)" toolTip="是否使该过滤器生效"/>
+		<mx:ComboBox id="logicalOptCob" width="75" labelField="name" change="logicalOptCob_changeHandler(event)" dataProvider="{logicalOptCol}" toolTip="选择逻辑运算符"/>
+		<mx:ComboBox id="filterTypeCob" width="125" labelField="name" change="filterTypeCob_changeHandler(event)" dataProvider="{filterTypeCol}" toolTip="选择过滤器类型"/>
+		<mx:ComboBox id="fieldNameCob" width="165" labelField="fieldLabel" change="fieldNameCob_changeHandler(event)" dataProvider="{filterFieldsCol}" toolTip="选择需要过滤的字段"/>
+		<mx:ComboBox id="relationalOptCob" width="95" labelField="name" change="relationalOptCob_changeHandler(event)" dataProvider="{currRelationalOptCol}" toolTip="选择关系运算符"/>
+		<mx:TextInput id="valueInput" editable="{isEdit}" width="100%" text="{itemXml.@value}" change="valueInput_changeHandler(event)" toolTip="输入参数值,多个参数值之间用英文逗号隔开(注:字典过滤器只能从已有数值中选取)" />
+		<mx:LinkButton id="addBtn" width="22" height="22" icon="{AssetsFileLib.refsearchIcon}" toolTip="选择字典参数值" click="addBtn_clickHandler(event)"/>
+		<mx:LinkButton id="musBtn" width="22" height="22" icon="{AssetsFileLib.delete2Icon}" toolTip="删除此字段过滤" click="musBtn_clickHandler(event)"/>
+	</mx:HBox>
+</mx:VBox>

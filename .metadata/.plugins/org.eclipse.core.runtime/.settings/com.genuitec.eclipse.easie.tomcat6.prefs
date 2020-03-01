@@ -1,0 +1,10 @@
+#Thu Sep 11 18:03:36 CST 2014
+TOMCAT_HOME=D\:\\tomcat6_8080
+TOMCAT_TEMP=D\:\\tomcat6_8080\\temp
+LIBRARY_PATH="D\:\\ProgramFile\\MyEclipse\\Common\\binary\\com.sun.java.jdk.win32.x86_1.6.0.013\\bin;D\:\\tomcat6_8080\\bin"
+TOMCAT_BASE=D\:\\tomcat6_8080
+ENDORSED_DIRS="D\:\\tomcat6_8080/common/endorsed"
+eclipse.preferences.version=1
+JDK_HOME=D\:\\ProgramFile\\MyEclipse\\Common\\binary\\com.sun.java.jdk.win32.x86_1.6.0.013
+OPT_VM_ARGS=-Xms128m -Xmx1024m
+SERVER_ENABLEMENT=true

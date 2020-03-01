@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AdvXYChart xmlns="smartx.flex.components.core.chart.*" 
+			xmlns:mx="http://www.adobe.com/2006/mxml"
+			initialize="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.charts.series.LineSeries;
+			import mx.collections.ArrayCollection;
+			import mx.graphics.SolidColorStroke;
+			
+			import smartx.flex.components.util.Hashtable;
+			
+			private function init():void{
+				initXYAxis(lineChart);
+			}
+			
+			public override function refreshData(_dataProvider:ArrayCollection):void{
+				axisDataProvider = _dataProvider;
+				initXYAxis(lineChart);
+				refreshUserDefindAxis(lineChart);
+				
+				dataProvider = loadRowData(_dataProvider);
+				
+				if(isShowLabels){
+					if(isHorizontalLegend)
+						legend.direction = "horizontal";
+					legend.dataProvider = lineChart;
+				}
+//				lineChart.invalidateDisplayList();
+			}
+			
+			override protected function initRowDataSeries(typeFields:ArrayCollection):void{
+				var series:Array = new Array();
+				for(var i:int=0;i<typeFields.length;i++){
+					var lineSeries:LineSeries = new LineSeries();
+					lineSeries.yField = typeFields[i];
+					lineSeries.xField = xField;
+					if(seriesNames && seriesNames.length > i)
+						lineSeries.displayName = seriesNames[i];
+					else
+						lineSeries.displayName = typeFields[i];
+					lineSeries.setStyle("form","curve");
+					if(colors && colors.length > i){
+						var colorStr:String = colors[i];
+						colorStr = "0x".concat(colorStr);
+						var sc:SolidColorStroke = new SolidColorStroke(parseInt(colorStr),2);
+						lineSeries.setStyle("lineStroke",sc);
+					}
+					series.push(lineSeries);
+				}
+				lineChart.series = series;
+			}
+		]]>
+	</mx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:VBox width="100%" height="100%">
+			<mx:LineChart id="lineChart" dataProvider="{dataProvider}" 
+						  height="100%" width="100%" paddingLeft="5" paddingRight="5" fontSize="12" showDataTips="true" />
+			<mx:Legend id ="legend" />
+		</mx:VBox>
+	</mx:VBox>
+</AdvXYChart>

@@ -1,0 +1,25 @@
+package smartx.framework.metadata.vo.sqlmapping;
+
+public class SQL_PUB_MENU {
+
+    public static final String TABLENAME = "PUB_MENU"; //表名
+
+    public static final String ID = "id"; //id字段!
+
+    public static final String NAME = "name";
+
+    public static final String LOCALNAME = "LOCALNAME";
+
+    public static final String PARENTMENUID = "PARENTMENUID";
+
+    public static final String SEQ = "SEQ";
+
+    public static final String COMMANDTYPE = "COMMANDTYPE";
+
+    public static final String COMMAND = "COMMAND";
+
+    public static final String SHOWINTOOLBAR = "SHOWINTOOLBAR";
+
+    public static final String ICON = "ICON";
+
+}

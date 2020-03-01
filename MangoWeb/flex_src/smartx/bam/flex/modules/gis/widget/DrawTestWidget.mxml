@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gis:WidgetControl xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				   xmlns:s="library://ns.adobe.com/flex/spark" 
+				   xmlns:mx="library://ns.adobe.com/flex/mx" 
+				   xmlns:gis="smartx.bam.flex.modules.gis.*" creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			
+			import org.openscales.core.events.FeatureEvent;
+			import org.openscales.core.events.MapEvent;
+			import org.openscales.core.feature.Feature;
+			[Bindable]
+			private var featureDp:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				fxMap.map.addEventListener(FeatureEvent.FEATURE_CLICK,onFeatureClickHandler);
+			}
+			
+			private function onFeatureClickHandler(event:FeatureEvent):void{
+				var feature:Feature = event.feature;
+				initColumn(feature.attributes);
+				refreshData(feature.attributes);
+			}
+			
+			private function initColumn(data:Object):void{
+				var columns:Array = [];
+				var dataColumn:DataGridColumn;
+				for(var key:String in data){
+					dataColumn = new DataGridColumn();
+					dataColumn.dataField = key;
+					dataColumn.headerText = key;
+					columns.push(dataColumn);
+				}
+				featureDg.columns = columns;
+			}
+			
+			private function refreshData(data:Object):void{
+				featureDp.removeAll();
+				featureDp.addItem(data);
+				featureDg.invalidateList();
+			}
+			
+		]]>
+	</fx:Script>
+	<gis:WidgetTemplate id="mainContainer" width="100%" height="100%">
+		<mx:VBox width="100%" height="100%">
+			<!--<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Label text="图层名称:" width="10%" />
+				<mx:TextInput id="fetureNameTxt" width="40%" backgroundAlpha="0.8" backgroundColor="0x333333" borderColor="0x000000" />
+				<mx:Button label="text" />
+			</mx:HBox>-->
+			<mx:DataGrid id="featureDg" width="100%" height="100%" backgroundColor="0x333333"
+						 dataProvider="{featureDp}" backgroundAlpha="0.8" />
+		</mx:VBox>
+	</gis:WidgetTemplate>
+</gis:WidgetControl>

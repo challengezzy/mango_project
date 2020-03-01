@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+         xmlns:s="library://ns.adobe.com/flex/spark"
+         xmlns:mx="library://ns.adobe.com/flex/mx">
+    <fx:Script>
+        <![CDATA[
+            [Bindable]
+            private var _widgetOpen:Boolean = false;
+
+            public function set widgetOpen(value:Boolean):void
+            {
+                _widgetOpen = value;
+            }
+        ]]>
+    </fx:Script>
+    <s:Line width="10"
+            includeInLayout="{_widgetOpen}"
+            visible="{_widgetOpen}">
+        <s:stroke>
+            <s:SolidColorStroke caps="square"
+                                color="0xFFD700"
+                                weight="2"/>
+        </s:stroke>
+    </s:Line>
+</s:Group>

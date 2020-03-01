@@ -1,0 +1,372 @@
+/**************************************************************************
+ * $RCSfile: TextAreaDetailDialog.java,v $  $Revision: 1.2.8.1 $  $Date: 2009/04/20 06:30:51 $
+ **************************************************************************/
+package smartx.framework.metadata.ui.componentscard;
+
+import java.util.*;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+import javax.swing.text.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.metadata.ui.*;
+import smartx.framework.metadata.vo.jepfunctions.*;
+
+
+/**
+ * 大文本框对话框
+ *
+ * @author Administrator
+ *
+ */
+public class TextAreaDetailDialog extends NovaDialog {
+
+    private static final long serialVersionUID = -2855052189366290591L;
+
+    private final static Font textPaneFont = new Font("serif", Font.PLAIN, 16); //
+
+    private MutableAttributeSet bracketAttr;
+
+    private MyTextPane textPane = null;
+
+    private StyledDocument doc = null;
+
+    private SimpleAttributeSet sab_doc;
+
+    private JButton[] jbt_perform = null;
+
+    private JTable[] table = null;
+
+    private JTabbedPane jtp_detail = null;
+
+    private String info;
+
+    private static int[][] column_width = null;
+
+    private MouseAdapter adapter = null;
+
+    public TextAreaDetailDialog(Container _parent, String _name, String info) {
+        super(_parent, _name, 650, 480);
+        this.info = info;
+        init();
+    }
+
+    public TextAreaDetailDialog(Container _parent, String _name, String _info, String _parentcode) {
+        super(_parent, _name, 650, 480);
+        this.info = _info;
+        init();
+    }
+
+    /**
+     * 初始化面板
+     */
+    private void init() {
+        this.getContentPane().setLayout(new BorderLayout());
+        textPane = new MyTextPane();
+        textPane.setText(info);
+        textPane.requestFocus();
+        textPane.setCaretPosition(0);
+        textPane.syntaxParse();
+        textPane.setBackground(Color.WHITE);
+        textPane.setCursor(new Cursor(Cursor.TEXT_CURSOR));
+        textPane.setFont(textPaneFont);
+
+        doc = textPane.getStyledDocument();
+        sab_doc = initAttributeSet();
+        JScrollPane scrollPane = new JScrollPane(textPane);
+
+        scrollPane.setPreferredSize(new Dimension(400, 100));
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
+        jtp_detail = getDetailPane();
+
+        JSplitPane jsp_con = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scrollPane, jtp_detail);
+        jsp_con.setDividerLocation(240);
+        jsp_con.setDividerSize(5);
+        jsp_con.setOneTouchExpandable(true);
+
+        jbt_perform = new JButton[3];
+        jbt_perform[0] = getOperatorBtn("确定", new Dimension(75, 20));
+        jbt_perform[1] = getOperatorBtn("清空", new Dimension(75, 20));
+        jbt_perform[2] = getOperatorBtn("取消", new Dimension(75, 20));
+
+        JPanel panel_south = new JPanel();
+        panel_south.setLayout(new FlowLayout());
+
+        panel_south.add(jbt_perform[0]);
+        panel_south.add(jbt_perform[1]);
+        panel_south.add(jbt_perform[2]);
+
+        setFocusable(true);
+        this.addKeyListener(new KeyAdapter() {
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    onCancel();
+                }
+            }
+
+            public void keyTyped(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    onCancel();
+                }
+            }
+        });
+
+        this.getContentPane().add(jsp_con, BorderLayout.CENTER); //
+        this.getContentPane().add(panel_south, BorderLayout.SOUTH); //
+        this.setVisible(true); //
+    }
+
+    /**
+     * 定制JButton
+     *
+     * @param _obj
+     * @param _demension
+     * @return
+     */
+    private JButton getOperatorBtn(Object _obj, Dimension _demension) {
+        JButton jbt_temp = null;
+        if (_obj instanceof String) {
+            jbt_temp = new JButton(_obj.toString());
+        } else if (_obj instanceof Icon) {
+            jbt_temp = new JButton( (Icon) _obj);
+        }
+        jbt_temp.setPreferredSize(_demension);
+        jbt_temp.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                dealAcitonPerform(e);
+            }
+        });
+
+        return jbt_temp;
+    }
+
+    protected void dealAcitonPerform(ActionEvent e) {
+        Object obj = e.getSource();
+        if (obj.equals(jbt_perform[0])) {
+            onConfirm();
+        } else if (obj.equals(jbt_perform[1])) {
+            onReset();
+        } else if (obj.equals(jbt_perform[2])) {
+            onCancel();
+        }
+    }
+
+    /**
+     * 获得下边的页签面板
+     *
+     * @return
+     */
+    private JTabbedPane getDetailPane() {
+        table = new JTable[5];
+        getColumnWidth();
+        adapter = new MouseAdapter() {
+            public void mousePressed(MouseEvent e) {
+                if (e.getClickCount() >= 2) {
+                    dealTableClick();
+                }
+            }
+        };
+        // 系统公式初始化区域
+        String[] sys_exp_columnnames = new String[] {"公式名", "说明", "示例"};
+
+        ListAndTableFactoty latf_sys = new ListAndTableFactoty();
+        JScrollPane jsp_sys_exp = latf_sys.getJSPTable(getExpression(), sys_exp_columnnames, column_width[0]);
+        latf_sys.setAllColumnUnEditeable();
+        table[0] = latf_sys.getTable();
+        table[0].addMouseListener(adapter);
+
+        // 控制公式初始化区域
+        String[] con_exp_columnnames = new String[] {"公式名", "说明", "示例"};
+        ListAndTableFactoty latf_exp = new ListAndTableFactoty();
+        JScrollPane jsp_control_exp = latf_exp.getJSPTable(getUserExpression(), con_exp_columnnames, column_width[1]);
+        latf_exp.setAllColumnUnEditeable();
+        table[1] = latf_exp.getTable();
+        table[1].addMouseListener(adapter);
+
+        // 系统变量初始化区域
+        String[][] sys_data = NovaClientEnvironment.getInstance().getAllData();
+        String[] system_columnnames = new String[] {"变量名", "变量说明", "变量值"};
+        ListAndTableFactoty latf_system = new ListAndTableFactoty();
+
+        JScrollPane scroll = latf_system.getJSPTable(sys_data, system_columnnames, column_width[2]);
+        latf_system.setAllColumnUnEditeable();
+        table[2] = latf_system.getTable();
+        table[2].addMouseListener(adapter);
+
+        // 返回面板初始化区域
+        JTabbedPane pane = new JTabbedPane();
+        pane.add("系统公式", jsp_sys_exp);
+        pane.add("自定义公式", jsp_control_exp);
+        pane.add("系统变量", scroll);
+
+        return pane;
+    }
+
+    /**
+     * 处理表双击事件
+     */
+    protected void dealTableClick() {
+        int jtp_index = jtp_detail.getSelectedIndex();
+        int pos = textPane.getSelectionStart();
+        int index = table[jtp_index].getSelectedRow();
+
+        String str_replace = "";
+        str_replace = (String) table[jtp_index].getModel().getValueAt(index, 0);
+
+        if (isTextSelected()) {
+            if (jtp_index == 2) {
+                textPane.replaceSelection("{" + str_replace + "}");
+                doc.setCharacterAttributes(pos, 1, bracketAttr, false);
+                doc.setCharacterAttributes(pos + 1, str_replace.length(), sab_doc, false);
+                doc.setCharacterAttributes(pos + 1 + str_replace.length(), 1, bracketAttr, false);
+            } else {
+                textPane.replaceSelection("" + str_replace);
+                doc.setCharacterAttributes(pos, str_replace.length(), sab_doc, false);
+            }
+        } else {
+            try {
+                if (jtp_index == 2) {
+                    doc.insertString(pos, "{", bracketAttr);
+                    doc.insertString(pos + 1, str_replace, sab_doc);
+                    doc.insertString(pos + 1 + str_replace.length(), "}", bracketAttr);
+                } else {
+                    doc.insertString(pos, str_replace, sab_doc);
+                }
+            } catch (BadLocationException e) {
+                e.printStackTrace();
+            }
+        }
+        textPane.requestFocus();
+    }
+
+    private void getColumnWidth() {
+        column_width = new int[table.length][];
+        column_width[0] = new int[3];
+        column_width[0][0] = 200;
+        column_width[0][1] = 250;
+        column_width[0][2] = 200;
+
+        column_width[1] = new int[3];
+        column_width[1][0] = 200;
+        column_width[1][1] = 250;
+        column_width[1][2] = 200;
+
+        column_width[2] = new int[3];
+        column_width[2][0] = 200;
+        column_width[2][1] = 150;
+        column_width[2][2] = 150;
+    }
+
+    /**
+     * 判断文本区域是否有选中的文本
+     *
+     * @return
+     */
+    private boolean isTextSelected() {
+        return (textPane.getSelectionEnd() - textPane.getSelectionStart()) != 0;
+    }
+
+    /**
+     * 获得用户自定义公式
+     *
+     * @return
+     */
+    private String[][] getUserExpression() {
+        JepFormulaParse jfp_sys = new JepFormulaParse(JepFormulaParse.li_ui);
+        Vector vec_function = jfp_sys.getUserFunDoc();
+
+        String[][] str_values = new String[vec_function.size()][];
+        for (int i = 0; i < str_values.length; i++) {
+            str_values[i] = (String[]) vec_function.get(i);
+        }
+        return str_values;
+    }
+
+    /**
+     * 获得系统公式
+     *
+     * @return
+     */
+    private String[][] getExpression() {
+        JepFormulaParse jfp_sys = new JepFormulaParse(JepFormulaParse.li_ui);
+        Vector vec_function = jfp_sys.getSysFunDoc();
+
+        String[][] str_values = new String[vec_function.size()][];
+        for (int i = 0; i < str_values.length; i++) {
+            str_values[i] = (String[]) vec_function.get(i);
+        }
+        return str_values;
+    }
+
+    /**
+     * Create text formats with n different colors
+     *
+     * @param n
+     */
+    private SimpleAttributeSet initAttributeSet() {
+        SimpleAttributeSet baseAttr = new SimpleAttributeSet();
+
+        StyleConstants.setFontFamily(baseAttr, "serif");
+        StyleConstants.setBold(baseAttr, true);
+        StyleConstants.setItalic(baseAttr, false);
+        StyleConstants.setForeground(baseAttr, Color.blue);
+
+        bracketAttr = new SimpleAttributeSet();
+        StyleConstants.setForeground(bracketAttr, Color.RED);
+        StyleConstants.setFontFamily(bracketAttr, "Courier New");
+        StyleConstants.setBold(bracketAttr, true);
+
+        return baseAttr;
+    }
+
+    /**
+     * 获得文本区域的内容
+     *
+     * @return
+     */
+    public String getInfo() {
+        return this.info;
+    }
+
+    private void onConfirm() {
+        this.info = this.textPane.getText();
+        this.dispose(); //
+    }
+
+    private void onReset() {
+        textPane.setText("");
+        textPane.requestFocus();
+    }
+
+    private void onCancel() {
+        this.dispose();
+    }
+}
+/**************************************************************************
+ * $RCSfile: TextAreaDetailDialog.java,v $  $Revision: 1.2.8.1 $  $Date: 2009/04/20 06:30:51 $
+ *
+ * $Log: TextAreaDetailDialog.java,v $
+ * Revision 1.2.8.1  2009/04/20 06:30:51  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/05/31 07:38:19  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:01:06  qilin
+ * no message
+ *
+ * Revision 1.4  2007/03/07 02:25:01  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/02/10 08:51:58  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 05:14:30  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

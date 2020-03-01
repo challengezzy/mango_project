@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:containers="net.brandonmeyer.containers.*"
+					   xmlns:ext="smartx.flex.components.core.ext.*"
+					   xmlns:datatask="smartx.flex.modules.datatask.*"
+					   width="820" height="580" allowClose="true" allowDrag="true"
+					   allowMaximize="true" allowMinimize="true" allowResize="true"
+					   close="PopUpManager.removePopUp(this)" creationComplete="creationComplete()"					   
+					   layout="absolute" title="列剖析设计" xmlns:chart="smartx.flex.components.core.chart.*">
+	<fx:Declarations>
+		<mx:TitleWindow id="columnSelectWindow" width="600" height="520" title="选择分析列" showCloseButton="true"
+						close="PopUpManager.removePopUp(columnSelectWindow)">
+			<chart:AdvListChart id="columnListGrid" columns="{tabcolArray}" queryColumns="{tabcolQueryArray}" width="100%" height="100%"/>
+			<s:Spacer width="100%"/>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="columnSelect_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(columnSelectWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="indicatorAddWindow" width="600" height="520" title="选择分析指标" showCloseButton="true"
+						close="PopUpManager.removePopUp(indicatorAddWindow)">
+			<chart:AdvListChart id="indiListGrid" columns="{indiArray}" queryColumns="{indiQeuryArray}" width="100%" height="100%"/>
+			<s:Spacer width="100%"/>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="indicatorAdd_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(indicatorAddWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.effects.Effect;
+			import mx.events.CloseEvent;
+			import mx.events.CollectionEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.events.SliderEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillListPanel;
+			import smartx.flex.components.core.ext.DefineTreeDataDescriptor;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			[Bindable] 
+			public var switchEffect:Effect;
+			private var formSerivce:RemoteObject;
+			
+			[Bindable]
+			public var contentXml:XML;//任务内容XML
+			[Bindable]
+			public var confirmFunc:Function;//点击确定后需要执行的函数
+			
+			public var datasourceName:String;//分析集的数据源名称			
+			[Bindable]
+			private var columnId:String = "";
+			
+			[Bindable]
+			private var tabcolArray:Array = new Array();//分析列添加
+			[Bindable]
+			private var tabcolQueryArray:Array =new Array();//查询字段列表
+			[Bindable]
+			private var indiArray:Array = new Array();
+			[Bindable]
+			private var indiQeuryArray:Array = new Array();
+			
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			private function creationComplete():void{
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				if(contentXml == null){
+					contentXml = <root>
+									<columns desc='剖析列'/>
+								</root>;
+				}				
+				//添加其他元素
+				content.text = contentXml.toString();
+				
+			}
+			
+			//添加数据列
+			private function addDgColumn(headerText:String,dataField:String,width:int,visible:Boolean=true):void{
+				var column:DataGridColumn = new DataGridColumn();
+				column.headerText = headerText;
+				column.dataField = dataField;
+				column.visible = visible;
+				column.width=width;
+				tabcolArray = tabcolArray.concat(column);
+			}
+			private function addIndiDgColumn(headerText:String,dataField:String,width:int,visible:Boolean=true):void{
+				var column:DataGridColumn = new DataGridColumn();
+				column.headerText = headerText;
+				column.dataField = dataField;
+				column.visible = visible;
+				column.width=width;
+				indiArray = indiArray.concat(column);
+			}
+			
+			private function indicatorAdd_confirmHandler():void{
+				var selObj:Object = indiListGrid.dataListGrid.selectedItem;
+				var tempXml:XML = <indicator indicatorid="" name="" param="" />;
+				tempXml.@indicatorid = selObj["id"];
+				tempXml.@name = selObj["name"];
+				
+				delete contentXml.columns.column.(@tab_col==columnId).appendChild(tempXml);
+				PopUpManager.removePopUp(indicatorAddWindow);
+			}
+			
+			private function columnSelect_confirmHandler():void{
+				var selObj:Object = columnListGrid.dataListGrid.selectedItem;
+				var tempXml:XML = <column table="" name="" tab_col="" datafilter=""/>;
+				tempXml.@name = selObj["column_name"];
+				tempXml.@table = selObj["table_name"];
+				tempXml.@tab_col = selObj["table_name"] + "." + selObj["column_name"];
+				
+				contentXml.columns.appendChild(tempXml);
+				PopUpManager.removePopUp(columnSelectWindow);
+			}
+		
+			protected function mt_showHandler(event:FlexEvent):void{
+				content.text = contentXml.toXMLString();
+			}
+			public function getContentXml():String{
+				mt_showHandler(null);
+				return content.text;
+			}
+			
+			//应用
+			protected function applyButton_clickHandler(event:MouseEvent):void{
+				contentXml = XML(content.text);				
+			}
+			//重置
+			protected function resetButton_clickHandler(event:MouseEvent):void{
+				content.text = contentXml.toXMLString();				
+			}
+			
+			private function columnSelectHandler():void{
+				columnId = columnDataGrid.selectedItem["@tab_col"];
+			}
+			
+			//添加分析指标
+			private function addIndicatorHandler():void{
+				var selectedIndex:int = columnDataGrid.selectedIndex;
+				if(selectedIndex < 0){
+					SmartXMessage.show("请先选择分析列!");
+					return;
+				}
+				
+				PopUpManager.addPopUp(indicatorAddWindow,this,true);
+				PopUpManager.centerPopUp(indicatorAddWindow);
+				
+				indiListGrid.dataSource = null;//使用默认数据源
+				indiListGrid.sql = "select id,code,name,comments from pub_dp_indicatortemplate";
+				
+				indiArray = new Array();
+				indiQeuryArray =new Array();
+				addIndiDgColumn("ID","id",0,false);
+				addIndiDgColumn("指标名称","name",140);
+				addIndiDgColumn("指标说明","comments",400);
+				
+				indiQeuryArray = indiQeuryArray.concat("column_name");
+				
+				indiListGrid.refresh();
+			}
+			
+			//添加分析列
+			private function addProfileColHandler():void{
+				PopUpManager.addPopUp(columnSelectWindow,this,true);
+				PopUpManager.centerPopUp(columnSelectWindow);
+				
+				columnListGrid.dataSource = datasourceName;
+				columnListGrid.sql = "select table_name,column_name,data_type,data_length from user_tab_columns ";
+				tabcolArray = new Array();
+				tabcolQueryArray =new Array();
+				addDgColumn("表名","table_name",180);
+				addDgColumn("列名","column_name",180);
+				addDgColumn("列类型","data_type",100);
+				addDgColumn("长度","data_length",100);
+				tabcolQueryArray = tabcolQueryArray.concat("table_name");
+				tabcolQueryArray = tabcolQueryArray.concat("column_name");
+				
+				columnListGrid.refresh();
+			}
+			
+			//剖析列删除
+			private function columnDelHandler():void{
+				var selectedIndex:int = columnDataGrid.selectedIndex;
+				if(selectedIndex < 0){
+					SmartXMessage.show("请选择要删除的剖析列!");
+					return;
+				}
+				
+				delete contentXml.columns.column.(@tab_col==columnId)[0];
+				columnDataGrid.invalidateList();
+			}
+			
+			//分析指标删除
+			private function indicatorDelHandler():void{
+				var selectedIndex:int = indicatorDataGrid.selectedIndex;
+				if(selectedIndex < 0){
+					SmartXMessage.show("请选择要删除的分析指标!");
+					return;
+				}
+				
+				delete contentXml.columns.column.(@tab_col==columnId).indicator.(@indicatorid==indicatorDataGrid.selectedItem["@indicatorid"])[0];
+				
+				indicatorDataGrid.invalidateList();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:TabNavigator id="mainBox" width="100%" height="100%" creationPolicy="all">
+			<mx:VBox width="100%" height="100%" label="列剖析设计" paddingLeft="5" paddingRight="5">
+				<mx:Label height="25" width="100%" text="点击 +,- 按钮来添加或删除分析列及分析指标" color="red"/>
+				<mx:HDividedBox width="100%" height="100%">
+					<mx:VBox id="leftBox" width="65%" height="100%" >
+						<mx:HBox width="100%">
+							<mx:LinkButton width="22" height="22" click="addProfileColHandler()" icon="{AssetsFileLib.addIcon}" toolTip="添加分析列"/>
+							<mx:LinkButton width="22" height="22" click="columnDelHandler()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除分析列"/>
+							<mx:Label text="选择分析列" fontWeight="bold"/>
+						</mx:HBox>
+						<mx:DataGrid id="columnDataGrid" width="100%" height="100%" dataProvider="{contentXml.columns.column}" editable="true"
+									 itemClick="{columnSelectHandler()}">
+							<mx:columns>
+								<mx:DataGridColumn dataField="@tab_col" editable="false" headerText="表.列" visible="false"/>
+								<mx:DataGridColumn dataField="@table" editable="false" headerText="表名" width="200"/>
+								<mx:DataGridColumn dataField="@name" editable="false" headerText="列名" width="200"/>
+								<mx:DataGridColumn dataField="@datafilter" editable="true" headerText="过滤条件" width="260"/>
+							</mx:columns>
+						</mx:DataGrid>
+						<mx:Label text="过滤条件格式:co1='value1' [and col2='value2']" color="red"/>
+					</mx:VBox>
+					<mx:VBox id="rightBox" width="45%" height="100%" >
+						<mx:HBox width="100%">
+							<mx:LinkButton width="22" height="22" click="addIndicatorHandler()" icon="{AssetsFileLib.addIcon}" toolTip="添加分析指标"/>
+							<mx:LinkButton width="22" height="22" click="indicatorDelHandler()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除分析指标"/>
+							<mx:Label text="选择分析指标" fontWeight="bold"/>
+						</mx:HBox>
+						<mx:DataGrid id="indicatorDataGrid" width="100%" height="100%" editable="true" dataProvider="{contentXml.columns.column.(@tab_col==columnId).indicator}">
+							<mx:columns>
+								<mx:DataGridColumn dataField="@indicatorid" editable="false" headerText="指标ID" visible="false"/>
+								<mx:DataGridColumn dataField="@name" editable="false" headerText="指标名称" width="80"/>
+								<mx:DataGridColumn dataField="@param" editable="true" headerText="参数" width="120"/>
+							</mx:columns>
+						</mx:DataGrid>
+						<mx:Label text="参数在模式匹配分析时使用，格式: '%VALUE' 或 'VALUE' " color="red"/>
+					</mx:VBox>
+				</mx:HDividedBox>
+			</mx:VBox>
+			<mx:VBox width="100%" height="100%" label="元数据" show="mt_showHandler(event)">
+				<mx:HBox width="100%">
+					<mx:Button id="applyButton" label="应用" click="applyButton_clickHandler(event)"/>
+					<mx:Button id="resetButton" label="重置" click="resetButton_clickHandler(event)"/>
+				</mx:HBox>
+				<mx:TextArea id="content" width="100%" height="100%" editable="true"/>
+			</mx:VBox>
+		</mx:TabNavigator>
+		
+		<mx:HBox width="100%" horizontalAlign="center" paddingBottom="5" paddingLeft="8"
+				 paddingRight="8" paddingTop="5">
+			<mx:Button height="22" label="确定" click="confirmFunc()" icon="{AssetsFileLib.okIcon}"/>
+			<mx:Button height="22" label="取消" click="PopUpManager.removePopUp(this)"
+					   icon="{AssetsFileLib.clearIcon}"/>
+		</mx:HBox>
+	</mx:VBox>
+</containers:SuperPanel>

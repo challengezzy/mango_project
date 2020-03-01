@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtdesigner:MTDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:mtdesigner="smartx.flex.components.mtdesigner.*" 
+					   layout="vertical" creationComplete="init()" xmlns:itemcomponent="smartx.flex.components.itemcomponent.*">
+	<fx:Declarations>
+		<mx:VBox id="chkItemConfigBox" label="DQC检查项配置" width="100%" height="100%" 
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%">
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新增"
+							   click="addChkItemBtn_clickHandler()" />
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除"
+							   click="delChkItemBtn_clickHandler()" />
+			</mx:HBox>
+			<mx:DataGrid id="checkItemDg" width="100%" height="100%" dataProvider="{checkItemDp}" editable="true" />
+			
+		</mx:VBox>
+		<fx:Component id="showExcelBtnComponent">
+			<mx:HBox horizontalAlign="center" width="100%" horizontalScrollPolicy="off">
+				<fx:Script>
+					<![CDATA[
+						
+						public function get text():String{
+							return showExcelBtnChk.selected?"true":"false";
+						}
+						
+						override public function set data(value:Object):void{
+							super.data = value;
+						}
+					]]>
+				</fx:Script>
+				<mx:CheckBox id="showExcelBtnChk" 
+							 selected="{data.showExcelBtn=='true'?true:false}" 
+							 change="{data.showExcelBtn=text}"/>
+			</mx:HBox>
+		</fx:Component>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.itemcomponent.ListEditorComponentFactory;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			private var templetItemVO:TempletItemVO;
+			[Bindable]
+			private var checkItemDp:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				this.sourceTextArea.editable = false;
+				if(endpoint == null)
+					endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				tabNavigator.removeAllChildren();
+				tabNavigator.addChildAt(chkItemConfigBox,0);
+				checkItemDg.columns = initDatagridColumns();
+			}
+			
+			private function initDatagridColumns():Array{
+				var columns:Array = new Array();
+				
+				var chkItemDgCol:DataGridColumn = new DataGridColumn("检查项名称");
+				chkItemDgCol.dataField = "value";
+				chkItemDgCol.editable = true;
+				templetItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="检查项";
+				templetItemVO.itemkey="value";
+				templetItemVO.refdesc="select s.value id#,s.valuecn code#,s.valuecn 名称 from dqc_sysdictionary s " +
+					"where s.classid = 'DQC_CHK_TJ_RESULT_PROV' and s.attributeid = 'CHECK_ITEM';ds=datasource_dqc";
+				chkItemDgCol.itemEditor = new ListEditorComponentFactory(templetItemVO,GlobalConst.SERVICE_FORM,endpoint);
+				chkItemDgCol.editorDataField = "realValue";
+				columns.push(chkItemDgCol);
+				
+				var templetCodeDgCol:DataGridColumn = new DataGridColumn("元原模板");
+				templetCodeDgCol.dataField = "templetCode";
+				templetCodeDgCol.editable = true;
+				templetItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="元原模板";
+				templetItemVO.itemkey="templetCode";
+				templetItemVO.refdesc="select t.templetcode as id#,t.templetcode as 编码,t.templetname as 名称 from pub_templet_1 t;ds=datasource_default";
+				templetCodeDgCol.itemEditor = new ListEditorComponentFactory(templetItemVO,GlobalConst.SERVICE_FORM,endpoint);
+				templetCodeDgCol.editorDataField = "realValue";
+				columns.push(templetCodeDgCol);
+				
+				var dataFilterCol:DataGridColumn = new DataGridColumn("过滤条件");
+				dataFilterCol.dataField = "dataFilter";
+				dataFilterCol.editable = true;
+				columns.push(dataFilterCol);
+				
+				var exportExcelDg:DataGridColumn = new DataGridColumn("是否显示导出EXCEL按钮");
+				exportExcelDg.dataField = "showExcelBtn";
+				exportExcelDg.editable = true;
+				exportExcelDg.width = 100;
+				exportExcelDg.rendererIsEditor = true;
+				exportExcelDg.itemRenderer = showExcelBtnComponent;
+				columns.push(exportExcelDg);
+				
+				var excelMtCodeDg:DataGridColumn = new DataGridColumn("EXCEL元数据");
+				excelMtCodeDg.dataField = "excelMTCode";
+				excelMtCodeDg.editable = true;
+				templetItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="EXCEL元数据模板";
+				templetItemVO.itemkey="excelMTCode";
+				templetItemVO.refdesc="select p.code id#,p.code 编码,p.name 名称 from pub_metadata_templet p where p.type = 110;ds=datasource_default";
+				excelMtCodeDg.itemEditor = new ListEditorComponentFactory(templetItemVO,GlobalConst.SERVICE_FORM,endpoint);
+				excelMtCodeDg.editorDataField = "realValue";
+				columns.push(excelMtCodeDg);
+				
+				var excelBtnLabelDg:DataGridColumn = new DataGridColumn("按钮名称");
+				excelBtnLabelDg.dataField = "excelBtnLabel";
+				excelBtnLabelDg.editable = true;
+				columns.push(excelBtnLabelDg);
+				
+				var fileNameDg:DataGridColumn = new DataGridColumn("文件名");
+				fileNameDg.dataField = "fileName";
+				fileNameDg.editable = true;
+				columns.push(fileNameDg);
+				
+				return columns;
+			}
+			
+			private function xmlToArr():void{
+				checkItemDp.removeAll();
+				for each(var chkItem:XML in sourceXML.checkItem){
+					var valueVo:SimpleRefItemVO = new SimpleRefItemVO();
+					valueVo.id = String(chkItem.@value);
+					valueVo.name = String(chkItem.@name);
+					
+					var templetVo:SimpleRefItemVO = new SimpleRefItemVO();
+					templetVo.id = String(chkItem.@templetCode);
+					templetVo.name = String(chkItem.@templetName);
+					
+					var excelMtVo:SimpleRefItemVO = new SimpleRefItemVO();
+					excelMtVo.id = String(chkItem.@excelMTCode);
+					excelMtVo.name = String(chkItem.@excelMTName);
+					
+					checkItemDp.addItem({value:valueVo,templetCode:templetVo,dataFilter:String(chkItem.@dataFilter),
+									showExcelBtn:String(chkItem.@showExcelBtn),excelMTCode:excelMtVo,
+									excelBtnLabel:String(chkItem.@excelBtnLabel),fileName:String(chkItem.@fileName)});
+				}
+			}
+			
+			private function arrToXml():void{
+				delete sourceXML.*;
+				for each(var chkItem:Object in checkItemDp){
+					var valueVo:SimpleRefItemVO = SimpleRefItemVO(chkItem.value);
+					var templetVo:SimpleRefItemVO = SimpleRefItemVO(chkItem.templetCode);
+					var excelMtVo:SimpleRefItemVO = SimpleRefItemVO(chkItem.excelMTCode);
+					sourceXML.appendChild(<checkItem name={valueVo.name} value={valueVo.id} 
+						templetName={templetVo.name} templetCode={templetVo.id} dataFilter={chkItem.dataFilter} 
+						showExcelBtn={chkItem.showExcelBtn} excelMTCode={excelMtVo.id} excelMTName={excelMtVo.name} 
+						excelBtnLabel={chkItem.excelBtnLabel} fileName={chkItem.fileName} />);
+				}
+			}
+			
+			private function addChkItemBtn_clickHandler():void{
+				checkItemDp.addItem({value:new SimpleRefItemVO(),templetCode:new SimpleRefItemVO()});
+				checkItemDg.invalidateList();
+			}
+			
+			private function delChkItemBtn_clickHandler():void{
+				if(checkItemDg.selectedIndex < 0)
+					return;
+				checkItemDp.removeItemAt(checkItemDg.selectedIndex);
+				checkItemDg.invalidateList();
+			}
+			
+			override protected function confirmButton_clickHandler(event:MouseEvent):void{
+				arrToXml();
+				super.confirmButton_clickHandler(event);
+			}
+			
+			override public function initData():void{
+				xmlToArr();
+			}
+			
+			
+		]]>
+	</fx:Script>
+</mtdesigner:MTDesigner>

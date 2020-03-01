@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="net.brandonmeyer.containers.*" title="数据任务模板设计"
+					   layout="absolute" width="800" height="580" allowClose="true" close="PopUpManager.removePopUp(this)"
+					   allowDrag="true" allowMaximize="true" allowMinimize="true" allowResize="true"
+					   initialize="init()" xmlns:datatask="smartx.flex.modules.datatask.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.effects.Effect;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			[Bindable]
+			public var contentXml:XML;//任务内容XML
+			[Bindable]
+			public var confirmFunc:Function;
+			[Bindable]
+			private var switchEffect:Effect;
+			[Bindable]
+			public var dataTaskName:String;
+			[Bindable]
+			public var dataTaskId:String;
+			[Bindable]
+			public var dataTaskMtCode:String;
+			[Bindable]
+			public var endpoint:String;
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				mainDt.addEventListener(DataTaskEvent.SUB_DATATASK_EDIT,function(event:DataTaskEvent):void{
+					main.selectedChild = childDt;
+					childDt.switchNormalState();
+					childDt.contentXml = event.contentXml;
+					childDt.dataTaskName = event.contentXml.datatask.@name;
+					childDt.dataTaskId = event.contentXml.datatask.@code;
+					childDt.dataTaskMtCode = event.contentXml.datatask.@mtcode;
+					childDt.initContentXml();
+				});
+				
+				childDt.addEventListener(DataTaskEvent.RETURN_MAIN_DATATASK,function(event:DataTaskEvent):void{
+					main.selectedChild = mainDt;
+				});
+			}
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:ViewStack id="main" width="100%" height="100%" creationPolicy="all">
+		<datatask:DataTaskDesigner id="mainDt" contentXml="{contentXml}" dataTaskName="{dataTaskName}" dataTaskId="{dataTaskId}" 
+								   showEffect="{switchEffect}" hideEffect="{switchEffect}" endpoint="{endpoint}" confirmFunc="{confirmFunc}"
+								   cancelFunc="close" dataTaskMtCode="{dataTaskMtCode}"/>
+		<datatask:DataTaskDesigner id="childDt" showEffect="{switchEffect}" hideEffect="{switchEffect}" endpoint="{endpoint}" isSubDataTask="true"/>
+	</mx:ViewStack>
+</containers:SuperPanel>

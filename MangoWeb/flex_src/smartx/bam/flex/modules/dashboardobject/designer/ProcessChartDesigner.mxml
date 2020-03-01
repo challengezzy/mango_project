@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner 
+	xmlns:chartmtdesign="smartx.bam.flex.modules.dashboardobject.chartmtdesign.*" 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark"
+	creationComplete="init()" width="100%" height="100%"
+	xmlns:visual="org.un.cava.birdeye.ravis.enhancedGraphLayout.visual.*"
+	xmlns:lc="org.un.cava.birdeye.ravis.components.ui.controls.layouterControls.*"
+	xmlns:vc="org.un.cava.birdeye.ravis.components.ui.controls.vgraphControls.*"
+	xmlns:dp="org.un.cava.birdeye.ravis.components.ui.datapresentation.*"
+	xmlns:ravis="org.un.cava.birdeye.ravis.graphLayout.visual.*"
+	xmlns:mx="library://ns.adobe.com/flex/mx"
+	xmlns:flexlib="http://code.google.com/p/flexlib/" xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*">
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<fx:XML id="sampleDataXml" source="../../../assets/data/processChartSample.xml"/>
+		<mx:WipeLeft id="wipeLeft" duration="1000" />
+		<mx:WipeRight id="wipeRight" duration="1000" />
+		
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import org.un.cava.birdeye.ravis.graphLayout.data.Graph;
+			import org.un.cava.birdeye.ravis.graphLayout.data.IGraph;
+			import org.un.cava.birdeye.ravis.graphLayout.data.INode;
+			import org.un.cava.birdeye.ravis.graphLayout.layout.HierarchicalLayouter;
+			import org.un.cava.birdeye.ravis.graphLayout.layout.ILayoutAlgorithm;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.IEdgeRenderer;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.IVisualNode;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.edgeRenderers.FlowCurveEdgeRenderer;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.core.mtchart.vo.ProcessChartConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			[Bindable]
+			private var columnsArray:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var keyColumnArr:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var convertClassArr:ArrayCollection = new ArrayCollection();
+			
+			// root node to start with
+			public var startNodeId:String = ProcessChartConst.STARTNODE;
+			
+			private var layoutMode:String; //布局方式，层次、发散。。
+			private var orientation:String;//层次布局方向
+			private var nodeSpacing:String; //节点间距
+			private var nodeSytles:String; //节点风格
+			private var edgeStyles:String; //连线风格
+			private var edgeLabel:String; //连线图标
+			private var toggleEdgeLabel:String; //连线图标显示开关
+			private var toggleSiblingSpread:String;//层次布局
+			private var toggleNodeInterleaving:String;//层次布局
+			private var toggleHonorNodeSize:String;//层次布局
+			
+			private var linkLength:String;//连线长度
+			private var toggleAnimation:String;//渲染开关
+			private var toggleAutoFit:String;//是否自动适应大小
+			
+			
+			private function init():void{
+				/* init a graph object with the XML data */
+				vgraph.graph = new Graph("XMLAsDocsGraph",false,sampleDataXml);
+				
+				/* 设置图形根节点 */
+				vgraph.currentRootVNode = vgraph.graph.nodeByStringId(startNodeId).vnode;
+				
+				convertClassArr.addItem( {label:"BIZ数据转换类",value: BAMConst.PROCESSDATACONVERTCLASS_PAM });
+			}
+			
+			override public function initTableStructComplete():void{
+				columnsArray.removeAll();
+				keyColumnArr.removeAll();
+				for(var i:int=0;i< tableDataStruct.table_header.length; i++){
+					if("VARCHAR2" == tableDataStruct.table_body_type[i] 
+						|| "CLOB" == tableDataStruct.table_body_type[i]){
+						columnsArray.addItem( tableDataStruct.table_header[i] );
+					}
+					keyColumnArr.addItem( tableDataStruct.table_header[i] );
+				}
+				if(contentXml.extend.Controls != null ){
+					columnCbo.selectedItem =  contentXml.extend.Controls.ChartDataColumn.toString();
+					keyCbo.selectedItem = contentXml.extend.Controls.ChartKeyColumn.toString();
+				}
+			}
+						
+			override public function generalFormComplete():void{
+				if(contentXml.extend.length() == 0){
+					var extendXML:XML = <extend/>;
+					contentXml.appendChild(extendXML);
+				}
+				if(contentXml.extend.Controls.length() == 0){
+					contentXml.extend.appendChild(<Controls/>);
+				}
+				
+				initProperty();
+			}
+			
+			//将XML转换为属性
+			private function initProperty():void{
+				var controls:XML = contentXml.extend.Controls[0];
+				
+				//如果直接为空，则直接返回
+				if(controls == null ){
+					//设置默认属性
+					billLayoutSelector.selectedItem = ProcessChartConst.LAYOUT_HIERARCHICAL;
+					billLayoutSelector.changeLayouter();
+					
+					billNodeRendererSelector.selectedItem = "Icons";
+					billNodeRendererSelector.changeNodeRenderer();
+					
+					billEdgeRendererSelector.selectedItem = "Default";
+					billEdgeRendererSelector.changeEdgeRenderer();
+					
+					billELCs.elselector.selectedItem = "Default";
+					billELCs.elselector.changeEdgeLabelRenderer();
+					
+					billDegreeOS.updateMaxVisDist();
+					
+					billHierLC.orientSel.selectedItem = ProcessChartConst.HIERORIENTATION_TOPDOWN;				
+					
+					return ;
+				}
+				
+				columnsArray.addItem(controls.ChartDataColumn.toString());
+				columnCbo.selectedItem =  controls.ChartDataColumn.toString();
+				
+				keyColumnArr.addItem(controls.ChartKeyColumn.toString());
+				keyCbo.selectedItem = controls.ChartKeyColumn.toString();
+				
+				//自定义视图设置
+				isCustomConfigChk.selected = controls.CustomConfig.IsCustomConfig == "true" ? true : false;
+				if (isCustomConfigChk.selected )
+					currentState = "showCustomConfig";
+				else
+					currentState = "hideCustomConfig";
+				
+				maxTimeLimitInput.text = controls.CustomConfig.MaxTimeLimit;
+				minTimeLimitInput.text = controls.CustomConfig.MinTimeLimit;
+				periodDayInput.text = controls.CustomConfig.PeriodDay;
+				if(controls.CustomConfig.DataConvertClass.length() > 0 ){
+					for each(var obj:Object in convertClassArr){
+						if(obj.value == controls.CustomConfig.DataConvertClass){
+							dataConvertClassCbo.selectedItem = obj;
+							break;
+						}
+					}
+				}
+				
+				layoutMode = controls.Layout.LayoutMode;
+				billLayoutSelector.selectedItem = layoutMode;
+				billLayoutSelector.changeLayouter();
+				
+				nodeSytles = controls.NodeSytles;
+				billNodeRendererSelector.selectedItem = nodeSytles;
+				billNodeRendererSelector.changeNodeRenderer()
+				
+				edgeStyles = controls.EdgeStyles;
+				billEdgeRendererSelector.selectedItem = edgeStyles;
+				billEdgeRendererSelector.changeEdgeRenderer();
+				
+				edgeLabel = controls.EdgeLabelStyles.EdgeLabel;
+				billELCs.elselector.selectedItem = edgeLabel;
+				billELCs.elselector.changeEdgeLabelRenderer();
+				
+				billELCs.eltoggle.selected = controls.EdgeLabelStyles.ToggleEdgeLabel=="true" ? true : false;
+				billELCs.eltoggle.toggleShowEdgeLabels();
+				
+				//CommonLayoutControl
+				billCommonLC.linklengthctl.lslider.value = new Number(controls.CommonLayoutControl.LinkLength.toString());
+				billCommonLC.linklengthctl.updateLinkLength();
+				billCommonLC.toggleanim.selected = controls.CommonLayoutControl.ToggleAnimation == "true" ?true :false;
+				billCommonLC.toggleanim.toggleAnimation();
+				billCommonLC.toggleaf.selected = controls.CommonLayoutControl.ToggleAutoFit == "true" ?true :false;
+				billCommonLC.toggleaf.toggleAutoFit();
+				
+				//层次布局中参数设置
+				billHierLC.orientSel.selectedItem = controls.HierarchicalLayout.Orientation.toString();
+				billHierLC.orientSel.changeOrientation();
+				billHierLC.nodeSpacing.bslider.value = new Number(controls.HierarchicalLayout.NodeSpacing.toString());
+				billHierLC.nodeSpacing.updateNodeSpacing();
+				billHierLC.sibSpread.selected = controls.HierarchicalLayout.ToggleSiblingSpread == "true" ?true :false;
+				billHierLC.sibSpread.toggleSiblingSpread();
+				billHierLC.nodeILeave.selected = controls.HierarchicalLayout.ToggleNodeInterleaving == "true" ?true :false;
+				billHierLC.nodeILeave.toggleNodeInterleaving();
+				billHierLC.honNodeSize.selected = controls.HierarchicalLayout.ToggleHonorNodeSize == "true" ?true :false;
+				billHierLC.honNodeSize.toggleHonorNodeSize();
+				
+				//页面刷新,每个控制项的变化已触发刷新时间，此处不需要刷新
+			}
+			
+			
+			override public function propertyConvertXml():void{
+				
+				var tempXml:XML;
+				var controlXml:XML;
+				
+				delete contentXml.extend;
+				contentXml.appendChild(<extend />);
+				contentXml.extend.appendChild(<Controls/>);
+				controlXml = contentXml.extend.Controls[0];
+				
+				controlXml.appendChild(<sql>{sql}</sql>);
+				
+				var chartDataColumn:String = columnCbo.selectedItem as String;
+				controlXml.appendChild(<ChartDataColumn>{chartDataColumn}</ChartDataColumn>);				
+				var chartKey:String = keyCbo.selectedItem as String;
+				controlXml.appendChild(<ChartKeyColumn>{chartKey}</ChartKeyColumn>);
+				
+				//自定义视图设置
+				controlXml.appendChild(<CustomConfig/>);
+				var isCustomConfig:String = isCustomConfigChk.selected ? "true":"false";
+				controlXml.CustomConfig.appendChild(<IsCustomConfig>{isCustomConfig}</IsCustomConfig>);
+				controlXml.CustomConfig.appendChild(<MaxTimeLimit>{maxTimeLimitInput.text}</MaxTimeLimit>);
+				controlXml.CustomConfig.appendChild(<MinTimeLimit>{minTimeLimitInput.text}</MinTimeLimit>);
+				controlXml.CustomConfig.appendChild(<PeriodDay>{periodDayInput.text}</PeriodDay>);
+				controlXml.CustomConfig.appendChild(<DataConvertClass>{dataConvertClassCbo.selectedItem.value}</DataConvertClass>);
+				
+				
+				layoutMode = billLayoutSelector.selectedItem as String;
+				tempXml = <LayoutMode>{layoutMode}</LayoutMode>;
+				controlXml.appendChild(<Layout/>);
+				controlXml.Layout.appendChild(tempXml);
+				
+				nodeSytles = billNodeRendererSelector.selectedItem as String;
+				controlXml.appendChild(<NodeSytles>{nodeSytles}</NodeSytles>);
+				
+				edgeStyles = billEdgeRendererSelector.selectedItem as String;
+				controlXml.appendChild(<EdgeStyles>{edgeStyles}</EdgeStyles>);
+				
+				controlXml.appendChild(<EdgeLabelStyles/>);
+				edgeLabel = billELCs.elselector.selectedItem as String;
+				controlXml.EdgeLabelStyles.appendChild(<EdgeLabel>{edgeLabel}</EdgeLabel>);				
+				toggleEdgeLabel = billELCs.eltoggle.selected ?"true" :"false";
+				controlXml.EdgeLabelStyles.appendChild(<ToggleEdgeLabel>{toggleEdgeLabel}</ToggleEdgeLabel>);
+				
+				//CommonLayoutControl
+				controlXml.appendChild(<CommonLayoutControl/>);
+				linkLength = billCommonLC.linklengthctl.lslider.value.toString();
+				toggleAnimation = billCommonLC.toggleanim.selected ?"true" :"false";
+				toggleAutoFit = billCommonLC.toggleaf.selected ?"true" :"false";
+				controlXml.CommonLayoutControl.appendChild(<LinkLength>{linkLength}</LinkLength>);
+				controlXml.CommonLayoutControl.appendChild(<ToggleAnimation>{toggleAnimation}</ToggleAnimation>);
+				controlXml.CommonLayoutControl.appendChild(<ToggleAutoFit>{toggleAutoFit}</ToggleAutoFit>);
+				
+				//层次布局中参数设置
+				controlXml.appendChild(<HierarchicalLayout/>);
+				orientation = billHierLC.orientSel.selectedItem as String;
+				nodeSpacing = billHierLC.nodeSpacing.bslider.value.toString();
+				toggleSiblingSpread = billHierLC.sibSpread.selected ? "true":"false";
+				toggleNodeInterleaving = billHierLC.nodeILeave.selected ? "true":"false";
+				toggleHonorNodeSize = billHierLC.honNodeSize.selected ? "true":"false";
+				controlXml.HierarchicalLayout.appendChild(<Orientation>{orientation}</Orientation>);
+				controlXml.HierarchicalLayout.appendChild(<NodeSpacing>{nodeSpacing}</NodeSpacing>);
+				controlXml.HierarchicalLayout.appendChild(<ToggleSiblingSpread>{toggleSiblingSpread}</ToggleSiblingSpread>);
+				controlXml.HierarchicalLayout.appendChild(<ToggleNodeInterleaving>{toggleNodeInterleaving}</ToggleNodeInterleaving>);
+				controlXml.HierarchicalLayout.appendChild(<ToggleHonorNodeSize>{toggleHonorNodeSize}</ToggleHonorNodeSize>);
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<designer:states>
+		<s:State name="showCustomConfig"/>
+		<s:State name="hideCustomConfig"/>
+	</designer:states>
+	<mx:HDividedBox width="100%" height="100%" >
+		<mx:VBox id="NavContainerRB"
+				 horizontalScrollPolicy="off"
+				 verticalAlign="middle"
+				 horizontalAlign="center"
+				 verticalGap="1"
+				 horizontalGap="0"
+				 width="290"
+				 height="100%"
+				 hideEffect="{wipeLeft}"
+				 showEffect="{wipeRight}">
+			<mx:Accordion id="leftAccordion" paddingBottom="3" paddingRight="3" paddingTop="3" paddingLeft="3"
+						  horizontalScrollPolicy="off" verticalScrollPolicy="off" width="100%" height="100%" creationPolicy="all" >
+				<mx:Canvas id="visibilitycnvs" label="流程图设置" height="100%" width="98%" horizontalScrollPolicy="off" >
+					<mx:VBox width="100%" height="100%" horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="on">
+						<mx:Spacer height="3" />
+						
+						<flexlib:WindowShade id="columnsContainer" label="数据显示设置" styleName="linkButtonWindowShade" 
+								width="100%" opened="false" horizontalAlign="left" paddingBottom="5" paddingLeft="5">
+							<mx:VBox paddingLeft="3" paddingRight="3" paddingBottom="3" paddingTop="3" width="97%"
+									 borderColor="#666666" cornerRadius="3"	backgroundColor="#CCCCCC">
+								<mx:Label text="流程定义数据列" />
+								<mx:ComboBox id="columnCbo" dataProvider="{columnsArray}" toolTip="选择流程定义数据列"/>
+								
+								<mx:FormItem label="自定义图标显示">
+									<mx:CheckBox id="isCustomConfigChk" click.hideCustomConfig="currentState='showCustomConfig'"
+												 click.showCustomConfig="currentState='hideCustomConfig'" />
+								</mx:FormItem>
+								
+								<mx:Form paddingLeft="3" paddingRight="3" paddingBottom="3" paddingTop="3" width="97%"
+										 borderColor="#666666" cornerRadius="5" borderStyle="solid" backgroundColor="#CCCCCC"
+										 backgroundAlpha=".2" includeIn="showCustomConfig">
+									<mx:FormItem label = "流程关键字列">
+										<mx:ComboBox id="keyCbo" dataProvider="{keyColumnArr}" width="120" toolTip="选择关键字列,流程扩展查询显示用"/>
+									</mx:FormItem>
+									<mx:FormItem label="数据转换类:">
+										<mx:ComboBox id="dataConvertClassCbo" dataProvider="{convertClassArr}" width="120" toolTip="自定义数据转换实现类"/>
+									</mx:FormItem>
+									<mx:FormItem label="环节耗时上限(小时):">
+										<mx:TextInput id="maxTimeLimitInput" width="80" restrict="\-,0-9,." cornerRadius="5"/>
+									</mx:FormItem>
+									<mx:FormItem label="环节耗时下限(小时):">
+										<mx:TextInput id="minTimeLimitInput"  width="80" restrict="\-,0-9,." cornerRadius="5"/>
+									</mx:FormItem>
+									<mx:FormItem label="数据统计时段(天)  :">
+										<mx:TextInput id="periodDayInput" width="80" restrict="0-9" cornerRadius="5"/>
+									</mx:FormItem>
+								</mx:Form>
+							</mx:VBox>
+						</flexlib:WindowShade>
+						
+						<flexlib:WindowShade id="layoutContainer" label="布局设置" width="100%"
+							styleName="linkButtonWindowShade" opened="false"
+							horizontalAlign="center" paddingBottom="3"
+							>
+							<mx:VBox width="100%" horizontalAlign="center" borderColor="#666666" backgroundColor="#CCCCCC"
+								paddingLeft="3" paddingRight="3" paddingBottom="3" paddingTop="3"										
+								cornerRadius="3" borderStyle="solid" backgroundAlpha=".2" >
+								
+								<lc:LayoutSelector id="billLayoutSelector" vgraph="{vgraph}" />
+								<lc:HierLayoutControls id="billHierLC" vgraph="{vgraph}" />
+								<lc:PhiDial id="billPhiDial" vgraph="{vgraph}" />
+								<lc:ToggleDamping id="billDamping" vgraph="{vgraph}" />
+								<lc:CommonLayoutControls id="billCommonLC" vgraph="{vgraph}" />
+								<dp:CenteredNodeLabel id="billCenteredNodeLabel" vgraph="{vgraph}" />
+								<dp:NoVisNodesLabel id="billNoVisNodeLabel" vgraph="{vgraph}" />
+								
+							</mx:VBox>
+						</flexlib:WindowShade>
+						
+						<!-- Node Styles -->
+						<flexlib:WindowShade id="nodeRenderContainer" label="节点样式" opened="false"
+							styleName="linkButtonWindowShade" width="100%" horizontalAlign="center" paddingBottom="3">
+							
+							<vc:NodeRendererSelector id="billNodeRendererSelector" vgraph="{vgraph}" />
+						</flexlib:WindowShade>
+						
+						<!-- Edge Styles -->
+						<flexlib:WindowShade id="edgeRenderContainer" label="连线样式" opened="false"
+							styleName="linkButtonWindowShade" width="100%" 	horizontalAlign="center" paddingBottom="3">
+							<vc:EdgeRendererSelector id="billEdgeRendererSelector" vgraph="{vgraph}" width="95%"/>
+						</flexlib:WindowShade>
+						
+						<!-- Edge Labels -->
+						<flexlib:WindowShade id="edgeLabelRenderContainer" label="连线图标样式" opened="false"
+							styleName="linkButtonWindowShade" width="100%" horizontalAlign="center" paddingBottom="3">
+							<vc:EdgeLabelControls id="billELCs" vgraph="{vgraph}" />
+						</flexlib:WindowShade>
+						
+						<flexlib:WindowShade id="viewControlsContainer" label="视图控制" opened="false"
+											styleName="linkButtonWindowShade" width="100%" paddingBottom="3">
+							<mx:VBox width="100%" horizontalAlign="center"
+								paddingLeft="3" paddingRight="3" paddingBottom="3" paddingTop="3"
+								borderColor="#666666" cornerRadius="3"	backgroundColor="#CCCCCC" >
+								<vc:DegreesOfSeparation id="billDegreeOS" vgraph="{vgraph}" />
+								<vc:ScaleControls id="billSCs" vgraph="{vgraph}" />
+								<vc:DrawButton id="billDB" vgraph="{vgraph}" />
+								<vc:FullRefreshButton id="billFRB" vgraph="{vgraph}" xmlData="{sampleDataXml}" />
+							</mx:VBox>
+						</flexlib:WindowShade>					
+						
+						<mx:Spacer height="3" />
+					</mx:VBox>		
+				</mx:Canvas>
+			</mx:Accordion>
+		</mx:VBox>
+		<mx:Canvas id="graphCnvs" borderStyle="solid"  borderColor="#CCCCCC"
+				   backgroundColor="#FFFFFF" width="100%" height="100%">		
+			
+			<ravis:VisualGraph id="vgraph" left="0" right="0" top="0" bottom="5" backgroundColor="#FFFFFF" alpha="1"
+							   resize="vgraph.draw(VisualGraph.DF_RESET_LL)" visibilityLimitActive="true" >
+			</ravis:VisualGraph>
+		</mx:Canvas>
+	</mx:HDividedBox>
+		
+</designer:BaseDesigner>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				creationComplete="init()" layout="absolute">
+	
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		AdvancedDataGrid {
+			alternatingItemColors: #ffffff, #ffffcc;
+			headerColors: #99ccff, #e6eeee;
+			border-width:10px 2px 5px;
+			corner-radius:30px 30px;
+			
+		}
+	</fx:Style>
+	
+	<mx:AdvancedDataGrid id="ad" x="25" y="10" width="90%" height="60%"
+						 creationComplete="gc.refresh();" designViewDataType="flat" fontSize="12"
+						 headerSortSeparatorSkin="mx.skins.ProgrammaticSkin"
+						 itemClick="showValue(event)" selectable="true" selectionMode="multipleRows"
+						 styleFunction="myStyle">
+		<mx:dataProvider>
+			<mx:GroupingCollection2 id="gc" source="{arr}">
+				<mx:Grouping>
+					<mx:GroupingField name="year">
+						<mx:summaries>
+							<mx:SummaryRow summaryPlacement="last group">
+								<mx:fields>
+									<mx:SummaryField2 label="total" dataField="total" summaryOperation="SUM"/>
+									<mx:SummaryField2 label="year" dataField="year" summaryOperation="MAX"/>
+								</mx:fields>
+							</mx:SummaryRow>
+						</mx:summaries>
+					</mx:GroupingField>
+				</mx:Grouping>
+			</mx:GroupingCollection2>
+		</mx:dataProvider>
+		<mx:groupedColumns>
+			<mx:AdvancedDataGridColumnGroup headerText="国家">
+				<mx:AdvancedDataGridColumnGroup headerText="省-市">
+					<mx:AdvancedDataGridColumn dataField="city" headerText="城市"/>
+					<mx:AdvancedDataGridColumn dataField="provice" headerText="省份"/>
+				</mx:AdvancedDataGridColumnGroup>
+				<mx:AdvancedDataGridColumn dataField="total" headerText="数量"/>
+				<mx:AdvancedDataGridColumn dataField="year" headerText="年度">
+					<mx:itemRenderer>
+						<fx:Component>
+							<mx:CheckBox label="{data.year}"/>
+						</fx:Component>
+					</mx:itemRenderer>
+				</mx:AdvancedDataGridColumn>
+			</mx:AdvancedDataGridColumnGroup>
+			
+		</mx:groupedColumns>
+	</mx:AdvancedDataGrid>
+	
+	<fx:Script>
+		
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.GroupingField;
+			import mx.events.ListEvent;
+			
+			[Bindable]
+			private var arr:ArrayCollection= 
+				new ArrayCollection([
+					{year:2009,city:"Shanghai",provice:"上海",total:580000},
+					{year:2009,city:"Beijing",provice:"河北省",total:7852020},
+					{year:2009,city:"Nanjing",provice:"江苏省",total:895145},
+					{year:2009,city:"Hangzhou",provice:"浙江省",total:4132415},
+					{year:2008,city:"Shanghai",provice:"上海",total:12345},
+					{year:2008,city:"Beijing",provice:"河北省",total:7852020},
+					{year:2008,city:"Nanjing",provice:"江苏省",total:18524},
+					{year:2008,city:"Hangzhou",provice:"浙江省",total:4132415}]);
+			
+			//AD表格的样式
+			private function myStyle(data:Object,column:AdvancedDataGridColumn):Object
+			{
+				var output:Object;
+				if(data.children!=null){
+					output={color:"red",fontWeight:"bold"};
+				}
+				return output; 
+			}
+			
+			//		 	 private function summaryFun():SummaryObject{
+			//		 	 	
+			//		 	 }
+			/*===============右键菜单=================*/
+			private var meunu1:ContextMenuItem;
+			private var meunu2:ContextMenuItem;
+			
+			public function init():void
+			{
+				meunu1=new ContextMenuItem("最大化");
+				meunu2=new ContextMenuItem("还原",true);
+				
+				meunu1.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT,menuHandle);
+				meunu2.addEventListener(ContextMenuEvent.MENU_ITEM_SELECT,menuHandle);
+				
+				var menu:ContextMenu=new ContextMenu();
+				menu.hideBuiltInItems();
+				menu.customItems.push(meunu1);
+				menu.customItems.push(meunu2);
+				this.ad.contextMenu=menu;
+				
+			}
+			/*===============右键菜单事件=================*/
+			private function menuHandle(e:ContextMenuEvent):void
+			{
+				switch(e.target.caption)
+				{
+					case "最大化":
+						this.ad.percentWidth=100;
+						this.ad.percentHeight=100;
+						break;
+					case "还原":
+						this.ad.percentHeight=60;
+						this.ad.percentWidth=60;
+						break;
+				}
+			}
+			
+			/*================选择的值===================*/
+			private function showValue(event:ListEvent):void
+			{
+				//Alert.show(ad.selectedItem.city+" 省份-"+ad.selectedItem.provice);
+				
+				var arr:Array=ad.selectedItems;
+				txtA.text="";
+				for(var i:int=0;i<arr.length;i++)
+				{
+					txtA.text+="城市："+arr[i].city+"/n省份："+arr[i].provice+"/n数量："+arr[i].total+"/n";
+					txtA.text+="---------------"+"/n"
+				}
+				
+			}
+			
+		]]>
+		
+		
+	</fx:Script>
+	<mx:TextArea id="txtA" x="24" y="{this.ad.height+20}" width="300" height="200" fontSize="12"/>
+</mx:Application>

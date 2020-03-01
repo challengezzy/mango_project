@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Delete resource &apos;Air_Test_SQLite&apos;" deleteContents="true" description="Delete resource &apos;Air_Test_SQLite&apos;" element1="/Air_Test_SQLite" flags="7" id="org.eclipse.ltk.core.refactoring.delete.resources" resources="1" stamp="1412759482420"/>
+</session>

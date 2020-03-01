@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				showCloseButton="true" close="PopUpManager.removePopUp(this)"
+				title="仪表盘信息"
+				layout="absolute" width="400" height="300" xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+				creationComplete="init()">
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Button;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.util.IconUtility;
+			
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var debugmode:Boolean;
+			[Bindable]
+			public var templetcode:String;
+			
+			public function init():void{
+				var confirmBtn:Button = new Button();
+				confirmBtn.label = "确认";
+				confirmBtn.setStyle("icon",IconUtility.getClass(confirmBtn,"../../assets/image/save.png",22,22));
+				confirmBtn.addEventListener(MouseEvent.CLICK,confirmListener);
+			}
+			
+			private function confirmListener(event:MouseEvent):void{
+				mainStyle.cardPanel.save();
+				PopUpManager.removePopUp(this);
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<styletemplate:StyleTemplate11 id="mainStyle" templetCode="{templetcode}" debugMode="{debugmode}" commitLabel="保存"
+								   isButtonsBottom="true"
+								   endpoint="{endpoint}" isShowAlert="true" isCommitButton="true"/>
+</mx:TitleWindow>

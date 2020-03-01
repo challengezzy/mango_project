@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*" 
+					  xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:containers="flexlib.containers.*"
+					  creationComplete="init()" width="100%" height="100%"
+					  xmlns:componets="smartx.bam.flex.modules.dashboardobject.designer.components.*">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			private var dp:XMLListCollection = new XMLListCollection();
+			
+			[Bindable]
+			private var MAX_PAGESIZE:int = 1000;//每页最大条数
+			/** 统计方式*/
+			[Bindable]
+			private var statisticTypes:ArrayCollection = new ArrayCollection([
+				//{name:MTChartConst.OLAP_MEASURE_COUNT_NAME,data:MTChartConst.OLAP_MEASURE_COUNT},
+				{name:MTChartConst.OLAP_MEASURE_SUM_NAME,data:MTChartConst.OLAP_MEASURE_SUM},
+				{name:MTChartConst.OLAP_MEASURE_AVERAGE_NAME,data:MTChartConst.OLAP_MEASURE_AVERAGE},
+				{name:MTChartConst.OLAP_MEASURE_MAX_NAME,data:MTChartConst.OLAP_MEASURE_MAX},
+				{name:MTChartConst.OLAP_MEASURE_MIN_NAME,data:MTChartConst.OLAP_MEASURE_MIN}
+				
+			]);
+			
+			private function init():void{
+			}
+			
+			override public function generalFormComplete():void{
+				dp.source = contentXml.extend.items.item;
+				for each(var statisticData:* in statisticTypeCbo.dataProvider){
+					if(statisticData.data == contentXml.extend.statisticType.text()){
+						statisticTypeCbo.selectedItem = statisticData;
+						break;
+					}
+				}
+				customBtnDesignVbox.customListButtonXml = contentXml.extend[0].copy();
+			}
+			
+			override public function propertyConvertXml():void{
+				contentXml.extend.statisticType = statisticTypeCbo.selectedItem?statisticTypeCbo.selectedItem.data:"";
+				
+				delete contentXml.extend.customButton;
+				if(customBtnDesignVbox.getContentXml())
+					contentXml.extend.appendChild(customBtnDesignVbox.getContentXml());
+			}
+			
+			private function addField():void{
+				dp.addItem(<item dataField={newFieldComboBox.text} labelField={newFieldComboBox.text} 
+							isShowField='Y' isQueryField='N' width='100'
+							isStatisticField='N' itemRenderer='' />);
+			}
+			
+			private function deleteField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				dp.removeItemAt(selectedIndex);
+			}
+			
+			private function pageSizeInput_changeHandler(event:Event):void{
+				if(Number(pageSizeInput.text) > MAX_PAGESIZE)
+					SmartXMessage.show("每页最大为"+MAX_PAGESIZE+"条!",SmartXMessage.MESSAGE_ERROR);
+				else
+					contentXml.extend.pageSize = pageSizeInput.text;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%">
+		<mx:TabNavigator width="100%" height="100%" creationPolicy="all">
+			<mx:VBox width="100%" height="100%" label="列表"
+					 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%" >
+					<mx:ComboBox id="newFieldComboBox" editable="true" dataProvider="{fieldList}"/>
+					<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addField()"/>
+					<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteField()"/>
+				</mx:HBox>
+				<mx:DataGrid id="dataGrid" width="100%" height="100%" editable="true" dataProvider="{dp}"
+							 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true">
+					<mx:columns>
+						<mx:DataGridColumn headerText="数据字段" editable="false" dataField="@dataField" width="120" />
+						<mx:DataGridColumn headerText="显示名称" editable="true" dataField="@labelField" />
+						<mx:DataGridColumn headerText="宽度" editable="true" dataField="@width" width="60"/>
+						<mx:DataGridColumn headerText="是否显示" editable="true" dataField="@isShowField" width="80"
+										   rendererIsEditor="true" editorDataField="value" >
+							<mx:itemRenderer>
+								<fx:Component>
+									<mx:HBox horizontalAlign="center" width="100%" 
+											 horizontalScrollPolicy="off" verticalScrollPolicy="off">
+										<fx:Script>
+											<![CDATA[
+												public function get value():String
+												{
+													return String( data.@isShowField );
+												}
+											]]>
+										</fx:Script>
+										
+										<mx:CheckBox id="isShowCheckBox" selected="{String(data.@isShowField)=='Y'||String(data.@isShowField)=='y'}"
+													 change="{data.@isShowField=isShowCheckBox.selected?'Y':'N'}"/>
+									</mx:HBox>
+								</fx:Component>
+							</mx:itemRenderer>
+						</mx:DataGridColumn>
+						<mx:DataGridColumn headerText="是否查询" editable="true" dataField="@isQueryField" width="80"
+										   rendererIsEditor="true" editorDataField="value" >
+							<mx:itemRenderer>
+								<fx:Component>
+									<mx:HBox horizontalAlign="center" width="100%" 
+											 horizontalScrollPolicy="off" verticalScrollPolicy="off">
+										<fx:Script>
+											<![CDATA[
+												public function get value():String
+												{
+													return String( data.@isQueryField );
+												}
+											]]>
+										</fx:Script>
+										
+										<mx:CheckBox id="isQeuryCheckBox" selected="{String(data.@isQueryField)=='Y'||String(data.@isQueryField)=='y'}"
+													 change="{data.@isQueryField=isQeuryCheckBox.selected?'Y':'N'}"/>
+									</mx:HBox>
+								</fx:Component>
+							</mx:itemRenderer>
+						</mx:DataGridColumn>
+						<mx:DataGridColumn headerText="是否统计" width="80" rendererIsEditor="true" editable="true" dataField="@isStatisticField">
+							<mx:itemRenderer>
+								<fx:Component>
+									<mx:HBox horizontalAlign="center" width="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+										<fx:Script>
+											<![CDATA[
+												public function get text():String{
+													return String(data.@isStatisticField);
+												}
+												
+												override public function set data(value:Object):void{
+													super.data = value;
+													if(value != null){
+														var fieldType:String = outerDocument.fieldTypeMap.find(String(value.@dataField));
+														if(fieldType && fieldType.toUpperCase() == 'NUMBER')
+															isStatisticChk.enabled = true;
+														else
+															isStatisticChk.enabled = false;
+													}
+												}
+											]]>
+										</fx:Script>
+										<mx:CheckBox id="isStatisticChk" change="{data.@isStatisticField=isStatisticChk.selected?'Y':'N'}"
+													 selected="{String(data.@isStatisticField)=='Y'|| String(data.@isStatisticField)=='y'}" />
+									</mx:HBox>
+								</fx:Component>
+							</mx:itemRenderer>
+						</mx:DataGridColumn>
+						<mx:DataGridColumn headerText="特殊效果" editable="true" dataField="@itemRenderer" width="120"
+										   rendererIsEditor="true" editorDataField="value" >
+							<mx:itemRenderer>
+								<fx:Component>
+									<mx:HBox width="100%">
+										<fx:Script>
+											<![CDATA[
+												import mx.events.ListEvent;
+												import mx.managers.PopUpManager;
+												
+												import smartx.flex.components.util.TextAreaWindow;
+												public function get value():String{
+													return String( data.@itemRenderer );
+												}
+												
+												override public function set data(obj:Object):void{
+													super.data = obj;
+													if(itemRendererComboBox == null)
+														return;
+													if(String(obj.@itemRenderer) == ""){
+														itemRendererComboBox.selectedIndex = 0;
+														return;
+													}
+													for each (var item:Object in itemRendererArray){
+														if(String(obj.@itemRenderer) == item.value){
+															itemRendererComboBox.selectedItem = item;
+															return;
+														}
+													}
+													
+													itemRendererComboBox.selectedIndex = 1;
+												}
+
+												private function itemRendererComboBox_changeHandler(event:ListEvent):void{
+													if(itemRendererComboBox.selectedItem.label != "自定义"){ 
+														data.@itemRenderer=itemRendererComboBox.selectedItem.value;
+													}
+													else{
+														var window:TextAreaWindow = new TextAreaWindow();
+														window.width = 300;
+														window.height = 300;
+														window.title = "输入自定义的数据项渲染器类名";
+														window.confirmFunc = function():void{
+															data.@itemRenderer=window.text;
+															PopUpManager.removePopUp(window);
+														};
+														PopUpManager.addPopUp(window,this,true);
+														PopUpManager.centerPopUp(window);
+														
+													}
+												}
+
+											]]>
+										</fx:Script>
+										<mx:ComboBox id="itemRendererComboBox" 
+											labelField="label" toolTip="一些特殊效果要求数据集中必须包括名为capacity的字段，特别的，双条柱还要求有used和free的字段"
+											change="itemRendererComboBox_changeHandler(event)">
+											<mx:dataProvider>
+												<fx:Array id="itemRendererArray">
+													<fx:Object label="默认" value=""/>
+													<fx:Object label="自定义"/>
+													<fx:Object label="饼图" value="smartx.flex.components.util.render.PieRenderer"/>
+													<fx:Object label="五星" value="smartx.flex.components.util.render.StarRenderer"/>
+													<fx:Object label="圆圈" value="smartx.flex.components.util.render.CircleRenderer"/>
+													<fx:Object label="方块" value="smartx.flex.components.util.render.SquareRenderer"/>
+													<fx:Object label="条柱" value="smartx.flex.components.util.render.BarRenderer_Animated"/>
+													<fx:Object label="双条柱" value="smartx.flex.components.util.render.DoubleBarRenderer"/>
+												</fx:Array>
+											</mx:dataProvider>
+										</mx:ComboBox>
+									</mx:HBox>
+								</fx:Component>
+							</mx:itemRenderer>
+						</mx:DataGridColumn>
+					</mx:columns>
+				</mx:DataGrid>
+				<mx:HBox width="100%">
+					<mx:CheckBox label="是否显示搜索框" id="showQueryBoxInput" selected="{contentXml.extend.showQueryBox=='true'?true:false}"
+								 click="{contentXml.extend.showQueryBox = showQueryBoxInput.selected?'true':'false'}"/>
+					<mx:CheckBox label="是否显示分页控件" id="showPageBoxInput" selected="{contentXml.extend.showPageBox=='true'?true:false}"
+								 click="{contentXml.extend.showPageBox = showPageBoxInput.selected?'true':'false'}"/>
+					<mx:CheckBox label="是否显示自定义按钮控件" id="showCustomButtonBoxInput" 
+								 selected="{contentXml.extend.showCustomButtonBox=='true'?true:false}"
+								 click="{contentXml.extend.showCustomButtonBox = showCustomButtonBoxInput.selected?'true':'false'}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="统计方式" />
+					<mx:ComboBox id="statisticTypeCbo" labelField="name" dataProvider="{statisticTypes}" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="页大小" />
+					<mx:TextInput id="pageSizeInput" restrict="0-9" toolTip="最大每页{MAX_PAGESIZE.toString()}条"
+								  change="pageSizeInput_changeHandler(event)" text="{contentXml.extend.pageSize}"/>
+				</mx:HBox>
+			</mx:VBox>
+			<componets:CustomButtonDesigner id="customBtnDesignVbox" width="100%" height="100%" label="自定义按钮" 
+											paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" />
+		</mx:TabNavigator>
+	</mx:VBox>
+</designer:BaseDesigner>

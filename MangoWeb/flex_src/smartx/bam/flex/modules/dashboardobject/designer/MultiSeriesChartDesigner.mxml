@@ -1,0 +1,582 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="flexlib.containers.*" width="95%" 
+					   xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*"
+					   creationComplete="init()" >
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			private var chartTypeCboData:ArrayCollection = new ArrayCollection([
+				{label:"F系多组柱状图",data:"MSColumn2D"},
+				{label:"F系多组三维柱状图",data:"MSColumn3D"},
+				{label:"F系多组折线图",data:"MSLine"},
+				{label:"F系多组区域图",data:"MSArea"},
+				{label:"F系多组水平柱状图",data:"MSBar2D"},
+				{label:"F系多组三维水平柱状图",data:"MSBar3D"},
+				{label:"F系多组曲线图",data:"MSSpline"},
+				{label:"F系多组曲线区域图",data:"MSSplineArea"},
+				
+				{label:"F系多组堆积柱状图",data:"StackedColumn2D"},
+				{label:"F系多组三维堆积柱状图",data:"StackedColumn3D"},
+				{label:"F系多组堆积水平柱状图",data:"StackedBar2D"},
+				{label:"F系多组三维堆积水平柱状图",data:"StackedBar3D"},
+				{label:"F系多组堆积区域图",data:"StackedArea2D"},
+				
+				{label:"F系多组滚动柱状图",data:"ScrollColumn2D"},
+				{label:"F系多组滚动折线图",data:"ScrollLine2D"},
+				{label:"F系多组滚动区域图",data:"ScrollArea2D"},
+				{label:"F系多组滚动堆积柱状图",data:"ScrollStackedColumn2D"},
+				{label:"F系多组滚动组合图",data:"ScrollCombi2D"},
+				{label:"F系多组滚动组合图（双Y）",data:"ScrollCombiDY2D"},
+				
+				{label:"F系多组对数柱状图",data:"LogMSColumn2D"},
+				{label:"F系多组对数折线图",data:"LogMSLine"},
+				
+				{label:"F系多组倒序Y轴柱状图",data:"InverseMSColumn2D"},
+				{label:"F系多组倒序Y轴折线图",data:"InverseMSLine"},
+				{label:"F系多组倒序Y轴区域图",data:"InverseMSArea"},
+				
+				{label:"F系雷达图",data:"Radar"},
+				
+				{label:"F系组合图",data:"MSCombi2D"},
+				{label:"F系三维组合图",data:"MSCombi3D"},
+				{label:"F系三维柱线组合图",data:"MSColumnLine3D"},
+				{label:"F系组合图（双Y）",data:"MSCombiDY2D"},
+				{label:"F系三维柱线组合图（双Y）",data:"MSColumn3DLineDY"},
+				{label:"F系三维堆积柱线组合图（双Y）",data:"StackedColumn3DLineDY"}
+			]);
+			internal var dualY:ArrayCollection = new ArrayCollection([
+				"MSCombiDY2D","MSColumn3DLineDY","StackedColumn3DLineDY","ScrollCombiDY2D"
+			]);
+			
+			[Bindable]
+			private var dp:XMLListCollection = new XMLListCollection();
+			//数据模式
+			private var datamode:String;
+			
+			private function init():void{
+				
+			}
+			
+			override public function generalFormComplete():void{
+				if(contentXml.extend.items.length() == 0)
+					contentXml.extend.appendChild(<items />);
+				
+				var chartType:String = contentXml.charttype;
+				var obj:Object;
+				for each(obj in chartTypeCboData){
+					if(obj.data == chartType){
+						typeCbo.selectedItem = obj;
+						break;
+					}
+				}
+				datamode = contentXml.extend.datamode;
+				
+				if(datamode == MTChart.ROW_MODE)
+					dataModeCbo.selectedIndex = 1;
+				else
+					dataModeCbo.selectedIndex = 0;
+				
+				dataModeCbo_changeHandler(true);
+				
+				dp.source = contentXml.extend.items.item;
+				
+			}
+			
+			private function changeState():void{
+				if(typeColumn != null)
+					typeColumn.editable = isCombinationChart();
+				if(dualY.contains(typeCbo.selectedItem.data)){
+					syAxiaName.enabled = true;
+					subSeriesNames.enabled = true;
+					if(contentXml != null && contentXml.extend.syaxianame.length() > 0)
+						syAxiaName.text = contentXml.extend.syaxianame;
+				}else{
+					syAxiaName.enabled = false;
+					subSeriesNames.enabled = false;
+				}
+				if(dataGrid)
+					dataGrid.invalidateList();
+			}
+			
+			private function addField():void{
+				if(fieldList.length == 0){
+					SmartXMessage.show("绑定字段缺失！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				dp.addItem(<item dataField={fieldList.getItemAt(0)} labelField={fieldList.getItemAt(0)}
+					seriesNameField="" color="" type="" linkField="" bindSubYAxis="" />);
+			}
+			
+			private function deleteField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				dp.removeItemAt(selectedIndex);
+			}
+			
+			private function typeCbo_changeHandler(event:ListEvent):void{
+				changeState();
+				contentXml.charttype = typeCbo.selectedItem.data;
+			}
+			
+			private function dataGridTypeLabelFun(item:Object, column:DataGridColumn):String{
+				var type:String = item.@type;
+				
+				if(type == "Area")
+					return "区域";
+				else if(type == "Line")
+					return "线";
+				else if(type == "Column")
+					return "柱";
+				else
+					return "";
+			}
+
+
+			private function dataModeCbo_changeHandler(isInit:Boolean=false):void{
+				if(!isInit)
+					delete contentXml.extend.items.*;
+				if(dataModeCbo.selectedIndex == 1){
+					currentState = "rowDataMode";
+					datamode = MTChart.ROW_MODE;
+					if(contentXml.extend.items.item.length() == 0)
+						contentXml.extend.items.appendChild(<item />);
+					initRowModeField();
+				}
+				else{
+					currentState = "columnDataMode";
+					datamode = MTChart.COLUMN_MODE;
+				}
+				contentXml.extend.datamode = datamode;
+				
+			}
+			
+			private function isCombinationChart():Boolean{
+				if(typeCbo.selectedItem != null){
+					var type:String = typeCbo.selectedItem.data;
+					if(type == "MSCombi2D" ||
+						type == "MSCombi3D" ||
+						type == "MSColumnLine3D" ||
+						type == "MSCombiDY2D" ||
+						type == "MSColumn3DLineDY" ||
+						type == "StackedColumn3DLineDY" ||
+						type == "ScrollCombi2D" ||
+						type == "ScrollCombiDY2D")
+						return true;
+				}
+				return false;
+			}
+			
+			override public function initTableStructComplete():void{
+				
+				if(datamode == MTChart.ROW_MODE)
+					initRowModeField();
+			}
+			
+			private function initRowModeField():void{
+				var tempXml:XML = contentXml.extend.items.item[0];
+				seriesNames.text = tempXml.@seriesNameField;
+				colors.text = tempXml.@color;
+				
+				var data:*;
+				//类型
+				for each(data in itemTypeArray){
+					if(data.value == String(tempXml.@type)){
+						itemTypeInput.selectedItem = data;
+						break;
+					}else
+						itemTypeInput.selectedIndex = -1;
+				}
+				
+				setField(String(tempXml.@labelField),labelFieldInput);
+				
+				setField(String(tempXml.@nameField),typeFieldInput);
+				
+				setField(String(tempXml.@linkField),linkFieldInput);
+				
+				setField(String(tempXml.@dataField),dataFieldInput);
+				
+				setField(String(tempXml.@xShowField),xShowFieldInput);
+
+			}
+			
+			private function setField(value:String,cbo:ComboBox):void{
+				for each(data in fieldList){
+					if(data == value){
+						cbo.selectedItem = data;
+						break;
+					}else{
+						value == ""
+							?cbo.selectedIndex = -1
+							:cbo.text = value;
+					}
+				}
+			}
+			
+			private function colorPicker_changeHandler(event:ColorPickerEvent):void{
+				var colorStr:String = colorPicker.selectedColor.toString(16);
+				if(colors.text == null || colors.text == "")
+					colors.text = colorStr;
+				else
+					colors.text += ","+colorStr;
+				
+				contentXml.extend.items.item[0].@color = colors.text;
+			}
+			
+			private function itemTypeInput_changeHandler(event:ListEvent):void{
+				contentXml.extend.items.item[0].@type = itemTypeInput.selectedItem==null?"":itemTypeInput.selectedItem.value;
+			}
+			
+			private function dataFieldInput_changeHandler(event:ListEvent):void{
+				contentXml.extend.items.item[0].@dataField = dataFieldInput.text;
+			}
+			
+			private function labelFieldInput_changeHandler(event:ListEvent):void{
+				contentXml.extend.items.item[0].@labelField = labelFieldInput.text;	
+			}
+			
+			private function typeFieldInput_changeHandler(event:ListEvent):void{
+				contentXml.extend.items.item[0].@nameField = typeFieldInput.text;				
+			}
+			
+			private function linkFieldInput_changeHandler(event:ListEvent):void{
+				contentXml.extend.items.item[0].@linkField = linkFieldInput.text;
+			}
+			
+			private function xShowFieldInput_changeHandler(event:ListEvent):void{
+				contentXml.extend.items.item[0].@xShowField = xShowFieldInput.text;
+			}
+			
+		]]>
+	</fx:Script>
+	<designer:states>
+		<s:State name="rowDataMode"/>
+		<s:State name="columnDataMode" />
+	</designer:states>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+			 paddingTop="5">
+		<mx:HBox width="100%" >
+			<mx:Label text="类型" />
+			<mx:ComboBox id="typeCbo" dataProvider="{chartTypeCboData}" change="typeCbo_changeHandler(event)"/>
+		</mx:HBox>
+		<mx:HBox width="100%" >
+			<mx:Label text="数据模式" />
+			<mx:ComboBox id="dataModeCbo" change="dataModeCbo_changeHandler()">
+				<mx:dataProvider>
+					<s:ArrayCollection>
+						<fx:Object label="列模式"/>
+						<fx:Object label="行模式"/>
+					</s:ArrayCollection>
+				</mx:dataProvider>
+			</mx:ComboBox>
+		</mx:HBox>
+		<mx:HBox width="100%" includeIn="columnDataMode">
+			<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addField()"/>
+			<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteField()"/>
+		</mx:HBox>
+		<mx:DataGrid id="dataGrid" width="100%" height="200" editable="true" dataProvider="{dp}" includeIn="columnDataMode">
+			<mx:columns>
+				<mx:DataGridColumn headerText="y轴绑定字段" editable="true" dataField="@dataField">
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center">
+								<fx:Script>
+									<![CDATA[
+										
+										public function get text():String{
+											return yFieldCbo.selectedItem==null?"":String(yFieldCbo.selectedItem);
+										}
+										
+										override public function set data(value:Object):void{
+											super.data = value;
+											for each(var field:String in outerDocument.fieldList){
+												if(String(data.@dataField) == field){
+													yFieldCbo.selectedItem = field;
+													break;
+												}else
+													yFieldCbo.selectedIndex = 0;
+											}
+										}
+										
+										private function yFieldCbo_changeHandler():void{
+											data.@dataField = text;
+										}
+										
+									]]>
+								</fx:Script>
+								
+								<mx:ComboBox id="yFieldCbo" width="100%" dataProvider="{outerDocument.fieldList}"
+											 change="yFieldCbo_changeHandler()"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="x轴显示字段" editable="true" dataField="@labelField">
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center">
+								<fx:Script>
+									<![CDATA[
+										
+										public function get text():String{
+											return xFieldCbo.selectedItem==null?"":String(xFieldCbo.selectedItem);
+										}
+										
+										override public function set data(value:Object):void{
+											super.data = value;
+											for each(var field:String in outerDocument.fieldList){
+												if(String(data.@labelField) == field){
+													xFieldCbo.selectedItem = field;
+													break;
+												}else
+													xFieldCbo.selectedIndex = 0;
+											}
+										}
+										
+										private function xFieldCbo_changeHandler():void{
+											data.@labelField = text;
+										}
+										
+									]]>
+								</fx:Script>
+								
+								<mx:ComboBox id="xFieldCbo" width="100%" dataProvider="{outerDocument.fieldList}"
+											 change="xFieldCbo_changeHandler()"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="系列显示名称" editable="true" dataField="@seriesNameField" />
+				<mx:DataGridColumn headerText="链接绑定字段" editable="true" dataField="@linkField" >
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center">
+								<fx:Script>
+									<![CDATA[
+										import mx.events.ListEvent;
+										
+										public function get text():String{
+											return linkFieldCbo.selectedItem==null?"":String(linkFieldCbo.selectedItem.toString());
+										}
+										
+										override public function set data(value:Object):void{
+											super.data = value;
+											if(value != null){
+												linkFieldCbo.selectedItem = String(value.@linkField);
+											}else
+												linkFieldCbo.selectedItem = null;
+										}
+										
+										private function linkFieldCbo_changeHandler(event:ListEvent):void{
+											data.@linkField = text;
+										}
+										
+									]]>
+								</fx:Script>
+								<mx:ComboBox id="linkFieldCbo" width="100%" dataProvider="{outerDocument.fieldList}"
+											 change="linkFieldCbo_changeHandler(event)"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="颜色" editable="true" dataField="@color" rendererIsEditor="true">
+					<mx:itemRenderer>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center">
+								<fx:Script>
+									<![CDATA[
+										import mx.events.ColorPickerEvent;
+										
+										public function get text():String{
+											return itemColorPicker.selectedColor.toString(16);
+										}
+										
+										public override function set data(value:Object):void{
+											super.data = value;
+											if(value != null){
+												itemColorPicker.selectedColor = parseInt(String(value.@color),16);
+											}
+										}
+										
+										protected function itemColorPicker_changeHandler(event:ColorPickerEvent):void
+										{
+											data.@color=itemColorPicker.selectedColor.toString(16);
+										}
+										
+									]]>
+								</fx:Script>
+								<mx:ColorPicker id="itemColorPicker" change="itemColorPicker_changeHandler(event)"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemRenderer>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="类型" id="typeColumn" dataField="@type" labelFunction="dataGridTypeLabelFun">
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center">
+								<fx:Script>
+									<![CDATA[
+										import mx.events.ListEvent;
+										
+										public function get text():String{
+											return typeCbo.selectedItem==null?"":String(typeCbo.selectedItem.data);
+										}
+										
+										override public function set data(value:Object):void{
+											super.data = value;
+											if(value == null)
+												return;
+											for each(var data:Object in typeCbo.dataProvider){
+												if(data.data == String(value.@type)){
+													typeCbo.selectedItem = data;
+													break;
+												}else
+													typeCbo.selectedItem = null;
+											}
+										}
+										
+										private function typeCbo_changeHandler(event:ListEvent):void{
+											data.@type = text;
+										}
+										
+									]]>
+								</fx:Script>
+								
+								<mx:ComboBox id="typeCbo" width="100%" change="typeCbo_changeHandler(event)">
+									<mx:dataProvider>
+										<s:ArrayCollection>
+											<fx:Object label="区域" data="Area"/>
+											<fx:Object label="柱" data="Column"/>
+											<fx:Object label="线" data="Line"/>
+										</s:ArrayCollection>
+									</mx:dataProvider>
+								</mx:ComboBox>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="关联辅助y轴" dataField="@bindSubYAxis" editable="false">
+					<mx:itemRenderer>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off">
+								<fx:Script>
+									<![CDATA[
+										override public function set data(value:Object):void{
+											super.data = value;
+											if(outerDocument.dualY.contains(outerDocument.typeCbo.selectedItem.data))
+												subyInput.enabled = true;
+											else
+												subyInput.enabled = false;
+										}
+									]]>
+								</fx:Script>
+								<mx:CheckBox id="subyInput" selected="{String(data.@bindSubYAxis)=='y'?true:false}"
+											 click="{data.@bindSubYAxis = subyInput.selected?'y':'n'}"/>
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemRenderer>
+				</mx:DataGridColumn>
+			</mx:columns>
+		</mx:DataGrid>
+		<containers:AdvancedForm id="propertyForm" width="100%" height="100%">
+			<mx:FormItem label="x轴绑定字段" includeIn="rowDataMode">
+				<mx:ComboBox id="labelFieldInput" width="200" editable="true" dataProvider="{fieldList}"
+							 change="labelFieldInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="x轴显示字段" includeIn="rowDataMode">
+				<mx:ComboBox id="xShowFieldInput" width="200" editable="true" dataProvider="{fieldList}"
+							 change="xShowFieldInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="x轴显示名称">
+				<mx:TextInput id="xAxiaName" width="200" text="{contentXml.extend.xaxianame}"
+							  change="{contentXml.extend.xaxianame = xAxiaName.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="y轴绑定字段" includeIn="rowDataMode">
+				<mx:ComboBox id="dataFieldInput" width="200" editable="true" dataProvider="{fieldList}"
+							 change="dataFieldInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="y轴显示名称" >
+				<mx:TextInput id="pyAxiaName" width="200" text="{contentXml.extend.pyaxianame}"
+							  change="{contentXml.extend.pyaxianame = pyAxiaName.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="链接绑定字段" includeIn="rowDataMode">
+				<mx:ComboBox id="linkFieldInput" width="200" editable="true" dataProvider="{fieldList}"
+							 change="linkFieldInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="系列绑定字段" includeIn="rowDataMode" >
+				<mx:ComboBox id="typeFieldInput" width="200" editable="true" dataProvider="{fieldList}"
+							 change="typeFieldInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="辅助y轴显示的系列名称"  includeIn="rowDataMode">
+				<mx:TextInput id="subSeriesNames" width="200" enabled="false" text="{contentXml.extend.subseriesnames}"
+							  toolTip="多个系列名称以逗号分隔 (中国,美国,德国)" change="{contentXml.extend.subseriesnames = subSeriesNames.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="辅助y轴显示名称">
+				<mx:TextInput id="syAxiaName" width="200" enabled="false" text="{contentXml.extend.syaxianameXml}"
+							  change="{contentXml.extend.syaxianameXml = syAxiaName.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="系列显示名称" includeIn="rowDataMode">
+				<mx:TextInput id="seriesNames" width="200" toolTip="多个系列名称以逗号分隔 (中国,美国,德国)，按优先级排列"
+							  text="{contentXml.extend.items.item[0].@seriesNameField}"
+							  change="{contentXml.extend.items.item[0].@seriesNameField = seriesNames.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="颜色" includeIn="rowDataMode">
+				<mx:HBox>
+					<mx:TextInput id="colors" width="150" toolTip="多种颜色用逗号分隔(FF0000,0372AB,00000)，按优先级排列"
+								  text="{contentXml.extend.items.item[0].@color}"/>
+					<mx:ColorPicker id="colorPicker" change="colorPicker_changeHandler(event)"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="默认显示类型">
+				<mx:ComboBox id="itemTypeInput" labelField="label" enabled="{isCombinationChart()}" 
+							 change="itemTypeInput_changeHandler(event)">
+					<mx:dataProvider>
+						<fx:Array id="itemTypeArray">
+							<fx:Object label="柱" value="Column"/>
+							<fx:Object label="线" value="Line"/>
+							<fx:Object label="区域" value="Area"/>
+						</fx:Array>
+					</mx:dataProvider>
+				</mx:ComboBox>
+			</mx:FormItem>
+			<mx:FormItem label="是否显示标签">
+				<mx:CheckBox id="isShowLabelCbx" selected="{contentXml.extend.isShowLabel=='true'?true:false}"
+							 click="{contentXml.extend.isShowLabel=isShowLabelCbx.selected?'true':'false'}"/>
+			</mx:FormItem>
+			<mx:FormItem label="绝对高度"  >
+				<mx:TextInput id="abHeight" width="200" text="{contentXml.extend.height}" 
+							  change="{contentXml.extend.height = abHeight.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="绝对宽度"  >
+				<mx:TextInput id="abWidth" width="200" text="{contentXml.extend.width}"
+							  change="{contentXml.extend.width = abWidth.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="Y轴最大值"  >
+				<mx:TextInput id="yAxisMaxValue" width="200" restrict="0-9" text="{contentXml.extend.yaxismaxvalue}"
+							  change="{contentXml.extend.yaxismaxvalue = yAxisMaxValue.text}"/>
+			</mx:FormItem>
+			<mx:FormItem label="Y轴最小值"  >
+				<mx:TextInput id="yAxisMinValue" width="200" restrict="0-9" text="{contentXml.extend.yaxisminvalue}"
+							  change="{contentXml.extend.yaxisminvalue = yAxisMinValue.text}"/>
+			</mx:FormItem>
+		</containers:AdvancedForm>
+	</mx:VBox>
+</designer:BaseDesigner>

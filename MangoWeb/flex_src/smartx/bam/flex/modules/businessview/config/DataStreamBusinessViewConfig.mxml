@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config:BusinessViewConfig xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						   xmlns:s="library://ns.adobe.com/flex/spark" 
+						   xmlns:mx="library://ns.adobe.com/flex/mx" 
+						   xmlns:config="smartx.bam.flex.modules.businessview.config.*"
+						   xmlns:date="actionscriptdatetimelibrary.*"
+						   layout="absolute" width="850" height="550"
+						   title="数据流视图配置">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<date:DateTimeField id="initDateValueTxt" width="100%" showTime="true" showToday="true" formatString="YYYY-MM-DD HH:ii:ss"/>
+		<mx:TextInput id="initValueTxt" width="100%" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.formatters.DateFormatter;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			[Bindable]
+			private var datasources:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var intervalUnitData:ArrayCollection = new ArrayCollection([
+				{label:"天",data:"day"},
+				{label:"小时",data:"hour"},
+				{label:"分钟",data:"min"},
+				{label:"秒",data:"sec"},
+				{label:"毫秒",data:"msec"}
+			]);
+			
+			[Bindable]
+			private var incrementalFields:ArrayCollection = new ArrayCollection();
+			
+			private var rpc:RemoteObject;
+			
+			private var formService:RemoteObject;
+			
+			private var datasource:String;
+			
+			private var PREFIX_DATASOURCE:String ="datasource_relation_";
+			
+			private var sql:String;
+			
+			private var selectedIncrementalField:Object;//选中的增量字段
+			
+			private var isLoadComplete:Boolean = false;
+			
+			override protected function init():void{
+				super.init();
+				if(!mainbox.contains(winHbox))
+					mainbox.addChild(winHbox);
+				rpc = new RemoteObject(BAMConst.BAM_Service);
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint){
+					rpc.endpoint = endpoint;
+					formService.endpoint = endpoint;
+				}
+				rpc.queryAllRelationDsName.addEventListener(ResultEvent.RESULT,queryAllRelationDsNameHandler);
+				rpc.queryAllRelationDsName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					Alert.show("queryAllRelationDsName错误:"+event.fault.faultString,"error");
+				});
+				
+				rpc.getTableStructByName.addEventListener(ResultEvent.RESULT,getTableStructByNameHandler);
+				rpc.getTableStructByName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					Alert.show("getTableStructByName错误:"+event.fault.faultString,"error");
+				});
+				
+				if(contentXml == null){
+					contentXml = <DataStreamBvDesign>
+									<sql />
+					                <condition />
+								 </DataStreamBvDesign>;
+					incrementalFieldCbo_changeHandler(null);
+				}else
+					xmlConvertToProperty();
+				rpc.queryAllRelationDsName();
+			}
+			
+			override protected function setUniqueLabelField():void{
+				uniqueLabelField = "label";
+			}
+			
+			private function queryAllRelationDsNameHandler(event:ResultEvent):void{
+				datasources.removeAll();
+				var result:Array = event.result as Array;
+				for each(var value:String in result){
+					if(StringUtil.beginsWith(value,PREFIX_DATASOURCE))
+						datasources.addItem(value);
+				}
+				setDatasourceCboSelectedItem();
+			}
+			
+			private function setDatasourceCboSelectedItem():void{
+				if(datasource != null && datasource != ""){
+					for each(var obj:String in datasources){
+						if(obj == datasource){
+							datasourceCbo.selectedItem = obj;
+							break;
+						}
+					}
+				}else
+					datasource = String(datasourceCbo.selectedItem);
+			}
+			
+			private function getTableStructByNameHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				for(var i:Number=0;i < tableDataStruct.table_header.length;i++){
+					var type:String = convertFieldType(tableDataStruct.table_body_type[i]);
+					var data:Object = {};
+					data.label = tableDataStruct.table_header[i];
+					data.data = type;
+					if(type == "String"){//增量字段不能含有STRING类型的
+						dataProvider.addItem(data);
+						continue;
+					}
+					dataProvider.addItem(data);
+					incrementalFields.addItem(data);
+				}
+				if(!isLoadComplete && selectedIncrementalField){
+					setWindow();
+					for each(var field:Object in incrementalFields){
+						if(field.label == selectedIncrementalField.label)
+							incrementalFieldCbo.selectedItem = field;
+					}
+					isLoadComplete = true;
+				}
+				incrementalFieldCbo_changeHandler(null);
+				
+			}
+			
+			override protected function setWindow():void{
+				if(contentXml.sql.@isSave == "true"){
+					isKeepBvChx.selected = true;
+					if(contentXml.sql.@unit == "unique"){
+						for each(var unData:Object in dataProvider){
+							if(unData[uniqueLabelField] == contentXml.sql.@value)
+								uniqueCbo.selectedItem = unData;
+						}
+					}else	
+						windowParamTxt.text = contentXml.sql.@value;
+					isKeepBvChx_changeHandler(null);
+					for each(var typeDate:Object in windowType){
+						if(typeDate.data == contentXml.sql.@unit)
+							windowTypeCbo.selectedItem = typeDate;
+					}
+				}
+				else
+					isKeepBvChx.selected = false;
+				windowTypeCbo_changeHandler(null);
+			}
+			
+			private function reSubmitQueryBtn_clickHandler(event:MouseEvent):void{
+				incrementalFields.removeAll();
+				dataProvider.removeAll();
+				incrementalFields.addItem({label:"无",data:null});
+				sql = sqlText.text;
+				if(StringUtil.trim(sql) != "")
+					rpc.getTableStructByName(datasource,sql);
+			}
+
+			private function intervalRdo_clickHandler():void{
+				if(intervalRdo.selected){
+					intervalTxt.enabled = true;
+					intervalUnit.enabled = true;
+					planEpl.enabled = false;
+				}else if(planRdo.selected){
+					intervalTxt.enabled = false;
+					intervalUnit.enabled = false;
+					planEpl.enabled = true;
+				}
+			}
+
+			private function clearRdo_clickHandler():void{
+				if(noClearRdo.selected || alwaysClearRdo.selected)
+					planClearEpl.enabled = false;
+				else
+					planClearEpl.enabled = true;
+			}
+
+			private function datasourceCbo_changeHandler(event:ListEvent):void{
+				datasource = String(datasourceCbo.selectedItem);
+			}
+			
+			private function getHeaderEpl():String{
+				var headerEpl:String = "module "+PREFIX_MODULE.concat(bvCode).concat(";\n");
+				return headerEpl;
+			}
+			
+			private function getBodyEpl():String{
+				var bodyEpl:String = "\n";
+				var createSchema:String = "create schema ".concat(eventName).concat(" as(");
+				var selectFields:String = "";
+				for(var i:Number=0;i< dataProvider.length;i++){
+					var data:Object = dataProvider.getItemAt(i);
+					var fieldName:String = data.label;
+//					if(fieldName == "无")
+//						continue;
+					var fieldType:String = data.data;
+					if(i==dataProvider.length-1){
+						createSchema = createSchema.concat(fieldName).concat(" ").concat(fieldType).concat(");");
+						selectFields = selectFields.concat(fieldName);
+					}else{
+						createSchema = createSchema.concat(fieldName).concat(" ").concat(fieldType).concat(",");
+						selectFields = selectFields.concat(fieldName).concat(",");
+					}
+				}
+				selectedIncrementalField = incrementalFieldCbo.selectedItem;
+				var createVariable:String = "";
+				var hasIncrementalField:Boolean = false;
+				var variableName:String = "";
+				if(selectedIncrementalField && selectedIncrementalField.data){
+					hasIncrementalField = true;
+					variableName = bvCode.concat("_").concat(selectedIncrementalField.label);
+					if(selectedIncrementalField.data == "java.util.Date"){
+						createVariable = "\ncreate variable ".concat(selectedIncrementalField.data).concat(" ")
+							.concat(variableName).concat(" = ").concat(EPL_UTIL_PARSEDATE).concat("(\"").concat(initDateValueTxt.text).concat("\");");
+					}else{
+						createVariable = "\ncreate variable ".concat(selectedIncrementalField.data).concat(" ")
+							.concat(variableName).concat(" = ").concat(initValueTxt.text).concat(";");
+					}
+				}
+				
+				var insertEvent:String = "\ninsert into ".concat(eventName).concat(" select ").concat(selectFields).concat(" from pattern[every ");
+				var firstEvent:String = "\ninsert into ".concat(eventName).concat(" select ").concat(selectFields).concat(" from pattern[ ");
+				//判断是否按间隔轮询
+				if(intervalRdo.selected){
+					insertEvent = insertEvent.concat("timer:interval(").concat(intervalTxt.text)
+						.concat(" ").concat(intervalUnit.selectedItem["data"]).concat(")]");
+				}else if(planRdo.selected){
+					insertEvent = insertEvent.concat(planEpl.text).concat("]");
+				}
+				firstEvent = firstEvent.concat("timer:interval(1 sec)]")
+				insertEvent = insertEvent.concat(",sql:")
+					.concat(datasourceCbo.selectedItem.substring(PREFIX_DATASOURCE.length,datasourceCbo.selectedItem.length))
+					.concat("[\"").concat("select * from (").concat(sql).concat(") ");
+				firstEvent = firstEvent.concat(",sql:")
+					.concat(datasourceCbo.selectedItem.substring(PREFIX_DATASOURCE.length,datasourceCbo.selectedItem.length))
+					.concat("[\"").concat("select * from (").concat(sql).concat(") ");
+				if(hasIncrementalField){
+					insertEvent = insertEvent.concat(" where ").concat(selectedIncrementalField.label)
+						.concat(" > ${").concat(variableName).concat("}");
+					firstEvent = firstEvent.concat(" where ").concat(selectedIncrementalField.label)
+						.concat(" > ${").concat(variableName).concat("}");
+				}
+				insertEvent = insertEvent.concat("\"];");
+				firstEvent = firstEvent.concat("\"];");
+				var setVariable:String = "";
+				var clearVariable:String = "";
+				if(hasIncrementalField){
+					if(selectedIncrementalField.data == "java.util.Date"){
+						setVariable = setVariable.concat("\non ").concat(eventName).concat(" set ")
+							.concat(variableName).concat(" = ").concat(EPL_UTIL_LONGCONVERTTODATE).concat("(")
+							.concat("Math.max(").concat(EPL_UTIL_DATECONVERTTOLONG).concat("(").concat(selectedIncrementalField.label)
+							.concat("),").concat(EPL_UTIL_DATECONVERTTOLONG).concat("(").concat(variableName).concat(")));");
+					}else if(selectedIncrementalField.data == "java.math.BigDecimal"){
+						setVariable = setVariable.concat("\non ").concat(eventName).concat(" set ")
+							.concat(variableName).concat(" = ").concat("java.lang.Math.max(").concat(EPL_UTIL_BIGDECIMALCONVERTTOLONG)
+							.concat("(").concat(selectedIncrementalField.label).concat("),").concat(EPL_UTIL_BIGDECIMALCONVERTTOLONG)
+							.concat("(").concat(variableName).concat("));");
+					}else{
+						setVariable = setVariable.concat("\non ").concat(eventName).concat(" set ")
+							.concat(variableName).concat(" = ").concat("java.lang.Math.max(").concat(selectedIncrementalField.label)
+							.concat(",").concat(variableName).concat(");");
+					}
+					
+					if(planClearRdo.selected && planClearEpl.text != ""){
+						clearVariable = clearVariable.concat("\non pattern[every ").concat(planClearEpl.text).concat("] set ")
+							.concat(variableName).concat(" = ").concat(initValueTxt.text).concat(";");
+					}else if(alwaysClearRdo.selected)
+						setVariable = "";
+				}
+				
+				bodyEpl = bodyEpl.concat(createSchema).concat(createVariable).concat(firstEvent).concat(insertEvent).concat(setVariable).concat(clearVariable);
+				return bodyEpl;
+			}
+			
+			override public function checkOut():Boolean{
+				if(selectedIncrementalField && selectedIncrementalField.data && 
+					((initValueTxt.text == "" && selectedIncrementalField.data != "java.util.Date") || (initDateValueTxt.text == "" && selectedIncrementalField.data == "java.util.Date"))){
+					Alert.show("请设定初始值!","error");
+					return false;
+				}else if(intervalRdo.selected && intervalTxt.text == ""){
+					Alert.show("轮询时间不能为空!","error");
+					return false;
+				}else
+					return true;
+			}
+			
+			override public function getEpl():String{
+				checkOut();
+				return getHeaderEpl().concat(getBodyEpl()).concat(getWindowEpl());
+			}
+			
+			override protected function propertyConvertToXml():void{
+				clearContextXml();
+				contentXml.sql = sqlText.text;
+				contentXml.sql.@datasource = datasourceCbo.selectedItem;
+				if(isKeepBvChx.selected){
+					contentXml.sql.@isSave = "true";
+					contentXml.sql.@value = windowTypeCbo.selectedItem["data"]=="unique"?uniqueCbo.selectedItem[uniqueLabelField]:windowParamTxt.text;
+					contentXml.sql.@unit = windowTypeCbo.selectedItem["data"];
+				}else
+					contentXml.sql.@isSave = "false";
+				
+				var selectedIncrementalFieldXml:XML = <selectedIncrementalField />;
+				if(selectedIncrementalField){
+					selectedIncrementalFieldXml.@name = selectedIncrementalField.label;
+					selectedIncrementalFieldXml.@type = selectedIncrementalField.data==null?"null":selectedIncrementalField.data;
+					if(selectedIncrementalField.data == "java.util.Date")
+						selectedIncrementalFieldXml.@initValue = initDateValueTxt.text;
+					else
+						selectedIncrementalFieldXml.@initValue = initValueTxt.text;
+				}
+				contentXml.condition.appendChild(selectedIncrementalFieldXml);
+				
+				var repeatQuery:XML = <repeatQuery />;
+				if(intervalRdo.selected){
+					repeatQuery.@type = "interval";
+					repeatQuery.@value = intervalTxt.text;
+					repeatQuery.@unit = intervalUnit.selectedItem.data;
+				}else{
+					repeatQuery.@type = "plan";
+					repeatQuery.@value = planEpl.text;
+				}
+				contentXml.condition.appendChild(repeatQuery);
+				
+				var clearStatusInterval:XML = <clearStatusInterval />;
+				if(noClearRdo.selected)
+					clearStatusInterval.@type = "no";
+				else if(planClearRdo.selected){
+					clearStatusInterval.@type = "plan";
+					clearStatusInterval.@value = planClearEpl.text;
+				}else
+					clearStatusInterval.@type = "always";
+				contentXml.condition.appendChild(clearStatusInterval);
+			}
+			
+			private function xmlConvertToProperty():void{
+				sqlText.text = contentXml.sql;
+				datasource = contentXml.sql.@datasource;
+				if(contentXml.sql.@isSave == "true"){
+					isKeepBvChx.selected = true;
+					windowParamTxt.text = contentXml.sql.@value;
+					isKeepBvChx_changeHandler(null);
+					for each(var typeDate:Object in windowType){
+						if(typeDate.data == contentXml.sql.@unit)
+							windowTypeCbo.selectedItem = typeDate;
+					}
+				}else
+					isKeepBvChx.selected = false;
+				if(contentXml.condition.selectedIncrementalField.length() > 0){
+					selectedIncrementalField = {label:String(contentXml.condition.selectedIncrementalField.@name)
+						,data:contentXml.condition.selectedIncrementalField.@type=="null"?null:String(contentXml.condition.selectedIncrementalField.@type)};
+					if(selectedIncrementalField.data == "java.util.Date")
+						initDateValueTxt.text = contentXml.condition.selectedIncrementalField.@initValue;
+					else
+						initValueTxt.text = contentXml.condition.selectedIncrementalField.@initValue;
+				}
+				
+				if(contentXml.condition.repeatQuery.@type == "plan"){
+					planRdo.selected = true;
+					intervalRdo_clickHandler();
+					planEpl.text = contentXml.condition.repeatQuery.@value;
+				}else{
+					intervalRdo.selected = true;
+					intervalTxt.text = contentXml.condition.repeatQuery.@value;
+					for each(var unitDate:Object in intervalUnitData){
+						if(unitDate.data == contentXml.condition.repeatQuery.@unit)
+							intervalUnit.selectedItem = unitDate;
+					}
+				}
+				
+				if(contentXml.condition.clearStatusInterval.@type =="always")
+					alwaysClearRdo.selected = true;
+				else if(contentXml.condition.clearStatusInterval.@type =="plan"){
+					planClearRdo.selected = true;
+					clearRdo_clickHandler();
+				}else
+					noClearRdo.selected = true;
+				
+				reSubmitQueryBtn_clickHandler(null);
+			}
+			
+			private function clearContextXml():void{
+				delete contentXml.sql.*;
+				delete contentXml.condition.*;
+			}
+
+			private function incrementalFieldCbo_changeHandler(event:ListEvent):void{
+				if(incrementalFieldCbo.selectedItem && incrementalFieldCbo.selectedItem.data == "java.util.Date"){
+					if(!initValueVbox.contains(initDateValueTxt))
+						initValueVbox.addChild(initDateValueTxt);
+					if(initValueVbox.contains(initValueTxt))
+						initValueVbox.removeChild(initValueTxt);
+				}else{
+					if(!initValueVbox.contains(initValueTxt))
+						initValueVbox.addChild(initValueTxt);
+					if(initValueVbox.contains(initDateValueTxt))
+						initValueVbox.removeChild(initDateValueTxt);
+				}
+				selectedIncrementalField = incrementalFieldCbo.selectedItem;
+			}
+
+			protected function importQvBtn_clickHandler(event:MouseEvent):void{
+				var qvRefDialog:RefDialog = new RefDialog();
+				qvRefDialog.init2(formService,"select datasourcename value#,sql code#,name 名称,code from V_BAM_QUERYVIEW",null);
+				qvRefDialog.title = "选择查询视图";
+				qvRefDialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(qvRefDialog.closeByConfirm){
+						datasource = qvRefDialog.refPK;
+						sqlText.text = qvRefDialog.refCode;
+						setDatasourceCboSelectedItem();
+					}
+				});
+				PopUpManager.addPopUp(qvRefDialog,this,true);
+				PopUpManager.centerPopUp(qvRefDialog);
+			}
+			
+		]]>
+	</fx:Script>
+
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" 
+			 paddingRight="5" paddingTop="5">
+		<mx:VBox id="mainbox" width="100%" height="50%" paddingBottom="5" paddingLeft="5" 
+				 paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%">
+				<mx:Label text="数据源：" />
+				<mx:ComboBox id="datasourceCbo" dataProvider="{datasources}" change="datasourceCbo_changeHandler(event)"/>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Label text="JDBC 查询：" />
+				<mx:TextArea id="sqlText" width="70%" height="170" />
+				<mx:VBox>
+					<mx:Button id="reSubmitQueryBtn" label="重新提交查询" click="reSubmitQueryBtn_clickHandler(event)" />
+					<mx:Button id="importQvBtn" label="查询视图导入" click="importQvBtn_clickHandler(event)" />
+				</mx:VBox>
+			</mx:HBox>
+		</mx:VBox>
+		<mx:TabNavigator width="100%" height="50%" creationPolicy="all">
+			<mx:VBox width="100%" height="100%" label="轮询" paddingBottom="5" paddingLeft="5" 
+					 paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%">
+					<mx:HBox width="50%" height="100%" horizontalAlign="left">
+						<mx:Label text="增量字段：" />
+						<mx:ComboBox id="incrementalFieldCbo" dataProvider="{incrementalFields}" change="incrementalFieldCbo_changeHandler(event)"/>
+					</mx:HBox>
+					<mx:HBox width="50%" height="100%" horizontalAlign="left">
+						<mx:Label text="起始值：" />
+						<mx:VBox id="initValueVbox" width="50%"/>
+						<mx:Label text="(该值不会包含在查询中)" />
+					</mx:HBox>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:RadioButton id="intervalRdo" groupName="interval" label="按间隔轮询" 
+									selected="true"	click="intervalRdo_clickHandler()"/>
+					<mx:TextInput id="intervalTxt" restrict="0-9"/>
+					<mx:ComboBox id="intervalUnit" dataProvider="{intervalUnitData}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:RadioButton id="planRdo" groupName="interval" label="按计划轮询" click="intervalRdo_clickHandler()"/>
+					<mx:TextArea width="70%" height="100" id="planEpl" enabled="false"/>
+				</mx:HBox>
+			</mx:VBox>
+			<mx:VBox width="100%" height="100%" label="清除状态间隔" paddingBottom="5" paddingLeft="5" 
+					 paddingRight="5" paddingTop="5">
+				<mx:RadioButton id="noClearRdo" groupName="clear" label="不清除状态" selected="true" click="clearRdo_clickHandler()"/>
+				<mx:HBox width="100%">
+					<mx:RadioButton id="planClearRdo" groupName="clear" label="按计划清除状态" click="clearRdo_clickHandler()"/>
+					<mx:TextArea width="70%" height="100" id="planClearEpl" enabled="false"/>
+				</mx:HBox>
+				<mx:RadioButton id="alwaysClearRdo" groupName="clear" label="始终清除新数据状态" click="clearRdo_clickHandler()"/>
+			</mx:VBox>
+		</mx:TabNavigator>
+		<mx:HBox id="btnBox" width="100%" paddingTop="5" horizontalAlign="right" paddingRight="5">
+			<mx:Button id="showMtBtn" label="显示元数据XML" visible="{debugMode}" click="{Alert.show(getContentXml())}"/>
+			<mx:Button id="showSqlBtn" label="显示EPL表达式" click="showEpl()"/>
+			<mx:Button id="saveBvBtn" label="确定" click="confirmFun()"/>
+			<mx:Button id="cancellBtn" label="取消" click="close()"/>
+		</mx:HBox>
+	</mx:VBox>
+</config:BusinessViewConfig>

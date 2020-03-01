@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WindowShade xmlns="flexlib.containers.*" xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			 xmlns:mx="library://ns.adobe.com/flex/mx"
+			 width="100%" height="100%" xmlns:ns1="flexlib.containers.*" creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:Tile width="100%" height="100%" id="controlTile" 
+				 verticalAlign="middle" horizontalAlign="left" 
+				 paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20" 
+				 borderStyle="solid"/>
+		<mx:VBox width="100%" height="100%" id="controlBox" 
+				 verticalAlign="top" horizontalAlign="left" 
+				 paddingTop="20" paddingBottom="20" paddingLeft="50" paddingRight="20" 
+				 borderStyle="solid"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.core.Container;
+			
+			import smartx.flex.components.itemcomponent.ItemUIComponent;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public var layoutType:String = GlobalConst.LAYOUTTYPE_BILLCARDPANEL_VBOX;
+			
+			private var controlContainer:Container;
+			
+			private function init():void{
+				if(layoutType == GlobalConst.LAYOUTTYPE_BILLCARDPANEL_TILE){
+					addChild(controlTile);
+					controlContainer = controlTile;
+					
+				}
+				else{
+					addChild(controlBox);
+					controlContainer = controlBox;
+				}
+			}
+			
+			public function addControl(component:ItemUIComponent):void{
+				controlContainer.addChild(component);
+			}
+		]]>
+	</fx:Script>
+</WindowShade>

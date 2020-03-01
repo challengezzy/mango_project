@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<design:ControlStyleEditorBase xmlns:mx="http://www.adobe.com/2006/mxml"
+								width="100%" xmlns:design="myreport.design.*">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			protected override function OnSetData():void
+			{
+				_Check.label = DesignUtil.GetLabelName(Name);
+				_Check.selected = Setting.GetStyle(Name);
+				
+			}
+			
+			private function OnChanged():void
+			{
+				Setting.SetStyle(Name, _Check.selected);
+			}
+		]]>
+	</mx:Script>
+	<mx:CheckBox label="CheckBox" id="_Check" change="OnChanged()"/>
+</design:ControlStyleEditorBase>

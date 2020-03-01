@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtdesigner:MTDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:mtdesigner="smartx.flex.components.mtdesigner.*" 
+					   layout="vertical" creationComplete="init()">
+	<fx:Declarations>
+		<mx:VBox id="dataTaskTypeMain" label="数据任务类型配置" width="100%" height="100%" 
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%">
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建数据任务类型"
+							   id="addDataTaskTypeBtn" click="addDataTaskTypeBtn_clickHandler(event)" />
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除数据任务类型"
+							   id="removeDataTaskTypeBtn" click="removeDataTaskTypeBtn_clickHandler(event)" />
+			</mx:HBox>
+			<mx:DataGrid id="dataTaskTypeDg" width="100%" height="100%" editable="true" dataProvider="{sourceXML.datatask}">
+				<mx:columns>
+					<mx:DataGridColumn headerText="名称" dataField="@name" editable="false" />
+					<mx:DataGridColumn headerText="实现类" dataField="@implclass" editable="true"/>
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		<mx:TitleWindow id="addDataTaskTypeWindow" width="200" height="120" title="添加数据任务类型" 
+						showCloseButton="true" close="PopUpManager.removePopUp(addDataTaskTypeWindow)">
+			<mx:HBox width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="名称" />
+				<mx:TextInput id="nameTxt" width="100" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="confirm_clickHandler(event)"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(addDataTaskTypeWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			private function init():void{
+				this.sourceTextArea.editable = false;
+				tabNavigator.removeAllChildren();
+				tabNavigator.addChildAt(dataTaskTypeMain,0);
+			}
+			
+			protected function addDataTaskTypeBtn_clickHandler(event:MouseEvent):void{
+				PopUpManager.addPopUp(addDataTaskTypeWindow,dataTaskTypeMain,true);
+				PopUpManager.centerPopUp(addDataTaskTypeWindow);
+			}
+			
+			protected function removeDataTaskTypeBtn_clickHandler(event:MouseEvent):void{
+				if(dataTaskTypeDg.selectedIndex < 0)
+					return;
+				delete sourceXML.datatask[dataTaskTypeDg.selectedIndex];
+			}
+			
+			protected function confirm_clickHandler(event:MouseEvent):void{
+				if(nameTxt.text == ""){
+					SmartXMessage.show("数据任务类型名称不能为空!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				for each(var datataskXml:XML in sourceXML.datatask){
+					if(datataskXml.@name == nameTxt.text){
+						SmartXMessage.show("数据任务类型名称重复!",SmartXMessage.MESSAGE_WARN);
+						return;
+					}
+				}
+				sourceXML.appendChild(<datatask name={nameTxt.text} implclass="" />);
+				PopUpManager.removePopUp(addDataTaskTypeWindow);
+			}
+			
+		]]>
+	</fx:Script>
+</mtdesigner:MTDesigner>

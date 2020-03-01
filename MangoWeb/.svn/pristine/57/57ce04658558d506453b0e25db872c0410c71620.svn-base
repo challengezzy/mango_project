@@ -1,0 +1,872 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:containers="net.brandonmeyer.containers.*"
+					   xmlns:core="smartx.flex.components.core.*"
+					   layout="vertical" paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3"
+					   allowClose="true" allowDrag="true" allowMaximize="true" allowResize="true" allowMinimize="true"
+					   close="PopUpManager.removePopUp(this)" creationComplete="init()" xmlns:chart="smartx.flex.components.core.chart.*">
+	
+	<fx:Declarations>
+		<mx:TitleWindow id="createDatataskPanel" title="新建数据循环任务模板" showCloseButton="true" 
+						width="450" height="245" close="PopUpManager.removePopUp(createDatataskPanel)">
+			<mx:VBox width="100%" height="100%" paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3" >
+				
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="任务模板名称" width="30%" />
+					<mx:TextInput id="taskNameTxt" width="70%" change="taskNameTxt_changeHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="任务模板编码" width="30%" />
+					<mx:TextInput id="taskCodeTxt" width="70%" change="taskNameTxt_changeHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="调度表达式" width="30%" />
+					<mx:TextInput id="taskExpTxt" text="0 30 23 * * ?" width="70%" change="taskExpTxt_changeHandler(event)" 
+								  toolTip="默认每天23点30分执行;注:从左到右,空格间的字符依次表示:秒(0-59),分(0-59),时(0-23),日(1-31),月(1-12),日(星期周期1-7)\n
+								 			 表达式为空，则该任务为普通任务，必须手动执行！" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="任务类型" width="30%" />
+					<mx:ComboBox id="taskTypeCob" width="70%" labelField="name" change="taskTypeCob_changeHandler(event)" dataProvider="{taskTypeCol}" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="前置任务" width="30%" />
+					<mx:ComboBox id="roundtaskCob" width="60%" labelField="name" dataProvider="{roundTaskCol}" />
+					<mx:LinkButton width="10%" icon="{AssetsFileLib.closeIcon}" click="linkbutton2_clickHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+					<mx:Button id="subBtn" label="确定" click="subBtn_clickHandler(event)" />
+					<mx:Button label="取消" click="PopUpManager.removePopUp(createDatataskPanel)" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="editDatataskPanel" title="编辑数据循环任务模板" showCloseButton="true" 
+						width="450" height="210" close="PopUpManager.removePopUp(editDatataskPanel)">
+			<mx:VBox width="100%" height="100%" paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3" >
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="任务模板名称" width="30%" />
+					<mx:TextInput id="editTaskNameTxt" width="70%" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="调度表达式" width="30%" />
+					<mx:TextInput id="editTaskExpTxt" text="0 30 23 * * ?" width="70%" 
+								  toolTip="默认每天23点30分执行;注:从左到右,空格间的字符依次表示:秒(0-59),分(0-59),时(0-23),日(1-31),月(1-12),日(星期周期1-7)\n
+								 			 表达式为空，则该任务为普通任务，必须手动执行！" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="任务类型" width="30%" />
+					<mx:ComboBox id="editTaskTypeCob" width="70%" change="editTaskTypeCob_changeHandler(event)" labelField="name" dataProvider="{taskTypeCol}" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="前置任务" width="30%" />
+					<mx:ComboBox id="editRoundtaskCob" width="60%" labelField="name" dataProvider="{roundTaskCol}" />
+					<mx:LinkButton width="10%" icon="{AssetsFileLib.closeIcon}" click="linkbutton1_clickHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+					<mx:Button id="editSubBtn" label="确定" click="editSubBtn_clickHandler(event)" />
+					<mx:Button label="取消" click="PopUpManager.removePopUp(editDatataskPanel)" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="chooseSubTaskPanel" title="{choosePanelTitle}" showCloseButton="true" 
+						width="650" height="370" close="PopUpManager.removePopUp(chooseSubTaskPanel)">
+			<mx:VBox width="100%" height="100%" >
+				<chart:AdvListChart id="chooseSubTaskAdvList" queryColumns="{chooseSubTaskAdvQueryColumns}" sql="{chooseSubTaskAdvQuerySql}" 
+									dataSource="{chooseSubTaskAdvDs}" isAllowMultipleSelection="{true}" columns="{chooseSubTaskAdvListColumnArr}"  doubleClickEnabled="true"
+									doubleClick="subTaskConfirmHandler()"/>
+			</mx:VBox>
+			<mx:HRule width="100%" />
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="subTaskConfirmHandler()" />
+				<mx:Button label="取消" click="PopUpManager.removePopUp(chooseSubTaskPanel)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="msgWindow" title="任务执行日志" showCloseButton="true" 
+						width="{pubWidth}" height="{pubHeight}" close="msgWindow_closeHandler()">
+			<mx:VBox width="100%" height="100%" paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3" >
+				<mx:DataGrid id="taskList" width="100%" height="100" dataProvider="{logCol}" >
+					<mx:columns>
+						<mx:DataGridColumn dataField="name" headerText="名称" />
+						<mx:DataGridColumn dataField="rate" width="100" headerText="进度(%)" />
+						<mx:DataGridColumn dataField="begintime" width="150" headerText="开始时间" />
+						<mx:DataGridColumn dataField="endtime" width="150" headerText="结束时间" />
+						<mx:DataGridColumn dataField="lastmassage" headerText="消息" />
+
+					</mx:columns>
+				</mx:DataGrid> 
+				<mx:HRule width="100%" />
+				<mx:HBox width="100%" >
+					<mx:CheckBox id="logScrollChk" label="日志滚动显示" selected="true"/>
+					<mx:Label id="taskLable" text="当前任务执行日志：" />
+				</mx:HBox>
+				<mx:TextArea width="100%" height="100%" text="" id="logArea" editable="false"/>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.ScrollPolicy;
+			import mx.effects.Effect;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.Consumer;
+			import mx.messaging.channels.StreamingAMFChannel;
+			import mx.messaging.events.MessageEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.BillListPanelEvent;
+			import smartx.flex.components.event.MetadataTempletUtilEvent;
+			import smartx.flex.components.styletemplate.MTStyleTemplate09;
+			import smartx.flex.components.styletemplate.StyleTemplate09;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			public static const TASK_CATEGORY_DEFAULT:String = "0";//缺省
+			public static const TASK_CATEGORY_DATAEXTRACT:String = "1";//数据采集
+			public static const TASK_CATEGORY_DATAPROFILE:String = "2";//数据剖析
+			public static const TASK_CATEGORY_RULECHECK:String = "3";//规则检查
+			public static const TASK_CATEGORY_DATACOMPARE:String = "4";//数据比对
+			public static const TASK_CATEGORY_QUALITYEXAMINATION:String = "5";//质量考核
+			public static const TASK_CATEGORY_DBDATACALCULATE:String = "6";//仪表盘数据计算
+			public static const TASK_CATEGORY_GISCONVERT:String = "9";//GIS数据转换
+			
+			protected var bamService:RemoteObject;
+			
+			protected var formService:RemoteObject;
+			
+			[Bindable]
+			protected var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			protected var loginName:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_CODE) as String;
+			
+			protected var taskInfo:Object;
+			[Bindable]
+			public var currentTaskCode:String;//选填
+			[Bindable]
+			public var taskCategory:String;//必填
+			[Bindable]
+			public var initCondition:String = " 1=1 ";
+			[Bindable]
+			protected var searchTaskSQL:String = "select dt.id,dt.code,dt.name,dt.mtcode,mt.content,dt.cronexpression,dt.type," +
+				" (select s.valuecn from bfbiz_sysdictionary s where s.classid='PUB_DATATASK_TEMPLET' and s.attributeid='TYPE' and s.value=dt.type) typecn," +
+				" dt.foregroundtask," +
+				" (select pt.name from pub_datatask_templet pt where pt.code=dt.foregroundtask) roundtaskname " +
+													"from pub_datatask_templet dt,pub_metadata_templet mt where dt.mtcode = mt.code ";
+			[Bindable]
+			protected var taskTempletCol:ArrayCollection = new ArrayCollection();
+			
+			protected var currentTaskTempletXml:XML;
+			
+			protected var currentTaskMtCode:String;
+			[Bindable]
+			private var switchEffect:Effect;
+			
+			protected var curLogTaskId:String;
+			
+			private var styletemplate:StyleTemplate09;
+			[Bindable]
+			protected var choosePanelTitle:String;//子任务选择列表标题
+			[Bindable]
+			protected var chooseSubTaskAdvListColumnArr:Array = [];//子任务选择列表列集合
+			[Bindable]
+			protected var chooseSubTaskAdvQueryColumns:Array = [];//子任务选择列表查询列集合
+			[Bindable]
+			protected var chooseSubTaskAdvQuerySql:String;//子任务选择列表查询SQL
+			[Bindable]
+			protected var chooseSubTaskAdvDs:String = BAMConst.DATASOURCE_SMARTDQ;//子任务选择列表数据源，默认为smart_dq数据源
+			
+			protected var flushedMtCodeArr:Array = [];//要被刷新的元数据编码
+			
+			protected var updatedMtObjArr:Array = [];//要被刷新的元数据
+			[Bindable]
+			public var subItemName:String;
+			
+			[Bindable]
+			private var pubHeight:Number = 900;
+			[Bindable]
+			private var pubWidth:Number = 550;
+			
+			private var timer:Timer;
+			
+			[Bindable]
+			private var logCol:ArrayCollection = new ArrayCollection();
+			
+			private var hasPopLog:Boolean = false;
+			
+			[Bindable]
+			private var roundTaskCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var taskTypeCol:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				
+				pubHeight = screen.height - 50;
+				pubWidth = screen.width*2/3;
+				
+				this.height = pubHeight;
+				this.width = pubWidth;
+				
+				searchTaskSQL = searchTaskSQL+" and dt.taskcategory="+this.taskCategory;
+				initCondition = " TASKCATEGORY="+this.taskCategory;
+				
+				taskTypeCol.removeAll();
+				
+				var item2:Object = new Object();
+				item2["value"] = "1";
+				item2["name"] ="循环任务";
+				taskTypeCol.addItem(item2);
+				
+				var item1:Object = new Object();
+				item1["value"] = "0";
+				item1["name"] ="普通任务";
+				taskTypeCol.addItem(item1);
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint != null ){
+					bamService.endpoint = endpoint;
+					formService.endpoint = endpoint;
+				}
+				
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				bamService.saveEntityRuleTask.addEventListener(ResultEvent.RESULT,saveEntityRuleTaskHandler);
+				bamService.saveEntityRuleTask.addEventListener(FaultEvent.FAULT,function (event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("任务模板创建失败!",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.editTaskTemplet.addEventListener(ResultEvent.RESULT,editTaskTempletHandler);
+				bamService.editTaskTemplet.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.deleteTaskTemplete.addEventListener(ResultEvent.RESULT,deleteTaskTempleteHandler);
+				bamService.deleteTaskTemplete.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.stopTaskByTempletId.addEventListener(ResultEvent.RESULT,stopTaskByTempletIdHandler);
+				bamService.stopTaskByTempletId.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.addAndStartTask.addEventListener(ResultEvent.RESULT,addAndStartTaskHandler);
+				bamService.addAndStartTask.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.updateMetaData.addEventListener(ResultEvent.RESULT,updateMetaDataHandler);
+				bamService.updateMetaData.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				formService.getMessageByTaskId.addEventListener(ResultEvent.RESULT,getMessageByTaskIdHandler);
+				formService.getMessageByTaskId.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				timer = new Timer(5000);
+				timer.addEventListener(TimerEvent.TIMER,function(event:TimerEvent):void{
+					formService.getMessageByTaskId(curLogTaskId);
+				});
+				
+				MetadataTempletUtil.getInstance().addEventListener(MetadataTempletUtilEvent.FLUSH_MTCODE_COMPLETE,mtFlushMtcodeCompleteHandler);
+				MetadataTempletUtil.getInstance().addEventListener(MetadataTempletUtilEvent.FLUSH_MTCODE_FAILED,mtFlushMtcodeFailedHandler);
+				
+//				styletemplate = new StyleTemplate09();
+//				styletemplate.endpoint = endpoint;
+//				styletemplate.templetCode = "T_V_PUB_DATATASKHIS";
+//				styletemplate.initQueryCondition = (" DATATASKTEMPLETID in(select id from PUB_DATATASK_TEMPLET t where taskcategory="+taskCategory+")")
+//				styletemplate.editable = false;
+//				styletemplate.percentWidth = 100;
+//				styletemplate.percentHeight = 100;
+//				styletemplate.direction = "vertical";
+//				styletemplate.childTemplates = [{label:"详细日志信息",templetCode:"T_PUB_DATATASKLOG",forienKey:"DATATASKID",buttonBox:new HBox()}];
+//				
+//				if(msgVbox.getChildren().length>0){
+//					msgVbox.removeAllChildren();
+//				}
+//				msgVbox.addChild(styletemplate);
+				
+				formService.getSimpleHashVoArrayByDS(null,searchTaskSQL);
+			}
+			
+			private function editTaskTempletHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("任务模板编辑成功",SmartXMessage.MESSAGE_INFO);
+				PopUpManager.removePopUp(editDatataskPanel);
+				formService.getSimpleHashVoArrayByDS(null,searchTaskSQL);
+			}
+			
+			private function deleteTaskTempleteHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("任务模板删除成功",SmartXMessage.MESSAGE_INFO);
+				formService.getSimpleHashVoArrayByDS(null,searchTaskSQL);
+			}
+			
+			private function stopTaskByTempletIdHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("任务已停止",SmartXMessage.MESSAGE_INFO);
+			}
+			
+			private function addAndStartTaskHandler(event:ResultEvent):void{
+				
+				OperatingTipUtil.endOperat();
+				curLogTaskId = event.result as String;
+//				SmartXMessage.show("任务已启动!");
+				
+				PopUpManager.addPopUp(msgWindow,this,true);
+				PopUpManager.centerPopUp(msgWindow);
+				
+				hasPopLog = true;
+				logArea.text = "";
+				if(timer && !timer.running){
+					timer.start();
+				}
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var temArr:Array = event.result as Array;
+				taskTempletCol.removeAll();
+				roundTaskCol.removeAll();
+				var selectItem:Object = null;
+				for each(var sp:SimpleHashVO in temArr){
+					var tempItem:Object = sp.dataMap;
+					var tempTaskCode:String = tempItem["code"] as String;
+					if(currentTaskCode != null && currentTaskCode != "" && currentTaskCode == tempTaskCode ){
+						selectItem = tempItem;
+					}
+					taskTempletCol.addItem(sp.dataMap);
+					roundTaskCol.addItem(sp.dataMap);
+				}
+				if(selectItem != null ){
+					templeteList.selectedItem = selectItem;
+					templeteList.scrollToIndex(templeteList.selectedIndex);
+					templeteList_clickHandler(null);
+				}
+				
+			}
+			
+			private function saveEntityRuleTaskHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("任务模板创建成功",SmartXMessage.MESSAGE_INFO);
+				PopUpManager.removePopUp(createDatataskPanel);
+				formService.getSimpleHashVoArrayByDS(null,searchTaskSQL);
+				
+			}
+			
+			private function subBtn_clickHandler(event:MouseEvent):void{
+				if(BAMUtil.isEmpty(taskNameTxt.text)){
+					SmartXMessage.show("名称不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				if(BAMUtil.isEmpty(taskCodeTxt.text)){
+					SmartXMessage.show("编码不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				/* if(BAMUtil.isEmpty(taskExpTxt.text)){
+					SmartXMessage.show("表达式不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				} */
+				
+				taskInfo = new Object();
+				taskInfo["taskExp"] = taskExpTxt.text;
+				taskInfo["taskCode"] = taskCodeTxt.text;
+				taskInfo["taskName"] = taskNameTxt.text;
+				taskInfo["loginName"] = loginName;
+				
+				var item:Object = roundtaskCob.selectedItem;
+				if(item != null ){
+					taskInfo["foregroundtask"] = item["code"];
+				}else{
+					taskInfo["foregroundtask"] = "";
+				}
+				
+				var itemType:Object = taskTypeCob.selectedItem;
+				if(itemType != null ){
+					taskInfo["type"] = itemType["value"];
+				}
+				
+				OperatingTipUtil.startOperat("正在保存....",this);
+				bamService.saveEntityRuleTask(taskInfo,taskCategory);
+				
+			}
+			
+			private function taskNameTxt_changeHandler(event:Event):void{
+				if(taskInfo != null )
+					taskInfo["taskName"] = taskNameTxt.text;
+			}
+			
+			private function taskExpTxt_changeHandler(event:Event):void{
+				if(taskInfo != null )
+					taskInfo["taskExp"] = taskExpTxt.text;
+			}
+			
+			
+			private function createNewTaskBtn_clickHandler(event:MouseEvent):void{
+				PopUpManager.addPopUp(createDatataskPanel,this,true);
+				PopUpManager.centerPopUp(createDatataskPanel);
+			}
+			
+			private function editSubBtn_clickHandler(event:MouseEvent):void{
+				if(BAMUtil.isEmpty(editTaskNameTxt.text)){
+					SmartXMessage.show("名称不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				/* if(BAMUtil.isEmpty(editTaskExpTxt.text)){
+					SmartXMessage.show("表达式不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				} */
+				
+				var item:Object = templeteList.selectedItem;
+				if(item != null ){
+					var id:String = item["id"] as String;
+					var name:String = editTaskNameTxt.text;
+					var code:String = item["code"] as String;
+					var exp:String = editTaskExpTxt.text;
+					var roundTask:String = "";
+					var taskObj:Object = editRoundtaskCob.selectedItem;
+					if(taskObj != null ){
+						roundTask = taskObj["code"];
+					}
+					
+					var type:String = "";
+					var itemType:Object = editTaskTypeCob.selectedItem;
+					if(itemType != null ){
+						type = itemType["value"];
+					}
+					
+					bamService.editTaskTemplet(id,name,code,exp,roundTask,taskCategory,type);
+				}
+			}
+			
+			protected function addTaskTempletclickHandler(event:MouseEvent):void{
+				PopUpManager.addPopUp(createDatataskPanel,this.root,true);
+				PopUpManager.centerPopUp(createDatataskPanel);
+				taskNameTxt.text = "";
+				taskCodeTxt.text = "";
+				roundtaskCob.selectedItem = null;
+			}
+			
+			protected function editTaskTempleteclickHandler():void{
+				var item:Object = templeteList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条任务模板记录");
+					return;
+				}
+				
+				PopUpManager.addPopUp(editDatataskPanel,this.root,true);
+				PopUpManager.centerPopUp(editDatataskPanel);
+				
+				editTaskNameTxt.text = item["name"];
+				editTaskExpTxt.text = item["cronexpression"];
+				
+				var code:String = item["foregroundtask"];
+				if(code != null && code != ""){
+					for each(var obj:Object in roundTaskCol){
+						var tempCode:String = obj["code"];
+						if(code == tempCode){
+							editRoundtaskCob.selectedItem = obj;
+							break;
+						}
+					}
+				}else{
+					editRoundtaskCob.selectedItem = null;
+				}
+				
+				var type:String = item["type"];
+				if(type != null && type != ""){
+					for each(var objType:Object in taskTypeCol){
+						var tempValue:String = objType["value"];
+						if(type == tempValue){
+							editTaskTypeCob.selectedItem = objType;
+							break;
+						}
+					}
+				}else{
+					editTaskTypeCob.selectedItem = null;
+				}
+
+				
+			}
+			
+			protected function delTaskTempleteclickHandler(event:MouseEvent):void{
+				var item:Object = templeteList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条任务模板记录");
+					return;
+				}else{
+					SmartXMessage.show("是否删除该任务模板?",SmartXMessage.MESSAGE_CONFIRM,"",this,deleteTaskTemplete);
+				}
+			}
+			
+			private function deleteTaskTemplete(event:CloseEvent):void{
+				if(Alert.YES == event.detail){
+					var item:Object = templeteList.selectedItem;
+					var code:String = item["code"];
+					var mtcode:String = item["mtcode"];
+					OperatingTipUtil.startOperat("正在删除....");
+					bamService.deleteTaskTemplete(code,mtcode);
+				}
+			}
+			
+			protected function addSubTaskclickHandler():void{ 
+				var item:Object = templeteList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条任务模板记录");
+					return;
+				}
+				
+				PopUpManager.addPopUp(chooseSubTaskPanel,this.root,true);
+				PopUpManager.centerPopUp(chooseSubTaskPanel);
+				
+				chooseSubTaskPanel.callLater(function():void{
+					chooseSubTaskAdvList.refresh();
+				});
+			}
+			
+			
+			private function delSubTaskclickHandler():void{ 
+				SmartXMessage.show("是否删除子任务？",SmartXMessage.MESSAGE_CONFIRM,"",this,delSubTaskConfirmHandler);
+			}
+			
+			private function delSubTaskConfirmHandler(event:CloseEvent):void{
+				if(Alert.YES == event.detail)
+					delSubTaskHandler();
+			}
+			
+			/**
+			 * 删除子任务，由于子任务类型不同，需要子类实现
+			 **/ 
+			protected function delSubTaskHandler():void{ }
+			
+			/**
+			 * 子任务选择确认处理事件
+			 **/ 
+			protected function subTaskConfirmHandler():void{ };
+			
+			/**
+			 * 上移子任务操作
+			 **/ 
+			private function upClickHandler(event:MouseEvent):void{
+				var item:Object = subItemList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条子任务记录");
+					return;
+				}
+				
+				if(item==null || item.parent() ==undefined)
+					return;
+				var index:int = item.childIndex();
+				if(index == 0)
+					return;
+				var newXml:XML = XML(item).copy();
+				CEPUtils.xmlDeleteNode(XML(item));
+				
+				this.currentTaskTempletXml.datatask[0].insertChildBefore(currentTaskTempletXml.datatask[0].children()[index-1],newXml);
+				subItemList.dataProvider = currentTaskTempletXml.datatask.custom_task;
+				callLater(function():void{
+					subItemList.selectedItem = newXml;
+				});
+			}
+			
+			/**
+			 * 下移子任务操作
+			 **/ 
+			private function downClickHandler(event:MouseEvent):void{
+				var item:Object = subItemList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条子任务记录");
+					return;
+				}
+				
+				var attSelectedItem:Object = subItemList.selectedItem;
+				if(attSelectedItem==null || attSelectedItem.parent() ==undefined)
+					return;
+				var index:int = attSelectedItem.childIndex();
+				if(index == attSelectedItem.parent().children().length() -1)
+					return;
+				var newXml:XML = XML(attSelectedItem).copy();
+				CEPUtils.xmlDeleteNode(XML(attSelectedItem));
+				this.currentTaskTempletXml.datatask[0].insertChildAfter(this.currentTaskTempletXml.datatask[0].children()[index],newXml);
+				
+				subItemList.dataProvider = currentTaskTempletXml.datatask.custom_task;
+				callLater(function():void{
+					subItemList.selectedItem =newXml;
+					subItemList.scrollToIndex(subItemList.selectedIndex-1);
+				});
+			}
+			
+			private function saveMtContent():void{
+				var item:Object = templeteList.selectedItem;
+				if(item != null){
+					
+					var mtcode:String = item["mtcode"] as String;
+					
+					updatedMtObjArr = new Array();
+					flushedMtCodeArr = new Array();
+					
+					var taskObj:Object = new Object();
+					taskObj["mtcode"] = mtcode;
+					taskObj["content"] = currentTaskTempletXml.toXMLString();
+					updatedMtObjArr.push(taskObj);
+					flushedMtCodeArr.push(mtcode);
+					
+					OperatingTipUtil.startOperat("正在保存....",this);
+					bamService.updateMetaData(updatedMtObjArr,taskCategory);
+				}
+			}
+			
+			/**
+			 * 选中任务模板
+			 **/ 
+			private function templeteList_clickHandler(event:MouseEvent):void{
+				var item:Object = templeteList.selectedItem;
+				if(item != null){
+					
+					var content:String = item["content"] as String;
+					var code:String = item["code"] as String;
+					var mtcode:String = item["mtcode"] as String;
+					
+					currentTaskTempletXml = new XML(content);
+					currentTaskCode = code;
+					currentTaskMtCode = mtcode;
+					
+					subItemList.dataProvider = currentTaskTempletXml.datatask.custom_task;
+				}
+			}
+			
+			/**
+			 * 启动任务
+			 **/ 
+			protected function startClickHandler(event:MouseEvent):void{
+				var item:Object = templeteList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条任务模板记录");
+					return;
+				}
+				
+				var taskId:String = item["id"];
+				var taskName:String = item["name"];
+				var taskContent:String = item["content"];
+				
+				logCol.removeAll();
+				bamService.addAndStartTask(taskId,taskName,taskContent,null);
+				OperatingTipUtil.startOperat("正在执行....",this);
+			}
+			
+			private function updateMetaDataHandler(event:ResultEvent):void{
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtCodeArray(flushedMtCodeArr,this.endpoint);
+			}
+			
+			private function mtFlushMtcodeCompleteHandler(event:MetadataTempletUtilEvent):void{
+				OperatingTipUtil.endOperat();
+				formService.getSimpleHashVoArrayByDS(null,searchTaskSQL);
+				
+			}
+			
+			private function mtFlushMtcodeFailedHandler(event:MetadataTempletUtilEvent):void{
+				OperatingTipUtil.endOperat();
+				formService.getSimpleHashVoArrayByDS(null,searchTaskSQL);
+			}
+			
+			private function getMessageByTaskIdHandler(event:ResultEvent):void{
+				var msgArr:Array = event.result as Array;
+				if(msgArr != null && msgArr.length>0 ){
+					logCol.removeAll();
+					for each(var sp:SimpleHashVO in msgArr){
+						if(hasPopLog){
+							logArea.text = sp.dataMap["execlog"];
+							if(logScrollChk.selected){
+								logArea.verticalScrollPosition = logArea.maxVerticalScrollPosition;
+							}
+						}
+						
+						execLogArea.text = sp.dataMap["execlog"];
+						execLogArea.verticalScrollPosition = execLogArea.maxVerticalScrollPosition;
+						
+						logCol.addItem(sp.dataMap);
+						if(sp.dataMap["status"]==9||sp.dataMap["status"]==10){
+							if(timer && timer.running){
+								timer.stop();
+							}
+						}
+					}
+				}
+//				listPanel.query();
+			}
+			
+			/**
+			 * 通过任务模板编码获得任务对象
+			 **/ 
+			protected function getTaskObjByCode(taskCode:String):Object{
+				var obj:Object;
+				if(!BAMUtil.isEmpty(taskCode)){
+					for each(var item:Object in taskTempletCol){
+						if(item["code"]==taskCode){
+							obj = item;
+						}
+					}
+				}
+				return obj;
+			}
+			
+			protected function msgWindow_closeHandler():void
+			{
+				logArea.text = "";
+				hasPopLog = false;
+				PopUpManager.removePopUp(msgWindow);
+				if(timer && timer.running){
+					timer.stop();
+				}
+			}
+			
+			protected function listPanel_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = listPanel.getSelectedRowValue();
+				if(item != null ){
+					curLogTaskId = item["ID"];
+					formService.getMessageByTaskId(curLogTaskId);
+				}
+			}
+		
+			protected function listPanel_queryEndHandler(event:BillListPanelEvent):void
+			{
+				execLogArea.text = "";
+				
+			}
+			
+			protected function msgVbox_showHandler(event:FlexEvent):void
+			{
+				listPanel.query();
+			}
+			
+			protected function linkbutton1_clickHandler(event:MouseEvent):void
+			{
+				editRoundtaskCob.selectedItem = null;
+				
+			}
+			
+			protected function linkbutton2_clickHandler(event:MouseEvent):void
+			{
+				roundtaskCob.selectedItem = null;
+				
+			}
+			
+			protected function stopClickHandler(event:MouseEvent):void
+			{
+				var item:Object = templeteList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条任务模板记录");
+					return;
+				}else{
+					var id:String = item["id"];
+					OperatingTipUtil.startOperat("正在终止任务....");
+					bamService.stopTaskByTempletId(id);
+				}
+				
+			}
+			
+			protected function taskTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = taskTypeCob.selectedItem;
+				if(item != null && item["value"] == "0"){
+					taskExpTxt.text = "";
+				}else{
+					taskExpTxt.text = "0 30 23 * * ?";
+				}
+				
+			}
+			
+			protected function editTaskTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = editTaskTypeCob.selectedItem;
+				if(item != null && item["value"] == "0"){
+					editTaskExpTxt.text = "";
+				}else{
+					editTaskExpTxt.text = "0 30 23 * * ?";
+				}
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:TabNavigator id="tabNavigator" width="100%" height="100%" creationPolicy="all" >
+		<mx:VBox label="任务模板" width="100%" height="100%" showEffect="{switchEffect}" hideEffect="{switchEffect}" >
+			<mx:HBox width="100%" >
+				<mx:LinkButton toolTip="新增" icon="{AssetsFileLib.addIcon}" width="22" click="addTaskTempletclickHandler(event)" />
+				<mx:LinkButton toolTip="编辑" icon="{AssetsFileLib.editIcon}" width="22" click="editTaskTempleteclickHandler()" />
+				<mx:LinkButton toolTip="删除" icon="{AssetsFileLib.minuseIcon}" width="22" click="delTaskTempleteclickHandler(event)" />
+				<mx:LinkButton toolTip="立即执行" icon="{AssetsFileLib.startIcon}" width="22" click="startClickHandler(event)" />
+				<mx:LinkButton toolTip="停止任务" icon="{AssetsFileLib.stopIcon}" width="22" click="stopClickHandler(event)" />
+			</mx:HBox>
+			<mx:DataGrid id="templeteList" width="100%" height="100%" dataProvider="{taskTempletCol}" 
+						 click="templeteList_clickHandler(event)" verticalScrollPolicy="{ScrollPolicy.ON}" >
+				<mx:columns>
+					<mx:DataGridColumn dataField="name" editable="false" headerText="模板名称"/>
+					<mx:DataGridColumn dataField="typecn" editable="false" headerText="任务类型"/>
+					<mx:DataGridColumn dataField="cronexpression" editable="false"  headerText="表达式"/>
+					<mx:DataGridColumn dataField="roundtaskname" editable="false"  headerText="前置任务"/>
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox width="100%" >
+				<mx:LinkButton toolTip="新增" icon="{AssetsFileLib.addIcon}" width="22" click="addSubTaskclickHandler()" />
+				<mx:LinkButton toolTip="删除" icon="{AssetsFileLib.minuseIcon}" width="22" click="delSubTaskclickHandler()" />
+				<mx:LinkButton toolTip="上移" icon="{AssetsFileLib.upIcon}" width="22" click="upClickHandler(event)" />
+				<mx:LinkButton toolTip="下移" icon="{AssetsFileLib.downIcon}" width="22" click="downClickHandler(event)" />
+				<mx:LinkButton toolTip="保存" icon="{AssetsFileLib.saveasIcon}" width="22" click="saveMtContent()" />
+			</mx:HBox>
+			<mx:DataGrid id="subItemList" width="100%" height="100%" >
+				<mx:columns>
+					<mx:DataGridColumn dataField="@name" editable="false" headerText="{subItemName}"/>
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		<mx:VBox id="msgVbox" label="任务日志" width="100%" height="100%" showEffect="{switchEffect}" hideEffect="{switchEffect}" show="msgVbox_showHandler(event)" >
+			<core:BillListPanel 
+				allowMultipleSelection="{false}"
+				click="listPanel_clickHandler(event)"
+				destination="{GlobalConst.SERVICE_FORM}" endpoint="{endpoint}" templetCode="T_V_PUB_DATATASKHIS" 
+				id="listPanel" editable="false" width="100%" height="100%" 
+				showEditBox="false" showDataAfterInit="{false}" queryEnd="listPanel_queryEndHandler(event)"
+				isShowAlert = "{false}" initQueryCondition="{initCondition}"
+				/>
+			<mx:HRule width="100%" />
+			<mx:TextArea width="100%" height="100%" text="" id="execLogArea" editable="false"/>
+		</mx:VBox>
+	</mx:TabNavigator>
+</containers:SuperPanel>

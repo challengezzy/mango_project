@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<code:SuperPanel xmlns:code="net.brandonmeyer.containers.*"
+	xmlns:mx="http://www.adobe.com/2006/mxml" width="300" height="400" close="PopUpManager.removePopUp(this)" 
+	title="脚本编辑器" allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true"  
+	creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			import com.searchcoders.ui.syntax.TextUtil;
+			import com.searchcoders.ui.syntax.lang.DefaultDictionary;
+			import com.searchcoders.ui.syntax.DocumentMarker;
+			import com.searchcoders.ui.syntax.format.ActionScriptFormatter;
+			import mx.events.ListEvent;
+			
+			[Bindable]
+			public var text:String;
+			
+			[Bindable]
+			public var editable:Boolean = true;
+			
+			private var marker:DocumentMarker;
+			
+			private var selectors:Array = null;
+			
+			private var textField:TextField;
+			
+			[Bindable]
+			public var working:Boolean = false;
+			
+			private static var isCompileRepositoryReady:Boolean = false;
+			
+			[Bindable]
+			private var sysFunctionList:Array = [
+			{名称:"sysOutput(value:String)",描述:"脚本结果输出"},
+			{名称:"sysGetVar(name:String)",描述:"返回运行时上下文变量的值（一般在运行前声明注册）"},
+			{名称:"sysGetClientVar(name:String)",描述:"返回客户端环境变量的值"},
+			{名称:"getCurrentTime()",描述:"返回当前日期YYYY-MM-DD JJ:NN:SS"}
+			];
+			
+			[Bindable]
+			public var confirmFunc:Function = function():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function init():void{
+				if(!editable)
+					buttonBar.removeChild(cancelButton);
+					
+				if(!isCompileRepositoryReady){
+					// compile the repository only once
+					TextUtil.compileRepository(DefaultDictionary.repository);
+					isCompileRepositoryReady = true;
+				}
+				
+				// create the marker
+				marker = new DocumentMarker();
+				
+				// extract the textfield from the control
+				textField = TextUtil.getTextField(textArea);
+			}
+			
+			private function textChanged():void{
+				text=textArea.text;
+				if(!working){
+					working = true;
+					
+					// start marking
+					marker.markDocument(text, 
+						DefaultDictionary.actionscript, 
+						DefaultDictionary.repository, 
+						markerDone);	
+				}	
+			}
+			
+			/**
+			 * Called when marking is complete
+			 *
+			 * @param selectors The list of selectors
+			 */
+			private function markerDone(selectors:Array):void
+			{				
+				// pring out the selectors
+				trace(TextUtil.insertSelectors(text, selectors));				
+				
+				// decorate the text field
+				var decorator:ActionScriptFormatter = new ActionScriptFormatter();
+				decorator.format(selectors, textField);
+				
+				working = false;
+			}
+			
+			private function insertStrIntoTextArea(insertString:String):void{
+				var textAreaString:String = textArea.text;
+			    var startPart:String = textAreaString.substring(0,textArea.selectionBeginIndex);
+			    var endPart:String = textAreaString.substring(textArea.selectionEndIndex,textAreaString.length);
+			    startPart+=insertString;
+			    startPart+=endPart;
+			    textArea.text = startPart;
+				text = textArea.text;
+			}
+			
+			private function functionSelected(event:ListEvent):void{
+				if(editable){
+					var insertString:String = sysFunctionList[event.rowIndex]["名称"];
+					insertStrIntoTextArea(insertString);
+				}
+			}
+		]]>
+	</mx:Script> 
+	<mx:VBox width="100%" height="100%" backgroundColor="white">
+		<mx:VDividedBox width="100%" height="100%">
+			<mx:VBox height="40%" width="100%">
+				<mx:TabNavigator width="100%" height="100%">
+					<mx:VBox label="系统函数">
+						<mx:DataGrid width="100%" height="100%" dataProvider="{sysFunctionList}" itemClick="functionSelected(event)"/>
+					</mx:VBox>
+				</mx:TabNavigator>
+			</mx:VBox>
+			<mx:TextArea height="60%" width="100%" text="{text}" id="textArea" change="textChanged()"
+							editable="{editable}" fontSize="14"/>
+		</mx:VDividedBox>
+		<mx:HBox id="buttonBar" width="100%" horizontalAlign="center">
+			<mx:Button id="confirmButton" label="确定" click="confirmFunc()"/>
+			<mx:Button id="cancelButton" label="取消" click="PopUpManager.removePopUp(this)"/>
+		</mx:HBox>
+	</mx:VBox>
+</code:SuperPanel>

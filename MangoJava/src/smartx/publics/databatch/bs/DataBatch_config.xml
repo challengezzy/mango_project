@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="gb2312"?>
+<imports>
+	<import>
+		<tablename>test</tablename>
+		<excelhastitle>true</excelhastitle>
+		<columns_by_import>
+			<column>
+				<name>id</name>
+				<type>Num</type>
+				<colNum>1</colNum>
+				<isConstraint>true</isConstraint><!--类似于isKey-->
+			</column>
+			<column>
+				<name>name</name>
+				<type>String</type>
+				<colNum>2</colNum>
+				<isConstraint>true</isConstraint>
+			</column>
+			<column>
+				<name>fav</name>
+				<type>String</type>
+				<colNum>3</colNum>
+				<isConstraint>false</isConstraint>
+			</column>
+			<column>
+				<name>time</name>
+				<type>Date</type>
+				<colNum>4</colNum>
+				<isConstraint>false</isConstraint>
+			</column>
+		</columns_by_import>
+		<columns_by_other>
+			<column>
+				<name>idtest</name>
+				<type>Function</type>
+				<value>(select max(idtest) from test)+1</value>
+			</column>
+			<!--该Formula部分暂时不实现
+			<column>
+				<name>idtest</name>
+				<type>Formula</type>
+				<value>(select max(id) from PUB_USER_MENU)+1</value>
+			</column>
+			-->		
+		</columns_by_other>
+		<showmessage></showmessage>
+	</import>
+	<import>
+		<tablename>test2</tablename>
+		<excelhastitle>true</excelhastitle>
+		<columns>
+			<column>
+				<name>id</name>
+				<type attr="(select max(id) from PUB_USER_MENU)+1">Function</type>
+				<colNum>1</colNum>
+				<isConstraint>true</isConstraint>
+			</column>
+			
+			<column>
+				<name>name</name>
+				<type>String</type>
+				<colNum>2</colNum>
+				<isConstraint>true</isConstraint>
+			</column>
+			
+			<column>
+				<name>fav</name>
+				<type>String</type>
+				<colNum>3</colNum>
+				<isConstraint>false</isConstraint>
+			</column>
+		</columns>
+		<showmessage></showmessage>
+	</import>
+</imports>
+

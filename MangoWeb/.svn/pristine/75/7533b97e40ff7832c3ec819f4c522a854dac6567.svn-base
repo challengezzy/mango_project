@@ -1,0 +1,1441 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				width="100%" height="580"
+				creationComplete="creationComplete()" xmlns:ext="smartx.flex.components.core.ext.*" 
+				xmlns:datatask="smartx.flex.modules.datatask.*">
+	<fx:Declarations>
+		<mx:TitleWindow id="sqlNameWindow" width="250" height="130" title="设置SQL名称" showCloseButton="true"
+						close="PopUpManager.removePopUp(sqlNameWindow)">
+			<mx:HBox width="100%">
+				<mx:Label text="SQL名称" />
+				<mx:TextInput id="sqlNameTxt" width="120"/>
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="setSqlNameBtn_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(sqlNameWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="cusDefineNameWindow" width="250" height="130" title="设置自定义参数名称" showCloseButton="true"
+						close="PopUpManager.removePopUp(cusDefineNameWindow)">
+			<mx:HBox width="100%">
+				<mx:Label text="自定义参数名称" />
+				<mx:TextInput id="cusDefineNameTxt" width="120"/>
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="setCusDefineNameBtn_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(cusDefineNameWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="initParamNameWindow" width="250" height="130" title="设置初始化参数名称" showCloseButton="true"
+						close="PopUpManager.removePopUp(initParamNameWindow)">
+			<mx:HBox width="100%">
+				<mx:Label text="初始化参数名称" />
+				<mx:TextInput id="initParamNameTxt" width="120"/>
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="setInitParamNameBtn_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(initParamNameWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		
+		<mx:Button id="subDataTaskEditBtn" icon="{AssetsFileLib.editIcon}" click="subDataTaskEditBtn_clickHandler(event)" />
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.effects.Effect;
+			import mx.events.CloseEvent;
+			import mx.events.CollectionEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.events.SliderEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.ext.DefineTreeDataDescriptor;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.DataTaskUtil;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.modules.datatask.renderer.DataTaskTreeItemRenderer;
+			
+			[Bindable]
+			public var contentXml:XML;//任务内容XML
+			[Bindable]
+			public var confirmFunc:Function;
+			[Bindable]
+			public var cancelFunc:Function;
+			[Bindable]
+			public var dataTaskName:String;
+			[Bindable]
+			public var dataTaskId:String;
+			[Bindable]
+			public var dataTaskMtCode:String;
+			
+			public var endpoint:String;
+			[Bindable]
+			public var isSubDataTask:Boolean = false;//是否为子任务设计器
+			[Bindable]
+			private var operationList:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var dataTaskTreeDataDescriptor:DefineTreeDataDescriptor = new DefineTreeDataDescriptor();
+			[Bindable]
+			private var selectedItem:Object;
+			[Bindable]
+			private var datasources:ArrayCollection = new ArrayCollection();
+			
+			private var rpc:RemoteObject;
+			
+			[Bindable]
+			private var excelFieldDataProvider:ArrayCollection = new ArrayCollection();
+			
+			private const CEP_DS_PREFIX:String = "datasource_cep";
+			[Bindable]
+			private var filePathTooltip:String = "windows平台(d:/temp/up/) linux平台(/opt)";
+			
+			private var sqlList:List;
+			
+			private var sqlDetail:TextArea;
+			[Bindable]
+			private var datasplitDataProvider:ArrayCollection = new ArrayCollection([
+				{name:"分号",data:";"},
+				{name:"逗号",data:","},
+				{name:"制表符",data:"\\t"}
+			]);
+			
+			private var loadingWindow:LoadingWindow = new LoadingWindow();
+			
+			private var isChangeExcelFieldDataProvider:Boolean = true;
+			
+			private var subDataTaskRefPanel:ItemRefPanel;
+			[Bindable]
+			private var cusDefineParamsDp:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var initParamsDp:XMLListCollection = new XMLListCollection();
+			[Bindable]
+			private var switchEffect:Effect;
+			[Bindable]
+			private var charsetDataProvider:ArrayCollection = new ArrayCollection([
+				{name:"utf-8"},{name:"gbk"},{name:"ISO-8859-1"}
+			]);
+			
+			private var contentXmlDup:XML;//元数据副本
+			
+			private function creationComplete():void{
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				var operationMenu:Menu = operationButton.popUp as Menu;
+				operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+				
+				initContentXml();
+				
+				initButtons();
+				rpc = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint != null)
+					rpc.endpoint = endpoint;
+				rpc.queryAllRelationDsName.addEventListener(ResultEvent.RESULT,queryAllRelationDsNameHandler);
+				rpc.queryAllRelationDsName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("queryAllRelationDsName错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				rpc.getTaskParamById.addEventListener(ResultEvent.RESULT,getTaskParamHandler);
+				rpc.getTaskParamById.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取任务变量错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				
+				rpc.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				rpc.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("getTableDataStructByDS错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					loadingWindow.stopOper();
+				});
+				
+				rpc.getSubsequentDataTask.addEventListener(ResultEvent.RESULT,getSubsequentDataTaskHandler);
+				rpc.getSubsequentDataTask.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("getSubsequentDataTask错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					loadingWindow.stopOper();
+				});
+				
+				rpc.updateDataTaskMetaData.addEventListener(ResultEvent.RESULT,updateDataTaskMetaDataHandler);
+				rpc.updateDataTaskMetaData.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("updateDataTaskMetaData错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					loadingWindow.stopOper();
+				});
+				
+				excelFieldDataProvider.addEventListener(CollectionEvent.COLLECTION_CHANGE,excelFieldDataProviderChangeHandler,false,0,true);
+				cusDefineParamsDp.addEventListener(CollectionEvent.COLLECTION_CHANGE,parseCusDefineParams,false,0,true);
+				parseInitParams();
+				
+				rpc.queryAllRelationDsName();
+				if(isSubDataTask){
+					mainBox.contains(confirmBox)?mainBox.removeChild(confirmBox):null;
+				}else{
+					mainBox.contains(confirmBox)?null:mainBox.addChild(confirmBox);
+				}
+					
+			}
+			
+			public function initContentXml():void{
+				if(contentXml == null){
+					contentXml = <root>
+									<datatask desc={dataTaskName==null?"":dataTaskName} />
+								</root>;
+				}
+				if(String(contentXml.datatask.@taskId) == "")
+					contentXml.datatask.@taskId = dataTaskId==null?"":dataTaskId;
+				if(String(contentXml.datatask.@mtcode) == "")
+					contentXml.datatask.@mtcode = dataTaskMtCode==null?"":dataTaskMtCode;
+				//将初始化参数添加在第一个节点
+				if(contentXml.datatask.initparam.length() == 0)
+					contentXml.datatask.insertChildBefore(contentXml.datatask.children()[0],<initparam desc='综合设置' hasChildren='false' />);
+				else
+					contentXml.datatask.initparam.@desc = "综合设置";
+				contentXmlDup = contentXml.copy();
+			}
+			
+			private function queryAllRelationDsNameHandler(event:ResultEvent):void{
+				datasources.removeAll();
+				var result:Array = event.result as Array;
+				for each(var value:String in result){
+					if(!StringUtil.beginsWith(value,CEP_DS_PREFIX))
+						datasources.addItem(value);
+				}
+				
+			}
+			
+			private function setDSComboSelected():void{
+				if(currentState == "export_db"){
+					setDatasourceCboValue(selectedItem.from.@datasource,datasourceCbo)
+					setDatasourceCboValue(selectedItem.to.@datasource,tagDatasourceCbo)
+				}else if( currentState == "data_extract" ){
+					setDatasourceCboValue(selectedItem.from.@datasource,datasourceCbo)
+					setDatasourceCboValue(selectedItem.to.@datasource,tagDatasourceCbo2)
+				}else{
+					setDatasourceCboValue(selectedItem.@datasource,datasourceCbo);
+				}
+			}
+			
+			private function setDatasourceCboValue(datasourceStr:Object,datasourceCbo:ComboBox):Boolean{
+				if(datasourceStr != null && String(datasourceStr) != ""){
+					for each(var obj:String in datasources){
+						if(obj == String(datasourceStr)){
+							datasourceCbo.selectedItem = obj;
+							return true;
+						}else
+							datasourceCbo.selectedIndex = -1;
+					}
+				}
+				return false;
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				var i:int;
+				var fromColsIdx:String = "";
+				var fromColsName:String = "";
+				for(i=1;i<=tableDataStruct.table_header.length;i++ ){
+					if(i == tableDataStruct.table_header.length){
+						fromColsIdx = fromColsIdx.concat(i);
+						fromColsName = fromColsName.concat(tableDataStruct.table_header[i-1].toString()) ;
+					}else{
+						fromColsIdx = fromColsIdx.concat(i).concat(",");
+						fromColsName = fromColsName.concat(tableDataStruct.table_header[i-1].toString()).concat(",") ;
+					}
+				}
+				
+				if(currentState == "export_db"){
+					selectedItem.from.@cols = fromColsTxt.text = fromColsIdx;
+					selectedItem.fromColsName = fromColsNameTxt.text = fromColsName;
+				}else if(currentState == "data_extract"){
+					selectedItem.from.@cols = fromColsTxt2.text = fromColsIdx;
+					selectedItem.fromColsName = fromColsNameTxt2.text = fromColsName;
+				}else if(currentState == "exportExcel"){
+					isChangeExcelFieldDataProvider = true;
+					excelFieldDataProvider.removeAll();
+					for(i=0;i<tableDataStruct.table_header.length;i++ ){
+						var data:Object = {};
+						data.field = tableDataStruct.table_header[i];
+						data.fieldType = tableDataStruct.table_body_type[i];
+						excelFieldDataProvider.addItem(data);
+					}
+				}
+				loadingWindow.stopOper();
+			}
+			
+			private function initButtons():void{
+				operationList.addAll(new ArrayCollection([
+					{name:"SQL操作",id:"sqlOperates",icon:AssetsFileLib.SQLOperateIcon},
+					{name:"SQL操作事务",id:"trans",icon:AssetsFileLib.SQLTransIcon},
+					{name:"导出EXCEL",id:"export_xls",icon:AssetsFileLib.exportExcelIcon},
+					{name:"文件上传",id:"ftpupload",icon:AssetsFileLib.dtUploadIcon},
+					{name:"文件下载",id:"ftpdownload",icon:AssetsFileLib.dtDownloadIcon},
+					{name:"文本数据导入",id:"parsedata",icon:AssetsFileLib.parsedataIcon},
+					{name:"数据抽取",id:"data_extract",icon:AssetsFileLib.wjxIcon},
+					{name:"数据库间导数据",id:"export_db",icon:AssetsFileLib.exportDbIcon},
+					{name:"自定义任务",id:"custom_task",icon:AssetsFileLib.redpointIcon},
+					{name:"数据任务",id:"subdatatask",icon:AssetsFileLib.subDatataskIcon}
+				]));
+			}
+			
+			public function getContentXml():String{
+				mt_showHandler(null);
+				return content.text;
+			}
+			
+			private function dtTree_itemClickHandler(event:ListEvent):void{
+				selectedItem = dtTree.selectedItem;
+				switchState(XML(selectedItem));
+			}
+			
+			private function operationButton_itemClickHandler(event:MenuEvent):void{
+				var menuid:String = event.item["id"];
+				var name:String = event.item["name"];
+				if(menuid == "trans" && (selectedItem == null || String(XML(selectedItem).name()) != "sqlOperates")){
+					SmartXMessage.show("请选择相应的SQL操作!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				if(menuid == "trans"){
+					selectedItem.appendChild(<trans desc={name} rate='0' hasChildren='false' />);
+				}else if(menuid == "sqlOperates")
+					contentXml.datatask.appendChild(<sqlOperates desc={name} isNeedRun='true'>
+															<trans desc="SQL操作事务" rate="0" hasChildren="false" />
+													</sqlOperates>);
+				else if(menuid == "parsedata"){
+					contentXml.datatask.appendChild(<parsedata desc={name} isNeedRun='true' srctype="txt" hasChildren='false'>
+														<init-ctrl/><line-ctrl/><ending-ctrl/></parsedata>);
+				}else if(menuid == "export_db")
+					contentXml.datatask.appendChild(<export_db desc={name} isNeedRun='true' hasChildren='false'><from /><to /><option /></export_db>);
+				else if(menuid == "data_extract"){
+					contentXml.datatask.appendChild(<data_extract desc={name} isNeedRun='true' 
+														hasChildren='false'><from /><to /><option threadOrProcess="thread"/></data_extract>);
+				}else
+					contentXml.datatask.appendChild(<{menuid} desc={name} isNeedRun='true' hasChildren='false' />);
+			}
+			
+			private function deleteDataTask():void{
+				if(selectedItem == null){
+					SmartXMessage.show("请选择要删除的任务!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}else{
+					if(String(XML(selectedItem).name()) == "initparam"){
+						SmartXMessage.show("无法删除初始化参数!",SmartXMessage.MESSAGE_WARN);
+						return;
+					}
+					SmartXMessage.show("是否删除该任务?",SmartXMessage.MESSAGE_CONFIRM,"",this,deleteDataTaskHandler);
+				}
+			}
+			
+			private function deleteDataTaskHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES)
+					CEPUtils.xmlDeleteNode(XML(selectedItem));
+			}
+			
+			private function addSql():void{
+				if(sqlNameTxt)
+					sqlNameTxt.text = "";
+				PopUpManager.addPopUp(sqlNameWindow,this,true);
+				PopUpManager.centerPopUp(sqlNameWindow);
+			}
+			
+			private function delSql():void{
+				if(sqlList.selectedIndex < 0)
+					return;
+				if(sqlList == transSqlList)
+					delete selectedItem.sql[sqlList.selectedIndex];
+				else if(sqlList == pdInitSqlList)
+					delete selectedItem["init-ctrl"].sql[sqlList.selectedIndex];
+				else if(sqlList == pdLineSqlList)
+					delete selectedItem["line-ctrl"].sql[sqlList.selectedIndex];
+				else if(sqlList == pdEndSqlList)
+					delete selectedItem["ending-ctrl"].sql[sqlList.selectedIndex];
+			}
+			
+			private function sqlList_itemClickHandler():void{
+				if(sqlList.selectedIndex < 0)
+					return;
+				sqlDetail.text = String(sqlList.selectedItem);
+			}
+			
+			private function switchState(node:XML):void{
+				switch(String(node.name())){
+					case "sqlOperates":
+						currentState = "sqlOperates";
+						break;
+					case "trans":
+						currentState = "sql";
+						setDSComboSelected();
+						sqlList = transSqlList;
+						sqlDetail = transSqlDetail;
+						transSqlDetail.text = "";
+						break;
+					case "export_xls":
+						currentState = "exportExcel";
+						setDSComboSelected();
+						setExcelFieldDataProvider();
+						break;
+					case "ftpupload":
+						currentState = "ftpupload";
+						break;
+					case "ftpdownload":
+						currentState = "ftpdownload";
+						break;
+					case "parsedata":
+						currentState = "parsedata";
+						setDSComboSelected();
+						pdInitBox_showHandler();
+						setDatasplitCboValue();
+						pdInitSqlDetail.text = "";
+						pdLineSqlDetail.text = "";
+						pdEndSqlDetail.text = "";
+						break;
+					case "export_db":
+						currentState = "export_db";
+						setDSComboSelected();
+						break;
+					case "data_extract":
+						currentState = "data_extract";
+						setDSComboSelected();
+						break;
+					case "custom_task":
+						currentState = "custom_task";
+						var simpleRefVo:SimpleRefItemVO = new SimpleRefItemVO();
+						simpleRefVo.name = node.@name;
+						simpleRefVo.code = node.@implclass;
+						implClassTxt.value = simpleRefVo;
+						setCusDefineParams();
+						break;
+					case "subdatatask":
+						currentState = "subdatatask";
+						initRefPanel();
+						var refvo:SimpleRefItemVO = new SimpleRefItemVO();
+						refvo.name = node.@name;
+						refvo.code = node.@mtcode;
+						refvo.id = node.@taskId;
+						subDataTaskRefPanel.data = {"subDataTask":refvo};
+						break;
+					case "initparam":
+						currentState = "init_param";
+						querySubsequent();
+						break;
+					default:
+						currentState = "normal";
+				}
+			}
+			
+			public function switchNormalState():void{
+				currentState = "normal";
+			}
+			
+			private function setSqlNameBtn_confirmHandler():void{
+				if(sqlNameTxt.text == ""){
+					SmartXMessage.show("请填写SQL名称!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				var sql:XML = <sql desc={sqlNameTxt.text} />;
+				if(sqlList == transSqlList){
+					selectedItem.appendChild(sql);
+					sqlList.selectedIndex = selectedItem.sql.length()-1;
+				}else if(sqlList == pdInitSqlList){
+					selectedItem["init-ctrl"].appendChild(sql);
+					sqlList.selectedIndex = selectedItem["init-ctrl"].sql.length()-1;
+				}else if(sqlList == pdLineSqlList){
+					selectedItem["line-ctrl"].appendChild(sql);
+					sqlList.selectedIndex = selectedItem["line-ctrl"].sql.length()-1;
+				}else if(sqlList == pdEndSqlList){
+					selectedItem["ending-ctrl"].appendChild(sql);
+					sqlList.selectedIndex = selectedItem["ending-ctrl"].sql.length()-1;
+				}
+				sqlList_itemClickHandler();
+				PopUpManager.removePopUp(sqlNameWindow);
+				sqlList.scrollToIndex(sqlList.selectedIndex);
+			}
+			
+			protected function mt_showHandler(event:FlexEvent):void{
+				content.text = contentXml.toXMLString();
+			}
+			
+			protected function sqlDetail_changeHandler(event:Event):void{
+				if(sqlList.selectedIndex < 0)
+					return;
+				var tempSelectedIndex:int = sqlList.selectedIndex;
+				if(sqlList == transSqlList)
+					selectedItem.sql[sqlList.selectedIndex] = sqlDetail.text;
+				else if(sqlList == pdInitSqlList)
+					selectedItem["init-ctrl"].sql[sqlList.selectedIndex] = sqlDetail.text;
+				else if(sqlList == pdLineSqlList)
+					selectedItem["line-ctrl"].sql[sqlList.selectedIndex] = sqlDetail.text;
+				else if(sqlList == pdEndSqlList)
+					selectedItem["ending-ctrl"].sql[sqlList.selectedIndex] = sqlDetail.text;
+				sqlList.selectedIndex = tempSelectedIndex;
+			}
+			
+			private function datasourceCbo_changeHandler(event:ListEvent):void{
+				if(currentState == "export_db"){
+					selectedItem.from.@datasource = String(datasourceCbo.selectedItem);
+					selectedItem.to.@datasource = String(tagDatasourceCbo.selectedItem);
+				}else if(currentState == "data_extract"){
+					selectedItem.from.@datasource = String(datasourceCbo.selectedItem);
+					selectedItem.to.@datasource = String(tagDatasourceCbo2.selectedItem);
+				}else
+					selectedItem.@datasource = String(datasourceCbo.selectedItem);
+			}
+			
+			private function submitQueryBtn_clickHandler():void{
+				loadingWindow.startOper("查询中...",this);
+				rpc.getTableDataStructByDS(String(datasourceCbo.selectedItem),sqlText.text);
+			}
+			
+			private function delExcelField():void{
+				if(excelFieldDg.selectedIndex < 0)
+					return;
+				excelFieldDataProvider.removeItemAt(excelFieldDg.selectedIndex);
+			}
+			
+			private function excelFieldDataProviderChangeHandler(event:CollectionEvent):void{
+				if(!isChangeExcelFieldDataProvider){
+					isChangeExcelFieldDataProvider = true;
+					return;
+				}
+				var colsrc:String = "";
+				var coltitle:String = "";
+				var coltype:String = "";
+				for each(var data:Object in excelFieldDataProvider){
+					if(data.field != "" && data.field != undefined)
+						colsrc = colsrc.concat(data.field).concat(",");
+					if(data.alias != "" && data.alias != undefined)
+						coltitle = coltitle.concat(data.alias).concat(",");
+					if(data.fieldType != "" && data.fieldType != undefined)
+						coltype = coltype.concat(data.fieldType).concat(",");
+				}
+				selectedItem.colsrc = colsrc.substring(0,colsrc.length-1);
+				selectedItem.coltitle = coltitle.substring(0,coltitle.length-1);
+				selectedItem.coltype = coltype.substring(0,coltype.length-1);
+			}
+			
+			private function pdInitBox_showHandler():void{
+				sqlList = pdInitSqlList
+				sqlDetail = pdInitSqlDetail;
+			}
+			
+			private function pdLineBox_showHandler():void{
+				sqlList = pdLineSqlList;
+				sqlDetail = pdLineSqlDetail;
+			}
+			
+			private function pdEndBox_showHandler():void{
+				sqlList = pdEndSqlList;
+				sqlDetail = pdEndSqlDetail;
+			}
+			
+			private function setDatasplitCboValue():void{
+				var obj:Object
+				for each(obj in datasplitDataProvider){
+					if(obj.data == String(selectedItem.@datasplit)){
+						datasplitCbo.selectedItem = obj;
+						break;
+					}else
+						datasplitCbo.selectedItem = null;
+				}
+				
+				for each(obj in charsetDataProvider){
+					if(obj.data == String(selectedItem.@charset)){
+						chartsetCbo.selectedItem = obj;
+						break;
+					}else
+						chartsetCbo.selectedItem = null;
+				}
+			}
+			
+			protected function batchtxt_changeHandler(event:Event):void{
+				if(Number(batchtxt.text) > 10000){
+					SmartXMessage.show("超过批量提交数量最大10000条限制!",SmartXMessage.MESSAGE_ERROR);
+					batchtxt.text = selectedItem.to.@batch;
+					return;
+				}
+				selectedItem.to.@batch = batchtxt.text;			
+			}
+			
+			protected function applyButton_clickHandler(event:MouseEvent):void{
+				contentXml = XML(content.text);				
+			}
+			
+			protected function resetButton_clickHandler(event:MouseEvent):void{
+				content.text = contentXml.toXMLString();				
+			}
+			
+			private function makeUp():void{
+				if(selectedItem==null || selectedItem.parent() ==undefined)
+					return;
+				var index:int = selectedItem.childIndex();
+				if(index == 0 || (index == 1 && currentState != "sql"))
+					return;
+				var newXml:XML = XML(selectedItem).copy();
+				var parentIndex:int = selectedItem.parent().childIndex();
+				CEPUtils.xmlDeleteNode(XML(selectedItem))
+				if(currentState != "sql"){
+					contentXml.datatask.insertChildBefore(contentXml.datatask.children()[index-1],newXml);
+				}else
+					contentXml.datatask.children()[parentIndex].insertChildBefore(contentXml.datatask.children()[parentIndex].children()[index-1],newXml);
+				callLater(function():void{
+					dtTree.selectedItem =newXml;
+					dtTree_itemClickHandler(null);
+				});
+			}
+			
+			private function makeDown():void{
+				if(selectedItem==null || selectedItem.parent() ==undefined)
+					return;
+				var index:int = selectedItem.childIndex();
+				if((index == 0 && currentState != "sql") 
+					|| index == selectedItem.parent().children().length() -1)
+					return;
+				var newXml:XML = XML(selectedItem).copy();
+				var parentIndex:int = selectedItem.parent().childIndex();
+				CEPUtils.xmlDeleteNode(XML(selectedItem))
+				if(currentState != "sql")
+					contentXml.datatask.insertChildAfter(contentXml.datatask.children()[index],newXml);
+				else
+					contentXml.datatask.children()[parentIndex].insertChildAfter(contentXml.datatask.children()[parentIndex].children()[index],newXml);
+				callLater(function():void{
+					dtTree.selectedItem =newXml;
+					dtTree_itemClickHandler(null);
+				});
+			}
+			
+			private function setExcelFieldDataProvider():void{
+				isChangeExcelFieldDataProvider = false;
+				excelFieldDataProvider.removeAll();
+				var colsrc:String = selectedItem.colsrc;
+				var coltitle:String = selectedItem.coltitle;
+				var coltype:String = selectedItem.coltype;
+				for(var i:int=0;i<colsrc.split(",").length;i++){
+					var data:Object = {field:colsrc.split(",")[i],
+									   alias:coltitle.split(",").length > 0?coltitle.split(",")[i]:"",
+									   fieldType:coltype.split(",")[i]};
+					excelFieldDataProvider.addItem(data);
+				}
+			}
+			
+			private function sqlListMakeUp():void{
+				var sqlSelectedItem:Object = sqlList.selectedItem;
+				if(sqlSelectedItem==null || sqlSelectedItem.parent() ==undefined)
+					return;
+				var index:int = sqlSelectedItem.childIndex();
+				if(index == 0)
+					return;
+				var newXml:XML = XML(sqlSelectedItem).copy();
+				var parentIndex:int = sqlSelectedItem.parent().childIndex();
+				CEPUtils.xmlDeleteNode(XML(sqlSelectedItem))
+				contentXml.datatask.sqlOperates.(@desc==selectedItem.parent().@desc)[0].trans.(@desc==selectedItem.@desc)[0]
+					.insertChildBefore(contentXml.datatask.sqlOperates.(@desc==selectedItem.parent().@desc)[0]
+						.trans.(@desc==selectedItem.@desc)[0].children()[index-1],newXml);
+				callLater(function():void{
+					sqlList.selectedItem =newXml;
+					sqlList.scrollToIndex(sqlList.selectedIndex-1);
+				});
+			}
+			
+			private function sqlListMakeDown():void{
+				var sqlSelectedItem:Object = sqlList.selectedItem;
+				if(sqlSelectedItem==null || sqlSelectedItem.parent() ==undefined)
+					return;
+				var index:int = sqlSelectedItem.childIndex();
+				if(index == sqlSelectedItem.parent().children().length() -1)
+					return;
+				var newXml:XML = XML(sqlSelectedItem).copy();
+				var parentIndex:int = sqlSelectedItem.parent().childIndex();
+				CEPUtils.xmlDeleteNode(XML(sqlSelectedItem))
+				contentXml.datatask.sqlOperates.(@desc==selectedItem.parent().@desc)[0].trans.(@desc==selectedItem.@desc)[0]
+					.insertChildAfter(contentXml.datatask.sqlOperates.(@desc==selectedItem.parent().@desc)[0]
+						.trans.(@desc==selectedItem.@desc)[0].children()[index],newXml);
+				callLater(function():void{
+					sqlList.selectedItem =newXml;
+					sqlList.scrollToIndex(sqlList.selectedIndex-1);
+				});
+			}
+			
+			protected function generateSrcBtn_clickHandler(event:MouseEvent):void{
+				var testSql:String = "";
+				if(currentState == "export_db"){
+					testSql = fromSqlTxt.text;
+				}else if(currentState == "data_extract"){
+					testSql = fromSqlTxt2.text;
+				}
+				
+				if(testSql == ""){
+					SmartXMessage.show("请填写源SQL",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				loadingWindow.startOper("生成中...",this);
+				rpc.getTableDataStructByDS(String(datasourceCbo.selectedItem),"select * from (".concat(testSql).concat(") generateSqcAlias where 1=2"));			
+			}
+			
+			protected function implClassTxt_changeHandler(event:UIComponentEvent):void{
+				selectedItem.@name = implClassTxt.value==null?"":implClassTxt.value.name;
+				selectedItem.@implclass = implClassTxt.value==null?"":implClassTxt.value.code;			
+			}
+			
+			private function iconFunction(item:Object):*{
+				var node:XML = XML(item);
+				switch(String(node.name())){
+					case "sqlOperates":
+						return AssetsFileLib.SQLOperateIcon;
+					case "trans":
+						return AssetsFileLib.SQLTransIcon;
+					case "export_xls":
+						return AssetsFileLib.exportExcelIcon;
+					case "ftpupload":
+						return AssetsFileLib.dtUploadIcon;
+					case "ftpdownload":
+						return AssetsFileLib.dtDownloadIcon;
+					case "parsedata":
+						return AssetsFileLib.parsedataIcon;
+					case "export_db":
+						return AssetsFileLib.exportDbIcon;
+					case "data_extract":
+						return AssetsFileLib.wjxIcon;
+					case "custom_task":
+						return AssetsFileLib.redpointIcon;
+					case "subdatatask":
+						return AssetsFileLib.subDatataskIcon;
+					case "init_param":
+						return AssetsFileLib.designIcon;
+				}
+			}
+
+			private function initRefPanel():void{
+				if(subDataTaskRefPanel != null){
+					subDatataskBox.removeChild(subDataTaskRefPanel);
+					subDatataskBox.contains(subDataTaskEditBtn)?subDatataskBox.removeChild(subDataTaskEditBtn):null;
+				}
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="数据任务";
+				templetItemVO.itemkey="subDataTask";
+				templetItemVO.refdesc="select dt.id id#,dt.mtcode code#,dt.name 名称,dt.code dtcode#,"
+					+" (select valuecn from bfbiz_sysdictionary d where d.attributeid='TASKCATEGORY' " +
+						"and d.classid='PUB_DATATASK_TEMPLET' and d.value=dt.taskcategory) 任务类别,"
+       				+" dt.appmodule 模块,"
+       				+" (select valuecn from bfbiz_sysdictionary d where d.attributeid='TYPE' " +
+						"and d.classid='PUB_DATATASK_TEMPLET' and d.value=dt.type) 任务类型"
+					+" from pub_datatask_templet dt;ds=datasource_default";
+				subDataTaskRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				subDataTaskRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function(event:UIComponentEvent):void{
+					if(subDataTaskRefPanel.returnVO != null){
+						
+						delete selectedItem.*;
+						selectedItem.@mtcode = subDataTaskRefPanel.returnVO.code;
+						selectedItem.@name = subDataTaskRefPanel.returnVO.name;
+						selectedItem.@desc = subDataTaskRefPanel.returnVO.name;
+						selectedItem.@taskId = subDataTaskRefPanel.returnVO.id;
+						nameTxt.text =  subDataTaskRefPanel.returnVO.name;
+						
+						rpc.getTaskParamById(subDataTaskRefPanel.returnVO.id);
+					}else{
+						selectedItem.@mtcode = "";
+						selectedItem.@name = "";
+						delete selectedItem.*;
+					}
+				});
+				subDatataskBox.addChild(subDataTaskRefPanel);
+				if(!isSubDataTask)
+					subDatataskBox.contains(subDataTaskEditBtn)?null:subDatataskBox.addChild(subDataTaskEditBtn);
+			}
+			
+			private function getTaskParamHandler(event:ResultEvent):void{
+				var parameterMap:Object = event.result as Object;
+				
+				var objInfo:Object = ObjectUtil.getClassInfo(parameterMap);
+				var fieldArr:Array = objInfo["properties"] as Array;
+				if(fieldArr != null ){
+					for each(var fieldName:String in fieldArr){
+						var param:String = "{".concat(fieldName).concat("}");
+						XML(selectedItem).appendChild(<param>{param}</param>);
+					}
+				}
+			}
+			
+			private function addCusDefineParam():void{
+				PopUpManager.addPopUp(cusDefineNameWindow,this,true);
+				PopUpManager.centerPopUp(cusDefineNameWindow);
+				cusDefineNameTxt.text = "";
+			}
+			
+			private function delCusDefineParam():void{
+				if(cusDefineParamDg.selectedIndex < 0)
+					return;
+				cusDefineParamsDp.removeItemAt(cusDefineParamDg.selectedIndex);
+				cusDefineParamDg.invalidateList();
+			}
+			
+			private function setCusDefineNameBtn_confirmHandler():void{
+				if(cusDefineNameTxt.text == ""){
+					SmartXMessage.show("自定义参数名称不能为空!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				var data:Object;
+				for each(data in cusDefineParamsDp){
+					if(data.name == cusDefineNameTxt.text){
+						SmartXMessage.show("自定义参数名称不能重复!",SmartXMessage.MESSAGE_ERROR);
+						return;
+					}
+				}
+				data = {name:cusDefineNameTxt.text,value:""};
+				cusDefineParamsDp.addItem(data);
+				cusDefineParamDg.invalidateList();
+				PopUpManager.removePopUp(cusDefineNameWindow);
+			}
+			
+			private function parseCusDefineParams(event:CollectionEvent):void{
+				if(!isChangeExcelFieldDataProvider){
+					isChangeExcelFieldDataProvider = true;
+					return;
+				}
+				delete selectedItem.*;
+				for each(var data:Object in cusDefineParamsDp){
+					var dataXml:XML = <{data.name}>{data.value}</{data.name}>
+					selectedItem.appendChild(dataXml);
+				}
+			}
+			
+			private function setCusDefineParams():void{
+				isChangeExcelFieldDataProvider = false;
+				cusDefineParamsDp.removeAll();
+				for each(var xml:XML in selectedItem.children()){
+					var data:Object = {};
+					data.name = xml.name().toString();
+					data.value = xml.text().toString();
+					cusDefineParamsDp.addItem(data);
+				}
+			}
+			
+			private function preview():void{
+				previewTxt.text = XML(selectedItem).toXMLString();
+				mainViewStack.selectedChild = previewVbox;
+			}
+			
+			private function previewReturn_clickHandler(event:MouseEvent):void{
+				mainViewStack.selectedChild = mainVbox;
+			}
+			
+			private function parseInitParams():void{
+				initParamsDp.source = contentXml.datatask.initparam.param;
+			}
+			
+			private function addInitParam():void{
+				PopUpManager.addPopUp(initParamNameWindow,this,true);
+				PopUpManager.centerPopUp(initParamNameWindow);
+				initParamNameTxt.text = "";
+			}
+			
+			private function delInitParam():void{
+				if(initParamDg.selectedIndex < 0)
+					return;
+				initParamsDp.removeItemAt(initParamDg.selectedIndex);
+				initParamDg.invalidateList();
+			}
+			
+			private function setInitParamNameBtn_confirmHandler():void{
+				if(StringUtil.trim(initParamNameTxt.text) == ""){
+					SmartXMessage.show("初始化参数名称不能为空!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				if(StringUtil.trim(initParamNameTxt.text).indexOf(",") >= 0 
+					|| StringUtil.trim(initParamNameTxt.text).indexOf(";") >= 0){
+					SmartXMessage.show("初始化参数名称中不能含有[,;]!");
+					return;
+				}
+				var data:XML;
+				for each(data in initParamsDp){
+					if(String(data.@name) == initParamNameTxt.text){
+						SmartXMessage.show("初始化参数名称不能重复!",SmartXMessage.MESSAGE_ERROR);
+						return;
+					}
+				}
+				data = <param name={initParamNameTxt.text} />;
+				initParamsDp.addItem(data);
+				initParamDg.invalidateList();
+				PopUpManager.removePopUp(initParamNameWindow);
+			}
+			
+			private function paramValueLableFun(item:Object, column:DataGridColumn):String{
+				return item.text();
+			}
+			
+			private function querySubsequent():void{
+				if(dataTaskId != "")
+					rpc.getSubsequentDataTask(dataTaskId);
+			}
+			
+			private function getSubsequentDataTaskHandler(event:ResultEvent):void{
+				var result:ArrayCollection = event.result as ArrayCollection;
+				subsequentList.dataProvider = result;
+				subsequentList.invalidateList();
+			}
+			
+			private function saveSubDataTask():void{
+				loadingWindow.startOper("保存中...",this);
+				rpc.updateDataTaskMetaData(dataTaskMtCode,getContentXml());
+			}
+			
+			private function updateDataTaskMetaDataHandler(event:ResultEvent):void{
+				SmartXMessage.show("保存成功！");
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(dataTaskMtCode,endpoint);
+				contentXmlDup = contentXml.copy();
+				loadingWindow.stopOper();
+			}
+			
+			private function returnMainDataTask():void{
+				if(contentXmlDup.toXMLString() != contentXml.toXMLString()){
+					SmartXMessage.show("元数据已经改变，是否保存？",SmartXMessage.MESSAGE_CONFIRM,"",this,function(event:CloseEvent):void{
+						if(event.detail == Alert.YES){
+							saveSubDataTask();
+							dispatchEvent(new DataTaskEvent(DataTaskEvent.RETURN_MAIN_DATATASK));
+						}
+					});
+				}else
+					dispatchEvent(new DataTaskEvent(DataTaskEvent.RETURN_MAIN_DATATASK));
+				
+			}
+			
+			private function subDataTaskEditBtn_clickHandler(event:MouseEvent):void{
+				var mt:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(String(selectedItem.@mtcode));
+				var content:XML = mt.contentXML;
+				content.datatask.@mtcode = selectedItem.@mtcode;
+				content.datatask.@taskId = selectedItem.@taskId;
+				dispatchEvent(new DataTaskEvent(DataTaskEvent.SUB_DATATASK_EDIT,content));
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:states>
+		<s:State name="normal" />
+		<s:State name="sqlOperates" />
+		<s:State name="sql" />
+		<s:State name="exportExcel" />
+		<s:State name="ftpupload" />
+		<s:State name="ftpdownload" />
+		<s:State name="parsedata" />
+		<s:State name="export_db" />
+		<s:State name="data_extract" />
+		<s:State name="custom_task" />
+		<s:State name="subdatatask" />
+		<s:State name="init_param"  />
+	</mx:states>
+	<mx:VBox width="100%" height="100%" id="mainBox">
+		<mx:TabNavigator width="100%" height="100%" creationPolicy="all">
+			<mx:VBox width="100%" height="100%" label="任务设计">
+				<mx:HDividedBox width="100%" height="100%">
+					<mx:VBox width="30%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+							 paddingTop="5">
+						<mx:HBox id="treeButtonBox" width="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+								 paddingTop="5">
+							<mx:PopUpMenuButton id="operationButton" label="新建任务" dataProvider="{operationList}"
+												labelField="name" openAlways="true"/>
+							<mx:Button toolTip="删除任务" click="deleteDataTask()" width="18" icon="{AssetsFileLib.minuseIcon}" />
+							<mx:Button toolTip="节点上移" click="makeUp()" width="18" icon="{AssetsFileLib.upIcon}" />
+							<mx:Button toolTip="节点下移" click="makeDown()" width="18" icon="{AssetsFileLib.downIcon}" />
+						</mx:HBox>
+						<ext:TreeWrapper allowMultipleSelection="false" width="100%" height="100%" dataDescriptor="{dataTaskTreeDataDescriptor}"
+										 id="dtTree" labelField="@desc" iconFunction="iconFunction" dataProvider="{contentXml.datatask.children()}" 
+										 itemClick="dtTree_itemClickHandler(event)" 
+										 itemRenderer="smartx.flex.modules.datatask.renderer.DataTaskTreeItemRenderer" />
+					</mx:VBox>
+					<mx:VBox width="70%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+							 paddingTop="5" >
+						<mx:HBox id="cardButtonBox" width="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+								 paddingTop="5">
+							<mx:Button toolTip="预览" label="预览" click="preview()" icon="{AssetsFileLib.viewIcon}" excludeFrom="normal,sqlOperates" />
+							<s:Spacer width="100%" />
+							<mx:Button toolTip="保存子数据任务" label="保存" click="saveSubDataTask()" 
+									   icon="{AssetsFileLib.saveIcon}" visible="{isSubDataTask}"/>
+							<mx:Button toolTip="返回到主数据任务" label="返回" click="returnMainDataTask()" 
+									   icon="{AssetsFileLib.returnIcon}" visible="{isSubDataTask}"/>
+						</mx:HBox>
+						<mx:ViewStack width="100%" height="100%" id="mainViewStack">
+							<mx:VBox id="mainVbox" width="100%" height="100%" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+								<mx:HBox width="100%" excludeFrom="normal,init_param">
+									<mx:Label text=" 名称" width="25%"/>
+									<mx:TextInput id="nameTxt" width="70%" text="{selectedItem.@desc}" change="{selectedItem.@desc = nameTxt.text}" />
+								</mx:HBox>
+								<mx:HBox width="100%" excludeFrom="normal,sql,init_param">
+									<mx:Label text=" 运行设置" width="25%"/>
+									<mx:HBox width="70%" >
+										<mx:Label text=" 是否运行"/>
+										<mx:CheckBox id="isNeedRunChk" selected="{selectedItem.@isNeedRun=='false'?false:true}" 
+													 change="{selectedItem.@isNeedRun = isNeedRunChk.selected?'true':'false'}" />
+										<mx:Label text="     是否忽略异常" />
+										<mx:CheckBox id="isIgnoreExceptionChk" selected="{selectedItem.@exceptionIgnore=='true'?true:false}" 
+													 change="{selectedItem.@exceptionIgnore = isIgnoreExceptionChk.selected?'true':'false'}" />
+									</mx:HBox>
+								</mx:HBox>
+								
+								<mx:HBox width="100%" includeIn="exportExcel,export_db,parsedata,sql,data_extract">
+									<mx:Label text.export_db=" 源数据源" text=" 数据源" width="25%" />
+									<mx:ComboBox id="datasourceCbo" width="50%" dataProvider="{datasources}" change="datasourceCbo_changeHandler(event)"/>
+								</mx:HBox>
+								<mx:HBox width="100%" excludeFrom="normal,sqlOperates,init_param">
+									<mx:Label text=" 当前进度(%)" width="25%"/>
+									<mx:HSlider id="completedPercentSl" minimum="0" maximum="100" width="50%" 
+												value="{selectedItem.@rate}"
+												snapInterval="1" change="{selectedItem.@rate = completedPercentSl.value}" />
+								</mx:HBox>
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="sql">
+									<mx:HBox width="100%" height="40%">
+										<mx:Label width="25%" text="SQL列表" />
+										<mx:VBox width="70%" height="100%">
+											<mx:HBox width="100%">
+												<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建SQL" click="addSql()"/>
+												<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除SQL" click="delSql()"/>
+												<mx:Button toolTip="节点上移" click="sqlListMakeUp()" icon="{AssetsFileLib.upIcon}" />
+												<mx:Button toolTip="节点下移" click="sqlListMakeDown()" icon="{AssetsFileLib.downIcon}" />
+											</mx:HBox>
+											<mx:List id="transSqlList" width="100%" height="100%" 
+													 dataProvider="{contentXml.datatask.sqlOperates.(@desc==selectedItem.parent().@desc)[0].trans.(@desc==selectedItem.@desc).sql}" 
+													 labelField="@desc" itemClick="sqlList_itemClickHandler()" />
+										</mx:VBox>
+									</mx:HBox>
+									<mx:HBox width="100%" height="60%" >
+										<mx:Label width="25%" text="SQL详情" />
+										<mx:VBox width="70%" height="100%">
+											<mx:TextArea id="transSqlDetail" width="100%" height="100%" change="sqlDetail_changeHandler(event)" />
+										</mx:VBox>
+									</mx:HBox>
+								</mx:VBox>
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="exportExcel">
+									<mx:HBox width="100%">
+										<mx:Label text="文件名" width="25%" />
+										<mx:TextInput id="excelFileNameTxt" width="70%" text="{selectedItem.@fileName}" 
+													  change="{selectedItem.@fileName = excelFileNameTxt.text.concat('.xsl')}"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="导出路径" width="25%" />
+										<mx:TextInput id="exportPathTxt" width="70%" text="{selectedItem.@localPath}" 
+													  change="{selectedItem.@localPath = exportPathTxt.text}" 
+													  toolTip="建议不要使用中文 (例  d:/temp/up/)"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="JDBC 查询" width="25%" />
+										<mx:TextArea id="sqlText" width="70%" height="100" text="{selectedItem.fetchsql}" 
+													 change="{selectedItem.fetchsql = sqlText.text}" />
+										
+									</mx:HBox>
+									<mx:HBox width="100%" >
+										<mx:Button id="submitQueryBtn" label="查询SQL" click="submitQueryBtn_clickHandler()" />
+										<!--<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除字段" click="delExcelField()"/>-->
+									</mx:HBox>
+									<mx:DataGrid id="excelFieldDg" width="100%" height="100%" editable="true" dataProvider="{excelFieldDataProvider}">
+										<mx:columns>
+											<mx:DataGridColumn headerText="字段" dataField="field" editable="false"/>
+											<mx:DataGridColumn headerText="字段名称" dataField="alias" editable="true" />
+											<mx:DataGridColumn headerText="类型" dataField="fieldType" editable="false" />
+										</mx:columns>
+									</mx:DataGrid>
+								</mx:VBox>
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="ftpupload,ftpdownload">
+									<mx:HBox width="100%">
+										<mx:Label text="服务器" width="25%" />
+										<mx:TextInput id="uploadServerTxt" width="70%" text="{selectedItem.@server}" 
+													  change="{selectedItem.@server = uploadServerTxt.text}"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="端口" width="25%" />
+										<mx:TextInput id="uploadPortTxt" width="70%" text="{selectedItem.@port}" 
+													  change="{selectedItem.@port = uploadPortTxt.text;}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="用户名" width="25%" />
+										<mx:TextInput id="uploadUserTxt" width="70%" text="{selectedItem.@user}" 
+													  change="{selectedItem.@user = uploadUserTxt.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="密码" width="25%" />
+										<mx:TextInput id="uploadPwdTxt" width="70%" text="{selectedItem.@passwd}" 
+													  change="{selectedItem.@passwd = uploadPwdTxt.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="服务器文件目录" width="25%"/>
+										<mx:TextInput id="uploadRemotePathTxt" width="70%" text="{selectedItem.@remotepath}" 
+													  toolTip="{filePathTooltip}" change="{selectedItem.@remotepath = uploadRemotePathTxt.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="服务器文件名" width="25%" />
+										<mx:TextInput id="uploadRemoteFileTxt" width="70%" text="{selectedItem.@remotefile}" 
+													  change="{selectedItem.@remotefile = uploadRemoteFileTxt.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="本地文件目录" width="25%" />
+										<mx:TextInput id="uploadLocalPathTxt" width="70%" text="{selectedItem.@localpath}" 
+													  toolTip="{filePathTooltip}" change="{selectedItem.@localpath = uploadLocalPathTxt.text}"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="本地文件名" width="25%" />
+										<mx:TextInput id="uploadLocalFileTxt" width="70%" text="{selectedItem.@localfile}" 
+													  change="{selectedItem.@localfile = uploadLocalFileTxt.text}" />
+									</mx:HBox>
+								</mx:VBox>
+								<mx:VDividedBox width="100%" height="100%" includeIn="parsedata">
+									<mx:VBox width="100%" height="70%" paddingBottom="5" 
+											 paddingLeft="5" paddingRight="5" paddingTop="5">
+										<mx:HBox width="100%">
+											<mx:Label text="文件名" width="25%" />
+											<mx:TextInput id="parseFileTxt" width="70%" text="{selectedItem.@filename}" 
+														  change="{selectedItem.@filename = parseFileTxt.text}"/>
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Label text="本地路径" width="25%" />
+											<mx:TextInput id="localPathTxt" width="70%" text="{selectedItem.@localPath}" 
+														  change="{selectedItem.@localPath = localPathTxt.text}" />
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Label text="是否有标题" width="25%" />
+											<mx:CheckBox id="hasTitleChk" selected="{selectedItem.@hastitle == 'true'?true:false}" 
+														 change="{selectedItem.@hastitle = hasTitleChk.selected ?'true':'false'}"/>
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Label text="源字段" width="25%" />
+											<mx:TextInput id="srcFieldTxt" width="70%" text="{selectedItem.@srcfields}" 
+														  toolTip="多个字段以分号分隔(SID;BSC编号;BTS编号)" 
+														  change="{selectedItem.@srcfields = srcFieldTxt.text}" />
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Label text="源字段索引" width="25%" />
+											<mx:TextInput id="srcfieldidxTxt" width="70%" text="{selectedItem.@srcfieldidxs}" 
+														  change="{selectedItem.@srcfieldidxs = srcfieldidxTxt.text}" />
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Label text="源文件分割符" width="25%" />
+											<mx:ComboBox id="datasplitCbo" width="70%" labelField="name" dataProvider="{datasplitDataProvider}" 
+														 change="{selectedItem.@datasplit = 
+														 		datasplitCbo.selectedItem==null?'':datasplitCbo.selectedItem.data}"/>
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Label text="目标字段" width="25%" />
+											<mx:TextInput id="tagFieldTxt" width="70%" text="{selectedItem.@tagfields}" 
+														  toolTip="多个字段以分号分隔(SID;BSCNO;BTSNO),引用字段格式([@SID])" 
+														  change="{selectedItem.@tagfields = tagFieldTxt.text}" />
+										</mx:HBox>
+										<mx:HBox width="100%">
+											<mx:Label text="编码类型" width="25%" />
+											<mx:ComboBox id="chartsetCbo" width="70%" labelField="name" dataProvider="{charsetDataProvider}" 
+														 change="{selectedItem.@charset = chartsetCbo.selectedItem==null?'':chartsetCbo.selectedItem.name}" />
+										</mx:HBox>
+									</mx:VBox>
+									<mx:VBox width="100%" height="30%" paddingBottom="5" 
+											 paddingLeft="5" paddingRight="5" paddingTop="5">
+										<mx:TabNavigator width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" 
+														 paddingTop="5" creationPolicy="all">
+											<mx:VBox label="初始化" width="100%" height="100%" show="pdInitBox_showHandler()">
+												<mx:HBox width="100%">
+													<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建SQL" click="addSql()"/>
+													<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除SQL" click="delSql()"/>
+												</mx:HBox>
+												<mx:HBox width="100%" height="100%" >
+													<mx:List id="pdInitSqlList" width="70%" height="100%" 
+															 dataProvider="{contentXml.datatask.parsedata.(@desc==selectedItem.@desc)[0]['init-ctrl'].sql}" 
+															 labelField="@desc" itemClick="sqlList_itemClickHandler()" />
+													<mx:TextArea id="pdInitSqlDetail" width="70%" height="100%" change="sqlDetail_changeHandler(event)" />
+												</mx:HBox>
+											</mx:VBox>
+											<mx:VBox label="数据处理" width="100%" height="100%" show="pdLineBox_showHandler()">
+												<mx:HBox width="100%">
+													<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建SQL" click="addSql()"/>
+													<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除SQL" click="delSql()"/>
+												</mx:HBox>
+												<mx:HBox width="100%" height="100%" >
+													<mx:List id="pdLineSqlList" width="70%" height="100%" 
+															 dataProvider="{contentXml.datatask.parsedata.(@desc==selectedItem.@desc)[0]['line-ctrl'].sql}" 
+															 labelField="@desc" itemClick="sqlList_itemClickHandler()" />
+													<mx:TextArea id="pdLineSqlDetail" width="70%" height="100%" change="sqlDetail_changeHandler(event)" />
+												</mx:HBox>
+											</mx:VBox>
+											<mx:VBox label="收尾处理" width="100%" height="100%" show="pdEndBox_showHandler()">
+												<mx:HBox width="100%">
+													<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建SQL" click="addSql()"/>
+													<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除SQL" click="delSql()"/>
+												</mx:HBox>
+												<mx:HBox width="100%" height="100%" >
+													<mx:List id="pdEndSqlList" width="70%" height="100%" 
+															 dataProvider="{contentXml.datatask.parsedata.(@desc==selectedItem.@desc)[0]['ending-ctrl'].sql}" 
+															 labelField="@desc" itemClick="sqlList_itemClickHandler()" />
+													<mx:TextArea id="pdEndSqlDetail" width="70%" height="100%" change="sqlDetail_changeHandler(event)" />
+												</mx:HBox>
+											</mx:VBox>	
+										</mx:TabNavigator>
+									</mx:VBox>
+								</mx:VDividedBox>
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="export_db">
+									<mx:HBox width="100%">
+										<mx:Label text="源SQL" width="25%" />
+										<mx:TextArea id="fromSqlTxt" width="70%" height="160" text="{selectedItem.from}" 
+													 change="{selectedItem.from = fromSqlTxt.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="源字段序号" width="25%" />
+										<mx:HBox width="70%">
+											<mx:TextInput id="fromColsTxt" width="100%"  text="{selectedItem.from.@cols}" 
+														  change="{selectedItem.from.@cols = fromColsTxt.text}" />
+											<mx:Button id="generateSrcBtn" label="序列生成" click="generateSrcBtn_clickHandler(event)" />
+										</mx:HBox>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="源字段名称" width="25%" />
+										<mx:TextArea id="fromColsNameTxt" editable="false" height="80" width="70%" text="{selectedItem.fromColsName}" 
+													 change="{selectedItem.fromColsName = fromColsNameTxt.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标数据源" width="25%" />
+										<mx:ComboBox id="tagDatasourceCbo" width="50%" dataProvider="{datasources}" change="datasourceCbo_changeHandler(event)"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标表" width="25%"/>
+										<mx:TextInput id="toTable" width="70%" text="{selectedItem.option.@toTable}" 
+													  change="{selectedItem.option.@toTable = toTable.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="导入设置" width="25%"/>
+										<mx:Label text="  清空数据"/>
+										<mx:CheckBox id="isTruncate" selected="{selectedItem.option.@truncateTable=='true'?true:false}" 
+													 change="{selectedItem.option.@truncateTable = isTruncate.selected?'true':'false'}" />
+										<mx:Label text="    禁用索引" />
+										<mx:CheckBox id="isDisableIndex" selected="{selectedItem.option.@disableIndex=='true'?true:false}" 
+													 change="{selectedItem.option.@disableIndex = isDisableIndex.selected?'true':'false'}" />
+										<mx:Label text="    表分析" />
+										<mx:CheckBox id="isAnalyzeTable" selected="{selectedItem.option.@analyzeTable=='true'?true:false}" 
+													 change="{selectedItem.option.@analyzeTable = isAnalyzeTable.selected?'true':'false'}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="批量提交数量" width="25%" />
+										<mx:TextInput id="batchtxt" width="70%" text="{selectedItem.to.@batch}" change="batchtxt_changeHandler(event)" restrict="0-9" toolTip="最大数量 10000" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标SQL" width="25%" />
+										<mx:TextArea id="tagSqltxt" width="70%" height="160" text="{selectedItem.to}" 
+													 change="{selectedItem.to = tagSqltxt.text}"  />
+									</mx:HBox>
+								</mx:VBox>
+								
+								<!-- 数据抽取配置节点 -->
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="data_extract">
+									<mx:HBox width="100%">
+										<mx:Label text="源SQL" width="25%" />
+										<mx:TextArea id="fromSqlTxt2" width="70%" height="160" text="{selectedItem.from}" 
+													 change="{selectedItem.from = fromSqlTxt2.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="源字段序号" width="25%" />
+										<mx:HBox width="70%">
+											<mx:TextInput id="fromColsTxt2" width="100%"  text="{selectedItem.from.@cols}" 
+														  change="{selectedItem.from.@cols = fromColsTxt2.text;}" />
+											<mx:Button id="generateSrcBtn2" label="序列生成" click="generateSrcBtn_clickHandler(event)" />
+										</mx:HBox>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="源字段名称" width="25%" />
+										<mx:TextArea id="fromColsNameTxt2" editable="false" height="80" width="70%" text="{selectedItem.fromColsName}" 
+													 change="{selectedItem.fromColsName = fromColsNameTxt2.text;}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="源表主键" width="25%" />
+										<mx:TextInput id="fromPkColumn" width="70%" text="{selectedItem.from.@pkColumn}" 
+													  change="{selectedItem.from.@pkColumn = fromPkColumn.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标数据源" width="25%" />
+										<mx:ComboBox id="tagDatasourceCbo2" width="50%" dataProvider="{datasources}" 
+													 change="{selectedItem.to.@datasource = String(tagDatasourceCbo2.selectedItem);}"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标表" width="25%"/>
+										<mx:TextInput id="toTable2" width="70%" text="{selectedItem.to.@toTable}" 
+													  change="{selectedItem.to.@toTable = toTable2.text;}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标表主键" width="25%"/>
+										<mx:TextInput id="toPkColumn" width="70%" text="{selectedItem.to.@pkColumn}" 
+													  toolTip="多个主键之间用','半角逗号分隔,如cl1,cl2"
+													  change="{selectedItem.to.@pkColumn=toPkColumn.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="主键类型" width="25%"/>
+										<mx:TextInput id="toPkColumnType" width="70%" text="{selectedItem.to.@pkColumnType}" 
+													  toolTip="多个之间用','半角逗号分隔,如NUMBER(18),VARCHAR2(255)"
+													  change="{selectedItem.to.@pkColumnType=toPkColumnType.text}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="抽取选项" width="25%"/>
+										<mx:Label text="  是否增量抽取"/>
+										<mx:CheckBox id="isIncrement" selected="{selectedItem.option.@isIncrement=='true'?true:false}" 
+													 change="{selectedItem.option.@isIncrement = isIncrement.selected?'true':'false'}" 
+													 toolTip="不先则为全量抽取"/>
+										<mx:Label text="      是否创建增量表" />
+										<mx:CheckBox id="isCreateHashTable" selected="{selectedItem.option.@isCreateHashTable=='true'?true:false}" 
+													 change="{selectedItem.option.@isCreateHashTable = isCreateHashTable.selected?'true':'false'}" 
+													 toolTip="全量抽取时该选项有效,选中可以为增量抽取做准备"/>
+										
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标表选项" width="25%"/>
+										<mx:Label text="  清空数据"/>
+										<mx:CheckBox id="isTruncate2" selected="{selectedItem.option.@truncateTable=='true'?true:false}" 
+													 change="{selectedItem.option.@truncateTable = isTruncate2.selected?'true':'false'}" />
+										<mx:Label text="    禁用索引" />
+										<mx:CheckBox id="isDisableIndex2" selected="{selectedItem.option.@disableIndex=='true'?true:false}" 
+													 change="{selectedItem.option.@disableIndex = isDisableIndex2.selected?'true':'false'}" />
+										<mx:Label text="    表分析" />
+										<mx:CheckBox id="isAnalyzeTable2" selected="{selectedItem.option.@analyzeTable=='true'?true:false}" 
+													 change="{selectedItem.option.@analyzeTable = isAnalyzeTable2.selected?'true':'false'}" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="批量提交数量" width="25%" />
+										<mx:TextInput id="batchtxt2" width="70%" text="{selectedItem.to.@batch}" 
+													  change="{selectedItem.to.@batch = batchtxt2.text}" restrict="0-9" toolTip="最大数量 10000" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="目标SQL" width="25%" />
+										<mx:TextArea id="tagSqltxt2" width="70%" height="160" text="{selectedItem.to}" 
+													 change="{selectedItem.to = tagSqltxt2.text;}"  />
+									</mx:HBox>
+								</mx:VBox>
+								
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="custom_task">
+									<mx:HBox width="100%">
+										<mx:Label text="自定义任务" width="25%" />
+										<datatask:DataTaskDefineTypeRefInput id="implClassTxt" width="200" realValueChange="implClassTxt_changeHandler(event)" />
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="自定义参数" width="25%" />
+										<mx:VBox width="70%">
+											<mx:HBox width="100%">
+												<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建自定义参数" click="addCusDefineParam()"/>
+												<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除自定义参数" click="delCusDefineParam()"/>
+											</mx:HBox>
+											<mx:DataGrid id="cusDefineParamDg" width="100%" height="100%" editable="true" 
+														 dataProvider="{cusDefineParamsDp}"  >
+												<mx:columns>
+													<mx:DataGridColumn headerText="名称" dataField="name" editable="false"/>
+													<mx:DataGridColumn headerText="值" dataField="value" editable="true" />
+												</mx:columns>
+											</mx:DataGrid>
+										</mx:VBox>
+									</mx:HBox>
+								</mx:VBox>
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="subdatatask">
+									<mx:HBox width="100%" id="subDatataskBox">
+										<mx:Label text="数据任务" width="25%" />
+									</mx:HBox>
+								</mx:VBox>
+								<mx:VBox width="100%" height="100%" paddingBottom="5" 
+										 paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="init_param">
+									<mx:HBox width="100%">
+										<mx:CheckBox label="是否执行后置任务" labelPlacement="left" id="runSubsequentTaskChk"
+													 selected="{String(contentXml.datatask.@runSubsequentTask)=='true'?true:false}"
+													 click="{contentXml.datatask.@runSubsequentTask=runSubsequentTaskChk.selected?'true':'false'}"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:Label text="后置任务" width="20%" />
+										<mx:List id="subsequentList" height="90" width="30%"/>
+									</mx:HBox>
+									<mx:HBox width="100%">
+										<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建参数" click="addInitParam()"/>
+										<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除参数" click="delInitParam()"/>
+									</mx:HBox>
+									<mx:DataGrid id="initParamDg" width="100%" height="100%" editable="true" 
+												 dataProvider="{initParamsDp}"  >
+										<mx:columns>
+											<mx:DataGridColumn headerText="名称" dataField="@name" editable="false"/>
+											<mx:DataGridColumn headerText="值" dataField="" editable="true" labelFunction="paramValueLableFun">
+												<mx:itemEditor>
+													<fx:Component>
+														<mx:HBox horizontalAlign="center" width="100%">
+															<fx:Script>
+																<![CDATA[
+																	import com.adobe.utils.StringUtil;
+																	
+																	import smartx.flex.components.util.SmartXMessage;
+																	public function get text():String{
+																		return valueTxt.text;
+																	}
+																	
+																	override public function set data(value:Object):void{
+																		super.data = value;
+																		if(value != null)
+																			valueTxt.text = value.toString();
+																	}
+																	
+																	protected function valueTxt_changeHandler(event:Event):void{
+																		if(StringUtil.trim(valueTxt.text).indexOf(";") >= 0
+																			|| StringUtil.trim(valueTxt.text).indexOf(",") >= 0){
+																			valueTxt.text = data.toString();
+																			SmartXMessage.show("初始化参数值中不能含有[,;]!");
+																			return;
+																		}
+																		data.text()[0] = StringUtil.trim(valueTxt.text);
+																	}
+																	
+																]]>
+															</fx:Script>
+															<mx:TextInput width="100%" id="valueTxt" change="valueTxt_changeHandler(event)"/>
+														</mx:HBox>
+													</fx:Component>
+												</mx:itemEditor>
+											</mx:DataGridColumn>
+										</mx:columns>
+									</mx:DataGrid>
+								</mx:VBox>
+							</mx:VBox>
+							<mx:VBox id="previewVbox" width="100%" height="100%" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+								<mx:Button label="返回" click="previewReturn_clickHandler(event)" />
+								<mx:TextArea id="previewTxt" width="100%" height="100%" editable="false" />
+							</mx:VBox>
+						</mx:ViewStack>
+					</mx:VBox>
+				</mx:HDividedBox>
+			</mx:VBox>
+			<mx:VBox label="元数据" width="100%" height="100%" show="mt_showHandler(event)">
+				<mx:HBox width="100%">
+					<mx:Button id="applyButton" label="应用" click="applyButton_clickHandler(event)"/>
+					<mx:Button id="resetButton" label="重置" click="resetButton_clickHandler(event)"/>
+				</mx:HBox>
+				<mx:TextArea id="content" height="100%" width="100%" editable="true" />
+			</mx:VBox>
+		</mx:TabNavigator>
+		<mx:HBox width="100%" paddingTop="5" paddingBottom="5" paddingLeft="8" paddingRight="8" horizontalAlign="center" id="confirmBox">
+			<mx:Button icon="{AssetsFileLib.okIcon}" label="确定"  click="confirmFunc()" height="22"/>
+			<mx:Button icon="{AssetsFileLib.clearIcon}" label="取消"  click="cancelFunc()"  height="22"/>
+		</mx:HBox>
+	</mx:VBox>
+</mx:Canvas>

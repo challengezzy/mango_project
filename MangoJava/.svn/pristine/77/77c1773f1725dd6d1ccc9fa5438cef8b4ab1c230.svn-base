@@ -1,0 +1,664 @@
+/************************************************************************
+ * $RCSfile: PrintTempletDMO.java,v $  $Revision: 1.4.2.2 $  $Date: 2009/02/05 12:02:53 $
+ * $Log: PrintTempletDMO.java,v $
+ * Revision 1.4.2.2  2009/02/05 12:02:53  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4.2.1  2009/02/02 16:13:10  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/10/12 03:22:45  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/10/10 03:27:41  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/09/11 08:04:25  john_liu
+ * no message
+ *
+ * Revision
+ *
+ * created by john_liu, 2007.09.11    for MR#: 0000, 迁移孙雪峰代码
+ *
+ ************************************************************************/
+
+
+package smartx.publics.print.bs;
+
+
+import java.util.HashMap;
+
+import smartx.framework.common.bs.AbstractDMO;
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.ui.NovaClientEnvironment;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.vo.FrameWorkTBUtil;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.ModifySqlUtil;
+import smartx.framework.metadata.vo.BillVO;
+import smartx.framework.metadata.vo.ComBoxItemVO;
+import smartx.framework.metadata.vo.Pub_Templet_1VO;
+import smartx.framework.metadata.vo.Pub_Templet_1_ItemVO;
+import smartx.framework.metadata.vo.RefItemVO;
+import smartx.framework.metadata.vo.jepfunctions.JepFormulaParse;
+import smartx.publics.print.vo.Pub_PrintTempletItemVO;
+import smartx.publics.print.vo.Pub_PrintTempletVO;
+
+public class PrintTempletDMO
+    extends AbstractDMO
+{
+
+    private JepFormulaParse jepParse = null; //公式解析器!!
+
+    private ModifySqlUtil modifySqlUtil = null; //转换工具!!
+
+    private HashMap refCache = null; //参照缓存!!
+
+    private HashMap mapLoadFormulaCache = null; //加载公式缓存!!
+
+    /**
+     * 从数据库中根据模板编码创建模板VO
+     *
+     * @param _code
+     * @return
+     * @throws Exception
+     */
+    public Pub_PrintTempletVO getPub_PrintTempletVO( String _code, NovaClientEnvironment _clientEnv )
+        throws Exception
+    {
+        CommDMO commDMO = new CommDMO();
+        String str_sql = "select * from pub_printtemplet where templet_1_id = (select pk_pub_templet_1 from pub_templet_1 where templetcode='" + _code + "' or templetcode='" + _code.toLowerCase() +
+            "')";
+        HashVO[] vos = commDMO.getHashVoArrayByDS( null, str_sql );
+        if ( vos == null || vos.length <= 0 )
+        {
+            throw new Exception( "编码为[" + _code + "]的模板不存在!!" );
+        }
+        HashVO parentVO = vos[0]; //
+
+        String str_sql_item = "select * from pub_printtemplet_item where printtempletid=" +
+            parentVO.getStringValue( "id" ) + " order by sequence";
+
+        HashVO[] hashVOs_item = commDMO.getHashVoArrayByDS( null, str_sql_item );
+        return getPub_PrintTemplet_VO( parentVO, hashVOs_item, _clientEnv );
+    }
+
+    /**
+     * 根据打印模板名称创建模板VO
+     * @param _printTempcode
+     * @param _clientEnv
+     * @param querybyprintTempCode
+     * @return
+     * @throws Exception
+     */
+    public Pub_PrintTempletVO getPub_PrintTempletVO( String _printTempcode, NovaClientEnvironment _clientEnv ,boolean querybyprintTempCode)
+        throws Exception
+    {
+        CommDMO commDMO = new CommDMO();
+        String str_sql = "select * from pub_printtemplet where TEMPLETNAME ='" +_printTempcode +"'";
+        HashVO[] vos = commDMO.getHashVoArrayByDS( null, str_sql );
+        if ( vos == null || vos.length <= 0 )
+        {
+            throw new Exception( "编码为[" + _printTempcode + "]的打印模板不存在!!" );
+        }
+        HashVO parentVO = vos[0];
+        
+        String str_sql_item = "select * from pub_printtemplet_item t, pub_printtemplet p WHERE t.PRINTTEMPLETID = p.ID AND p.TEMPLETNAME = '" +
+        _printTempcode + "' order by sequence";
+
+        HashVO[] hashVOs_item = commDMO.getHashVoArrayByDS( null, str_sql_item );
+        return getPub_PrintTemplet_VO( parentVO, hashVOs_item, _clientEnv );
+    }
+    /**
+     * 直接根据两个HashVO创建模板VO
+     *
+     * @param _parentVO
+     * @param _childVOs
+     * @return
+     * @throws Exception
+     */
+
+    public Pub_PrintTempletVO getPub_PrintTemplet_VO( HashVO _parentVO, HashVO[] _childVOs, NovaClientEnvironment _clientEnv )
+        throws
+        Exception
+    {
+        CommDMO commDMO = new CommDMO();
+        // 处理模板主表!!!!!!!!!!!!!
+        Pub_PrintTempletVO templet1VO = new Pub_PrintTempletVO();
+        templet1VO.setId( _parentVO.getStringValue( "id" ) ); // 模板编码
+        templet1VO.setTempletname( _parentVO.getStringValue( "templetname" ) ); // 模板名称
+        templet1VO.setTablename( _parentVO.getStringValue( "tablename" ) ); // 取数据的表名!!
+        templet1VO.setBottomspace( _parentVO.getStringValue( "bottomspace" ) );
+        templet1VO.setContentsize( _parentVO.getStringValue( "contentsize" ) );
+        templet1VO.setLeftspace( _parentVO.getStringValue( "leftspace" ) );
+        templet1VO.setLinespace( _parentVO.getStringValue( "linespace" ) );
+        templet1VO.setRightspace( _parentVO.getStringValue( "rightspace" ) );
+        templet1VO.setTemplet_1_id( _parentVO.getStringValue( "templet_1_id" ) );
+        templet1VO.setTitle( _parentVO.getStringValue( "title" ) );
+        templet1VO.setTitleheight( _parentVO.getStringValue( "titleheight" ) );
+        templet1VO.setTitlesize( _parentVO.getStringValue( "titlesize" ) ); //标题字号大小
+        templet1VO.setCustdealclass( _parentVO.getStringValue( "custdealclass" ) );
+        //add by cuiyi 20070927
+        templet1VO.setHeadStringLeft( _parentVO.getStringValue( "HEADSTRINGLEFT" ) );
+        templet1VO.setHeadStringRight( _parentVO.getStringValue( "HEADSTRINGRIGHT" ) );
+        templet1VO.setTailStringLeft( _parentVO.getStringValue( "TAILSTRINGLEFT" ) );
+        templet1VO.setTailStringRight( _parentVO.getStringValue( "TAILSTRINGRIGHT" ) );
+//      add by cuiyi 20070927 end 
+        
+        // 处理模板子表!!!!!!!!!!!!!
+        Pub_PrintTempletItemVO[] itemVOS = new Pub_PrintTempletItemVO[_childVOs.length]; //
+        for ( int i = 0; i < itemVOS.length; i++ )
+        {
+            itemVOS[i] = new Pub_PrintTempletItemVO();
+            itemVOS[i].setItemkey( _childVOs[i].getStringValue( "Itemkey" ).trim( ) );
+            itemVOS[i].setAligntype( _childVOs[i].getStringValue( "aligntype" ) );
+            itemVOS[i].setId( _childVOs[i].getStringValue( "id" ) );
+            itemVOS[i].setIsonerow( _childVOs[i].getStringValue( "isonerow" ) ); // 是否换行.
+            itemVOS[i].setIsshow( _childVOs[i].getStringValue( "isshow" ) ); // 设置是否显示
+            itemVOS[i].setIsshownull( _childVOs[i].getStringValue( "isshownull" ) ); // 是否显示空值列
+            itemVOS[i].setNamewidthabsolute( _childVOs[i].getStringValue( "namewidthabsolute" ) ); //
+            itemVOS[i].setNamewidthpercent( _childVOs[i].getStringValue( "namewidthpercent" ) ); //
+            itemVOS[i].setPrinttempletid( _childVOs[i].getStringValue( "printtempletid" ) );
+            itemVOS[i].setShowname( _childVOs[i].getStringValue( "showname" ) ); //显示名称
+            itemVOS[i].setValue( _childVOs[i].getStringValue( "value" ) );
+            itemVOS[i].setValueformula( _childVOs[i].getStringValue( "valueformula" ) );
+            itemVOS[i].setValuewidthabsolute( _childVOs[i].getStringValue( "valuewidthabsolute" ) );
+            itemVOS[i].setValuewidthpercent( _childVOs[i].getStringValue( "valuewidthpercent" ) ); //
+        }
+        templet1VO.setItemvo( itemVOS ); // 为主VO设置各项
+        return templet1VO; //
+    }
+
+    /**
+     * 执行加载公式!!!
+     *
+     * @param _data
+     * @param _templetVO
+     * @param _env
+     * @return
+     */
+    private Object[][] execLoadformula( Object[][] _data, Pub_Templet_1VO _templetVO, NovaClientEnvironment _env )
+    {
+        if ( _data == null )
+        {
+            return null;
+        }
+
+        int li_length = _templetVO.getItemKeys().length; // 总共有多少列,加上行号,还应多一列!!
+        Pub_Templet_1_ItemVO[] itemVos = _templetVO.getItemVos(); // 各子项.
+        String[] itemKeys = _templetVO.getItemKeys(); // 各项的key
+        String[] itemTypes = _templetVO.getItemTypes(); // 各项的类型
+
+        for ( int i = 0; i < _data.length; i++ )
+        {
+            HashMap mapRowCache = new HashMap();
+            for ( int j = 0; j < li_length; j++ )
+            {
+                mapRowCache.put( itemKeys[j], _data[i][j + 1] ); // 先一下子在缓存中加入数据
+            }
+
+            for ( int j = 0; j < li_length; j++ )
+            {
+                String str_loadformula_desc = itemVos[j].getLoadformula(); //
+                if ( str_loadformula_desc != null && !str_loadformula_desc.trim().equals( "" ) )
+                {
+                    String[] str_loadformulas = str_loadformula_desc.trim().split( ";" );
+                    for ( int k = 0; k < str_loadformulas.length; k++ )
+                    { // 遍历公式!!
+                        String[] str_execResult = dealFormula( str_loadformulas[k], _env, mapRowCache ); // 真正执行公式!!!
+                        mapRowCache.put( str_execResult[0], str_execResult[1] ); // 在缓存中加入!!!
+                        int li_pos = findItemPos( itemVos, str_execResult[0] ); // 去页面是找位置
+                        if ( li_pos >= 0 )
+                        { // 看公式前辍是不是在模板中定义的,如果是
+                            String str_type = findItemType( itemVos, str_execResult[0] ); // 看是什么类型
+                            if ( str_type.equals( "文本框" ) )
+                            { // 如果是文本框,则直接赋值,绝大多数情况是这样!!!
+                                _data[i][li_pos + 1] = str_execResult[1];
+                            }
+                            else if ( str_type.equals( "下拉框" ) )
+                            { // 这里其实还要判断参照类型,如果是Table则还要自动根据对照的SQL取数!!!
+                                _data[i][li_pos +
+                                    1] = new ComBoxItemVO( str_execResult[1], str_execResult[1], str_execResult[1] );
+                            }
+                            else if ( str_type.equals( "参照" ) )
+                            {
+                                _data[i][li_pos +
+                                    1] = new RefItemVO( str_execResult[1], str_execResult[1], str_execResult[1] );
+                            }
+                            else
+                            {
+                                _data[i][li_pos + 1] = str_execResult[1];
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+        return _data;
+    }
+
+    /**
+     * 真正执行某一个公式..使用JEP去执行!!
+     *
+     * @param _formula
+     */
+    private String[] dealFormula( String _formula, NovaClientEnvironment _env, HashMap _map )
+    {
+        String str_formula = replaceAll( _formula, " ", "" );
+        int li_pos = str_formula.indexOf( "=>" );
+        String str_prefix = str_formula.substring( 0, li_pos );
+        String str_subfix = str_formula.substring( li_pos + 2, str_formula.length() );
+
+        String str_subfix_new = str_subfix;
+        try
+        {
+            str_subfix_new = getModifySqlUtil().convertMacroStr( str_subfix, _env, _map ); // 新的公式,即过转换过后的公式
+        }
+        catch ( Exception ex )
+        {
+            ex.printStackTrace();
+        }
+
+        String str_return = "";
+        if ( getLoadFormulaCache().containsKey( str_subfix_new ) )
+        { //看缓存中有没有计算过的值,如果有则直接返回!!!这个缓存处理非常重要!!!对性能优化极大!
+            str_return = ( String ) getLoadFormulaCache().get( str_subfix_new ); //直接返回!!
+        }
+        else
+        {
+            Object obj = getJepParse().execFormula( str_subfix_new ); //执行公式!!!!
+            if ( obj == null )
+            {
+                str_return = "";
+            }
+            else
+            {
+                str_return = "" + obj;
+            }
+            getLoadFormulaCache().put( str_subfix_new, str_return ); //
+        }
+
+        //System.out.println("加载公式项:[" + str_formula + "],前辍:[" + str_prefix + "],后辍:[" + str_subfix + "],宏代码转换后的后辍的:[" + str_subfix_new + "],JEP运算结果:[" + str_return + "]"); //
+        return new String[]
+            {
+            str_prefix, str_return}; //
+    }
+
+    private int findItemPos( Pub_Templet_1_ItemVO[] itemVos, String _itemkey )
+    {
+        for ( int i = 0; i < itemVos.length; i++ )
+        {
+            if ( itemVos[i].getItemkey().equalsIgnoreCase( _itemkey ) )
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private String findItemType( Pub_Templet_1_ItemVO[] itemVos, String _itemkey )
+    {
+        for ( int i = 0; i < itemVos.length; i++ )
+        {
+            if ( itemVos[i].getItemkey().equalsIgnoreCase( _itemkey ) )
+            {
+                return itemVos[i].getItemtype();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 要到匹配的ComBoxItemVO
+     *
+     * @param _vos
+     * @param _id
+     * @return
+     */
+    private ComBoxItemVO findComBoxItemVO( ComBoxItemVO[] _vos, String _id )
+    {
+        for ( int k = 0; k < _vos.length; k++ )
+        {
+            if ( _vos[k].getId().equals( _id ) )
+            {
+                return _vos[k];
+            }
+        }
+        return null;
+    }
+
+    public Object[][] getQueryDataByDS( String _datasourcename, String _sql, Pub_Templet_1VO _templetVO,
+                                        NovaClientEnvironment _clientEnv )
+        throws Exception
+    {
+        CommDMO commDMO = new CommDMO(); //
+        int li_length = _templetVO.getItemKeys().length; // 总共有多少列,加上行号,还应多一列!!
+        Pub_Templet_1_ItemVO[] itemVos = _templetVO.getItemVos(); // 各子项.
+        String[] itemKeys = _templetVO.getItemKeys(); // 各项的key
+        String[] itemTypes = _templetVO.getItemTypes(); // 各项的类型
+
+        HashVO[] hashVOs = commDMO.getHashVoArrayByDS( _datasourcename, _sql ); // 取得真正的数据
+
+        Object[][] valueData = new Object[hashVOs.length][li_length]; // 创建数据对象!!!,比模板多一列是行号,永远在第一列!!
+
+        //HashMap hm_RefItemVos = new HashMap(); // 一下子为各个参照灌入所有的参照数据!!!
+        for ( int i = 0; i < hashVOs.length; i++ )
+        { // 遍历各行
+            Object[] rowobjs = new Object[li_length]; // 一行的数据
+            HashMap map_cache = new HashMap(); // 一行数据中的缓存!!!其Value可能是String,ComBoxItemVO,RefItemVO
+
+            // 首先一下子将所有值灌入....
+            String[] str_realvalues = new String[li_length]; //
+            for ( int j = 0; j < li_length; j++ )
+            { // 遍历各列
+                String str_key = itemKeys[j];
+                String str_type = itemTypes[j]; //
+                if ( str_type.equals( "日历" ) )
+                {
+                    str_realvalues[j] = hashVOs[i].getStringValueForDay( str_key ); //
+                }
+                else if ( str_type.equals( "时间" ) )
+                {
+                    str_realvalues[j] = hashVOs[i].getStringValueForSecond( str_key ); //
+                }
+                else
+                {
+                    str_realvalues[j] = hashVOs[i].getStringValue( str_key ); //
+                }
+
+                if ( str_realvalues[j] != null )
+                {
+                    if ( itemTypes[j].equals( "文本框" ) )
+                    { // 如果是文本框
+                        map_cache.put( str_key, str_realvalues[j] );
+                    }
+                    else if ( itemTypes[j].equals( "下拉框" ) )
+                    {
+                        map_cache.put( str_key, new ComBoxItemVO( str_realvalues[j], str_realvalues[j], str_realvalues[j] ) );
+                    }
+                    else if ( itemTypes[j].equals( "参照" ) )
+                    {
+                        map_cache.put( str_key, new RefItemVO( str_realvalues[j], str_realvalues[j], str_realvalues[j] ) );
+                    }
+                    else
+                    {
+                        map_cache.put( str_key, str_realvalues[j] ); //
+                    }
+                }
+            }
+            // 然后再处理每一列的值
+            for ( int j = 0; j < li_length; j++ )
+            { // 遍历各列
+                String str_key = itemKeys[j];
+                String str_type = itemTypes[j];
+                String str_value = null;
+                if ( str_type.equals( "日历" ) )
+                {
+                    str_value = hashVOs[i].getStringValueForDay( str_key ); //
+                }
+                else if ( str_type.equals( "时间" ) )
+                {
+                    str_value = hashVOs[i].getStringValueForSecond( str_key ); //
+                }
+                else
+                {
+                    str_value = hashVOs[i].getStringValue( str_key ); //
+                }
+                if ( str_value != null )
+                {
+                    if ( itemTypes[j].equals( "文本框" ) )
+                    { // 如果是文本框
+                        rowobjs[j] = str_value;
+                    }
+                    else if ( itemTypes[j].equals( "下拉框" ) )
+                    { // 如果是下拉框..
+                        ComBoxItemVO[] comBoxItemVos = itemVos[j].getComBoxItemVos();
+                        ComBoxItemVO matchVO = findComBoxItemVO( comBoxItemVos, str_value ); // //..
+                        if ( matchVO != null )
+                        {
+                            rowobjs[j] = matchVO;
+                        }
+                        else
+                        {
+                            rowobjs[j] = new ComBoxItemVO( str_value, str_value, str_value ); // 下拉框VO
+                        }
+                    }
+                    else if ( itemTypes[j].equals( "参照" ) )
+                    {
+                        if ( itemVos[j].getRefdesc_type().equalsIgnoreCase( "TABLE" ) ||
+                             itemVos[j].getRefdesc_type().equalsIgnoreCase( "TREE" ) )
+                        { // 如果是表或者树
+                            String str_refsql = itemVos[j].getRefdesc_realsql(); //
+                            if ( str_refsql != null && !str_refsql.trim().equals( "" ) )
+                            {
+                                String modify_str = null; //
+                                
+                                try
+                                {
+                                    modify_str = new FrameWorkTBUtil().convertFormulaMacPars( str_refsql, _clientEnv, map_cache ); // !!!!得到转换后的SQL,即直接可以执行的SQL,即将其中的{aaa}进行转换,!!!这是关键
+                                }
+                                catch ( Exception ex )
+                                {
+                                    System.out.println( "转换参照[" + _templetVO.getTempletcode() + "][" +
+                                        itemVos[j].getItemkey() + "][" + itemVos[j].getItemname() + "]参照定义SQL[" +
+                                        str_refsql + "]失败!!!" );
+                                    ex.printStackTrace(); //
+                                }
+
+                                if ( modify_str != null )
+                                { // 如果成功转换SQL!!
+                                    FrameWorkTBUtil tbUtil = new FrameWorkTBUtil();
+                                    modify_str = StringUtil.replaceAll( modify_str, "1=1",
+                                        itemVos[j].getRefdesc_firstColName() + "='" + str_value + "'" ); // 将SQL语句中的1=1替换成..
+                                    System.out.println( "开始执行参照定义转换后的SQL:" + modify_str ); //
+                                    HashVO[] ht_allRefItemVOS = null;
+                                    try
+                                    {
+                                        ht_allRefItemVOS = commDMO.getHashVoArrayByDS( _datasourcename, modify_str ); // 执行SQL!!!可能会抛异常!!
+                                    }
+                                    catch ( Exception ex )
+                                    {
+                                        System.out.println( "执行参照[" + _templetVO.getTempletcode() + "][" +
+                                            itemVos[j].getItemkey() + "][" + itemVos[j].getItemname() + "]转换后SQL[" +
+                                            modify_str + "]失败,原因:" + ex.getMessage() ); //
+                                        ex.printStackTrace();
+                                    }
+
+                                    if ( ht_allRefItemVOS != null )
+                                    { // 如果取得到数据!!
+                                        boolean bo_iffindref = false;
+                                        for ( int pp = 0; pp < ht_allRefItemVOS.length; pp++ )
+                                        { // 遍历去找!!!
+                                            if ( str_value.equals( ht_allRefItemVOS[pp].getStringValue( 0 ) ) )
+                                            {
+                                                rowobjs[j] = new RefItemVO( ht_allRefItemVOS[pp] ); //
+                                                bo_iffindref = true; // 如果非常幸运的找到品配的了!!!!!!!!!
+                                                break;
+
+                                            }
+                                        }
+                                        if ( !bo_iffindref )
+                                        { // 如果没找到品配的,则直接创建参照VO
+                                            rowobjs[j] = new RefItemVO( str_value, str_value, str_value ); // 参照VO
+                                        }
+                                    }
+                                    else
+                                    // 如果执行SQL取数失败!!
+                                    {
+                                        rowobjs[j] = new RefItemVO( str_value, str_value, str_value ); // 参照VO
+                                    }
+                                }
+                                else
+                                { // 如果转换SQL失败
+                                    rowobjs[j] = new RefItemVO( str_value, str_value, str_value ); // 参照VO
+                                }
+                            }
+                            else
+                            {
+                                rowobjs[j] = new RefItemVO( str_value, str_value, str_value ); // 参照VO
+                            }
+                        }
+                        else
+                        { // 如果不是表型1或树型1参照!!,比如自定义,TABLE2,TREE2等
+                            rowobjs[j] = new RefItemVO( str_value, str_value, str_value ); // 参照VO
+                        }
+                    }
+                    else
+                    { // 如果是其他控件
+                        rowobjs[j] = str_value;
+                    }
+                }
+                else
+                { // 如果没取到数,则为空!
+                    rowobjs[j] = null;
+                }
+
+                map_cache.put( str_key, rowobjs[j] ); // 往缓存中送入
+            } // 一行数据中的各列全部处理处理结束!!!
+
+            valueData[i] = rowobjs; //
+        } // 所有行数据处理结束!!
+
+        return valueData; //
+    } //
+
+    //提交BillVO进行数据库操作!!
+    public void commitBillVO( String _dsName, BillVO[] _deleteVOs, BillVO[] _insertVOs, BillVO[] _updateVOs )
+        throws
+        Exception
+    {
+        CommDMO commDMO = new CommDMO(); //
+        String[] str_sql_deletes = null;
+        if ( _deleteVOs != null && _deleteVOs.length > 0 )
+        {
+            str_sql_deletes = new String[_deleteVOs.length]; //
+            for ( int i = 0; i < str_sql_deletes.length; i++ )
+            {
+                str_sql_deletes[i] = _deleteVOs[i].getDeleteSQL(); //
+            }
+        }
+
+        String[] str_sql_inserts = null;
+        if ( _insertVOs != null && _insertVOs.length > 0 )
+        {
+            str_sql_inserts = new String[_insertVOs.length]; //
+            for ( int i = 0; i < str_sql_inserts.length; i++ )
+            {
+                str_sql_inserts[i] = _insertVOs[i].getInsertSQL(); //
+            }
+        }
+
+        String[] str_sql_updates = null;
+        if ( _updateVOs != null && _updateVOs.length > 0 )
+        {
+            str_sql_updates = new String[_updateVOs.length]; //
+            for ( int i = 0; i < str_sql_updates.length; i++ )
+            {
+                str_sql_updates[i] = _updateVOs[i].getUpdateSQL(); //
+            }
+        }
+
+        if ( str_sql_deletes != null )
+        {
+            commDMO.executeBatchByDS( _dsName, str_sql_deletes ); //先删除!!
+        }
+
+        if ( str_sql_inserts != null )
+        {
+            commDMO.executeBatchByDS( _dsName, str_sql_inserts ); //后插入!!
+        }
+
+        if ( str_sql_updates != null )
+        {
+            commDMO.executeBatchByDS( _dsName, str_sql_updates ); //最后修改!!
+        }
+
+    }
+
+    /**
+     * 替换字符
+     *
+     * @param str_par
+     * @param old_item
+     * @param new_item
+     * @return
+     */
+    private String replaceAll( String str_par, String old_item, String new_item )
+    {
+        String str_return = "";
+        String str_remain = str_par;
+        boolean bo_1 = true;
+        while ( bo_1 )
+        {
+            int li_pos = str_remain.indexOf( old_item );
+            if ( li_pos < 0 )
+            {
+                break;
+            } // 如果找不到,则返回
+            String str_prefix = str_remain.substring( 0, li_pos );
+            str_return = str_return + str_prefix + new_item; // 将结果字符串加上原来前辍
+            str_remain = str_remain.substring( li_pos + old_item.length(), str_remain.length() );
+        }
+        str_return = str_return + str_remain; // 将剩余的加上
+        return str_return;
+    }
+
+    private String getDataSourceName( String _des )
+    {
+        String str_new = _des;
+        int li_pos = str_new.indexOf( "=" ); //
+        str_new = str_new.substring( li_pos + 1, str_new.length() ).trim();
+
+        if ( str_new.startsWith( "\"" ) || str_new.startsWith( "'" ) )
+        {
+            str_new = str_new.substring( 1, str_new.length() );
+        }
+
+        if ( str_new.endsWith( "\"" ) || str_new.endsWith( "'" ) )
+        {
+            str_new = str_new.substring( 0, str_new.length() - 1 );
+        }
+
+        return str_new; // 取得数据源名称
+    }
+
+    private ModifySqlUtil getModifySqlUtil()
+    {
+        if ( modifySqlUtil == null )
+        {
+            modifySqlUtil = new ModifySqlUtil();
+        }
+        return modifySqlUtil; //
+    }
+
+    private JepFormulaParse getJepParse()
+    {
+        if ( jepParse == null )
+        {
+            jepParse = new JepFormulaParse( JepFormulaParse.li_bs );
+        }
+        return jepParse;
+    }
+
+    //参照缓存
+    private HashMap getRefCache()
+    {
+        if ( refCache == null )
+        {
+            refCache = new HashMap();
+        }
+        return refCache;
+    }
+
+    //加载公式缓存!!
+    private HashMap getLoadFormulaCache()
+    {
+        if ( mapLoadFormulaCache == null )
+        {
+            mapLoadFormulaCache = new HashMap();
+        }
+        return mapLoadFormulaCache;
+    }
+
+}

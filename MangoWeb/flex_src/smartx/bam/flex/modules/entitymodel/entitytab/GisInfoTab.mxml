@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitytab:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:entitytab="smartx.bam.flex.modules.entitymodel.entitytab.*" 
+					   width="100%" height="100%" label="GIS信息" creationComplete="init()">
+	<fx:Declarations>
+		<mx:TitleWindow id="addAttWindow" title="添加属性" width="500" showCloseButton="true" close="PopUpManager.removePopUp(addAttWindow)">
+			<mx:DataGrid width="100%" height="100%" allowMultipleSelection="true" dataProvider="{allAtt}" id="addAttDg" 
+						 doubleClickEnabled="true" doubleClick="addAttDg_doubleClickHandler(event)">
+				<mx:columns>
+					<mx:DataGridColumn headerText="名称" dataField="@name" />
+					<mx:DataGridColumn headerText="类型" dataField="@type" labelFunction="attTypeLabelFun"/>
+					<mx:DataGridColumn headerText="显示名称" dataField="@label" />
+					<mx:DataGridColumn headerText="是否为空" dataField="@isNullable" labelFunction="isNullableLabelFun"/>
+					<mx:DataGridColumn headerText="类别" dataField="@category" labelFunction="categoryFun" />
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="addAttConfirm_clickHandler()" />
+				<mx:Button label="取消" click="PopUpManager.removePopUp(addAttWindow)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.EntityTaskViewWindow;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			public var allInheritAtt:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var allAtt:ArrayCollection = new ArrayCollection();
+			
+			private var rpc:RemoteObject;
+			
+			[Bindable]
+			private var typeDp:ArrayCollection = new ArrayCollection([
+				{name:"点",data:"POINT"},
+				{name:"线",data:"LINE"},
+				{name:"多边形",data:"POLYGAN"},
+				{name:"多点",data:"MULTIPOINT"},
+				{name:"多线",data:"MULTILINE"},
+				{name:"多多边形",data:"MULTPOLYGAN"}
+				
+			]);
+			
+			private function init():void{
+				rpc = new RemoteObject(BAMConst.BAM_Service);
+				rpc.endpoint = endpoint;
+				rpc.calculateAndImportGisDataByXml.addEventListener(ResultEvent.RESULT,calculateAndImportGisDataHandler);
+				rpc.calculateAndImportGisDataByXml.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("计算GIS数据错误！",SmartXMessage.MESSAGE_ERROR,"错误：\n"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				rpc.publishDBLayer.addEventListener(ResultEvent.RESULT,publishDBLayerHandler);
+				rpc.publishDBLayer.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("发布图层错误！",SmartXMessage.MESSAGE_ERROR,"错误：\n"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				initData();
+				isCreationComplete = true;
+			}
+			
+			private function calculateAndImportGisDataHandler(event:ResultEvent):void{
+				SmartXMessage.show("计算GIS数据完成！");
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function publishDBLayerHandler(event:ResultEvent):void{
+				SmartXMessage.show("发布图层完成！");
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function addAttDg_doubleClickHandler(event:MouseEvent):void{
+				if(addAttDg.selectedIndex >= 0){
+					selectedItem.content.gisInfo.attributes.appendChild(<attribute name={addAttDg.selectedItem.@name} />);
+					refreshAsAttributeControl();
+				}
+				PopUpManager.removePopUp(addAttWindow);
+			}
+			
+			private function addAttBtn_clickHandler(event:MouseEvent):void{
+				allAtt.removeAll();
+				allAtt.addAll(allInheritAtt);
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					allAtt.addItem(att);
+				}
+				PopUpManager.addPopUp(addAttWindow,this,true);
+				PopUpManager.centerPopUp(addAttWindow);
+			}
+			
+			private function delAttBtn_clickHandler(event:MouseEvent):void{
+				if(gisAttList.selectedItems.length == 0)
+					return;
+				for each(var data:Object in gisAttList.selectedItem){
+					CEPUtils.xmlDeleteNode(XML(data));
+				}
+				refreshAsAttributeControl();
+			}
+			
+			private function addAttConfirm_clickHandler():void{
+				if(addAttDg.selectedItems.length > 0){
+					for each(var data:Object in addAttDg.selectedItems){
+						selectedItem.content.gisInfo.attributes.appendChild(<attribute name={data.@name} />);
+					}
+					refreshAsAttributeControl();
+				}
+				PopUpManager.removePopUp(addAttWindow);
+			}
+			
+			//刷新属性相关控件
+			private function refreshAsAttributeControl():void{
+				gisAttList.dataProvider = selectedItem.content.gisInfo.attributes.attribute;
+				if(currentState == "point"){
+					geoyCbo.dataProvider = selectedItem.content.gisInfo.attributes.attribute;
+					geoxCbo.dataProvider = selectedItem.content.gisInfo.attributes.attribute;
+					selectedItem.content.gisInfo.info.geox = geoxCbo.selectedItem==null?"":geoxCbo.selectedItem.@name;
+					selectedItem.content.gisInfo.info.geoy = geoyCbo.selectedItem==null?"":geoyCbo.selectedItem.@name;
+				}
+			}
+			
+			private function typeCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.gisInfo.@type = typeCbo.selectedItem.data;		
+			}
+			
+			private function geoyCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.gisInfo.info.geoy = geoyCbo.selectedItem.@name;
+			}
+			
+			private function geoxCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.gisInfo.info.geox = geoxCbo.selectedItem.@name;
+			}
+			
+			private function initData():void{
+				if(selectedItem.content.gisInfo.length() == 0){
+					//表名生成规则（GEO_实体领域CODE_实体CODE）
+					var tableName:String = BAMConst.ENTITYGIS_TABLENAME_PREFIX.concat(contentXml.entityModelCode)
+						.concat("_").concat(selectedItem.content.@code);
+					//默认GIS类型为点
+					selectedItem.content.appendChild(<gisInfo type='POINT' tableName={tableName} code={tableName}>
+															<attributes />
+															<info>
+																<geox />
+																<geoy />
+																<srid>4326</srid>
+															</info>
+													</gisInfo>);
+				}
+				var data:*;
+				for each(data in typeDp){
+					if(data.data == String(selectedItem.content.gisInfo.@type)){
+						typeCbo.selectedItem = data;
+						break;
+					}else
+						typeCbo.selectedIndex = -1;
+				}
+				
+				for each(data in selectedItem.content.gisInfo.attributes.attribute){
+					if(String(data.@name) == String(selectedItem.content.gisInfo.info.geox)){
+						geoxCbo.selectedItem = data;
+						break;
+					}else
+						geoxCbo.selectedIndex = -1;
+				}
+				
+				for each(data in selectedItem.content.gisInfo.attributes.attribute){
+					if(String(data.@name) == String(selectedItem.content.gisInfo.info.geoy)){
+						geoyCbo.selectedItem = data;
+						break;
+					}else
+						geoyCbo.selectedIndex = -1;
+				}
+				
+				for each(data in sridDp){
+					if(data.data == String(selectedItem.content.gisInfo.info.srid)){
+						sridCbo.selectedItem = data;
+						break;
+					}else
+						sridCbo.selectedIndex = -1;
+				}
+			}
+			
+			public function showHandler():void{
+				initData();
+			}
+			
+			private function calcGisDataBtn_clickHandler(event:MouseEvent):void{
+				OperatingTipUtil.startOperat("正计算GIS数据...",this);
+				rpc.calculateAndImportGisDataByXml(contentXml.toXMLString(),XML(selectedItem.content).toXMLString());
+			}
+			
+			private function calcTaskBtn_clickHandler(event:MouseEvent):void{
+				if(!insertMode){
+					var rtw:EntityTaskViewWindow = new EntityTaskViewWindow();
+					rtw.entityModelCode = contentXml.entityModelCode;
+					rtw.entityCode = selectedItem.content.@code;
+					rtw.code = selectedItem.content.gisInfo.@code;
+					rtw.taskCode = selectedItem.content.gisInfo.@taskCode;
+					rtw.dataTaskDesc = String(selectedItem.content.@name).concat("实体GIS数据计算");
+					rtw.content = XML(selectedItem.content.gisInfo);
+					rtw.entityTaskType = BAMConst.ENTITY_DATATASK_GIS;
+					
+					if(desktop != null)
+						PopUpManager.addPopUp(rtw,desktop,true);
+					else
+						PopUpManager.addPopUp(rtw,this,true);
+					PopUpManager.centerPopUp(rtw);
+				}else
+					SmartXMessage.show("模型尚未保存,不能发布任务",SmartXMessage.MESSAGE_WARN);
+			}
+			
+			private function sridCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.gisInfo.info.srid = sridCbo.selectedItem.data;
+			}
+			
+			private function publishLayerBtn_clickHandler(event:MouseEvent):void{
+				OperatingTipUtil.startOperat("正发布图层...",this);
+				rpc.publishDBLayer(String(contentXml.geoServer.@url),String(contentXml.geoServer.@user)
+								,String(contentXml.geoServer.@pwd),String(contentXml.geoServer.workspace),String(contentXml.geoServer.store)
+								,String(selectedItem.content.gisInfo.@tableName).toLowerCase()
+								,String(selectedItem.content.gisInfo.info.srid)
+								,String(selectedItem.content.gisInfo.@type),String(selectedItem.content.gisInfo.@title));
+			}
+			
+			private function titleTxt_changeHandler(event:Event):void{
+				selectedItem.content.gisInfo.@title = titleTxt.text;
+			}
+			
+		]]>
+	</fx:Script>
+	<entitytab:states>
+		<s:State name="point" />
+		<s:State name="line" />
+		<s:State name="polygan" />
+	</entitytab:states>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" 
+			 paddingRight="5" paddingTop="5" >
+		<mx:HBox width="100%" >
+			<mx:Label text="图层名称" width="20%" />
+			<mx:TextInput id="titleTxt" width="50%" text="{selectedItem.content.gisInfo.@title}" change="titleTxt_changeHandler(event)"  />
+		</mx:HBox>
+		<mx:HBox width="100%" >
+			<mx:Label text="类型" width="20%" />
+			<mx:ComboBox id="typeCbo" labelField="name" dataProvider="{typeDp}" change="typeCbo_changeHandler(event)"/>
+		</mx:HBox>
+		<mx:HBox width="100%" >
+			<mx:Label text="相关属性" width="20%" />
+			<mx:VBox width="70%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%" >
+					<mx:Button icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加"
+							   id="addAttBtn" click="addAttBtn_clickHandler(event)" />
+					<mx:Button icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除"
+							   id="delAttBtn" click="delAttBtn_clickHandler(event)" />
+				</mx:HBox>
+				<mx:List id="gisAttList" allowMultipleSelection="true" width="100%" labelField="@name" 
+						 dataProvider="{selectedItem.content.gisInfo.attributes.attribute}" />
+			</mx:VBox>
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="left">
+			<mx:Label text="GIS信息描述" color="blue"/>
+		</mx:HBox>
+		<mx:VBox width="100%" paddingBottom="5" paddingLeft="5" height="50%"
+				 paddingRight="5" paddingTop="5" includeIn="point">
+			
+			<mx:HBox width="100%">
+				<mx:Label text="X坐标" width="20%" />
+				<mx:ComboBox id="geoxCbo" labelField="@name" change="geoxCbo_changeHandler(event)"
+							 dataProvider="{selectedItem.content.gisInfo.attributes.attribute}" />
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Label text="Y坐标" width="20%" />
+				<mx:ComboBox id="geoyCbo" labelField="@name" change="geoyCbo_changeHandler(event)"
+							 dataProvider="{selectedItem.content.gisInfo.attributes.attribute}" />
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Label text="参考坐标系" width="20%" />
+				<mx:ComboBox id="sridCbo" labelField="name" 
+							 dataProvider="{sridDp}" change="sridCbo_changeHandler(event)"/>
+			</mx:HBox>
+		</mx:VBox>
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button label="计算GIS数据" id="calcGisDataBtn" click="calcGisDataBtn_clickHandler(event)" />
+			<mx:Label  />
+			<mx:Button label="发布图层" id="publishLayerBtn" click="publishLayerBtn_clickHandler(event)" />
+			<mx:Label  />
+			<mx:Button label="计算调度" id="calcTaskBtn" click="calcTaskBtn_clickHandler(event)" />
+		</mx:HBox>
+	</mx:VBox>
+</entitytab:AbstractTab>

@@ -1,0 +1,35 @@
+/* CSS file */
+
+grid {
+	defaultCellWidth: 50;
+	defaultCellHeight: 24;
+	topHeaderHeight: 24;
+	leftHeaderWidth: 28;
+}
+
+.dataCell {
+	fontFamily: "Arial";
+	fontSize: 10;
+}
+
+.totalCell {
+	fontSize: 14;
+	fontWeight: bold;
+}
+
+.headerCell {
+	fontFamily: "Arial";
+	fontSize: 10;
+}
+
+.expandedHeaderCell {
+	textIndent: 4;
+	leftIcon: Embed(source="styles/swf/skins.swf", symbol="MinusIconClass", color="#00FF00");
+	useHandCursor: true;
+}
+
+.collapsedHeaderCell {
+	textIndent: 4;
+	leftIcon: url:styles/icons/plusIcon.png, color:#00FF00;
+	useHandCursor: true;
+}

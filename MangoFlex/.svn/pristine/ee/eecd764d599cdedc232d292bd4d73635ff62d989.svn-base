@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseAttr:BaseAttributePanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+							 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:baseAttr="smartx.flex.components.mtdesigner.styletemplate.*"
+							 creationComplete="init()" label="{titleName}">
+	
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			private var buttonXML:XML;
+			
+			private function init():void{
+				
+			}
+			
+			override protected function getXMLString():String{
+				return sourceXML.toString();
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <button id="在此填写按钮ID" label="在此填写按钮名称" toolTip="在此填写按钮提示信息" icon="在此填写按钮图标" ><listeners /></button>;
+				if( sourceXML.customTreeButton.length()<= 0 ){
+					var customTreeButtonXML:XML = new XML("<customTreeButton />");
+					sourceXML.appendChild(customTreeButtonXML);
+				}
+				
+				sourceXML.customTreeButton.appendChild(tempBtnXml);
+				
+				btnsDatagrid.invalidateList();
+				
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = btnsDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+					buttonXML = null;
+				}
+			}
+			
+			protected function addLstBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				var btnObj:Object = btnsDatagrid.selectedItem;
+				if( btnObj != null ){
+					if( buttonXML == null ){
+						buttonXML = <button id="" label="" toolTip="" icon="" ><listeners /></button>;
+					}
+					
+					var listener:XML = new XML("<listener>在此填写监听器实现类</listener>");
+					
+					buttonXML.listeners.appendChild(listener);
+					
+					lstsDatagrid.invalidateList();
+				}else{
+					SmartXMessage.show("请先选择一条按钮数据!");
+				}
+				
+				
+			}
+			
+			protected function musLstBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = lstsDatagrid.selectedItem;
+				if( item != null ){
+					var listenerXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(listenerXml);
+					lstsDatagrid.invalidateList();
+				}
+			}
+			
+			protected function btnsDatagrid_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = btnsDatagrid.selectedItem;
+				if(item != null ){
+					buttonXML = item as XML;
+					lstsDatagrid.invalidateList();
+				}
+				
+			}
+			
+			private function lstsColLabelFunction(item:Object,column:DataGridColumn):String{
+				var tempXml:XML = XML(item);
+				var result:String = tempXml.text();
+				return result;
+			}
+			
+			protected function insertBfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = insertBfIncCardTxt.text;
+				sourceXML.interceptors.insertBfIncCard = temp;
+				
+			}
+			
+			protected function insertAfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = insertAfIncCardTxt.text;
+				sourceXML.interceptors.insertAfIncCard = temp;
+				
+			}
+			
+			protected function updateBfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = updateBfIncCardTxt.text;
+				sourceXML.interceptors.updateBfIncCard = temp;
+				
+			}
+			
+			protected function updateAfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = updateAfIncCardTxt.text;
+				sourceXML.interceptors.updateAfIncCard = temp;
+				
+			}
+			
+			protected function clientInsertBfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = clientInsertBfIncCardTxt.text;
+				sourceXML.interceptors.clientInsertBfIncCard = temp;
+				
+			}
+			
+			protected function clientUpdateBfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = clientUpdateBfIncCardTxt.text;
+				sourceXML.interceptors.clientUpdateBfIncCard = temp;
+				
+			}
+			
+			protected function clientUpdateAfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = clientUpdateAfIncCardTxt.text;
+				sourceXML.interceptors.clientUpdateAfIncCard = temp;
+				
+			}
+			
+			protected function clientInsertAfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = clientInsertAfIncCardTxt.text;
+				sourceXML.interceptors.clientInsertAfIncCard = temp;
+				
+			}
+			
+			protected function addEventBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <event type="在此填写事件类型" listener="在此处填写事件监听器实现类" />;
+				if( sourceXML.events.length()<= 0 ){
+					var eventsXML:XML = new XML("<events />");
+					sourceXML.appendChild(eventsXML);
+				}
+				
+				sourceXML.events.appendChild(tempBtnXml);
+				
+				eventsDatagrid.invalidateList();
+				
+			}
+			
+			protected function musEventBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = eventsDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+				}
+				
+			}
+			
+			protected function isLoadAllCB_changeHandler(event:Event):void
+			{
+				sourceXML.loadAll = isLoadAllCB.selected?"true":"false";
+				
+			}
+			
+			protected function parentFieldNameTxt_changeHandler(event:Event):void
+			{
+				sourceXML.parentFieldName = parentFieldNameTxt.text;
+				
+			}
+			
+			protected function seqFieldNameTxt_changeHandler(event:Event):void
+			{
+				sourceXML.seqFieldName = seqFieldNameTxt.text;
+				
+			}
+			
+			protected function labelFieldNameTxt_changeHandler(event:Event):void
+			{
+				sourceXML.labelFieldName = labelFieldNameTxt.text;
+				
+			}
+			
+			protected function typeFieldNameTxt_changeHandler(event:Event):void
+			{
+				sourceXML.typeFieldName = typeFieldNameTxt.text;
+				
+			}
+			
+			protected function addTypeBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <item value="在此填写类型值" name="在此填写类型名称" />;
+				if( sourceXML.typeLabelMap.length()<= 0 ){
+					var typeLabelMapXML:XML = new XML("<typeLabelMap />");
+					sourceXML.appendChild(typeLabelMapXML);
+				}
+				
+				sourceXML.typeLabelMap.appendChild(tempBtnXml);
+				
+				typeDatagrid.invalidateList();
+				
+			}
+			
+			protected function musTypeBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = typeDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+				}
+				
+			}
+			
+			protected function addTempleteBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <item value="在此填写类型值" name="在此填写模板编码" />;
+				if( sourceXML.typeTempletCodeMap.length()<= 0 ){
+					var typeTempletCodeMapXML:XML = new XML("<typeTempletCodeMap />");
+					sourceXML.appendChild(typeTempletCodeMapXML);
+				}
+				
+				sourceXML.typeTempletCodeMap.appendChild(tempBtnXml);
+				
+				templeteDatagrid.invalidateList();
+				
+			}
+			
+			protected function musTempleteBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = templeteDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+				}
+				
+			}
+			
+			protected function addPidBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <item value="在此填写模板编码" name="在此填写父节点的字段名" />;
+				if( sourceXML.templetCodeParentFieldMap.length()<= 0 ){
+					var templetCodeParentFieldMapXML:XML = new XML("<templetCodeParentFieldMap />");
+					sourceXML.appendChild(templetCodeParentFieldMapXML);
+				}
+				
+				sourceXML.templetCodeParentFieldMap.appendChild(tempBtnXml);
+				
+				pidDatagrid.invalidateList();
+				
+			}
+			
+			protected function musPidBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = pidDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+				}
+				
+			}
+			
+			protected function deleteBfIncCardTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deleteBfIncCard = deleteBfIncCardTxt.text;
+				
+			}
+			
+			protected function deleteAfIncCardTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deleteAfIncCard = deleteAfIncCardTxt.text;
+				
+			}
+			
+			protected function clientDeleteBfIncCardTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.clientDeleteBfIncCard = clientDeleteBfIncCardTxt.text;
+				
+			}
+			
+			protected function clientDeleteAfIncCardTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.clientDeleteAfIncCard = clientDeleteAfIncCardTxt.text;
+				
+			}
+			
+			protected function deleteBfIncTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deleteBfInc = deleteBfIncTxt.text;
+				
+			}
+			
+			protected function deleteAfIncTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deleteAfInc = deleteAfIncTxt.text;
+				
+			}
+			
+			protected function fkFieldNameTxt_changeHandler(event:Event):void
+			{
+				sourceXML.fkFieldName = fkFieldNameTxt.text;
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:TabNavigator width="100%" height="100%" id="tabNavigator" resizeToContent="true" >
+		
+		<mx:VBox id="baseAtt" width="100%" height="100%" label="基本属性" >
+			
+			<mx:HBox width="100%" >
+				<mx:CheckBox id="isLoadAllCB" change="isLoadAllCB_changeHandler(event)" label="是否加载所有节点" selected="{sourceXML.loadAll=='true'}" toolTip="打开界面时是否加载所有树形节点" />
+				<mx:Label text="父节点字段:" /><mx:TextInput id="parentFieldNameTxt" text="{sourceXML.parentFieldName}" change="parentFieldNameTxt_changeHandler(event)" toolTip="树形结构的父节点字段" />
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label text="显示字段:" /><mx:TextInput id="labelFieldNameTxt" text="{sourceXML.labelFieldName}" change="labelFieldNameTxt_changeHandler(event)" toolTip="树形结构上显示的字段" />
+				<mx:Label text="类型字段:" /><mx:TextInput id="typeFieldNameTxt" text="{sourceXML.typeFieldName}" change="typeFieldNameTxt_changeHandler(event)" toolTip="区分树形结构上不同节点类形的字段" />
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label text="外键字段:" /><mx:TextInput id="fkFieldNameTxt" text="{sourceXML.fkFieldName}" change="fkFieldNameTxt_changeHandler(event)" toolTip="关联子模板的外键名称" />
+				<mx:Label text="排序字段:" /><mx:TextInput id="seqFieldNameTxt" text="{sourceXML.seqFieldName}" change="seqFieldNameTxt_changeHandler(event)" toolTip="树形结构的排序字段" />
+			</mx:HBox>
+			
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="事件属性:" toolTip="可通过在下列列表中填写树形控件中发出的事件并指定对应的监听器响应相关的事件" />
+				<mx:LinkButton id="addEventBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加事件" click="addEventBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musEventBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除事件" click="musEventBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="eventsDatagrid" editable="true" allowMultipleSelection="false" dataProvider="{sourceXML.events.event}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="事件名称" editable="true" dataField="@type" />
+					<mx:DataGridColumn headerText="监听器" editable="true" dataField="@listener" />
+					
+				</mx:columns>
+			</mx:DataGrid>
+			
+		</mx:VBox>
+		
+		<mx:VBox id="relationMappinVbox" width="100%" height="100%" label="关系映射" >
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="类型与名称映射:" />
+				<mx:LinkButton id="addTypeBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加" click="addTypeBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musTypeBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="musTypeBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="typeDatagrid" editable="true" allowMultipleSelection="false" dataProvider="{sourceXML.typeLabelMap.item}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="类型值" editable="true" dataField="@value" />
+					<mx:DataGridColumn headerText="名称" editable="true" dataField="@name" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="类型与模板映射:" />
+				<mx:LinkButton id="addTempleteBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加" click="addTempleteBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musTempleteBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="musTempleteBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="templeteDatagrid" editable="true" allowMultipleSelection="false" dataProvider="{sourceXML.typeTempletCodeMap.item}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="类型值" editable="true" dataField="@value" />
+					<mx:DataGridColumn headerText="模板编码" editable="true" dataField="@name" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="模板与父节点映射:" />
+				<mx:LinkButton id="addPidBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加" click="addPidBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musPidBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="musPidBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="pidDatagrid" editable="true" allowMultipleSelection="false" dataProvider="{sourceXML.templetCodeParentFieldMap.item}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="模板编码" editable="true" dataField="@value" />
+					<mx:DataGridColumn headerText="父节点字段" editable="true" dataField="@name" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+		</mx:VBox>
+		
+		<mx:VBox id="interceptorsVbox" width="100%" height="100%" label="拦截器属性" paddingLeft="10">			
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="服务端插入前置拦截器:" /><mx:TextInput width="360" id="insertBfIncCardTxt" text="{sourceXML.interceptors.insertBfIncCard}" change="insertBfIncCardTxt_changeHandler(event)" toolTip="服务端插入前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >	
+				<mx:Label width="165" text="服务端插入后置拦截器:" /><mx:TextInput width="360" id="insertAfIncCardTxt" text="{sourceXML.interceptors.insertAfIncCard}" change="insertAfIncCardTxt_changeHandler(event)" toolTip="服务端插入后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="客户端插入前置拦截器:" /><mx:TextInput width="360" id="clientInsertBfIncCardTxt" text="{sourceXML.interceptors.clientInsertBfIncCard}" change="clientInsertBfIncCardTxt_changeHandler(event)" toolTip="客户端插入前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="客户端插入后置拦截器:" /><mx:TextInput width="360" id="clientInsertAfIncCardTxt" text="{sourceXML.interceptors.clientInsertAfIncCard}" change="clientInsertAfIncCardTxt_changeHandler(event)" toolTip="客户端插入后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="服务端更新前置拦截器:" /><mx:TextInput width="360" id="updateBfIncCardTxt" text="{sourceXML.interceptors.updateBfIncCard}" change="updateBfIncCardTxt_changeHandler(event)" toolTip="服务端更新前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >	
+				<mx:Label width="165" text="服务端更新后置拦截器:" /><mx:TextInput width="360" id="updateAfIncCardTxt" text="{sourceXML.interceptors.updateAfIncCard}" change="updateAfIncCardTxt_changeHandler(event)" toolTip="服务端更新后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="客户端更新前置拦截器:" /><mx:TextInput width="360" id="clientUpdateBfIncCardTxt" text="{sourceXML.interceptors.clientUpdateBfIncCard}" change="clientUpdateBfIncCardTxt_changeHandler(event)" toolTip="客户端更新前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="客户端更新后置拦截器:" /><mx:TextInput width="360" id="clientUpdateAfIncCardTxt" text="{sourceXML.interceptors.clientUpdateAfIncCard}" change="clientUpdateAfIncCardTxt_changeHandler(event)" toolTip="客户端更新后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="服务端删除前置拦截器:" /><mx:TextInput width="360" id="deleteBfIncTxt" text="{sourceXML.interceptors.deleteBfInc}" change="deleteBfIncTxt_changeHandler(event)" toolTip="服务端删除前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="服务端删除后置拦截器:" /><mx:TextInput width="360" id="deleteAfIncTxt" text="{sourceXML.interceptors.deleteAfInc}" change="deleteAfIncTxt_changeHandler(event)" toolTip="服务端删除后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="服务端卡片删除前置拦截器:" /><mx:TextInput width="360" id="deleteBfIncCardTxt" text="{sourceXML.interceptors.deleteBfIncCard}" change="deleteBfIncCardTxt_changeHandler(event)" toolTip="服务端卡片删除前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="服务端卡片删除后置拦截器:" /><mx:TextInput width="360" id="deleteAfIncCardTxt" text="{sourceXML.interceptors.deleteAfIncCard}" change="deleteAfIncCardTxt_changeHandler(event)" toolTip="服务端卡片删除后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="客户端卡片删除前置拦截器:" /><mx:TextInput width="360" id="clientDeleteBfIncCardTxt" text="{sourceXML.interceptors.clientDeleteBfIncCard}" change="clientDeleteBfIncCardTxt_changeHandler(event)" toolTip="客户端卡片删除前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label width="165" text="客户端卡片删除后置拦截器:" /><mx:TextInput width="360" id="clientDeleteAfIncCardTxt" text="{sourceXML.interceptors.clientDeleteAfIncCard}" change="clientDeleteAfIncCardTxt_changeHandler(event)" toolTip="客户端卡片删除后置拦截器实现类" />
+			</mx:HBox>
+		</mx:VBox>
+		
+		<mx:VBox id="buttonsVbox" width="100%" height="100%" label="按钮属性" >
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="按钮:" />
+				<mx:LinkButton id="addBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加按钮" click="addBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除按钮" click="musBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="btnsDatagrid" editable="true" allowMultipleSelection="false"
+						 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true"
+						 dataProvider="{sourceXML.customTreeButton.button}" click="btnsDatagrid_clickHandler(event)" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="ID" editable="true" dataField="@id" />
+					<mx:DataGridColumn headerText="名称" editable="true" dataField="@label" />
+					<mx:DataGridColumn headerText="提示信息" editable="true" dataField="@toolTip" />
+					<mx:DataGridColumn headerText="图片路径" editable="true" dataField="@icon" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="监听器:" />
+				<mx:LinkButton id="addLstBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加监听器" click="addLstBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musLstBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除监听器" click="musLstBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="lstsDatagrid" editable="true" allowMultipleSelection="false" dataProvider="{buttonXML.listeners.listener}" >
+				<mx:columns>
+					<mx:DataGridColumn id="lstsCol" headerText="实现类" editable="true" dataField="*" labelFunction="lstsColLabelFunction" />
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		
+	</mx:TabNavigator>
+</baseAttr:BaseAttributePanel>

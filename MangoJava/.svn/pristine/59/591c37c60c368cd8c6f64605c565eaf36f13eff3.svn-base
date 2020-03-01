@@ -1,0 +1,73 @@
+/**************************************************************************
+ * $RCSfile: TestCustButtonBarPanel.java,v $  $Revision: 1.3 $  $Date: 2007/05/31 07:39:02 $
+ **************************************************************************/
+package smartx.publics.styletemplet.ui.templet01;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import smartx.framework.common.vo.*;
+import smartx.framework.metadata.ui.*;
+
+
+/**
+ * 在模板中注册该类,该类就是用户自定义的按钮栏!!
+ * @author user
+ *
+ */
+public class TestCustButtonBarPanel extends AbstractCustomerButtonBarPanel {
+
+    private static final long serialVersionUID = 468433666101921333L;
+
+    public void initialize() {
+        this.setLayout(new FlowLayout());
+        JButton btn_1 = new JButton("查询测试");
+        btn_1.setPreferredSize(new Dimension(120, 20));
+        btn_1.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onClicked_1();
+            }
+        });
+        this.add(btn_1);
+    }
+
+    private void onClicked_1() {
+        PubQueryTempletDialog dialog = new PubQueryTempletDialog(this, "PUB_MENU_CODE_1");
+        HashVO[] vos = dialog.getQueryResult();
+        System.out.println("\n\n\nYour select size is:" + vos.length);
+        for (int i = 0; i < vos.length; i++) {
+            String[] values = vos[i].getValuesAsString();
+            for (int j = 0; j < values.length; j++) {
+                System.out.print(values[j] + "  ");
+            }
+            System.out.print("\n");
+//			((AbstractTempletFrame01)super.getParentFrame()).getTablePanel().addRow(vos[i].getM_hData());
+        }
+
+    }
+}
+/**************************************************************************
+ * $RCSfile: TestCustButtonBarPanel.java,v $  $Revision: 1.3 $  $Date: 2007/05/31 07:39:02 $
+ *
+ * $Log: TestCustButtonBarPanel.java,v $
+ * Revision 1.3  2007/05/31 07:39:02  qilin
+ * code format
+ *
+ * Revision 1.2  2007/05/31 06:47:51  qilin
+ * 界面重构，所有的JFrame改为JInternalFrame样式
+ *
+ * Revision 1.1  2007/05/17 06:14:26  qilin
+ * no message
+ *
+ * Revision 1.4  2007/03/05 09:53:53  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/02/27 06:03:03  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 04:48:33  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

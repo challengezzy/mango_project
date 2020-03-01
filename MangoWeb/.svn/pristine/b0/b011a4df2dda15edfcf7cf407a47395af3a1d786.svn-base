@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitytab:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:entitytab="smartx.bam.flex.modules.entitymodel.entitytab.*" 
+					   width="100%" height="100%" creationComplete="creationCompleteHandler()" label="实体关系" paddingBottom="5"
+					   paddingLeft="5" paddingRight="5" paddingTop="5">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.collections.HashMap;
+			
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			public var refreshTree:Function;
+			
+			public var deleteXmlNode:Function;
+			
+			public var selectItemByCode:Function;
+			
+			public var relationsArr:ArrayCollection;
+			[Bindable]
+			public var allEntitiesCol:ArrayCollection;
+			
+			public var entitiesCache:HashMap;
+			
+			private var formService:RemoteObject
+			
+			private function creationCompleteHandler():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取表结构错误！",SmartXMessage.MESSAGE_ERROR,"错误："+event.fault.faultString);
+					inputSqlTxt.text = selectedItem.content.fetchSQL;
+					OperatingTipUtil.endOperat();
+				});
+				initRelationData();
+				isCreationComplete = true;
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				if(tableDataStruct.table_header.length < 2){
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("字段数量不能小于两个!");
+					inputSqlTxt.text = selectedItem.content.fetchSQL;
+					return;
+				}
+				if(tableDataStruct.table_header[0].toString().toLowerCase() != 'fromid' 
+					|| tableDataStruct.table_header[1].toString().toLowerCase() != "toid"){
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("字段别名不正确，第一个字段应该为fromid,第二个字段应该为toid！");
+					inputSqlTxt.text = selectedItem.content.fetchSQL;
+					return;
+				}
+				selectedItem.content.fetchSQL = inputSqlTxt.text;
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function initRelationData():void{
+				var ownerEntityCode:String = selectedItem["entityCode"] as String;
+				var ownerObj:Object = entitiesCache.getValue(ownerEntityCode);
+				ownerEntityCob.selectedItem = ownerObj;
+				var goalEntityCode:String = String(selectedItem.content.@toEntityCode);
+				var tempObj:Object = entitiesCache.getValue(goalEntityCode);
+				goalEntityCob.selectedItem = tempObj;
+			}
+			
+			protected function relationNameTxt_changeHandler(event:Event):void{
+				if(StringUtil.trim(relationNameTxt.text) != ""){
+					selectedItem.content.@name = relationNameTxt.text;
+				}
+			}
+			
+			protected function relationCodeTxt_changeHandler(event:Event):void{
+				selectedItem.content.@name = relationCodeTxt.text;
+			}
+			
+			protected function goalEntityCob_changeHandler(event:ListEvent):void{
+				var tempEntity:XML = goalEntityCob.selectedItem as XML;
+				selectedItem.content.@toEntityCode = tempEntity.@code;
+			}
+			
+			
+			protected function inputSqlTxt_changeHandler(event:Event):void{
+				if(inputSqlTxt.text != String(selectedItem.content.fetchSQL)){
+					OperatingTipUtil.startOperat("查询中...",this);
+					formService.getTableDataStructByDS(String(contentXml.datasource),"select * from ("+inputSqlTxt.text+") where 1=2");
+				}
+			}
+			
+			protected function relationDescTxt_changeHandler(event:Event):void{
+				selectedItem.content.@desc = relationDescTxt.text;
+			}
+			
+			protected function ownerEntityCob_changeHandler(event:Event):void{
+				var tempEntity:XML = ownerEntityCob.selectedItem as XML;
+				var currentRelationXml:XML = selectedItem.content as XML;
+				var newRelationNodeXml:XML = currentRelationXml.copy();
+				
+				deleteXmlNode(currentRelationXml);
+				if(tempEntity.relations.length() <= 0 )
+					tempEntity.appendChild(new XML("<relations />"));
+				
+				tempEntity.relations.appendChild(newRelationNodeXml);
+				
+				refreshTree();
+				selectItemByCode(String(newRelationNodeXml.@code),relationsArr);
+			}
+			
+			public function showHandler():void{
+				initRelationData();
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%">
+		<mx:Label width="25%" text="名称"/>
+		<mx:TextInput id="relationNameTxt" width="50%"
+					  change="relationNameTxt_changeHandler(event)"
+					  focusOut="refreshTree()"
+					  text="{selectedItem.content.@name}"/>
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:Label width="25%" text="编码"/>
+		<mx:TextInput id="relationCodeTxt" width="50%"
+					  change="relationCodeTxt_changeHandler(event)"
+					  editable="false" text="{selectedItem.content.@code}"/>
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:Label width="25%" text="描述"/>
+		<mx:TextInput id="relationDescTxt" width="50%"
+					  change="relationDescTxt_changeHandler(event)"
+					  text="{selectedItem.content.@desc}"/>
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:Label width="25%" text="所属实体"/>
+		<mx:ComboBox id="ownerEntityCob" width="50%"
+					 change="ownerEntityCob_changeHandler(event)"
+					 dataProvider="{allEntitiesCol}" labelField="@name"/>
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:Label width="25%" text="目标实体"/>
+		<mx:ComboBox id="goalEntityCob" width="50%"
+					 change="goalEntityCob_changeHandler(event)"
+					 dataProvider="{allEntitiesCol}" labelField="@name"/>
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:Label width="25%" text="读取语句"/>
+		<mx:TextArea id="inputSqlTxt" width="50%" height="150"
+					 focusOut="inputSqlTxt_changeHandler(event)"
+					 text="{selectedItem.content.fetchSQL}"/>
+	</mx:HBox>
+</entitytab:AbstractTab>

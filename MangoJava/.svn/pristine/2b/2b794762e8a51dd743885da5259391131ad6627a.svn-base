@@ -1,0 +1,202 @@
+/**************************************************************************
+ * $RCSfile: TriggerInfo_VO.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:24 $
+ **************************************************************************/
+package smartx.framework.metadata.ui.dictmanager;
+
+import smartx.framework.common.vo.*;
+import smartx.framework.metadata.vo.templetvo.*;
+
+public class TriggerInfo_VO extends AbstractTempletVO {
+
+    /**
+     *
+     */
+    private static final long serialVersionUID = -8736539743771349601L;
+
+    private static int VO_LENGTH = 6;
+
+    public TriggerInfo_VO() {
+    }
+
+    public TriggerInfo_VO(String _type) {
+    }
+
+    public HashVO getPub_templet_1Data() {
+        HashVO vo = new HashVO(); //
+        vo.setAttributeValue("templetcode", "triggerInfo"); //
+        vo.setAttributeValue("templetname", "triggerInfo");
+        vo.setAttributeValue("tablename", "USER_TRIGGERS");
+        vo.setAttributeValue("pkname", "TRIGGER_NAME");
+        vo.setAttributeValue("pksequencename", null);
+        vo.setAttributeValue("savedtablename", "USER_TRIGGERS");
+        vo.setAttributeValue("lastmodifytime", null);
+        vo.setAttributeValue("ui_intercept", null);
+        vo.setAttributeValue("bs_intercept", null);
+        vo.setAttributeValue("ui_eventlistener", null);
+        return vo;
+    }
+
+    public HashVO[] getPub_templet_1_itemData() {
+        HashVO[] vos = new HashVO[VO_LENGTH]; //
+        int li_index = 0;
+
+        vos[li_index] = new HashVO();
+        vos[li_index].setAttributeValue("itemkey", "TRIGGER_NAME"); //
+        vos[li_index].setAttributeValue("itemname", "触发器名称");
+        vos[li_index].setAttributeValue("itemtype", "文本框");
+        vos[li_index].setAttributeValue("comboxdesc", null);
+        vos[li_index].setAttributeValue("refdesc", null);
+        vos[li_index].setAttributeValue("issave", "Y");
+        vos[li_index].setAttributeValue("isdefaultquery", "N");
+        vos[li_index].setAttributeValue("ismustinput", "N");
+        vos[li_index].setAttributeValue("loadformula", null);
+        vos[li_index].setAttributeValue("editformula", null);
+        vos[li_index].setAttributeValue("defaultvalueformula", null);
+        vos[li_index].setAttributeValue("colorformula", null);
+        vos[li_index].setAttributeValue("showorder", "1");
+        vos[li_index].setAttributeValue("listwidth", "100");
+        vos[li_index].setAttributeValue("cardwidth", "100");
+        vos[li_index].setAttributeValue("listisshowable", "Y");
+        vos[li_index].setAttributeValue("listiseditable", "N");
+        vos[li_index].setAttributeValue("cardisshowable", "Y");
+        vos[li_index].setAttributeValue("cardiseditable", "N");
+        vos[li_index].setAttributeValue("lastmodifytime", "Y");
+        li_index++;
+
+        vos[li_index] = new HashVO();
+        vos[li_index].setAttributeValue("itemkey", "TRIGGER_TYPE"); //
+        vos[li_index].setAttributeValue("itemname", "触发器类别");
+        vos[li_index].setAttributeValue("itemtype", "文本框");
+        vos[li_index].setAttributeValue("comboxdesc", null);
+        vos[li_index].setAttributeValue("refdesc", null);
+        vos[li_index].setAttributeValue("issave", "Y");
+        vos[li_index].setAttributeValue("isdefaultquery", "N");
+        vos[li_index].setAttributeValue("ismustinput", "N");
+        vos[li_index].setAttributeValue("loadformula", null);
+        vos[li_index].setAttributeValue("editformula", null);
+        vos[li_index].setAttributeValue("defaultvalueformula", null);
+        vos[li_index].setAttributeValue("colorformula", null);
+        vos[li_index].setAttributeValue("showorder", "1");
+        vos[li_index].setAttributeValue("listwidth", "70");
+        vos[li_index].setAttributeValue("cardwidth", "70");
+        vos[li_index].setAttributeValue("listisshowable", "Y");
+        vos[li_index].setAttributeValue("listiseditable", "Y");
+        vos[li_index].setAttributeValue("cardisshowable", "Y");
+        vos[li_index].setAttributeValue("cardiseditable", "Y");
+        vos[li_index].setAttributeValue("lastmodifytime", "Y");
+        li_index++;
+
+        vos[li_index] = new HashVO();
+        vos[li_index].setAttributeValue("itemkey", "TRIGGERING_EVENT"); //
+        vos[li_index].setAttributeValue("itemname", "触发器事件");
+        vos[li_index].setAttributeValue("itemtype", "文本框");
+        vos[li_index].setAttributeValue("comboxdesc", null);
+        vos[li_index].setAttributeValue("refdesc", null);
+        vos[li_index].setAttributeValue("issave", "Y");
+        vos[li_index].setAttributeValue("isdefaultquery", "N");
+        vos[li_index].setAttributeValue("ismustinput", "N");
+        vos[li_index].setAttributeValue("loadformula", null);
+        vos[li_index].setAttributeValue("editformula", null);
+        vos[li_index].setAttributeValue("defaultvalueformula", null);
+        vos[li_index].setAttributeValue("colorformula", null);
+        vos[li_index].setAttributeValue("showorder", "1");
+        vos[li_index].setAttributeValue("listwidth", "100");
+        vos[li_index].setAttributeValue("cardwidth", "100");
+        vos[li_index].setAttributeValue("listisshowable", "Y");
+        vos[li_index].setAttributeValue("listiseditable", "Y");
+        vos[li_index].setAttributeValue("cardisshowable", "Y");
+        vos[li_index].setAttributeValue("cardiseditable", "Y");
+        vos[li_index].setAttributeValue("lastmodifytime", "Y");
+        li_index++;
+
+        vos[li_index] = new HashVO();
+        vos[li_index].setAttributeValue("itemkey", "TABLE_NAME"); //
+        vos[li_index].setAttributeValue("itemname", "表名");
+        vos[li_index].setAttributeValue("itemtype", "文本框");
+        vos[li_index].setAttributeValue("comboxdesc", null);
+        vos[li_index].setAttributeValue("refdesc", null);
+        vos[li_index].setAttributeValue("issave", "Y");
+        vos[li_index].setAttributeValue("isdefaultquery", "N");
+        vos[li_index].setAttributeValue("ismustinput", "N");
+        vos[li_index].setAttributeValue("loadformula", null);
+        vos[li_index].setAttributeValue("editformula", null);
+        vos[li_index].setAttributeValue("defaultvalueformula", null);
+        vos[li_index].setAttributeValue("colorformula", null);
+        vos[li_index].setAttributeValue("showorder", "1");
+        vos[li_index].setAttributeValue("listwidth", "150");
+        vos[li_index].setAttributeValue("cardwidth", "150");
+        vos[li_index].setAttributeValue("listisshowable", "Y");
+        vos[li_index].setAttributeValue("listiseditable", "Y");
+        vos[li_index].setAttributeValue("cardisshowable", "Y");
+        vos[li_index].setAttributeValue("cardiseditable", "Y");
+        vos[li_index].setAttributeValue("lastmodifytime", "Y");
+        li_index++;
+
+        vos[li_index] = new HashVO();
+        vos[li_index].setAttributeValue("itemkey", "DESCRIPTION"); //
+        vos[li_index].setAttributeValue("itemname", "触发器描述");
+        vos[li_index].setAttributeValue("itemtype", "大文本框");
+        vos[li_index].setAttributeValue("comboxdesc", null);
+        vos[li_index].setAttributeValue("refdesc", null);
+        vos[li_index].setAttributeValue("issave", "Y");
+        vos[li_index].setAttributeValue("isdefaultquery", "N");
+        vos[li_index].setAttributeValue("ismustinput", "N");
+        vos[li_index].setAttributeValue("loadformula", null);
+        vos[li_index].setAttributeValue("editformula", null);
+        vos[li_index].setAttributeValue("defaultvalueformula", null);
+        vos[li_index].setAttributeValue("colorformula", null);
+        vos[li_index].setAttributeValue("showorder", "1");
+        vos[li_index].setAttributeValue("listwidth", "200");
+        vos[li_index].setAttributeValue("cardwidth", "200");
+        vos[li_index].setAttributeValue("listisshowable", "Y");
+        vos[li_index].setAttributeValue("listiseditable", "Y");
+        vos[li_index].setAttributeValue("cardisshowable", "Y");
+        vos[li_index].setAttributeValue("cardiseditable", "Y");
+        vos[li_index].setAttributeValue("lastmodifytime", "Y");
+        li_index++;
+
+        vos[li_index] = new HashVO();
+        vos[li_index].setAttributeValue("itemkey", "TRIGGER_BODY"); //
+        vos[li_index].setAttributeValue("itemname", "触发器主体");
+        vos[li_index].setAttributeValue("itemtype", "大文本框");
+        vos[li_index].setAttributeValue("comboxdesc", null);
+        vos[li_index].setAttributeValue("refdesc", null);
+        vos[li_index].setAttributeValue("issave", "Y");
+        vos[li_index].setAttributeValue("isdefaultquery", "N");
+        vos[li_index].setAttributeValue("ismustinput", "N");
+        vos[li_index].setAttributeValue("loadformula", null);
+        vos[li_index].setAttributeValue("editformula", null);
+        vos[li_index].setAttributeValue("defaultvalueformula", null);
+        vos[li_index].setAttributeValue("colorformula", null);
+        vos[li_index].setAttributeValue("showorder", "1");
+        vos[li_index].setAttributeValue("listwidth", "150");
+        vos[li_index].setAttributeValue("cardwidth", "150");
+        vos[li_index].setAttributeValue("listisshowable", "Y");
+        vos[li_index].setAttributeValue("listiseditable", "Y");
+        vos[li_index].setAttributeValue("cardisshowable", "Y");
+        vos[li_index].setAttributeValue("cardiseditable", "Y");
+        vos[li_index].setAttributeValue("lastmodifytime", "Y");
+        li_index++;
+
+        return vos;
+    }
+
+}
+/**************************************************************************
+ * $RCSfile: TriggerInfo_VO.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:24 $
+ *
+ * $Log: TriggerInfo_VO.java,v $
+ * Revision 1.2  2007/05/31 07:38:24  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:02:12  qilin
+ * no message
+ *
+ * Revision 1.3  2007/02/27 06:03:00  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 05:01:56  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

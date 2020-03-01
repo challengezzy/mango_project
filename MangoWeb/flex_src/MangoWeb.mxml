@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" layout="absolute" xmlns:ns1="smartx.flex.components.novabasic.*" 
+				creationComplete="init()" xmlns:basic="smartx.flex.components.basic.*"
+				preinitialize="preinit()" historyManagementEnabled="false" 
+				pageTitle="mango">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		
+	</fx:Declarations>
+	<!--公共不变的样式-->
+	<fx:Style source="/style/css/Styles.css"/>
+	<!--可选的主题-->
+	<!--fx:Style source="/theme/granite/style.css"/-->
+	<fx:Script>
+		<![CDATA[
+			import com.hurlant.eval.CompiledESC;
+			
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			import mx.managers.BrowserManager;
+			import mx.managers.HistoryManager;
+			import mx.managers.PopUpManager;
+			import mx.managers.ToolTipManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.LoginInfoVO;
+			import smartx.flex.components.basic.MTMainContainer;
+			import smartx.flex.components.basic.MainContainer;
+			import smartx.flex.components.core.mtchart.MTCardChartPanel;
+			import smartx.flex.components.core.mtchart.MTIndicatorPanel;
+			import smartx.flex.components.core.mtchart.MTListChartPanel;
+			import smartx.flex.components.core.mtchart.MTMultiSeriesChartPanel;
+			import smartx.flex.components.core.mtchart.MTOLAPChartPanel;
+			import smartx.flex.components.core.mtchart.MTProcessChartPanel;
+			import smartx.flex.components.core.mtchart.MTSingleSeriesPanel;
+			import smartx.flex.components.core.mtchart.MTTreeGridChartPanel;
+			import smartx.flex.components.core.mtchart.MTXYPlotChartPanel;
+			import smartx.flex.components.core.workflow.task.AllTaskFilter;
+			import smartx.flex.components.core.workflow.task.DefaultTaskFilter;
+			import smartx.flex.components.event.MetadataTempletUtilEvent;
+			import smartx.flex.components.mtdesigner.DataTaskTypeConfigDesigner;
+			import smartx.flex.components.mtdesigner.DqcCheckItemConfigDesigner;
+			import smartx.flex.components.mtdesigner.ExportExcelConfigDesigner;
+			import smartx.flex.components.mtdesigner.PivotComponentDesigner;
+			import smartx.flex.components.mtdesigner.SynonmsConfigDesigner;
+			import smartx.flex.components.mtdesigner.SystemConfigDesigner;
+			import smartx.flex.components.mtdesigner.styletemplate.StyletemplateDesigner;
+			import smartx.flex.components.util.CookieUtil;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.util.render.BarRenderer_Animated;
+			import smartx.flex.components.util.render.CircleRenderer;
+			import smartx.flex.components.util.render.DoubleBarRenderer;
+			import smartx.flex.components.util.render.PieRenderer;
+			import smartx.flex.components.util.render.SquareRenderer;
+			import smartx.flex.components.util.render.StarRenderer;
+			import smartx.flex.components.util.script.ScriptExecutorFactory;
+			import smartx.flex.components.vo.BillListPanelVO;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleComboxItemVO;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemGroupVO;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			import smartx.flex.components.vo.XMLExportObject;
+			import smartx.flex.components.vo.workflow.Activity;
+			import smartx.flex.components.vo.workflow.Process;
+			import smartx.flex.components.vo.workflow.TaskAssign;
+			import smartx.flex.components.vo.workflow.TaskAssignObject;
+			import smartx.flex.components.vo.workflow.TaskAssignRule;
+			import smartx.flex.components.vo.workflow.TaskAssignRuleTemplate;
+			import smartx.flex.components.vo.workflow.Transition;
+			import smartx.flex.modules.announcement.*;
+			import smartx.flex.modules.announcement.AnnounceViewAttachDownloadBtnListener;
+			import smartx.flex.modules.basic.system.help.listeners.UploadFileBtnListener;
+			import smartx.flex.modules.basic.system.jobmgmt.JobMgmtStartButtonListener;
+			import smartx.flex.modules.basic.system.jobmgmt.JobMgmtStopButtonListener;
+			import smartx.flex.modules.basic.system.menumgmt.MenuExportButtonListener;
+			import smartx.flex.modules.basic.system.menumgmt.MenuImportButtonListener;
+			import smartx.flex.modules.basic.system.mtdesigner.DesignButtonListener;
+			import smartx.flex.modules.basic.system.mtdesigner.ExportMetadataButtonListener;
+			import smartx.flex.modules.basic.system.mtdesigner.FlushCacheAfInterceptor;
+			import smartx.flex.modules.basic.system.mtdesigner.FlushClientCacheButtonListener;
+			import smartx.flex.modules.basic.system.mtdesigner.FlushServerCacheButtonListener;
+			import smartx.flex.modules.basic.system.mtdesigner.ImportMetadataButtonListener;
+			import smartx.flex.modules.basic.system.mtdesigner.MetadataUpdateBfInterceptor;
+			import smartx.flex.modules.basic.system.sysdictionarymgmt.ExportButtonListener;
+			import smartx.flex.modules.basic.system.sysdictionarymgmt.ExportSysButtonListener;
+			import smartx.flex.modules.basic.system.sysdictionarymgmt.ExportUserButtonListener;
+			import smartx.flex.modules.basic.system.sysdictionarymgmt.ImportButtonListener;
+			import smartx.flex.modules.basic.system.usermgmt.ModifyPwdButtonListener;
+			import smartx.flex.modules.basic.system.usermgmt.UsermgmtDataValidator;
+			import smartx.flex.modules.datatask.DataTaskStartBtnListener;
+			import smartx.flex.modules.datatask.ExportDataTaskListener;
+			import smartx.flex.modules.datatask.ImportDataTaskListener;
+			import smartx.flex.modules.datatask.TaskDesignBtnListener;
+			import smartx.flex.modules.datatask.ViewTaskContentListener;
+			import smartx.flex.modules.datatask.ViewTaskExecLogListener;
+			import smartx.flex.modules.menu.MenuItemChangeListener;
+			
+			private var hist:HistoryManager;
+			private var bpv:BillListPanelVO;
+			private var scio:SimpleComboxItemVO;
+			private var shv:SimpleHashVO;
+			private var srv:SimpleRefItemVO;
+			private var tio:TempletItemVO;
+			private var tv:TempletVO;
+			private var lv:LoginInfoVO;
+			private var nce:ClientEnviorment;
+			private var tds:TableDataStruct;
+			private var activity:Activity;
+			private var process:Process;
+			private var ta:TaskAssign;
+			private var tao:TaskAssignObject;
+			private var tar:TaskAssignRule;
+			private var tart:TaskAssignRuleTemplate;
+			private var trans:Transition;
+			private var tmr:ToolTipManager;
+			private var allfilter:AllTaskFilter;
+			private var defaultfilter:DefaultTaskFilter;
+			//private var boeth:BizsOrderExceptionTaskHandler;
+			private var nsef:ScriptExecutorFactory;
+			private var nsu:ScriptUtil;
+			private var esc:CompiledESC = new CompiledESC; 
+			private var exportXMLObject:XMLExportObject;
+			private var jsl:JobMgmtStartButtonListener;
+			private var jstl:JobMgmtStopButtonListener;
+			private var fscbl:FlushServerCacheButtonListener;
+			private var fccbl:FlushClientCacheButtonListener;
+			private var ibl:ImportButtonListener;
+			private var ebl:ExportButtonListener;
+			private var embl:ExportMetadataButtonListener;
+			private var imbl:ImportMetadataButtonListener;
+			private var iibl:MenuImportButtonListener;
+			private var eebl:MenuExportButtonListener;
+			private var undv:UsermgmtDataValidator;
+			private var mpbl:ModifyPwdButtonListener;
+			private var dbl:DesignButtonListener;
+			private var pcd:PivotComponentDesigner;
+			private var starrenderer:StarRenderer;
+			private var srd:SquareRenderer;
+			private var crd:CircleRenderer;
+			private var barrd:BarRenderer_Animated;
+			private var dbarrd:DoubleBarRenderer;
+			private var pierd:PieRenderer;
+			private var esbl:ExportSysButtonListener;
+			private var eubl:ExportUserButtonListener;
+			private var tdu:TempletDataUtil;
+			private var asutil:AssetsFileLib;
+			private var tigv:TempletItemGroupVO;
+			private var icutil:IconUtility;
+			private var popmamaner:PopUpManager;
+			private var flushCacheAfInterceptor:FlushCacheAfInterceptor;
+			private var metadataUpdateBfInterceptor:MetadataUpdateBfInterceptor;
+			private var taskDesignBtnListener:TaskDesignBtnListener;
+			private var dataTaskStartBtnListener:DataTaskStartBtnListener;
+			private var exportDataTaskListener:ExportDataTaskListener;
+			private var importDataTaskListener:ImportDataTaskListener;
+			private var menuItemChangeListener:MenuItemChangeListener;
+			private var annouceAthBtnListener:AnnounceAttachAddBtnListener;
+			private var attatchFileDownloadLis:AttachDownloadBtnListener;
+			private var announceViewAttachDownloadBtnListener:AnnounceViewAttachDownloadBtnListener;
+			private var editAnnounceContentBtnListener:EditAnnounceContentBtnListener;
+			private var viewTaskLogLis:ViewTaskExecLogListener;
+			private var viewTaskContentLis:ViewTaskContentListener;
+			private var uploadFileBtnListener:UploadFileBtnListener;
+			
+			private var scd:SystemConfigDesigner;
+			private var synonymsConfigDesigner:SynonmsConfigDesigner;
+			private var dataTaskTypeConfigDesigner:DataTaskTypeConfigDesigner;
+			private var styletemplateDesigner:StyletemplateDesigner;
+			private var dqcChkConfigDesigner:DqcCheckItemConfigDesigner;
+			private var exportExcelConfigDesigner:ExportExcelConfigDesigner;
+			
+			private var mTSingleSeriesPanel:MTSingleSeriesPanel;
+			private var mTMultiSeriesChartPanel:MTMultiSeriesChartPanel;
+			private var mTXYPlotChartPanel:MTXYPlotChartPanel;
+			private var mTIndicatorPanel:MTIndicatorPanel;
+			private var mTListChartPanel:MTListChartPanel;
+			private var mTTreeGridChartPanel:MTTreeGridChartPanel;
+			private var mTCardChartPanel:MTCardChartPanel;
+			private var mTOLAPChartPanel:MTOLAPChartPanel;
+			private var mTProcessChartPanel:MTProcessChartPanel;
+			
+			private var loadingWindow:LoadingWindow = new LoadingWindow();
+			private var debugMode:Boolean = false;
+			private var endpoint:String = null;
+			private var so:SharedObject;
+			
+			private function init():void{
+				endpoint = FlexGlobals.topLevelApplication.parameters["endpoint"];
+				var polling_point:String = FlexGlobals.topLevelApplication.parameters["endpoint_polling"];
+				var streaming_point:String = FlexGlobals.topLevelApplication.parameters["endpoint_streaming"];
+				var webroot:String = FlexGlobals.topLevelApplication.parameters["webroot"];
+				
+				ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT_POLLING,polling_point);
+				ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT_STREAMING,streaming_point);
+				ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_WEBROOT,webroot);
+				
+				if(endpoint != null && endpoint != "")
+					ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT,endpoint);
+				else{
+					ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT,null);
+					endpoint = null;	
+				}
+				var debugModeStr:String = FlexGlobals.topLevelApplication.parameters["debugmode"];
+				if(debugModeStr == "true")
+					debugMode = true;
+				
+				var xx:String =  ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_WEBROOT) as String;
+				
+				so = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_MT_NAMES,"/");
+				//so.addEventListener(SharedObjectFlushStatus.PENDING,soPendingHandler);
+				var flushResult:String = so.flush(100000000);
+				if(flushResult == SharedObjectFlushStatus.PENDING)
+					so.addEventListener(NetStatusEvent.NET_STATUS,soNetStatusEventHandler);
+				else
+					initCache();
+			}
+			
+			private function soNetStatusEventHandler(event:NetStatusEvent):void{
+				if(event.info.code == "SharedObject.Flush.Success")
+					initCache();
+				so.removeEventListener(NetStatusEvent.NET_STATUS,soNetStatusEventHandler);
+			}
+			
+			private function initCache():void{
+				loadingWindow.text = "正在初始化...";
+				PopUpManager.addPopUp(loadingWindow,this);
+				PopUpManager.centerPopUp(loadingWindow);
+				var util:MetadataTempletUtil = MetadataTempletUtil.getInstance();
+				util.addEventListener(MetadataTempletUtilEvent.INIT_GLOBAL_COMPLETE,initGlobalMetadataTempletCacheComplete);
+				loadingWindow.text = "正在初始化缓存...";
+				util.initGlobalMetadataTempletCache(endpoint);
+			}
+			
+			private function initGlobalMetadataTempletCacheComplete(event:MetadataTempletUtilEvent):void{
+				loadingWindow.text = "初始化成功";
+				var util:MetadataTempletUtil = MetadataTempletUtil.getInstance();
+				util.removeEventListener(MetadataTempletUtilEvent.INIT_GLOBAL_COMPLETE,initGlobalMetadataTempletCacheComplete);
+				PopUpManager.removePopUp(loadingWindow);
+				var mtMainContainer:MTMainContainer = new MTMainContainer();
+				mtMainContainer.endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+				var mainContainer:MainContainer = mtMainContainer.mainContainer;	
+				mainContainer.debugMode = debugMode;
+				var templet:MetadataTemplet = util.findMetadataTemplet(GlobalConst.MTCODE_SYSTEMCONFIG);
+				if(templet == null)
+					throw new Error("没有找到系统参数配置模板");
+				var browserTitle:String = "欢迎使用";
+				if(templet.contentXML.title.length() > 0)
+					browserTitle = String(templet.contentXML.title);
+				BrowserManager.getInstance().setTitle(browserTitle);
+				
+				mtMainContainer.metadataTemplet = templet;
+				var userInfo:SharedObject = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_USERINFO);
+				mainContainer.autoLogin = false;
+				if(userInfo.data.autoLogin != null)
+					mainContainer.autoLogin = userInfo.data.autoLogin as Boolean;
+				mainContainer.rememberPassword = false;
+				if(userInfo.data.rememberPassword != null)
+					mainContainer.rememberPassword = userInfo.data.rememberPassword as Boolean;
+				if(userInfo.data.username != null)
+					mainContainer.defaultUsername = userInfo.data.username as String;
+				if(userInfo.data.userpwd != null)
+					mainContainer.defaultUserpwd = userInfo.data.userpwd as String;
+				if(userInfo.data.adpwd != null)
+					mainContainer.defaultAdminpwd = userInfo.data.adpwd as String;
+				FlexGlobals.topLevelApplication.addChild(mtMainContainer);
+			}
+			
+			private function initStyle():void{
+				var userStyle:SharedObject = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_USERSTYLE);
+				var styleFilePath:String = FlexGlobals.topLevelApplication.parameters["themeuri"] as String;
+				try
+				{
+					if(styleFilePath != null && styleFilePath != "" && styleFilePath != "null"){
+						FlexGlobals.topLevelApplication.styleManager.loadStyleDeclarations2(styleFilePath);
+						userStyle.data.styleFilePath = styleFilePath;
+					}else{
+						styleFilePath = userStyle.data.styleFilePath as String;
+						if(styleFilePath != null && styleFilePath != "" && styleFilePath != "null")
+							FlexGlobals.topLevelApplication.styleManager.loadStyleDeclarations2(styleFilePath);
+					}
+				} 
+				catch(error:Error) 
+				{
+					
+				}
+				
+			}
+			
+			private function preinit():void{
+				initStyle();
+			}
+		]]>
+	</fx:Script>
+</mx:Application>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:s="library://ns.adobe.com/flex/spark"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				minWidth="955" minHeight="600">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.containers.HBox;
+			import mx.controls.DataGrid;
+			import mx.controls.NumericStepper;
+			import mx.controls.TextInput;
+			import mx.core.UIComponent;
+			import mx.events.DataGridEvent;
+			import mx.events.DataGridEventReason;
+		
+			[Bindable]
+			private var myData:XML =
+				<items>
+					<item>
+						<icon>assets/icon1.png</icon>
+						<label>Item1</label>
+						<price>60.0</price>
+					</item>
+					<item>
+						<icon>assets/icon2.png</icon>
+						<label>Item2</label>
+						<price>75.0</price>
+					</item>
+					<item>
+						<icon>assets/icon3.png</icon>
+						<label>Item3</label>
+						<price>60.0</price>
+					</item>
+					<item>
+						<icon>assets/icon4.png</icon>
+						<label>Item4</label>
+						<price>70.0</price>
+					</item>
+				</items>;
+				
+		// 屏蔽第一列的编辑事件
+		private function onItemEditBeginning(event:DataGridEvent):void{
+			if(event.columnIndex==0)
+			event.preventDefault();
+		} 
+		private function onItemEditBegin(event:DataGridEvent):void{ 
+				// 阻止默认侦听器执行
+			event.preventDefault();
+			var dg:DataGrid = event.currentTarget as DataGrid;   
+			// 创建项目编辑器实例
+			dg.createItemEditor(event.columnIndex,event.rowIndex);
+			var editorInstance:UIComponent = dg.itemEditorInstance as UIComponent;
+			var tiLabel:TextInput = editorInstance.getChildAt(0) as TextInput;
+			tiLabel.percentWidth = 50;
+			tiLabel.text = dg.editedItemRenderer.data.label;
+			var numStepper:NumericStepper = editorInstance.getChildAt(1) as NumericStepper;
+			numStepper.percentWidth = 50;
+			numStepper.value = dg.editedItemRenderer.data.price;   
+		}
+		private function onItemEditEnd(event:DataGridEvent):void{
+			if (event.reason == DataGridEventReason.CANCELLED){
+			// 如果取消编辑，不更新数据 
+			return;
+			}
+			// 阻止默认侦听器执行
+			event.preventDefault();
+		var dg:DataGrid = event.currentTarget as DataGrid;  
+		var editorInstance:UIComponent = dg.itemEditorInstance as UIComponent; 
+		var tiLabel:TextInput = editorInstance.getChildAt(0) as TextInput;
+		var numStepper:NumericStepper = editorInstance.getChildAt(1) as NumericStepper;
+		var newLabel:String = tiLabel.text;
+		var newPrice:Number = numStepper.value;
+		// 取得旧数据
+		var oldLabel:String = dg.editedItemRenderer.data.label;
+		var oldPrice:Number = dg.editedItemRenderer.data.price;
+		// 判断label是否为空，price是否小于50
+		if(newLabel=="" || newPrice<50){  
+		//销毁项目编辑器并返回，不更新数据
+		dg.destroyItemEditor();   
+		return;
+		}  
+		// 为项目渲染器设置新数据
+		dg.editedItemRenderer.data.label = newLabel;
+		dg.editedItemRenderer.data.price = newPrice;   
+		dg.destroyItemEditor();
+		}
+		]]>
+	</fx:Script>
+	
+	<mx:DataGrid width="400" dataProvider="{myData.item}" editable="true"
+				 itemEditBegin="onItemEditBegin(event)"
+				 itemEditBeginning="onItemEditBeginning(event)" itemEditEnd="onItemEditEnd(event)">
+		<mx:columns>
+			<mx:DataGridColumn dataField="icon" itemRenderer="mx.controls.Image"/> 
+			<mx:DataGridColumn headerText="price">
+				<!-- 在项目渲染器中使用Label组件显示label和price值  -->
+				<mx:itemRenderer>
+					<fx:Component>
+						<mx:Label text="{data.label}:${data.price}"/>    
+					</fx:Component>
+				</mx:itemRenderer>
+				<mx:itemEditor>
+					<fx:Component>
+						<!-- 在项目编辑器中使用TextInput和NumericStepper组件 -->
+						<mx:HBox horizontalScrollPolicy="off">
+							<mx:TextInput/>
+							<mx:NumericStepper maximum="100" minimum="0"/>
+						</mx:HBox>     
+					</fx:Component>
+				</mx:itemEditor>    
+			</mx:DataGridColumn>   
+		</mx:columns>
+	</mx:DataGrid>
+</mx:Application>

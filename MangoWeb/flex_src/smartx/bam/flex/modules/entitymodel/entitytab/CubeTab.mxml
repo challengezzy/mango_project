@@ -1,0 +1,828 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009"
+						 xmlns:s="library://ns.adobe.com/flex/spark"
+						 xmlns:mx="library://ns.adobe.com/flex/mx" 
+						 xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*"
+						 width="100%" height="100%" label="指标"
+						 creationComplete="init()">
+	<fx:Declarations>
+		
+		<mx:TitleWindow id="dimensionTw" title="维度" showCloseButton="true" width="430" height="165" close="PopUpManager.removePopUp(dimensionTw)">
+			<mx:VBox width="100%" height="100%" horizontalAlign="center" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%" >
+					<mx:Label text="属性" toolTip="" width="25%"/>
+					<mx:ComboBox id="columnCob" width="75%" labelField="columnLabel" change="columnCob_changeHandler(event)" dataProvider="{columnsCol}" toolTip="属性字段"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="维度" toolTip="" width="25%"/>
+					<mx:ComboBox id="dimensionCob" width="75%" labelField="name" dataProvider="{dimensionCol}" toolTip="选择维度"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" >
+					<mx:Button id="dimensionConfirmBtn" label="确定" click="dimensionConfirmBtn_clickHandler(event)" />
+					<mx:Button click="PopUpManager.removePopUp(dimensionTw)" label="取消" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="measureTw" title="指标" showCloseButton="true" width="470" height="210" close="PopUpManager.removePopUp(measureTw)">
+			<mx:VBox width="100%" height="100%" horizontalAlign="center" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%" >
+					<mx:Label text="指标名" toolTip="指标名" width="25%"/>
+					<mx:TextInput id="measureNameTxt" toolTip="填写指标名" width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="计算函数" toolTip="" width="25%"/>
+					<mx:ComboBox id="functionCob" width="75%" labelField="label" dataProvider="{functionsCol}" toolTip="计算函数"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="属性" toolTip="" width="25%"/>
+					<mx:ComboBox id="measureColumnCob" width="75%" labelField="columnLabel" dataProvider="{columnsCol}" toolTip="属性字段"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="格式化" toolTip="" width="25%"/>
+					<mx:ComboBox id="formatCob" width="75%" labelField="label" dataProvider="{formatCol}" toolTip="格式化"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" >
+					<mx:Button id="measureConfirmBtn" label="确定" click="measureConfirmBtn_clickHandler(event)" />
+					<mx:Button click="PopUpManager.removePopUp(measureTw)" label="取消" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="contentXmlTw" title="元数据" showCloseButton="true" width="800" height="500" close="PopUpManager.removePopUp(contentXmlTw)">
+			<mx:TextArea id="contentXmlText" width="100%" height="100%" editable="false" />
+		</mx:TitleWindow>
+		
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.effects.Effect;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.Pixelate;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.EntityTaskViewWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public static const ENTITY_DIMENSION:String = "EntityDimension";//实体维度
+			public static const TIME_DIMENSION:String = "TimeDimension";//时间维度
+			public static const INNER_DIMENSION:String = "InnerDimension";//内部维度
+			public static const SYNONYMS_DIMENSION:String = "SynonymsDimension";//同义词维度
+			
+			public static const CATEGORY_NORMAL:String = "normal";//普通
+			public static const CATEGORY_ENTITY:String = "entity";//实体引用
+			public static const CATEGORY_DICTIONARY:String = "dictionary";//字典引用
+			
+			private var loginName:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME) as String;
+			
+			[Bindable]
+			public var isEdit:Boolean = true;
+			
+			[Bindable]
+			private var switchEffect:Effect;
+			
+			[Bindable]
+			public var saveFun:Function;
+			
+			[Bindable]
+			public var saveNoAlert:Function;
+			
+			[Bindable]
+			public var refresh:Function;
+			
+			[Bindable]
+			public var allCubesCol:ArrayCollection;
+			
+			[Bindable]
+			private var columnsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var dimensionCol:ArrayCollection = new ArrayCollection();
+			
+			private var content:String;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			[Bindable]
+			public var seletedCubeXml:XML;
+			
+			[Bindable]
+			private var tempCubeXml:XML;
+			
+			private var saveInfo:Object;
+			
+			[Bindable]
+			public var dwDsName:String;
+			
+			[Bindable]
+			private  var isDimensionEdit:Boolean = false;
+			
+			[Bindable]
+			private var isMeasureEdit:Boolean = false;
+			
+			[Bindable]
+			private var functionsCol:ArrayCollection = new ArrayCollection([
+				{label:"count",value:"count"},
+				{label:"sum",value:"sum"},
+				{label:"avg",value:"avg"},
+				{label:"max",value:"max"},
+				{label:"min",value:"min"}
+			]);
+			
+			[Bindable]
+			private var formatCol:ArrayCollection = new ArrayCollection([
+				{label:"Standard",value:"Standard"},
+				{label:"#.0",value:"#.0"},
+				{label:"#,#",value:"#,#"},
+				{label:"#,###",value:"#,###"},
+				{label:"#,###.00",value:"#,###.00"}
+			]);
+			
+			[Bindable]
+			public var allEntityCol:ArrayCollection;
+			
+			[Bindable]
+			private var allInheritAtts:ArrayCollection = new ArrayCollection();
+			
+			private var entityXml:XML;
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new Pixelate();
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.dealCube.addEventListener(ResultEvent.RESULT,dealCubeHandler);
+				bamService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("计算时出错",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				isCreationComplete = true;
+				showHandler();
+			}
+			
+			public function showHandler():void{
+				
+				this.tempCubeXml = seletedCubeXml.copy();
+				
+				//轮循所有维度
+				dimensionCol.removeAll();
+				for each(var dimensionXml:XML in contentXml.dimensions.Dimension){
+					var dimensionObj:Object = {name:String(dimensionXml.@name),code:String(dimensionXml.@code),dimensionType:String(dimensionXml.@type),content:dimensionXml,type:"dimension"};
+					dimensionCol.addItem(dimensionObj);
+				}
+				
+				if(isEdit){
+					
+					cubeNameTxt.text = String(tempCubeXml.@name);
+					cubeCodeTxt.text = String(tempCubeXml.@code);
+					
+					var ownerEntityCode:String = String(seletedCubeXml.parent().parent().@code);
+					ownerEntityCob.selectedItem = this.getEntityByCode(ownerEntityCode);
+					
+					ownerEntityCob_changeHandler(null);
+					
+				}else{
+					cubeNameTxt.text = "";
+					cubeCodeTxt.text = "";
+					ownerEntityCob_changeHandler(null);
+				}
+
+			}
+			
+			private function dealCubeHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("计算结束!");
+			}
+			
+			private function getItemFromArrayCollection(columnCol:ArrayCollection,itemName:String,keyName:String):Object{
+				var columnItem:Object = null;
+				for each(var tempItem:Object in columnCol){
+					var tempItemName:String = tempItem[keyName] as String;
+					if(!BAMUtil.isEmpty(tempItemName) && !BAMUtil.isEmpty(itemName) && tempItemName == itemName ){
+						columnItem = tempItem;
+						break;
+					}
+				}
+				return columnItem;
+			}
+			
+			private function getEntityByCode(code:String):Object{
+				var columnItem:Object = null;
+				for each(var tempItem:Object in allEntityCol){
+					var tempXml:XML = tempItem as XML;
+					var tempCode:String = String(tempXml.@code);
+					if(!BAMUtil.isEmpty(tempCode) && !BAMUtil.isEmpty(code) && code == tempCode ){
+						columnItem = tempItem;
+						break;
+					}
+				}
+				return columnItem;
+			}
+			
+			private function refreshColumns():void{
+				
+				for each(var innerDimensionItem:Object in dimensionCol){
+					var index:int = dimensionCol.getItemIndex(innerDimensionItem);
+					var dimensionType:String = innerDimensionItem["dimensionType"] as String;
+					if(dimensionType == DimensionTab.INNER_DIMENSION ){
+						dimensionCol.removeItemAt(index);
+					}
+				}
+				
+				columnsCol.removeAll();
+				var currEntityXml:XML = entityXml;
+				for each( var attributeItem:XML in currEntityXml.attributes.attribute){
+					var name:String = String(attributeItem.@name);
+					var type:String = String(attributeItem.@type);
+					var label:String = String(attributeItem.@label);
+					var refDesc:String = String(attributeItem.@dictionaryRef);
+					var category:String = String(attributeItem.@category);
+					
+					if(name.toUpperCase()=="ID"){
+						continue;
+					}
+					
+					var innerDimensionXml:XML = <Dimension name="Payment method">
+													<Hierarchy hasAll="true">
+														<Level name="Payment method" column="payment_method" uniqueMembers="true" />
+													</Hierarchy>
+												</Dimension>;
+					innerDimensionXml.@name = label;
+					innerDimensionXml.@code = name.toUpperCase();
+					innerDimensionXml.@foreignKey = name.toUpperCase();
+					innerDimensionXml.@type = DimensionTab.INNER_DIMENSION;
+					innerDimensionXml.Hierarchy.Level.@name = label;
+					innerDimensionXml.Hierarchy.Level.@column = name.toUpperCase();
+					
+					var innerDimension:Object = {name:label,code:name.toUpperCase(),dimensionType:DimensionTab.INNER_DIMENSION,content:innerDimensionXml,type:"dimension"};
+					dimensionCol.addItem(innerDimension);
+					
+					var columnItem:Object;
+					if(String(currEntityXml.@type) == "virtual"){//如果是虚拟实体
+						columnItem = new Object();
+						columnItem["columnName"] = String(attributeItem.@expression);
+						columnItem["columnAlias"] = name.toUpperCase();
+						columnItem["columnType"] = type;
+						columnItem["columnLabel"] = label;
+						columnItem["columnRef"] = refDesc;
+						columnItem["category"] = category;
+						columnItem["content"] = attributeItem;
+						columnsCol.addItem(columnItem);
+					}else{
+						var mappingItems:XMLList = currEntityXml.mappingInfo.attributeMapping.map.(@attributeName == attributeItem.@name);
+						if(mappingItems.length() > 0){
+							columnItem = new Object();
+							columnItem["columnName"] = String(mappingItems[0].@columnName);
+							columnItem["columnAlias"] = name.toUpperCase();
+							columnItem["columnType"] = type;
+							columnItem["columnLabel"] = label;
+							columnItem["columnRef"] = refDesc;
+							columnItem["category"] = category;
+							columnItem["content"] = attributeItem;
+							columnsCol.addItem(columnItem);
+						}
+					}
+				}
+				
+				for each(var parentAttXml:XML in allInheritAtts){
+					var parentAttName:String = String(parentAttXml.@name);
+					var parentAttType:String = String(parentAttXml.@type);
+					var parentAttLabel:String = String(parentAttXml.@label);
+					var parentAttRefDesc:String = String(parentAttXml.@dictionaryRef);
+					var parentCategory:String = String(parentAttXml.@category);
+					
+					if(parentAttName.toUpperCase()=="ID"){
+						continue;
+					}
+					
+					var parenColumnItem:Object = new Object();
+					parenColumnItem["columnName"] = parentAttName.toUpperCase();
+					parenColumnItem["columnAlias"] = parentAttName.toUpperCase();
+					parenColumnItem["columnType"] = parentAttType;
+					parenColumnItem["columnLabel"] = parentAttLabel;
+					parenColumnItem["columnRef"] = parentAttRefDesc;
+					parenColumnItem["category"] = parentCategory;
+					columnItem["content"] = parentAttXml;
+					columnsCol.addItem(parenColumnItem);
+					
+					var innerDimensionXml2:XML = <Dimension name="innerDimension">
+													<Hierarchy hasAll="true">
+														<Level name="Payment method" column="payment_method" uniqueMembers="true" />
+													</Hierarchy>
+												</Dimension>;
+					innerDimensionXml2.@name = parentAttLabel;
+					innerDimensionXml.@code = parentAttName.toUpperCase();
+					innerDimensionXml.@column = parentAttName.toUpperCase();
+					innerDimensionXml2.@type = DimensionTab.INNER_DIMENSION;
+					innerDimensionXml2.Hierarchy.Level.@name = parentAttLabel;
+					innerDimensionXml2.Hierarchy.Level.@column = parentAttName.toUpperCase();
+					
+					var innerDimension2:Object = {name:parentAttLabel,code:parentAttName.toUpperCase(),dimensionType:DimensionTab.INNER_DIMENSION,content:innerDimensionXml2,type:"dimension"};
+					dimensionCol.addItem(innerDimension2);
+					
+				}
+				
+			}
+			
+			private function onSave():void{
+				
+				var cubeName:String = cubeNameTxt.text;
+				var cubeCode:String = cubeCodeTxt.text;
+				var filter:String = filterTxt.text;
+				
+				if(BAMUtil.isEmpty(cubeName)){
+					SmartXMessage.show("名称不能为空!");
+					return;
+				}
+				
+				if(BAMUtil.isEmpty(cubeCode)){
+					SmartXMessage.show("编码不能为空!");
+					return;
+				}
+				
+				if(isEdit){
+					if(getCubeCount(cubeCode)>1){
+						SmartXMessage.show("编码重复!");
+						return;
+					}
+				}else{
+					if(getCubeCount(cubeCode)>=1){
+						SmartXMessage.show("编码重复!");
+						return;
+					}
+				}
+				
+				tempCubeXml.@name = cubeName;
+				tempCubeXml.@code = cubeCode;
+				tempCubeXml.@filter = filter;
+				
+				if(isEdit){
+					CEPUtils.xmlDeleteNode(seletedCubeXml);
+					entityXml.cubes.appendChild(tempCubeXml);
+					seletedCubeXml = tempCubeXml;
+					refresh();
+				}else{
+					
+					if(entityXml.cubes.length()<=0 ){
+						entityXml.appendChild(new XML("<cubes />"));
+					}
+					entityXml.cubes.appendChild(tempCubeXml);
+					seletedCubeXml = tempCubeXml;
+					isEdit = true;
+					refresh();
+				}
+				
+				showHandler();
+				
+				saveNoAlert();
+			}
+			
+			private function getCubeCount(code:String):int{
+				var acount:int = 0;
+				for each(var cubeXml:XML in entityXml.cubes.Cube){
+					var tempCode:String = String(cubeXml.@code);
+					if(!BAMUtil.isEmpty(tempCode) && !BAMUtil.isEmpty(code) && tempCode == code){
+						acount = acount+1;
+					}
+				}
+				return acount;
+			}
+			
+			private function entityLabelFunction(item:Object):String{
+				var entityName:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					entityName = xml.@name;
+				}
+				return entityName;
+			}
+			
+			private function showXml():void{
+				if(desktop != null){
+					PopUpManager.addPopUp(contentXmlTw,desktop,true);
+				}else{
+					PopUpManager.addPopUp(contentXmlTw,this,true);
+				}
+				PopUpManager.centerPopUp(contentXmlTw);
+				contentXmlText.text = tempCubeXml.toXMLString();
+			}
+			
+			private function onAddDimension():void{
+				
+				isDimensionEdit = false;
+				
+				if(desktop != null){
+					PopUpManager.addPopUp(dimensionTw,desktop,true);
+				}else{
+					PopUpManager.addPopUp(dimensionTw,this,true);
+				}
+				PopUpManager.centerPopUp(dimensionTw);
+				
+				if(columnsCol.length>0){
+					columnCob.selectedIndex = 0;
+					columnCob_changeHandler(null);
+				}
+				
+				
+			}
+			
+			private function onDeleteDimension():void{
+				var dimensionListItem:Object = dimensionDg.selectedItem;
+				if(dimensionListItem != null ){
+					var xml:XML = dimensionListItem as XML;
+					CEPUtils.xmlDeleteNode(xml);
+				}
+			}
+			
+			private function onEditDimension():void{
+				isDimensionEdit = true;
+				var dimensionListItem:Object = dimensionDg.selectedItem;
+				if(dimensionListItem != null ){
+					var xml:XML = dimensionListItem as XML;
+					if(desktop != null){
+						PopUpManager.addPopUp(dimensionTw,desktop,true);
+					}else{
+						PopUpManager.addPopUp(dimensionTw,this,true);
+					}
+					PopUpManager.centerPopUp(dimensionTw);
+					
+					columnCob.selectedItem = getItemFromArrayCollection(columnsCol,String(xml.@foreignKey),"columnAlias");
+					dimensionCob.selectedItem = getItemFromArrayCollection(dimensionCol,String(xml.@code),"code");
+					
+				}
+			}
+			
+			private function onAddMeasure():void{
+				
+				this.isMeasureEdit = false;
+				
+				if(desktop != null){
+					PopUpManager.addPopUp(measureTw,desktop,true);
+				}else{
+					PopUpManager.addPopUp(measureTw,this,true);
+				}
+				PopUpManager.centerPopUp(measureTw);
+				
+			}
+			
+			private function onDeleteMeasure():void{
+				var measureItem:Object = measureDg.selectedItem;
+				if(measureItem != null ){
+					var xml:XML = measureItem as XML;
+					CEPUtils.xmlDeleteNode(xml);
+				}
+			}
+			
+			private function onEditMeasure():void{
+				this.isMeasureEdit = true;
+				isDimensionEdit = true;
+				var measureItem:Object = measureDg.selectedItem;
+				if(measureItem != null ){
+					var xml:XML = measureItem as XML;
+					if(desktop != null){
+						PopUpManager.addPopUp(measureTw,desktop,true);
+					}else{
+						PopUpManager.addPopUp(measureTw,this,true);
+					}
+					PopUpManager.centerPopUp(measureTw);
+					measureNameTxt.text = String(xml.@name);
+					functionCob.selectedItem = getItemFromArrayCollection(functionsCol,String(xml.@aggregator),"value");
+					measureColumnCob.selectedItem = getItemFromArrayCollection(columnsCol,String(xml.@column),"columnAlias");
+					formatCob.selectedItem = getItemFromArrayCollection(formatCol,String(xml.@formatString),"value");
+					
+				}
+			}
+			
+			private function getValueFromObject(obj:Object,key:String):String{
+				var tempValue:String = "";
+				if(obj != null ){
+					tempValue = obj[key] as String;
+				}
+				return tempValue;
+			}
+
+			protected function ownerEntityCob_changeHandler(event:ListEvent):void
+			{
+				var selectEntityItem:Object = ownerEntityCob.selectedItem;
+				if(selectEntityItem != null ){
+					entityXml = selectEntityItem as XML;
+						allInheritAtts = EntityUtil.getInheritAttributes(entityXml,contentXml);
+						refreshColumns();
+				}
+			}
+			
+			private function getDimensionTypeName(item:Object,column:DataGridColumn):String{
+				var name:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					var typeCode:String = String(xml.@type);
+					if(typeCode == CubeTab.ENTITY_DIMENSION){
+						name = "实体维度";
+					}else if(typeCode == CubeTab.TIME_DIMENSION){
+						name = "时间维度";
+					}else if(typeCode == CubeTab.INNER_DIMENSION){
+						name = "内部维度";
+					}else if(typeCode == CubeTab.SYNONYMS_DIMENSION){
+						name = "同义词维度";
+					}
+				}
+				return name;
+			}
+			
+			private function getDimensionColumnName(item:Object,column:DataGridColumn):String{
+				var name:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					var columnItem:Object = this.getItemFromArrayCollection(columnsCol,String(xml.@foreignKey),"columnAlias");
+					if(columnItem != null ){
+						name = columnItem["columnLabel"] as String;
+					}else{
+						name = String(xml.@foreignKey);
+					}
+				}
+				return name;
+			}
+			
+			private function getMeasureColumnName(item:Object,column:DataGridColumn):String{
+				var name:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					var columnItem:Object = this.getItemFromArrayCollection(columnsCol,String(xml.@column),"columnAlias");
+					if(columnItem != null ){
+						name = columnItem["columnLabel"] as String;
+					}else{
+						name = String(xml.@column);
+					}
+				}
+				return name;
+			}
+			
+			protected function measureConfirmBtn_clickHandler(event:MouseEvent):void
+			{
+				var name:String = measureNameTxt.text;
+				if(BAMUtil.isEmpty(name)){
+					SmartXMessage.show("名称不能为空!");
+					return;
+				}
+				
+				var functionItem:Object = functionCob.selectedItem;
+				var columnItem:Object = measureColumnCob.selectedItem;
+				var formatItem:Object = formatCob.selectedItem;
+				
+				if(isMeasureEdit){
+					
+					var measureItem:Object = measureDg.selectedItem;
+					if(measureItem != null ){
+						var tempMeasureXml:XML = measureItem as XML;
+						var columnName:String = columnItem["columnAlias"] as String;
+						tempMeasureXml.@name = name;
+						tempMeasureXml.@column = columnName.toUpperCase();
+						tempMeasureXml.@aggregator = functionItem["value"] as String;
+						tempMeasureXml.@formatString = formatItem["value"] as String;
+					}
+					
+				}else{
+					
+					var column:String = columnItem["columnAlias"] as String;
+					
+					var newMeasureXml:XML = <Measure />;
+					newMeasureXml.@name = name;
+					newMeasureXml.@column = column.toUpperCase();
+					newMeasureXml.@aggregator = functionItem["value"] as String;
+					newMeasureXml.@formatString = formatItem["value"] as String;
+					
+					tempCubeXml.appendChild(newMeasureXml);
+					
+				}
+				
+				PopUpManager.removePopUp(measureTw);
+				measureDg.invalidateList();
+			}
+			
+			protected function dimensionConfirmBtn_clickHandler(event:MouseEvent):void
+			{
+				var dimensionItem:Object = dimensionCob.selectedItem;
+				var columnItem:Object = columnCob.selectedItem;
+				if(dimensionItem != null ){
+					
+					if(isDimensionEdit){
+						var dimensionListItem:Object = dimensionDg.selectedItem;
+						if(dimensionListItem != null ){
+							var tempDimensionXml:XML = dimensionListItem as XML;
+							CEPUtils.xmlDeleteNode(tempDimensionXml);
+						}else{
+							SmartXMessage.show("维度列表中没有选中任何项,无法进行编辑!");
+							return;
+						}
+					}
+					var foreignKey:String = columnItem["columnAlias"] as String;
+					var newDimensionXml:XML = <Dimension />;
+					newDimensionXml.@name = dimensionItem["name"] as String;
+					newDimensionXml.@code = dimensionItem["code"] as String;
+					newDimensionXml.@type = dimensionItem["dimensionType"] as String;
+					newDimensionXml.@foreignKey = foreignKey.toUpperCase();
+					tempCubeXml.appendChild(newDimensionXml);
+
+				}
+				PopUpManager.removePopUp(dimensionTw);
+				dimensionDg.invalidateList();
+			}
+			
+			private function ownerEntityCobLabelFunction(item:Object):String{
+				var entityName:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					entityName = xml.@name;
+				}
+				return entityName;
+			}
+			
+			protected function columnCob_changeHandler(event:ListEvent):void{
+				var columnItem:Object = columnCob.selectedItem;
+				if(columnItem != null){
+					var columName:String = columnItem["columnAlias"] as String;
+					var category:String = columnItem["category"] as String;
+					var dimensionObj:Object = null;
+					for each(var dimensionItem:Object in dimensionCol){
+						var dimensionType:String = String(dimensionItem["dimensionType"]);
+						var tempColumName:String = String(dimensionItem.content.@foreignKey);
+						
+						if(category == CubeTab.CATEGORY_ENTITY && dimensionType == CubeTab.ENTITY_DIMENSION){
+							var dimensionEntityCode:String = String(dimensionItem.content.@entityCode);
+							var entityCode:String = String(columnItem.content.@refEntity);
+							if(!BAMUtil.isEmpty(dimensionEntityCode)&&!BAMUtil.isEmpty(entityCode)
+								&&dimensionEntityCode==entityCode){
+								dimensionObj = dimensionItem;
+								break;
+							}
+							
+						}else if(category == CubeTab.CATEGORY_DICTIONARY && dimensionType == CubeTab.SYNONYMS_DIMENSION){
+							var synonymsCode:String = String(dimensionItem.content.@synonymsCode);
+							var dictionaryRefCode:String = String(columnItem.content.@dictionaryRefCode);
+							if(!BAMUtil.isEmpty(synonymsCode)&&!BAMUtil.isEmpty(dictionaryRefCode)
+								&&synonymsCode==dictionaryRefCode){
+								dimensionObj = dimensionItem;
+								break;
+							}
+						}else if(category == CubeTab.CATEGORY_NORMAL && dimensionType == CubeTab.INNER_DIMENSION){
+							if(!BAMUtil.isEmpty(tempColumName)&&!BAMUtil.isEmpty(columName)&&columName==tempColumName){
+								dimensionObj = dimensionItem;
+							}
+						}
+						
+					}
+					if(dimensionObj != null){
+						dimensionCob.selectedItem = dimensionObj;
+					}
+				}
+			}
+			
+			private function onDeal():void{
+				if(isEdit){
+					var entityCode:String = String(seletedCubeXml.parent().parent().@code);
+					var cubeCode:String = String(seletedCubeXml.@code);
+					var modelCode:String = String(contentXml.entityModelCode);
+					OperatingTipUtil.startOperat("正在计算....",this);
+					bamService.dealCube(modelCode,entityCode,cubeCode);
+				}else{
+					SmartXMessage.show("还未保存该指标,请先点滴左上角'保存'按钮!");
+				}
+
+			}
+			
+			private function onTask():void{
+				if(!insertMode){
+					
+					var cubeXml:XML = selectedItem.content as XML;
+					if(cubeXml != null ){
+						var modelCode:String = String(contentXml.entityModelCode);
+						var entityCode:String = String(seletedCubeXml.parent().parent().@code);
+						var cubeCode:String = cubeXml.@code;
+						var cubeName:String = cubeXml.@name;
+						var taskCode:String = cubeXml.@taskCode;
+						
+						var rtw:EntityTaskViewWindow = new EntityTaskViewWindow();
+						rtw.entityModelCode = modelCode;
+						rtw.entityCode = entityCode;
+						rtw.code = cubeCode;
+						rtw.taskCode = taskCode;
+						rtw.dataTaskDesc = cubeName;
+						rtw.content = cubeXml;
+						rtw.saveNoAlertFun = saveNoAlert;
+						rtw.entityTaskType = BAMConst.ENTITY_DATATASK_CUBE;
+						
+						if(desktop != null){
+							PopUpManager.addPopUp(rtw,desktop,true);
+						}else{
+							PopUpManager.addPopUp(rtw,this,true);
+						}
+						
+						PopUpManager.centerPopUp(rtw);
+						
+					}else{
+						SmartXMessage.show("请先选一条规则",SmartXMessage.MESSAGE_WARN);
+					}
+					
+				}else{
+					SmartXMessage.show("模型尚未保存,不能发布任务",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+		<mx:VBox id="baseInfoVbox" width="100%" height="100%" paddingBottom="5"
+				 paddingLeft="5" paddingRight="5" paddingTop="5" >
+			
+			<mx:HBox width="100%">
+				<mx:Button label="保存" toolTip="保存当前信息" click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+				<mx:Button label="查看XML" toolTip="查看XML" visible="{debugMode}" click="showXml()" icon="{AssetsFileLib.viewIcon}" />
+			</mx:HBox>
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="名称" toolTip="指标名称" width="25%"/>
+				<mx:TextInput id="cubeNameTxt" width="50%" />
+			</mx:HBox>
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="编码" toolTip="指标编码" width="25%"/>
+				<mx:TextInput id="cubeCodeTxt" width="50%" />
+			</mx:HBox>
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="所属实体" toolTip="所属实体" width="25%" />
+				<mx:ComboBox id="ownerEntityCob" width="50%" labelFunction="ownerEntityCobLabelFunction" change="ownerEntityCob_changeHandler(event)" dataProvider="{allEntityCol}" />
+			</mx:HBox>
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="过滤规则" toolTip="过滤规则" width="25%"/>
+				<mx:TextInput id="filterTxt" width="50%" />
+			</mx:HBox>
+			
+			<mx:HRule width="100%" />
+			
+			<mx:HBox width="100%" >
+				<mx:LinkButton width="22" height="22" click="onAddDimension()" icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+				<mx:LinkButton width="22" height="22" click="onDeleteDimension()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除"/>
+				<mx:LinkButton width="22" height="22" click="onEditDimension()" icon="{AssetsFileLib.editIcon}" toolTip="编辑"/>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="维度" fontWeight="bold" />
+				</mx:HBox>
+			</mx:HBox>
+			<mx:DataGrid id="dimensionDg" width="100%" height="100%" dataProvider="{tempCubeXml.Dimension}" doubleClickEnabled="true" doubleClick="onEditDimension()" >
+				<mx:columns>
+					<mx:DataGridColumn labelFunction="getDimensionColumnName" editable="false" headerText="属性"/>
+					<mx:DataGridColumn dataField="@name" editable="false"  headerText="维度"/>
+					<mx:DataGridColumn labelFunction="getDimensionTypeName" editable="false" headerText="类型"/>
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HRule width="100%" />
+			
+			<mx:HBox width="100%" >
+				<mx:LinkButton width="22" height="22" click="onAddMeasure()" icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+				<mx:LinkButton width="22" height="22" click="onDeleteMeasure()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除"/>
+				<mx:LinkButton width="22" height="22" click="onEditMeasure()" icon="{AssetsFileLib.editIcon}" toolTip="编辑"/>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="指标" fontWeight="bold" />
+				</mx:HBox>
+			</mx:HBox>
+			<mx:DataGrid id="measureDg" width="100%" height="100%" dataProvider="{tempCubeXml.Measure}" doubleClickEnabled="true" doubleClick="onEditMeasure()" >
+				<mx:columns>
+					<mx:DataGridColumn dataField="@name" editable="false" headerText="指标名"/>
+					<mx:DataGridColumn dataField="@aggregator" editable="false"  headerText="计算函数"/>
+					<mx:DataGridColumn labelFunction="getMeasureColumnName" editable="false" headerText="属性"/>
+					<mx:DataGridColumn dataField="@formatString" editable="false" headerText="格式化"/>
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" horizontalAlign="left" verticalAlign="bottom">
+				<mx:Button id="taskBtn" label="任务调度" click="onTask()" />
+				<mx:Button id="submitBtn" label="计算" click="onDeal()" visible="{debugMode}" />
+			</mx:HBox>
+			
+		</mx:VBox>
+</entitymodel:AbstractTab>

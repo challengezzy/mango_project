@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+		 xmlns="http://java.sun.com/xml/ns/javaee" 
+		 xmlns:web="http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd" 
+		 xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd" 
+		 id="WebApp_ID" version="3.0">
+		 
+	<context-param>
+		<param-name>flex.class.path</param-name>
+		<param-value>/WEB-INF/flex/hotfixes,/WEB-INF/flex/jars</param-value>
+	</context-param>
+
+    <!-- Http Flex Session attribute and binding listener support --> 
+    <listener>
+        <listener-class>flex.messaging.HttpFlexSession</listener-class>
+    </listener>
+    
+    <!-- MessageBroker Servlet -->
+    <servlet>
+        <servlet-name>MessageBrokerServlet</servlet-name>
+        <servlet-class>flex.messaging.MessageBrokerServlet</servlet-class>
+        <init-param>
+            <param-name>services.configuration.file</param-name>
+            <param-value>/WEB-INF/flex/services-config.xml</param-value>
+       </init-param>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+    
+	<servlet>
+		<servlet-name>BootServlet</servlet-name> <!-- 启动类,极为重要,少了则什么都玩不成!  -->
+		<servlet-class>smartx.framework.common.bs.BootServlet</servlet-class>
+		<load-on-startup>1</load-on-startup>
+	</servlet>
+	<servlet>
+		<servlet-name>SynchronizerServlet</servlet-name>
+		<servlet-class>smartx.framework.common.bs.SynchronizerServlet</servlet-class>
+	</servlet>
+	<servlet>
+		<servlet-name>RemoteCallServlet</servlet-name>
+		<servlet-class>smartx.framework.common.bs.RemoteCallServlet</servlet-class>
+	</servlet>
+	
+	<servlet>
+		<servlet-name>fileUploadServlet</servlet-name>
+		<servlet-class>smartx.publics.file.FileUploadServlet</servlet-class>
+	</servlet>
+	
+	<servlet>
+		<servlet-name>fileDownloadServlet</servlet-name>
+		<servlet-class>smartx.publics.file.FileDownloadServlet</servlet-class>
+	</servlet>
+	
+	<servlet-mapping>
+        <servlet-name>MessageBrokerServlet</servlet-name>
+        <url-pattern>/messagebroker/*</url-pattern>
+    </servlet-mapping>
+	<servlet-mapping>
+		<servlet-name>SynchronizerServlet</servlet-name>
+		<url-pattern>/SynchronizerServlet</url-pattern>
+	</servlet-mapping>
+	<servlet-mapping>
+		<servlet-name>RemoteCallServlet</servlet-name>
+		<url-pattern>/RemoteCallServlet</url-pattern>
+	</servlet-mapping>
+	
+	<servlet-mapping>
+		<servlet-name>fileUploadServlet</servlet-name>
+		<url-pattern>/fileUploadServlet</url-pattern>
+	</servlet-mapping>
+	
+	<servlet-mapping>
+		<servlet-name>fileDownloadServlet</servlet-name>
+		<url-pattern>/fileDownloadServlet</url-pattern>
+	</servlet-mapping>
+	
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+        <welcome-file>index.htm</welcome-file>
+    </welcome-file-list>
+
+</web-app>

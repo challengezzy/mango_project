@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 width="200" height="100%" fontFamily="Simsun" fontSize="12" horizontalAlign="center" 
+		 xmlns:design="myreport.design.*" creationComplete="Init()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import myreport.data.report.Define;
+			import myreport.data.report.ReportSettings;
+			import myreport.data.report.TableGroupSetting;
+			private static var g_Instance:TableGroupEditor;
+
+			public static function get Instance():TableGroupEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new TableGroupEditor();
+					g_Instance.initialize();
+					g_Instance.percentHeight = 100;
+					g_Instance.percentWidth = 100;
+				}
+				return g_Instance;
+			}
+			private var _Data:TableGroupSetting;
+			private var _Settings:ReportSettings;
+			
+			private function Init():void
+			{
+				if(_Data)
+					Refresh();
+			}
+			public function SetData(settings:ReportSettings, item:Object):void
+			{
+				_Settings = settings;
+				_Data = item as TableGroupSetting;
+				
+				var columns:ArrayCollection = DesignUtil.GetColumnSource(settings);
+
+				GroupColumn.dataProvider = columns;
+				OrderColumn.dataProvider = columns;
+				
+				Refresh();
+			}
+ 
+
+			public function Refresh():void
+			{
+				if (_Data != null)
+				{
+					GroupColumn.selectedIndex = -1;
+					GroupColumn.text = _Data.GroupColumn;
+					OrderColumn.selectedIndex = -1;
+					OrderColumn.text = _Data.OrderColumn;
+					GroupSize.text = _Data.GroupSize.toString();
+					PageBreakAtEnd.selected = _Data.PageBreakAtEnd;
+					FitToGroupSize.selected = _Data.FitToGroupSize;
+					Enabled.selected = _Data.Enabled;
+					
+					GroupColumn.enabled = true;
+					OrderColumn.enabled = true;
+					GroupSize.enabled = true;
+					PageBreakAtEnd.enabled = true;
+					FitToGroupSize.enabled = true;
+					Enabled.enabled = true;
+				}
+				else
+				{
+					GroupColumn.enabled = false;
+					OrderColumn.enabled = false;
+					GroupSize.enabled = false;
+					PageBreakAtEnd.enabled = false;
+					FitToGroupSize.enabled = false;
+					Enabled.enabled = false;
+				}
+			}
+
+			private function OnEdit(event:Event):void
+			{
+				var value:Number;
+				if(event.currentTarget == GroupColumn)
+				{
+					EditProperty(Define.PRO_GROUP_COLUMN, GroupColumn.text);
+
+				}
+				else if(event.currentTarget == Enabled)
+				{
+					EditProperty(Define.PRO_ENABLED, Enabled.selected);
+					
+				}
+				else if(event.currentTarget == OrderColumn)
+				{
+					EditProperty(Define.PRO_ORDER_COLUMN, OrderColumn.text);
+
+				}
+				else if (event.currentTarget == GroupSize)
+				{
+					value = Number(event.currentTarget.text);
+					if (isNaN(value))
+						return;
+					
+					EditProperty(Define.PRO_GROUP_SIZE, value);
+
+				}
+				else if (event.currentTarget == FitToGroupSize)
+				{
+					EditProperty(Define.PRO_FIT_TO_GROUP_SIZE, FitToGroupSize.selected);
+					
+				}
+				else if (event.currentTarget == PageBreakAtEnd)
+				{
+					EditProperty(Define.PRO_PAGE_BREAK_AT_END, PageBreakAtEnd.selected);
+
+				}
+			}
+
+			private function EditProperty(target:Object, value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_PROPERTY, true);
+				e.Target = target;
+				e.Value = value;
+				dispatchEvent(e);
+			}
+		]]>
+	</mx:Script>
+	<mx:CheckBox label="允许分组" id="Enabled" change="OnEdit(event)"/>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="分组字段"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:ComboBox width="160" editable="true" cornerRadius="0" id="GroupColumn"
+				 enter="OnEdit(event)" focusOut="OnEdit(event)" change="OnEdit(event)"
+				 fontWeight="normal" paddingLeft="0">
+	</mx:ComboBox>
+
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="分组大小"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:TextInput width="100" id="GroupSize" enter="OnEdit(event)" focusOut="OnEdit(event)"/>
+	<mx:CheckBox label="自动填充空行" id="FitToGroupSize" change="OnEdit(event)"/>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="排序字段"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:ComboBox width="160" editable="true" cornerRadius="0" id="OrderColumn"
+				 enter="OnEdit(event)" focusOut="OnEdit(event)" change="OnEdit(event)"
+				 fontWeight="normal" paddingLeft="0">
+	</mx:ComboBox>	
+	
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="其他"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	
+	<mx:CheckBox label="在结尾处分页" id="PageBreakAtEnd" change="OnEdit(event)"/>
+</mx:VBox>

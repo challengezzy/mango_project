@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AdvChart xmlns="smartx.flex.components.core.chart.*" xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			[Bindable]
+			public var pieChartDataField:String;
+			[Bindable]
+			public var pieChartNameField:String;
+			[Bindable]
+			public var pieChartLabelField:String;
+			private var _dataProvider:ArrayCollection;
+			private var selectedItem:int = -1;
+			
+			public override function refreshData(dataProvider:ArrayCollection):void{
+				_dataProvider = dataProvider;
+				pieChart.dataProvider = dataProvider;
+			}
+			
+			public function pieChartClick(item:Object):void{
+				var index:int = _dataProvider.getItemIndex(item);
+				var explodeData:Array = [];
+				if(selectedItem == index){
+					//已经选中，则缩回
+					selectedItem = -1;
+				}
+				else{
+            		explodeData[index] = 0.15;
+                	selectedItem = index;
+				}
+				pieChart.series[0].perWedgeExplodeRadius = explodeData;
+			}			
+		]]>
+	</mx:Script>
+	<mx:SeriesInterpolate id="interpolate" elementOffset="10"/>
+	<mx:VBox width="100%" height="100%">
+		<mx:Label text="{title}" width="100%" textAlign="center" fontSize="14" fontWeight="bold"/>
+		<mx:Canvas width="100%" height="100%">
+			<mx:PieChart id="pieChart" width="100%" height="100%"
+				itemClick="pieChartClick(event.hitData.item)"
+				showDataTips="true" showEffect="Fide" hideEffect="Fide" moveEffect="Glow" focusInEffect="Glow">
+				<mx:series>
+					<mx:PieSeries fontSize="12" labelPosition="callout" labelField="{pieChartLabelField}" field="{pieChartDataField}" nameField="{pieChartNameField}" showDataEffect="{interpolate}"/>
+				</mx:series>
+			</mx:PieChart>
+			<mx:Legend dataProvider="{pieChart}"/>	
+		</mx:Canvas>
+	</mx:VBox>
+</AdvChart>

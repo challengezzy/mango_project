@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:mx="library://ns.adobe.com/flex/mx"
+					width="100%" height="100%" fontSize="12"
+					xmlns:chart="smartx.flex.components.core.chart.*"
+					xmlns:mtchart="smartx.flex.components.core.mtchart.*"
+					initialize="preInit()" xmlns:datagrid="smartx.flex.components.core.datagrid.*" >
+	<fx:Declarations>
+		<datagrid:AdvDataGrid id="adg" width="100%" height="100%"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import flash.utils.getDefinitionByName;
+			
+			import mx.charts.ChartItem;
+			import mx.charts.Legend;
+			import mx.charts.chartClasses.Series;
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.ListEvent;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+			import mx.managers.PopUpManager;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.ListPanelDebugInfoWindow;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.listener.MTAdvDataGridButtonListener;
+			import smartx.flex.components.core.mtchart.listener.MTChartClickListener;
+			import smartx.flex.components.core.mtchart.listener.MTListCustomButtonListener;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.export.ChartExportUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			[Bindable]
+			private var columns:Array =  new Array();
+			[Bindable]
+			private var queryColumns:Array = new Array();//查询字段列表
+			[Bindable]
+			private var statisticFields:Array = [];//统计字段
+			[Bindable]
+			private var datas:ArrayCollection;
+			
+			private var exportOptWindow:ComboBoxWindow;
+
+			override protected function preInit():void{
+				super.preInit();
+				var xml:XML = metadataTemplet.contentXML;
+				
+				adg.xml = xml;
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				//不提供详情信息查看，详情按钮去除
+				setMenuItemIsEnable(MTChartConst.MTCHART_KEY_DETAIL,false);
+				
+				mainBox.addChild(adg);
+				
+				adg.addEventListener(AdvDataGrid.SHOWDATA_FINISH,showDataFinishHandler);
+				adg.adg.addEventListener(ListEvent.ITEM_CLICK,
+					function(event:ListEvent):void{
+						selectedItems = new ArrayCollection(adg.adg.selectedItems);
+						selectedEvent();
+					});
+				
+				registerListCellClickListener(adg.adg,this);
+				if(metadataTemplet.contentXML.extend.showQueryBox == "false" && metadataTemplet.contentXML.extend.showCustomButtonBox == "false")
+					adg.removeChild(adg.simpleQueryPanel);
+				else if(metadataTemplet.contentXML.extend.showQueryBox == "false")
+					adg.simpleQueryPanel.removeChild(adg.searchBox);
+				else if(metadataTemplet.contentXML.extend.showCustomButtonBox == "false")
+					adg.simpleQueryPanel.removeChild(adg.buttonBox);
+				if(metadataTemplet.contentXML.extend.showPageBox == "false")
+					adg.removeChild(adg.pageBox);
+				if(metadataTemplet.contentXML.extend.pageSize.length() > 0 &&  metadataTemplet.contentXML.extend.pageSize != "")
+					adg.pageSize = metadataTemplet.contentXML.extend.pageSize;
+
+				
+				initCustomButtons();
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			/**
+			 *注册高级列表控件的单击事件 
+			 **/
+			protected function registerListCellClickListener(adg:AdvancedDataGrid,mtchart:MTChartPanel):void{
+				if(chartClickListeners.length == 0)
+					return;
+				adg.addEventListener(ListEvent.ITEM_CLICK,function(event:ListEvent):void{
+					for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+						chartClickListener.listItemClick(event,mtchart);
+					}
+				},false,0,false);
+			}
+			
+			//真正的底层控件数据刷新
+			override protected function selfRefreshData():void{
+				super.selfRefreshData();
+				if( !isDataParseError && ( !isAccessFilterError || isIgnoreAccessParamError) ){
+					adg.dataSource = datasource;
+					adg.sql = realSql;
+					adg.refresh();
+				}else{
+					isLoading = false;
+				}
+			}
+
+			override public function refresh(event:TimerEvent):void
+			{
+				isLoading = true;
+				setQueryDataSql();
+			}
+			
+			//调用自己的刷新处理方式
+			override public function refreshComplete():void{
+				this.refresh(null);
+			}
+			
+			private function showDataFinishHandler(event:Event):void{
+				//数据加载显示完毕
+				isLoading = false;
+				
+				//考虑到 gc 和直接数据源方式，同义词的解析不能直接使用
+				//adg.adg.dataProvider = MTChartUtil.parseSynonyms(ArrayCollection(adg.adg.dataProvider),metadataTemplet.contentXML);
+			}
+			
+			override protected function export():void{
+				if(exportOptWindow == null)
+					exportOptWindow = new ComboBoxWindow();
+				exportOptWindow.title = "导出方式选择"
+				exportOptWindow.dataProvider = exportOptArray;
+				exportOptWindow.confirmFunc = exportConfirmHandler;
+				
+				if(!exportOptWindow.isPopUp){
+					PopUpManager.addPopUp(exportOptWindow,this,true);
+					PopUpManager.centerPopUp(exportOptWindow);
+				}
+			}
+			
+			override protected function exportConfirmHandler():void{
+				PopUpManager.removePopUp(exportOptWindow);
+				
+				var fileName:String = "mtdatagrid";
+				if("" != StringUtil.trim(title) )
+					fileName = title;
+				//目前支持3中格式的导出
+				if( exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_PNG)
+					ChartExportUtil.exportChart(exportObj,fileName);
+//				else if(exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_CURDATA_CSV)
+//					adg.exportCurData(fileName);
+//				else if(exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_ALLDATA_CSV)
+//					adg.exportAllData(fileName);
+			}
+			
+			private var iconComponentArray:Array = [];
+			
+			private var listenerMap:Hashtable = new Hashtable();
+			
+			private function initCustomButtons():void{
+				var customButton:XMLList = metadataTemplet.contentXML..customButton;
+				if(customButton.length() > 0){
+					for each(var buttonXML:XML in customButton.button){
+						var button:Button = new Button();
+						button.id = buttonXML.@id;
+						button.label = buttonXML.@label;
+						button.toolTip = buttonXML.@toolTip;
+						var iconUrl:String = buttonXML.@icon;
+						if(iconUrl != null && iconUrl != ""){
+							var cardIcon:Class = IconUtility.getClass(button,iconUrl,16,16);
+							button.setStyle("icon",cardIcon);
+							iconComponentArray.push(button);
+						}
+						
+						var listenerArr:Array = [];
+						
+						for each(var listener:String in buttonXML.listeners.listener){
+							var classRefrence:Class = getDefinitionByName(listener.toString()) as Class;
+							var customButtonListener:MTAdvDataGridButtonListener = new classRefrence() as MTAdvDataGridButtonListener;
+							listenerArr.push(customButtonListener);
+						}
+						listenerMap.add(button.id,listenerArr);
+						
+						button.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var listeners:Array = listenerMap.find(event.target.id) as Array;
+							for each(var listener:MTAdvDataGridButtonListener in listeners){
+								listener.buttonClick(getMTChart());
+							}
+						});
+						adg.buttonBox.addChild(button);
+					}
+				}
+			}
+			
+			private function getMTChart():MTAdvDataGridPanel{
+				return this;
+			}
+			
+			override public function destroy():void{
+				super.destroy();
+				for each (var obj:* in iconComponentArray){
+					IconUtility.destroy(obj);
+				}
+				iconComponentArray = null;
+				listenerMap.clear();
+			}
+			
+		]]>
+	</fx:Script>
+</mtchart:MTChartPanel>

@@ -1,0 +1,203 @@
+/**************************************************************************
+ * $RCSfile: NovaMessage.java,v $  $Revision: 1.5.8.2 $  $Date: 2009/12/29 00:50:04 $
+ **************************************************************************/
+package smartx.framework.metadata.ui;
+
+import java.awt.*;
+import java.util.HashMap;
+
+import javax.swing.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.common.vo.*;
+
+
+/**
+ * 系统对话框类
+ * @author James.W
+ *
+ */
+public class NovaMessage {
+    public static void show(String _message) {
+        init(null, _message, NovaConstants.MESSAGE_INFO);
+    }
+
+    public static void show(Component _parent, String _message) {
+        init(JOptionPane.getFrameForComponent(_parent), _message, NovaConstants.MESSAGE_INFO);
+    }
+
+    public static void show(Container _parent, String _message) {
+        init(JOptionPane.getFrameForComponent(_parent), _message, NovaConstants.MESSAGE_INFO);
+    }
+
+    public static void show(Frame _parent, String _message) {
+        init(_parent, _message, NovaConstants.MESSAGE_INFO);
+    }
+
+    public static void show(String _message, int infolevel) {
+        init(null, _message, infolevel);
+    }
+
+    public static void show(Container _parent, String _message, int infolevel) {
+        init(JOptionPane.getFrameForComponent(_parent), _message, infolevel);
+    }
+
+    public static void show(Frame _parent, String _message, int infolevel) {
+        init(_parent, _message, infolevel);
+    }
+
+    public static void showException(Container _parent, Throwable _ex) {
+        if (_ex instanceof NovaRemoteException) {
+            NovaRemoteException novaEx = (NovaRemoteException) _ex;
+            new ShowNovaRemoteExceptionDialog(_parent, novaEx);
+            //init(JOptionPane.getFrameForComponent(_parent), novaEx.getMessage() + "\r\n服务器端堆栈:\r\n" + novaEx.getServerStackDetail() + "\r\n\r\n客户端堆栈:\r\n" + novaEx.getClientStackDetail(), NovaConstants.MESSAGE_ERROR);
+        } else {
+            init(JOptionPane.getFrameForComponent(_parent), _ex.getMessage(), NovaConstants.MESSAGE_ERROR);
+        }
+    }
+
+    public static boolean confirm(Component _parent, String _message) {
+        if (init(_parent, _message, NovaConstants.MESSAGE_CONFIRM) == JOptionPane.YES_OPTION) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 询问对话框
+     * @param _message
+     * @return
+     */
+    public static boolean confirm(String _message) {
+        if (init(null, _message, NovaConstants.MESSAGE_CONFIRM) == JOptionPane.YES_OPTION) {
+            return true;
+        }
+        return false;
+    }
+
+    
+    private static HashMap iconmap=null;
+    static{
+    	iconmap=new HashMap();
+    	iconmap.put("info", "images/msg/info.png");
+    	iconmap.put("alert", "images/msg/alert.png");
+    	iconmap.put("bomb", "images/msg/bomb.png");
+    	iconmap.put("msg", "images/msg/msg.png");
+    	iconmap.put("msgs", "images/msg/msgs.png");
+    	iconmap.put("hello", "images/msg/hello.png");
+    	iconmap.put("error", "images/msg/error.png");
+    	iconmap.put("stop", "images/msg/stop.png");
+    	iconmap.put("error", "images/msg/error.png");
+    	iconmap.put("question", "images/msg/question.png");
+    	iconmap.put("warning", "images/msg/warning.png");
+    }
+    
+    
+    /**
+     * 初始化对话框
+     * @param _parent
+     * @param _message
+     * @param infolevel
+     * @return
+     */
+    private static int init(Component _parent, String _message, int infolevel) {
+        //如果存在
+    	if (NovaSplashWindow.window != null) {
+            NovaSplashWindow.window.closeWindow(); //
+        }
+        
+        JTextArea msgtext = new JTextArea();
+        //msgtext.setPreferredSize(new Dimension(320, 180));
+        msgtext.setColumns(30);
+        msgtext.setRows(10);
+        msgtext.setAutoscrolls(true);
+        msgtext.setBorder(BorderFactory.createEmptyBorder());
+        msgtext.setEditable(false);
+        //msgtext.setOpaque(true);
+        msgtext.setLineWrap(true);
+        msgtext.setText(_message);
+        
+        JScrollPane jsp=new JScrollPane(msgtext);
+        jsp.setBorder(BorderFactory.createLineBorder(new Color(Integer.parseInt("94AAD6",16)), 2));
+        jsp.createVerticalScrollBar();
+        
+        
+
+        if (infolevel == NovaConstants.MESSAGE_INFO) {
+            JOptionPane.showMessageDialog(_parent, jsp, NovaConstants.MESSAGE_INFO_TITLE, JOptionPane.OK_OPTION,UIUtil.getImage((String)iconmap.get("info")));
+        } else if (infolevel == NovaConstants.MESSAGE_WARN) {
+            JOptionPane.showMessageDialog(_parent, jsp, NovaConstants.MESSAGE_WARN_TITLE, JOptionPane.YES_OPTION,UIUtil.getImage((String)iconmap.get("warning")));
+        } else if (infolevel == NovaConstants.MESSAGE_ERROR) {
+            JOptionPane.showMessageDialog(_parent, jsp, NovaConstants.MESSAGE_ERROR_TITLE, JOptionPane.YES_OPTION,UIUtil.getImage((String)iconmap.get("error")));
+        } else if (infolevel == NovaConstants.MESSAGE_CONFIRM) {
+            return JOptionPane.showConfirmDialog(_parent, jsp, NovaConstants.MESSAGE_CONFIRM_TITLE,JOptionPane.YES_NO_OPTION,JOptionPane.QUESTION_MESSAGE,UIUtil.getImage((String)iconmap.get("question")));            
+        } else {
+        	JOptionPane.showMessageDialog(_parent, jsp, NovaConstants.MESSAGE_INFO_TITLE, JOptionPane.OK_OPTION,UIUtil.getImage((String)iconmap.get("info")));
+        }
+        return 0;
+    }
+
+    public static void main(String args[]) {
+    	String msg="    Color 类用于封装默认 sRGB 颜色空间中的颜色，或者用于封装由 ColorSpace 标识的任意颜色空" +
+    			"间中的颜色。每种颜色都有一个隐式的 alpha 值 1.0，或者有一个在构造方法中提供的显式的 alpha 值。" +
+    			"alpha 值定义了颜色的透明度，可用一个在 0.0 - 1.0 或 0 - 255 范围内的浮点值表示它。alpha " +
+    			"值为 1.0 或 255 则意味着颜色完全是不透明的，alpha 值为 0 或 0.0 则意味着颜色是完全透明的。在" +
+    			"使用显式的 alpha 值构造 Color 时，或者在获得某个 Color 的颜色/alpha 分量时，从不将颜色分量" +
+    			"预乘 alpha 分量。 \r\n" +
+    			"    Java 2D(tm) API 的默认颜色空间是 sRGB，这是一个被提议的标准 RGB 颜色空间。有关 sRGB 的更多" +
+    			"信息，请参阅 http://www.w3.org/pub/WWW/Graphics/Color/sRGB.html。 ";
+        NovaMessage.show(msg, NovaConstants.MESSAGE_INFO);
+        NovaMessage.show(msg, NovaConstants.MESSAGE_WARN);
+        NovaMessage.show(msg, NovaConstants.MESSAGE_ERROR);
+        NovaMessage.show(msg,NovaConstants.MESSAGE_CONFIRM);
+    }
+
+}
+/**************************************************************************
+ * $RCSfile: NovaMessage.java,v $  $Revision: 1.5.8.2 $  $Date: 2009/12/29 00:50:04 $
+ *
+ * $Log: NovaMessage.java,v $
+ * Revision 1.5.8.2  2009/12/29 00:50:04  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.5.8.1  2008/11/24 07:55:20  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2008/09/09 08:46:01  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.1  2008/09/01 07:38:13  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/05/31 07:38:15  qilin
+ * code format
+ *
+ * Revision 1.3  2007/05/22 07:58:45  qilin
+ * no message
+ *
+ * Revision 1.2  2007/05/22 02:03:21  sunxb
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/05/17 06:01:37  qilin
+ * no message
+ *
+ * Revision 1.2  2007/03/07 02:01:54  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/02/10 08:59:52  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/02/10 08:48:57  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/02/10 08:36:36  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/02/01 08:04:20  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 05:14:30  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

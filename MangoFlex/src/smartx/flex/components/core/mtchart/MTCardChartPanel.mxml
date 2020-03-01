@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  xmlns:mtchart="smartx.flex.components.core.mtchart.*" 
+					  width="100%" height="100%" xmlns:core="smartx.flex.components.core.*"
+					  initialize="preInit()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<core:BillCardChartPanel id="bccp" dataValue="{dataValue}" textTypeMap="{textTypeMap}" aliasMap="{aliasMap}" hideColumnMap="{hideColumnMap}"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.util.Hashtable;
+			[Bindable]
+			private var dataValue:Object;
+			[Bindable]
+			private var textTypeMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var hideColumnMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var aliasMap:Hashtable = new Hashtable();
+			
+			override protected function preInit():void{
+				super.preInit();
+				clearAll();
+				for each(var item:XML in metadataTemplet.contentXML.extend.items.item){
+					var key:String =  item.@dataField;
+					var type:String = item.@type;
+					var height:String = item.@height;
+					var width:String = item.@width;
+					var hiden:String = item.@ishiden;
+					var alias:String = item.@alias;
+					if(alias && alias != "")
+						aliasMap.add(key,alias);
+					if(hiden == "true")
+						hideColumnMap.add(key,hiden);
+					var value:Object = {type:type,height:height,width:width};
+					textTypeMap.add(key,value);
+				}
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				mainBox.addChild(bccp);
+				
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			private function clearAll():void{
+				textTypeMap.clear();
+				hideColumnMap.clear();
+				aliasMap.clear();
+			}
+			
+			override public function refreshComplete():void{
+				if(dataProvider && dataProvider.length > 0)
+					dataValue = dataProvider.getItemAt(0);
+				bccp.loadData();
+				super.refreshComplete();
+			}
+		]]>
+	</fx:Script>
+</mtchart:MTChartPanel>

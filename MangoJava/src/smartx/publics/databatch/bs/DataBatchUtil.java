@@ -1,0 +1,320 @@
+/**************************************************************************
+ * $RCSfile: DataBatchUtil.java,v $  $Revision: 1.4 $  $Date: 2007/08/20 02:49:15 $
+ ***************************************************************************/
+package smartx.publics.databatch.bs;
+
+import java.io.*;
+import java.util.List;
+import java.util.ArrayList;
+
+import org.jdom.*;
+import org.jdom.input.SAXBuilder;
+
+/**
+ * <p>Title: 读取配置文件</p>
+ * <p>Description: NOVA </p>
+ * <p>Copyright: Copyright (c) 2007</p>
+ * <p>Company: Gxlu inc., rm2 </p>
+ * @author Yangh Huan
+ * @version 1.0
+ */
+public class DataBatchUtil
+{
+    //private String path_xmlFile = null;
+    
+    private DataBatchDefine filedef = null;
+    private String		tableName = null;
+    private boolean		hasTitle = false;
+    private String  	showMessage = null;
+  	
+    private int			colCount_import;
+    private String[]	colName_import = null;
+    private int[]		colNum_import = null;
+    private String[]	type_import = null;
+    private boolean[]	isCons_import = null;
+    
+    private List			function = null;
+    private List			formula = null;
+    
+    
+    
+    public static void main(String[] args) throws Exception{
+    	InputStream in = new FileInputStream(new File("E:\\DataBatch_config.xml"));
+    	DataBatchUtil test = new DataBatchUtil(in, "test");
+    	for(int i=0;i<test.getFileTransferDef().getColCount();i++){
+        	System.out.println("---------------------------------col:" + i);
+        	System.out.println("getColumnName()="+test.getFileTransferDef().getColumnName()[i]);
+        	System.out.println("getColumnNum()="+test.getFileTransferDef().getColumnNum()[i]);
+        	System.out.println("getType()="+test.getFileTransferDef().getType()[i]);
+        	System.out.println("getIsKey()="+test.getFileTransferDef().getIsConstraint()[i]);
+        	System.out.println("-----------------------------------");
+    	}
+    	List function = test.getFileTransferDef().getFunction();
+    	for(int i=0;i<function.size();i++){
+			String[] fun = (String[])function.get(i);
+			System.out.println("...deal...fun[0]="+fun[0]);
+			System.out.println("...deal...fun[1]="+fun[1]);
+		}
+    	
+    }
+ 
+    /**
+     * 根据Xml文件的数据流解析
+     * @param in_xmlStream			Xml文件数据流
+     * @param in_tableName			表名
+     * @throws Exception
+     */
+    private DataBatchUtil(InputStream in_xmlStream,String in_tableName) throws Exception
+    {
+    	try{
+    		tableName = in_tableName;
+    		filedef = new DataBatchDefine(tableName);
+    		parseConfigByStream(in_xmlStream);
+        }catch (Exception e) {
+	        e.printStackTrace();
+	        throw e;
+        } 
+    }
+    
+    /**
+     * 
+     * @param in_xmlFile			Xml文件
+     * @param in_tableName			表名
+     * @throws Exception
+     */
+    private DataBatchUtil(File in_xmlFile,String in_tableName) throws Exception
+    {
+    	try{
+    		tableName = in_tableName;
+    		filedef = new DataBatchDefine(in_tableName);
+    		InputStream in = null;
+    		if(in_xmlFile == null){
+    			ClassLoader cl = getClass().getClassLoader();     	
+    			in = cl.getResourceAsStream(DataBatchConstant.CONFIG_FILE_NAME);
+    		}
+        parseConfigByStream(in);
+    	}catch (Exception e) {
+    		e.printStackTrace();
+    		throw e;
+    	}
+        
+    }
+    
+    /**
+     * 根据表名解析配置文件
+     * @param in_tableName			表名
+     * @throws Exception
+     */
+    private DataBatchUtil(String in_tableName) throws Exception
+    {
+    	try {
+        	tableName = in_tableName;
+            filedef = new DataBatchDefine(in_tableName);
+            InputStream in = null;
+         
+            ClassLoader cl = getClass().getClassLoader();     	
+            in = cl.getResourceAsStream(DataBatchConstant.CONFIG_FILE_NAME);
+        
+            parseConfigByStream(in);
+    	}catch (Exception e) {
+	        e.printStackTrace();
+	        throw e;
+        }
+        
+    }
+    
+    
+    /**
+     * 根据配置文件数据流解析
+     * @param in_xmlStream
+     * @throws Exception
+     */
+    public void parseConfigByStream(InputStream in_xmlStream) throws Exception{
+    	try {
+    		 SAXBuilder builder = new SAXBuilder();
+    		 Document doc = builder.build(in_xmlStream);  
+             parseXmlbyDoc(doc);	
+    	}catch (Exception e) {
+	        e.printStackTrace();
+	        throw e;
+        }
+    }
+    
+    
+    /**
+     * 根据路径读取配置文件并解析
+     * 该方法不适合客户端远程调用服务端接口的方式
+     * @param in_xmlPath
+     * @throws Exception
+     */
+    public void parseConfigByPath(String in_xmlPath) throws Exception{
+    	try {
+    		SAXBuilder builder = new SAXBuilder();
+    		Document doc = builder.build(new File(in_xmlPath));
+    		parseXmlbyDoc(doc);
+    	} catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
+    }
+    
+    /**
+     * 
+     * @param in_xmlFile		
+     * @throws Exception
+     */
+    public void parseConfigByFile(File in_xmlFile) throws Exception{
+    	try {
+    		 SAXBuilder builder = new SAXBuilder();
+    		 Document doc = builder.build(in_xmlFile);
+             parseXmlbyDoc(doc);	
+    	}catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("JDOMException=" + e.getMessage());
+            throw new Exception(DataBatchConstant.JDOM_FIELD + e.getMessage());
+        }
+    }
+    
+    /**
+     * 本类的核心方法，依靠此方法来最终解析Xml文件
+     * @param doc
+     * @throws Exception
+     */
+    public void parseXmlbyDoc(Document in_doc) throws Exception{
+    	try {
+             Element root = in_doc.getRootElement();
+             List elment_import = root.getChildren(DataBatchConstant.IMPORT_TAG); 
+ 			 Element elment_table = null;
+ 			 for (int i = 0; i < elment_import.size(); i++) {
+ 				elment_table=(Element)elment_import.get(i);
+ 				if(elment_table.getChild(DataBatchConstant.TABLENAME_TAG).getText().toString().equals(tableName)){
+ 					if(elment_table.getChild(DataBatchConstant.HASTITLE_TAG).getText().toString().equals("false")){
+ 						hasTitle = false;
+ 	 				}else{
+ 	 					hasTitle = true;
+ 	 				}
+ 					Element element_columns_import =  elment_table.getChild(DataBatchConstant.COLUMNSBYIMPORT_TAG);
+ 					Element element_columns_other =  elment_table.getChild(DataBatchConstant.COLUMNBYOTHER_TAG);
+ 					List list_column_import = element_columns_import.getChildren(DataBatchConstant.COLUMN_TAG);
+ 					List list_column_other = element_columns_other.getChildren(DataBatchConstant.COLUMN_TAG);
+ 					//表的列数为0
+ 					if(list_column_import!=null ){
+ 						if(list_column_import.size()!=0){
+ 							//取到列的个数,初始话各
+ 	 	 					colCount_import = list_column_import.size();
+ 	 	 					colName_import = new String[colCount_import];
+ 	 	 					colNum_import = new int[colCount_import];
+ 	 	 					type_import = new String[colCount_import];
+ 	 	 					isCons_import = new boolean[colCount_import];
+ 	 	 					
+ 	 	 					for(int j=0;j<colCount_import;j++){
+ 	 	 						Element elment_column_import = (Element)list_column_import.get(j);
+ 	 	 						colName_import[j] = elment_column_import.getChild(DataBatchConstant.COLNAME_TAG).getText().toString();
+ 		 	 					type_import[j] = elment_column_import.getChild(DataBatchConstant.COLTYPE_TAG).getText().toString();	
+ 		 	 					String constraint = elment_column_import.getChild(DataBatchConstant.ISCONSTRAINT_TAG).getText().toString();
+ 		 	 					isCons_import[j] = constraint.toLowerCase().equals("true");
+ 		 						String colNum = elment_column_import.getChild(DataBatchConstant.COLNUM_TAG).getText().toString();
+ 		 						colNum_import[j] = Integer.parseInt(colNum);
+ 	 	 					}
+ 						}
+ 					}else{
+ 						throw new Exception(DataBatchConstant.INVALID_CONFIG_FILE);
+ 					}
+ 					if(list_column_other!=null){
+ 						if(list_column_other.size()!=0){
+ 							function = new ArrayList(list_column_other.size());
+ 	 						for(int j=0;j<list_column_other.size();j++){
+ 	 							Element elment_column_other = (Element)list_column_other.get(j);
+ 	 							String[] colOther = new String[2];
+ 	 							colOther[0] = elment_column_other.getChild(DataBatchConstant.COLNAME_TAG).getText().toString();
+ 	 							colOther[1] = elment_column_other.getChild(DataBatchConstant.FUNCTIONVALUE_TAG).getText().toString();
+ 	 							function.add(colOther);
+ 	 						}
+ 						}
+ 					}
+ 				}
+ 			}
+         } catch (NullPointerException e) {
+             e.printStackTrace();
+             System.out.println("NullPointerException=" + e.getMessage());
+             throw new Exception(DataBatchConstant.JDOM_FIELD + e.getMessage());
+         }
+         filedef.setTableName(tableName);
+         filedef.setHasTitle(hasTitle);
+         filedef.setShowMessage(showMessage);
+         
+         filedef.setColCount(colCount_import);
+         filedef.setColumnName(colName_import);
+         filedef.setColumnNum(colNum_import);
+         filedef.setType(type_import);
+         filedef.setIsConstraint(isCons_import);
+         filedef.setFunction(function);
+         filedef.setFormula(formula);  
+    }
+    
+
+    /**
+     * 最终调用该方法得到导入约束
+     * @return
+     */
+    public DataBatchDefine getFileTransferDef()
+    {
+        return filedef;
+    }
+
+    /**
+     * 解析Xml文件入口
+     * @param in_stream
+     * @param in_tableName
+     * @return
+     * @throws Exception
+     */
+    public static synchronized DataBatchUtil getInstance(InputStream in_stream, String in_tableName) throws Exception
+    {
+        return new DataBatchUtil(in_stream, in_tableName);
+    }
+    
+    /**
+     * 解析Xml文件入口
+     * @param in_xmlFile
+     * @param in_tableName
+     * @return
+     * @throws Exception
+     */
+    public static synchronized DataBatchUtil getInstance(File in_xmlFile, String in_tableName) throws Exception
+    {
+        return new DataBatchUtil(in_xmlFile, in_tableName);
+    }
+    
+    /**
+     * 
+     * @param in_tableName
+     * @return
+     * @throws Exception
+     */
+    public static synchronized DataBatchUtil getInstance(String in_tableName) throws Exception
+    {
+        return new DataBatchUtil(in_tableName);
+    }
+
+}
+/************************************************************************
+ * $RCSfile: DataBatchUtil.java,v $  $Revision: 1.4 $  $Date: 2007/08/20 02:49:15 $
+ * $Log: DataBatchUtil.java,v $
+ * Revision 1.4  2007/08/20 02:49:15  yanghuan
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/08/17 07:22:04  yanghuan
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/08/17 06:22:42  yanghuan
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/08/15 01:53:58  Yanghuan
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/08/09 01:56:54  YangHuan
+ * MR#:MR_BFMR-0000
+ * create
+ *
+ *************************************************************************/

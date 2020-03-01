@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" label="元数据">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			[Bindable]
+			private var _contentXml:XML;
+			
+			public var applyFun:Function;
+			
+			public function set contentXml(value:XML):void{
+				_contentXml = value;
+				contentXmlText.text = _contentXml.toXMLString();
+			}
+			
+			public function get contentXml():XML{
+				return _contentXml;
+			}
+			
+			private function applyContentXml():void{
+				try{
+					contentXml = XML(contentXmlText.text);
+				}catch(e:Error){
+					resetContentXml();
+				}
+				applyFun();
+			}
+			
+			private function resetContentXml():void{
+				contentXmlText.text = _contentXml.toXMLString();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%">
+			<mx:Button label="应用" click="applyContentXml()"/>
+			<mx:Button label="重置" click="resetContentXml()"/>
+		</mx:HBox>
+		<mx:TextArea id="contentXmlText" width="100%" height="100%" editable="true"/>
+	</mx:VBox>
+</mx:Canvas>

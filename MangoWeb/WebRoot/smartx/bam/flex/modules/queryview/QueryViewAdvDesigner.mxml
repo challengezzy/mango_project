@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				layout="absolute" width="600" height="520" showCloseButton="true"
+				close="PopUpManager.removePopUp(this)"
+				creationComplete="creationComplete()"
+				title="查询视图规则设计(未完成)">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Menu;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.bam.flex.modules.queryview.filter.AbstraceBaseFilter;
+			import smartx.bam.flex.modules.queryview.filter.EqualsFilter;
+			import smartx.bam.flex.modules.queryview.vo.QueryViewConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.util.SmartXMessage;
+						
+			[Bindable]
+			private var filterListData:ArrayCollection = new ArrayCollection([
+				{label:"等值过滤", type: QueryViewConst.FILTER_EQUALS },
+				{label:"非空过滤", type: QueryViewConst.FILTER_NOTNULL },
+				{label:"模糊匹配过滤", type: QueryViewConst.FILTER_PATTERNMATCH }
+			]);
+			
+			[Bindable]
+			private var transformerListData:ArrayCollection = new ArrayCollection([
+				{label:"日期转换", type: QueryViewConst.TRANS_CONVERT2DATE },
+				{label:"字段连接", type: QueryViewConst.TRANS_CONCATENATOR }
+			]);
+			
+			private var filterArr:ArrayCollection = new ArrayCollection();//过滤器集合
+			private var transfArr:ArrayCollection = new ArrayCollection();//转换器集合
+			
+			public var initSql:String;//初始SQL
+			public var dataSource:String;//数据源
+			public var resultXml:String;
+			
+			private function creationComplete():void{
+				var filterMenu:Menu = filterAddBtn.popUp as Menu;
+				filterMenu.addEventListener(MenuEvent.ITEM_CLICK,filterAddHandler);
+				
+				var transformerMenu:Menu = transformerAddBtn.popUp as Menu;
+				transformerMenu.addEventListener(MenuEvent.ITEM_CLICK,filterAddHandler);
+			}
+			
+			//XML转换成属性
+			private function xmlToProperty():void{
+				
+			}
+			
+			//规则查询结果预览
+			private function ruleResultPreview():void{
+				//SmartXMessage.show("显示根据当前条件生成的SQL查询结果");
+				generateXml();
+				
+				SmartXMessage.show(resultXml);
+			}
+			
+			private function cancelRuleApply():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function ruleOk():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			//添加过滤器
+			private function filterAddHandler(event:MenuEvent):void{
+				//SmartXMessage.show(event.item.label);
+				
+				 var equals:EqualsFilter = new EqualsFilter();
+				 rulesTab.addChild(equals);
+				 filterArr.addItem(equals);
+			}
+			
+			//添加转换器
+			private function transformAddHandler(event:MenuEvent):void{
+				SmartXMessage.show(event.item.label);
+			}
+			
+			//生成XML配置文件
+			private function generateXml():void{
+				var metaXml:XML = <root/>;
+				for each(var baseFilter:AbstraceBaseFilter in filterArr){
+					var tempXml:XML = baseFilter.getFilterXml();
+					metaXml.appendChild(tempXml);
+				}
+				
+				resultXml = metaXml.toString();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%">
+		<mx:HBox width="100%" paddingTop="5" paddingLeft="8" paddingRight="8">
+			<mx:PopUpMenuButton label="添加过滤器" icon="{AssetsFileLib.addIcon}" id="filterAddBtn"
+								dataProvider="{filterListData}" openAlways="true" height="22"/>
+			<mx:PopUpMenuButton label="添加转换器" icon="{AssetsFileLib.addIcon}" id="transformerAddBtn"
+								dataProvider="{transformerListData}" openAlways="true" height="22"/>
+			<mx:Spacer width="100%" />
+			<mx:Button icon="{AssetsFileLib.clearIcon}" label="取消规则"  click="cancelRuleApply()"  height="22"/>
+			<mx:Button icon="{AssetsFileLib.quicQueryIcon}" label="规则预览"  click="ruleResultPreview()" height="22"/>
+			<mx:Button icon="{AssetsFileLib.okIcon}" label="确定"  click="ruleOk()" height="22"/>
+		</mx:HBox>
+		<mx:HRule width="100%" height="3" />
+		<mx:TabNavigator id="rulesTab" width="100%" height="100%" creationPolicy="all">
+		</mx:TabNavigator>
+	</mx:VBox>
+</mx:TitleWindow>

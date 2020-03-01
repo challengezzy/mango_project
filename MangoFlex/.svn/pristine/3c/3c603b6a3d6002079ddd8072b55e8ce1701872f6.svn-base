@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" xmlns:visual="org.un.cava.birdeye.ravis.enhancedGraphLayout.visual.*"
+		   creationComplete="init()" xmlns:ui="org.un.cava.birdeye.ravis.components.ui.*"
+		   xmlns:lc="org.un.cava.birdeye.ravis.components.ui.controls.layouterControls.*"
+		   xmlns:vc="org.un.cava.birdeye.ravis.components.ui.controls.vgraphControls.*"
+		   xmlns:dp="org.un.cava.birdeye.ravis.components.ui.datapresentation.*"
+		   xmlns:ravis="org.un.cava.birdeye.ravis.graphLayout.visual.*"
+		   xmlns:flexlib="http://code.google.com/p/flexlib/">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:WipeLeft id="wipeLeft" duration="1000" />
+		<mx:WipeRight id="wipeRight" duration="1000" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			
+			import org.un.cava.birdeye.ravis.enhancedGraphLayout.data.EnhancedGraph;
+			import org.un.cava.birdeye.ravis.enhancedGraphLayout.visual.edgeRenderers.EdgeControlRenderer;
+			import org.un.cava.birdeye.ravis.enhancedGraphLayout.visual.edgeRenderers.EdgeDrawer;
+			import org.un.cava.birdeye.ravis.enhancedGraphLayout.visual.edgeRenderers.EdgeRenderer;
+			import org.un.cava.birdeye.ravis.enhancedGraphLayout.visual.nodeRenderers.EnhancedIconNodeRenderer;
+			import org.un.cava.birdeye.ravis.enhancedGraphLayout.visual.nodeRenderers.NodeLabelRenderer;
+			import org.un.cava.birdeye.ravis.graphLayout.data.Graph;
+			import org.un.cava.birdeye.ravis.graphLayout.data.IGraph;
+			import org.un.cava.birdeye.ravis.graphLayout.data.INode;
+			import org.un.cava.birdeye.ravis.graphLayout.layout.HierarchicalLayouter;
+			import org.un.cava.birdeye.ravis.graphLayout.layout.ILayoutAlgorithm;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.IEdgeRenderer;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.IVisualNode;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.edgeRenderers.FlowCurveEdgeRenderer;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.events.VisualEdgeEvent;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.events.VisualNodeEvent;
+			
+			import smartx.flex.components.core.mtchart.vo.ProcessChartConst;
+			
+			[Bindable]
+			public var showControlPanel:Boolean = false;
+			[Bindable]
+			public var xmldata:XML; //需要展示的流程图定义
+			
+			// root node to start with
+			public var startNodeId:String = ProcessChartConst.STARTNODE;
+			
+			public var layoutMode:String; //布局方式，层次、发散。。
+			public var orientation:String;//层次布局方向
+			public var nodeSpacing:Number; //节点间距
+			public var nodeSytles:String; //节点风格
+			public var edgeStyles:String; //连线风格
+			public var edgeLabel:String; //连线图标
+			public var toggleEdgeLabel:Boolean; //连线图标显示开关
+			public var toggleSiblingSpread:Boolean;//层次布局
+			public var toggleNodeInterleaving:Boolean;//层次布局
+			public var toggleHonorNodeSize:Boolean;//层次布局
+			
+			public var linkLength:Number;//连线长度
+			public var toggleAnimation:Boolean;//渲染开关
+			public var toggleAutoFit:Boolean;//是否自动适应大小
+			
+			private function init():void
+			{
+				if(!showControlPanel)
+					currentState = "hideCntrlPanel";
+				else
+					currentState = "showCntrlPanel";
+				
+				vgraph.addEventListener(VisualNodeEvent.CLICK,vNodeClickHandler);
+				vgraph.addEventListener(VisualEdgeEvent.CLICK,vEdgeClickHandler);
+				
+				/* init a graph object with the XML data */
+				//vgraph.graph = new Graph("XMLAsDocsGraph",false,xmldata);
+				
+				/* assign start root */
+				//vgraph.currentRootVNode = vgraph.graph.nodeByStringId(startNodeId).vnode;
+				
+				billLayoutSelector.selectedItem = layoutMode;
+				billLayoutSelector.changeLayouter();
+				
+				billNodeRendererSelector.selectedItem = nodeSytles;
+				billNodeRendererSelector.changeNodeRenderer()
+				
+				billEdgeRendererSelector.selectedItem = edgeStyles;
+				billEdgeRendererSelector.changeEdgeRenderer();
+				
+				billELCs.elselector.selectedItem = edgeLabel;
+				billELCs.elselector.changeEdgeLabelRenderer();
+				
+				billELCs.eltoggle.selected = toggleEdgeLabel;
+				billELCs.eltoggle.toggleShowEdgeLabels();
+				
+				//CommonLayoutControl
+				billCommonLC.linklengthctl.lslider.value = linkLength;
+				billCommonLC.linklengthctl.updateLinkLength();
+				billCommonLC.toggleanim.selected = toggleAnimation;
+				billCommonLC.toggleanim.toggleAnimation();
+				billCommonLC.toggleaf.selected = toggleAutoFit;
+				billCommonLC.toggleaf.toggleAutoFit();
+				
+				//层次布局中参数设置
+				billHierLC.orientSel.selectedItem = orientation;
+				billHierLC.orientSel.changeOrientation();
+				billHierLC.nodeSpacing.bslider.value = nodeSpacing;
+				billHierLC.nodeSpacing.updateNodeSpacing();
+				billHierLC.sibSpread.selected = toggleSiblingSpread;
+				billHierLC.sibSpread.toggleSiblingSpread();
+				billHierLC.nodeILeave.selected = toggleNodeInterleaving;
+				billHierLC.nodeILeave.toggleNodeInterleaving();
+				billHierLC.honNodeSize.selected = toggleHonorNodeSize;
+				billHierLC.honNodeSize.toggleHonorNodeSize();
+				
+			}
+			
+			/**
+			 * 节点单击事件
+			 **/
+			public function vNodeClickHandler(event:VisualNodeEvent):void{
+				//Alert.show("You click the Node :" + event.node.id );
+				dispatchEvent(new VisualNodeEvent(VisualNodeEvent.CLICK,event.node,event.ctrlKey));
+			}
+			
+			/**
+			 * 连线单击事件
+			 **/
+			public function vEdgeClickHandler(event:VisualEdgeEvent):void{
+				//Alert.show("You click the Edge :" + event.edge.id );
+				dispatchEvent(new VisualEdgeEvent(VisualEdgeEvent.CLICK,event.edge,event.ctrlKey));
+			}
+			
+			/**
+			 * 图像刷新
+			 **/
+			public function refreshGraph():void{
+				/* init a graph object with the XML data */
+				vgraph.graph = new Graph("XMLAsDocsGraph",false,xmldata);
+				
+				if(xmldata != null) {
+					/* assign start root */
+					vgraph.currentRootVNode = vgraph.graph.nodeByStringId(startNodeId).vnode;
+					//vgraph.refresh(); //此种刷新经常傻掉
+					vgraph.draw();
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<mx:states>
+		<mx:State name="showCntrlPanel"/>       
+		<mx:State name="hideCntrlPanel"/>
+	</mx:states>
+	<mx:transitions>
+		<mx:Transition fromState="*" toState="*">
+			<mx:Resize target="{sideBar}" />
+		</mx:Transition>
+	</mx:transitions>
+	<mx:VBox width="100%" height="100%">
+		<mx:HBox width="100%" height="100%" id="mainBox" paddingBottom="5" horizontalGap="5">
+			<mx:HBox id="sideBar" width="300" height="100%" horizontalGap="0" includeIn="showCntrlPanel">
+				<ui:Grip id="navGrip" 
+						 width="17" height="100%" horizontalAlign="center"
+						 gripTip="显示/隐藏工具面板" />
+				<mx:VBox id="NavContainerRB"
+						 horizontalScrollPolicy="off"
+						 verticalScrollPolicy="off"
+						 verticalAlign="middle"
+						 horizontalAlign="center"
+						 verticalGap="1"
+						 horizontalGap="0"
+						 width="100%"
+						 height="100%"
+						 hideEffect="{wipeLeft}"
+						 showEffect="{wipeRight}">
+					<mx:Accordion id="leftAccordion"
+								  paddingBottom="5"
+								  paddingRight="5"
+								  paddingTop="5"
+								  paddingLeft="5"
+								  horizontalScrollPolicy="off"
+								  verticalScrollPolicy="off"
+								  width="100%"
+								  height="100%"
+								  creationPolicy="all" >
+						<mx:Canvas id="visibilitycnvs"
+								   label="Controls"
+								   height="100%"
+								   width="100%"
+								   horizontalScrollPolicy="off"
+								   verticalScrollPolicy="off" >
+							<mx:VBox width="100%"
+									 height="100%"
+									 horizontalAlign="center"
+									 horizontalScrollPolicy="off"
+									 verticalScrollPolicy="off">
+								<mx:Spacer height="3" />
+								
+								<flexlib:WindowShade
+									id="layoutContainer"
+									styleName="linkButtonWindowShade" 
+									label="Layout"
+									width="100%"
+									opened="false"
+									horizontalAlign="center"
+									paddingBottom="5"
+									>
+									<mx:VBox
+										width="99%"
+										horizontalAlign="center"
+										paddingLeft="5"
+										paddingRight="5"
+										paddingBottom="5"
+										paddingTop="5"
+										borderColor="#666666"
+										cornerRadius="5"
+										borderStyle="solid"
+										backgroundColor="#CCCCCC"
+										backgroundAlpha=".2" >
+										
+										<lc:LayoutSelector id="billLayoutSelector" vgraph="{vgraph}" />
+										<lc:HierLayoutControls id="billHierLC" vgraph="{vgraph}" />
+										<lc:PhiDial id="billPhiDial" vgraph="{vgraph}" />
+										<lc:ToggleDamping id="billDamping" vgraph="{vgraph}" />
+										<lc:CommonLayoutControls id="billCommonLC" vgraph="{vgraph}" />
+										<dp:CenteredNodeLabel id="billCenteredNodeLabel" vgraph="{vgraph}" />
+										<dp:NoVisNodesLabel id="billNoVisNodeLabel" vgraph="{vgraph}" />
+										
+									</mx:VBox>
+								</flexlib:WindowShade>
+								
+								<!-- Node Styles -->
+								<flexlib:WindowShade
+									id="nodeRenderContainer"
+									styleName="linkButtonWindowShade" 
+									label="Node Styles"
+									width="100%"
+									opened="true"
+									horizontalAlign="center"
+									paddingBottom="5"
+									>
+									
+									<vc:NodeRendererSelector id="billNodeRendererSelector" vgraph="{vgraph}" />
+									
+								</flexlib:WindowShade>
+								
+								<!-- Edge Styles -->
+								<flexlib:WindowShade
+									id="edgeRenderContainer"
+									styleName="linkButtonWindowShade" 
+									label="Edge Styles"
+									width="100%"
+									opened="true"
+									horizontalAlign="center"
+									paddingBottom="5"
+									>
+									
+									<vc:EdgeRendererSelector id="billEdgeRendererSelector" vgraph="{vgraph}" />
+									
+								</flexlib:WindowShade>
+								
+								<!-- Edge Labels -->
+								<flexlib:WindowShade
+									id="edgeLabelRenderContainer"
+									styleName="linkButtonWindowShade" 
+									label="Edge Label Styles"
+									width="100%"
+									opened="true"
+									horizontalAlign="center"
+									paddingBottom="5"
+									>
+									<vc:EdgeLabelControls id="billELCs" vgraph="{vgraph}" />
+								</flexlib:WindowShade>
+								
+								<flexlib:WindowShade
+									id="viewControlsContainer"
+									styleName="linkButtonWindowShade" 
+									label="View Controls"
+									width="100%"
+									opened="true"
+									horizontalAlign="center"
+									paddingBottom="5"
+									>
+									<mx:VBox
+										width="97%"
+										horizontalAlign="center"
+										paddingLeft="5"
+										paddingRight="5"
+										paddingBottom="5"
+										paddingTop="5"
+										borderColor="#666666"
+										cornerRadius="5"
+										borderStyle="solid"
+										backgroundColor="#CCCCCC"
+										backgroundAlpha=".2" >
+										<vc:DegreesOfSeparation id="billDegreeOS" vgraph="{vgraph}" />
+										<vc:ScaleControls id="billSCs" vgraph="{vgraph}" />
+										<vc:DrawButton id="billDB" vgraph="{vgraph}" />
+										<vc:FullRefreshButton
+											id="billRefreshBtn"
+											vgraph="{vgraph}"
+											directional="false"
+											xmlData="{xmldata}" />
+									</mx:VBox>
+								</flexlib:WindowShade>					
+								
+								<mx:Spacer height="5" />
+							</mx:VBox>		
+						</mx:Canvas>
+					</mx:Accordion>
+				</mx:VBox>		
+			</mx:HBox>
+			<mx:Canvas id="graphCnvs"
+					   borderStyle="solid"
+					   borderColor="#CCCCCC"
+					   backgroundColor="#FFFFFF"
+					   width="100%"
+					   height="100%"
+					   verticalScrollPolicy="off">		
+				
+				<ravis:VisualGraph id="vgraph" width="100%" height="100%" 
+								   left="0" right="0" top="0" bottom="5" backgroundColor="#FFFFFF" alpha="1"
+								   resize="vgraph.draw(VisualGraph.DF_RESET_LL)"
+								   visibilityLimitActive="true"
+								   >
+				</ravis:VisualGraph>
+			</mx:Canvas>
+		</mx:HBox>
+	</mx:VBox>
+	
+</mx:Canvas>

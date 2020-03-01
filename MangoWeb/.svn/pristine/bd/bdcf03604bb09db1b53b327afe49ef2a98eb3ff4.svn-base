@@ -1,0 +1,1031 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						 xmlns:s="library://ns.adobe.com/flex/spark" 
+						 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" label="属性" 
+						 creationComplete="creationCompleteHandler()" xmlns:synonyms="smartx.bam.flex.modules.synonyms.*" 
+						 xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*" show="synchronizeAttributeMapping()">
+	<fx:Declarations>
+		<mx:TitleWindow id="addAttWindow" title="添加属性" showCloseButton="true" close="PopUpManager.removePopUp(addAttWindow)">
+			<mx:DataGrid width="100%" height="100%" doubleClickEnabled="true" doubleClick="addAttDg_doubleClickHandler(event)"
+						 dataProvider="{allAtt}" id="addAttDg">
+				<mx:columns>
+					<mx:DataGridColumn headerText="名称" dataField="@name" />
+					<mx:DataGridColumn headerText="类型" dataField="@type" labelFunction="attTypeLabelFun"/>
+					<mx:DataGridColumn headerText="显示名称" dataField="@label" />
+					<mx:DataGridColumn headerText="可否为空" dataField="@isNullable" labelFunction="isNullableLabelFun"/>
+					<mx:DataGridColumn headerText="类别" dataField="@category" labelFunction="categoryFun" />
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="adjustDisplayAttWindow" title="显示信息" width="500" height="350" 
+						showCloseButton="true" close="PopUpManager.removePopUp(adjustDisplayAttWindow)"
+						show="adjustDisplayAttWindow_showHandler(event)">
+			<mx:HBox width="100%">
+				<mx:Label text="调整列表字段显示顺序"/>
+				<mx:Button icon="{AssetsFileLib.upIcon}" width="22" height="22" toolTip="上移"
+						   id="upAttributeBtn" click="upAttributeBtn_clickHandler(event)" />
+				<mx:Button icon="{AssetsFileLib.downIcon}" width="22" height="22" toolTip="下移"
+						   id="downAttributeBtn" click="downAttributeBtn_clickHandler(event)" />
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" dataProvider="{selectedItem.content.attributes.displayAttributes.attribute}" 
+						 id="adjustDisplayAttDg" dragEnabled="true" editable="true">
+				<mx:columns>
+					<mx:DataGridColumn headerText="名称" dataField="@name" editable="false"/>
+					<mx:DataGridColumn headerText="显示名称" dataField="@label" editable="false"/>
+					<mx:DataGridColumn headerText="是否快速查询" dataField="@isQuickQuery" editable="false" labelFunction="isQuickQueryLabelFun"/>
+					<mx:DataGridColumn headerText="是否列表显示" dataField="@isListShow" editable="false">
+						<mx:itemRenderer>
+							<fx:Component>
+								<mx:HBox width="100%" horizontalAlign="center">
+									<fx:Script>
+										<![CDATA[
+											override public function set data(value:Object):void{
+												super.data = value;
+												if(value == null)
+													return;
+												if(String(data.@isListShow) == "")
+													data.@isListShow = "false";
+											}
+										]]>
+									</fx:Script>
+									<mx:CheckBox id="isListShowChk" selected="{data.@isListShow=='true'?true:false}" 
+												 click="{data.@isListShow = isListShowChk.selected?'true':'false'}"/>
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="列表显示宽度" dataField="@listWidth" editable="true" />
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox width="100%">
+				<mx:Label text="显示布局"/>
+				<mx:RadioButtonGroup id="defaultLayoutInput" 
+									 selectedValue="{selectedItem.content.attributes.displayAttributes.@defaultLayout.length()==0?null:String(selectedItem.content.attributes.displayAttributes.@defaultLayout)}"
+									 itemClick="defaultLayoutInput_itemClickHandler(event)"/>
+				<mx:RadioButton groupName="defaultLayoutInput" label="并列" value="{BAMConst.LAYOUT_ENTITYCARD_TILE}"/>
+				<mx:RadioButton groupName="defaultLayoutInput" label="竖列" value="{BAMConst.LAYOUT_ENTITYCARD_VBOX}"/>
+				<mx:RadioButton groupName="defaultLayoutInput" label="分组" value="{BAMConst.LAYOUT_ENTITYCARD_GROUP}"/>
+			</mx:HBox>
+			<mx:VBox width="100%" id="groupLayoutBox"/>
+			<mx:HBox width="100%" horizontalAlign="center" paddingRight="5">
+				<mx:Button label="关闭" click="PopUpManager.removePopUp(adjustDisplayAttWindow)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:HDividedBox width="100%" height="200" id="layoutEditBox">
+			<mx:VBox width="40%" height="100%">
+				<mx:HBox width="100%">
+					<mx:ComboBox id="toAddLayoutTypeInput">
+						<mx:dataProvider>
+							<fx:Array>
+								<fx:Object label="横列容器" data="hbox"/>
+								<fx:Object label="竖列容器" data="vbox"/>
+								<fx:Object label="分组容器" data="group"/>
+							</fx:Array>
+						</mx:dataProvider>
+					</mx:ComboBox>
+					<mx:LinkButton icon="{AssetsFileLib.addIcon}" id="layoutTreeAddBtn" click="layoutTreeAddBtn_clickHandler(event)"/>
+					<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" id="layoutTreeRemoveBtn" click="layoutTreeRemoveBtn_clickHandler(event)"/>
+				</mx:HBox>
+				<mx:VBox width="100%" height="100%" borderStyle="solid">
+					<mx:Tree id="groupLayoutTree" width="100%" height="100%" labelFunction="layoutTreeLabelFunction"
+							 dataProvider="{selectedItem.content.attributes.displayAttributes.groupLayoutInfo.layoutTree}"
+							 change="groupLayoutTree_changeHandler(event)"
+							 showRoot="true"/>
+				</mx:VBox>
+			</mx:VBox>
+			<mx:VBox width="60%" height="100%" id="groupLayoutEditBox"/>
+		</mx:HDividedBox>
+		<fx:Component id="labelComponent">
+			<mx:HBox width="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+				<fx:Script>
+					<![CDATA[
+						import smartx.flex.components.util.SmartXMessage;
+						public function get text():String{
+							return labelTxt.text;
+						}
+						
+						protected function labelTxt_changeHandler(event:Event):void{
+							for each(var parentAtt:XML in outerDocument.allInheritAtt){
+								if(String(parentAtt.@name) == String(data.@name)){
+									var attXmlList:XMLList = outerDocument.selectedItem.content.attributes.displayAttributes.attribute.(@name == data.@name);
+									if(attXmlList.length() == 0 
+										&& event){
+										SmartXMessage.show("该属性不是显示属性，无法更改！");
+										labelTxt.text = data.@label;
+										return;
+									}
+								}
+							}
+							data.@label = labelTxt.text;
+							var displayAtts:XMLList = outerDocument.selectedItem.content.attributes
+								.displayAttributes.attribute.(@name == data.@name);
+							if(displayAtts.length() > 0)
+								displayAtts[0].@label = labelTxt.text;
+						}
+					]]>
+				</fx:Script>
+				<mx:TextInput id="labelTxt" text="{data.@label}" width="100%" height="100%" change="labelTxt_changeHandler(event)" />
+			</mx:HBox>
+		</fx:Component>
+		
+		<fx:Component id="isDisplayComponent">
+			<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+				<fx:Script>
+					<![CDATA[
+						import smartx.bam.flex.vo.BAMConst;
+						import smartx.flex.components.core.cep.CEPUtils;
+						public function get text():String{
+							return isDisplayChk.selected?'true':'false';
+						}
+						
+						override public function set data(value:Object):void{
+							super.data = value;
+							setIsDisplayChk();
+							isDisplayChk_changeHandler(null);
+						}
+						
+						private function setIsDisplayChk():void{
+							if(outerDocument.selectedItem.content.attributes.displayAttributes
+								.attribute.(@name == data.@name).length() > 0)
+								isDisplayChk.selected = true;
+							else
+								isDisplayChk.selected = false;
+						}
+						
+						protected function isDisplayChk_changeHandler(event:Event):void{
+							if(isDisplayChk.selected){
+								if(outerDocument.selectedItem.content.attributes.displayAttributes
+									.attribute.(@name == data.@name).length() > 0) return;
+								var displayAtt:XML = <attribute name={data.@name} label={data.@label} isQuickQuery="false" />;
+								if(String(data.@category) == BAMConst.ENTITY_ATT_CATEGORY_ENTITY)
+									displayAtt.@[BAMConst.ENTITY_ATT_ENTITY_DISPLAY] = data.@[BAMConst.ENTITY_ATT_ENTITY_DISPLAY];
+								else if(String(data.@category) == BAMConst.ENTITY_ATT_CATEGORY_DICT){
+									displayAtt.@dictionaryRefName = data.@dictionaryRefName;
+									displayAtt.@dictionaryRefCode = data.@dictionaryRefCode;
+								}
+								outerDocument.selectedItem.content.attributes.displayAttributes.appendChild(displayAtt);
+							}else{
+								var displayAtts:XMLList = outerDocument.selectedItem.content.attributes.displayAttributes.attribute.(@name == data.@name);
+								if(displayAtts.length() == 0) return;
+								CEPUtils.xmlDeleteNode(displayAtts[0]);
+							}
+						}
+						
+					]]>
+				</fx:Script>
+				<mx:CheckBox id="isDisplayChk" change="isDisplayChk_changeHandler(event)" />
+			</mx:HBox>
+		</fx:Component>
+		
+		<fx:Component id="isQuickQueryComponent">
+			<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+				<fx:Script>
+					<![CDATA[
+						import smartx.flex.components.util.SmartXMessage;
+						
+						public function get text():String{
+							return isQuickQueryChk.selected?'true':'false';
+						}
+						
+						override public function set data(value:Object):void{
+							super.data = value;
+							if(value != null){
+								var displayAtts:XMLList = outerDocument.selectedItem.content.attributes.displayAttributes
+									.attribute.(@name == data.@name);
+								if(displayAtts.length() == 0)
+									isQuickQueryChk.selected = false;
+								else
+									isQuickQueryChk.selected = displayAtts[0].@isQuickQuery=='true'?true:false;
+							}else
+								isQuickQueryChk.selected = false;
+							isQuickQueryChk_changeHandler(null);
+						}
+						
+						protected function isQuickQueryChk_changeHandler(event:Event):void{
+							if(event && outerDocument.selectedItem.content.attributes.displayAttributes
+								.attribute.(@name == data.@name).length() == 0){
+								SmartXMessage.show("该属性不是显示属性，无法更改！");
+								return;
+							}
+							var displayAtts:XMLList = outerDocument.selectedItem.content.attributes
+								.displayAttributes.attribute.(@name == data.@name);
+							if(displayAtts.length() > 0)
+								displayAtts[0].@isQuickQuery = text;
+						}
+					]]>
+				</fx:Script>
+				<mx:CheckBox id="isQuickQueryChk" change="isQuickQueryChk_changeHandler(event)"/>
+			</mx:HBox>
+		</fx:Component>
+		
+		<fx:Component id="isNullableComponent">
+			<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+				<fx:Script>
+					<![CDATA[
+						public function get text():String{
+							return isNullableChk.selected?'true':'false';
+						}
+						
+						override public function set data(value:Object):void{
+							super.data = value;
+							if(value != null){
+								isNullableChk.selected = value.@isNullable=='true'?true:false;
+								for each(var parentAtt:XML in outerDocument.allInheritAtt){
+									if(String(value.@name) == String(parentAtt.@name)){
+										isNullableChk.enabled = false;
+										return;
+									}
+								}
+								isNullableChk.enabled = true;
+							}else
+								isNullableChk.selected = false;
+						}
+					]]>
+				</fx:Script>
+				<mx:CheckBox id="isNullableChk" change="{data.@isNullable = text}"/>
+			</mx:HBox>
+		</fx:Component>
+		
+		<mx:TitleWindow id="attEditWindow" width="450" height.dictionary="480" height.entity="520" height="430" title="实体属性"
+						showCloseButton="true" close="PopUpManager.removePopUp(attEditWindow)">
+			<mx:VBox id="attributeCardVbox" width="100%" height="100%" paddingBottom="5" paddingLeft="5"
+					 paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%">
+					<mx:Label text="名称" width="40%" />
+					<mx:TextInput id="attNameTxt" width="50%" text="{selectedAttribute.@name}" editable="{!attIsEdit}" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="类型" width="40%" />
+					<mx:ComboBox id="attTypeCbo" labelField="name" dataProvider="{attributeTypeCboDp}" width="50%" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="显示名称" width="40%" />
+					<mx:TextInput id="attLabelTxt" width="50%" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="是否显示" width="40%" />
+					<mx:CheckBox id="attIsDisplayChk" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="可否为空" width="40%" />
+					<mx:CheckBox id="attIsNullabelChk" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="是否快速查询" width="40%" />
+					<mx:CheckBox id="attIsQuickQueryChk" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="类别" width="40%" />
+					<mx:ComboBox id="attCategoryCbo" labelField="name" dataProvider="{categoryArr}" width="50%" 
+								 change="attCategoryCbo_changeHandler(event)"  />
+				</mx:HBox>
+				<mx:HBox width="100%" includeIn="dictionary">
+					<mx:Label text="字典引用" width="40%" />
+					<synonyms:SynonymsRefInput id="dictionaryRefInput" width="200" />
+				</mx:HBox>
+				<mx:HBox width="100%" includeIn="entity">
+					<mx:Label text="选择实体:" width="40%" />
+					<mx:ComboBox id="refEntityCbo" width="50%" labelField="@name" dataProvider="{allEntityDp}" 
+								 change="refEntityCbo_changeHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%" includeIn="entity">
+					<mx:Label text="引用属性:" width="40%" />
+					<mx:ComboBox id="refAttCbo" width="50%" labelField="@name" dataProvider="{refEnityAttributesDbo}" />
+				</mx:HBox>
+				<mx:HBox width="100%" includeIn="entity" >
+					<mx:Label text="显示属性:" width="40%" />
+					<mx:ComboBox id="refShowAttCbo" width="50%" labelField="@name" dataProvider="{refEnityAttributesDbo}" />
+				</mx:HBox>
+				<mx:HBox width="100%" id="computeChkBox">
+					<mx:Label text="可计算属性" width="40%" />
+					<mx:CheckBox id="computeChk" />
+				</mx:HBox>
+				<mx:HBox width="100%" id="computeTypeBox" visible="{computeChk.selected}">
+					<mx:Label text="计算类型" width="40%" />
+					<mx:ComboBox id="computeTypeCbo" width="50%" labelField="name" dataProvider="{computeTypeDp}" />
+				</mx:HBox>
+				<mx:HBox width="100%" id="computeExprBox" visible="{computeChk.selected}">
+					<mx:Label text="计算表达式" width="40%" />
+					<mx:TextArea id="computeExprTxt" height="80" width="50%" text="{selectedAttribute.@computeExpr}"/>
+					<mx:Button id="addAttBtn" toolTip="添加属性" icon="{AssetsFileLib.designIcon}" width="22" height="22"
+							   click="addAttBtn_clickHandler(event)" />
+				</mx:HBox>
+			</mx:VBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="onSave()" />
+				<mx:Button label="取消" click="PopUpManager.removePopUp(attEditWindow)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.util.OperatingTipUtil;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.collections.XMLListCollection;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.bam.flex.modules.entitymodel.entitytab.attributetabutil.GroupLayoutEditForm;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import smartx.bam.flex.vo.BAMConst;
+			import mx.utils.ObjectUtil;
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			
+			[Bindable]
+			private var selectedAttribute:Object;
+			[Bindable]
+			public var allInheritAtt:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			public var allInheritDisplayAtt:ArrayCollection = new ArrayCollection();//所有继承的显示属性
+			[Bindable]
+			private var parentAttributes:XML = <root />;
+			[Bindable]
+			private var computeTypeDp:ArrayCollection = new ArrayCollection([
+				{name:"数值",data:"value"},
+				{name:"公式",data:"formula"},
+				{name:"SQL",data:"sql"}
+			]);
+			[Bindable]
+			private var attIsEdit:Boolean = true;
+			[Bindable]
+			private var allAtt:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			public var allEntityDp:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var refEnityAttributesDbo:XMLList = new XMLList();
+			[Bindable]
+			private var attributeDp:XMLListCollection = new XMLListCollection();
+			[Bindable]
+			public var onQueryFun:Function;
+			
+			private function creationCompleteHandler():void{
+				
+			}
+			
+			//添加属性
+			private function addAttribute():void{
+				PopUpManager.addPopUp(attEditWindow,desktop,true);
+				PopUpManager.centerPopUp(attEditWindow);
+				attEditWindow.y =50;
+				
+				attEditWindow.callLater(function ():void{
+					attIsEdit = false;
+					selectedAttribute = <attribute />;
+					clearAttributeCard();
+				});
+			}
+			
+			//编辑属性
+			private function editAttribute():void{
+				if(attributeDg.selectedIndex < 0){
+					SmartXMessage.show("请选择需要编辑的属性！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				PopUpManager.addPopUp(attEditWindow,desktop,true);
+				PopUpManager.centerPopUp(attEditWindow);
+				attEditWindow.y =50;
+				
+				attEditWindow.callLater(function ():void{
+					attIsEdit = true;
+					selectedAttribute = attributeDg.selectedItem;
+					initSelectedAttribute();
+				});
+			}
+			
+			//删除属性
+			private function deleteAttribute():void{
+				if(attributeDg.selectedItems.length == 0)
+					return;
+				
+				for each(var att:XML in attributeDg.selectedItems){
+					var selectedName:String = String(att.@name);
+					attributeDp.removeItemAt(attributeDp.getItemIndex(att));
+					//如果被删除的属性为显示属性，则将显示属性也删除
+					if(selectedItem.content.attributes.displayAttributes.attribute.(@name==selectedName).length() > 0)
+						CEPUtils.xmlDeleteNode(selectedItem.content.attributes.displayAttributes.attribute.(@name==selectedName)[0]);
+					//映射属性也一并删除
+					for each(var map:XML in selectedItem.content.mappingInfo.attributeMapping.map){
+						if(String(map.@attributeName) == selectedName)
+							CEPUtils.xmlDeleteNode(map);
+					}
+				}
+				refreshAttributeDg();
+			}
+			
+			private function onSave():void{
+				var att:XML;
+				if(!attIsEdit){
+					for each(att in selectedItem.content.attributes.attribute){
+						if(ObjectUtil.stringCompare(String(att.@name),attNameTxt.text,true) == 0){
+							SmartXMessage.show("属性名不能重复！");
+							return;
+						}
+					}
+					
+					for each(att in allInheritAtt){
+						if(ObjectUtil.stringCompare(String(att.@name),attNameTxt.text,true) == 0){
+							SmartXMessage.show("不能与继承属性名不能重复！");
+							return;
+						}
+					}
+				}
+				
+				selectedAttribute.@name = attNameTxt.text;
+				selectedAttribute.@type = attTypeCbo.selectedItem.data;
+				selectedAttribute.@label = attLabelTxt.text;
+				selectedAttribute.@isCompute = computeChk.selected?"true":"false";
+				//可计算属性
+				if(computeChk.selected){
+					selectedAttribute.@computeType = computeTypeCbo.selectedItem.data;
+					selectedAttribute.@computeExpr = computeExprTxt.text;
+				}
+				//显示属性
+				var displayAtts:XMLList = selectedItem.content.attributes.displayAttributes.attribute.(@name==attNameTxt.text);
+				if(attIsDisplayChk.selected){
+					if(displayAtts.length() == 0){
+						var displayAtt:XML = <attribute name={attNameTxt.text} label={attLabelTxt.text} 
+												isQuickQuery={attIsQuickQueryChk.selected?"true":"false"} />
+						selectedItem.content.attributes.displayAttributes.appendChild(displayAtt);
+					}else{
+						displayAtts[0].@label = attLabelTxt.text;
+						displayAtts[0].@isQuickQuery = attIsQuickQueryChk.selected?"true":"false";
+					}
+				}else
+					displayAtts.length() > 0?CEPUtils.xmlDeleteNode(displayAtts[0]):null;
+				
+				selectedAttribute.@isNullable = attIsNullabelChk.selected?"true":"false";
+				selectedAttribute.@category = attCategoryCbo.selectedItem.data;
+				
+				if(currentState == "dictionary"){
+					selectedAttribute.@dictionaryRefName = dictionaryRefInput.value.name;
+					selectedAttribute.@dictionaryRefCode = dictionaryRefInput.value.code;
+					
+					if(displayAtts.length() > 0){
+						displayAtts[0].@dictionaryRefName = dictionaryRefInput.value.name;
+						displayAtts[0].@dictionaryRefCode = dictionaryRefInput.value.code;
+					}
+				}else if(currentState == "entity"){
+					selectedAttribute.@refEntity = refEntityCbo.selectedItem != null?refEntityCbo.selectedItem.@code:"";
+					selectedAttribute.@refEntityAtt = refAttCbo.selectedItem != null?refAttCbo.selectedItem.@name:"";
+					selectedAttribute.@refEntityShowAtt = refShowAttCbo.selectedItem != null?refShowAttCbo.selectedItem.@name:"";
+					//如果是实体引用，则添加一个引用的显示属性名称
+					var refDisplayAtt:String = monikerRefEntityDisplayAttName(String(selectedAttribute.@name));
+					selectedAttribute.@[BAMConst.ENTITY_ATT_ENTITY_DISPLAY] = refDisplayAtt;
+					//显示属性中也要添加此属性
+					if(displayAtts.length() > 0)
+						displayAtts[0].@[BAMConst.ENTITY_ATT_ENTITY_DISPLAY] = refDisplayAtt;
+				}
+				
+				if(!attIsEdit)
+					attributeDp.addItem(selectedAttribute);
+				
+				refreshAttributeDg();
+				synchronizeAttributeMapping();
+				
+				PopUpManager.removePopUp(attEditWindow);
+			}
+			
+			//初始化选中的属性
+			private function initSelectedAttribute():void{
+				for each(var attType:Object in attributeTypeCboDp){
+					if(attType.data == String(attributeDg.selectedItem.@type)){
+						attTypeCbo.selectedItem = attType;
+						break;
+					}
+				}
+				for each(var attCategory:Object in categoryArr){
+					if(attCategory.data == String(attributeDg.selectedItem.@category)){
+						attCategoryCbo.selectedItem = attCategory;
+						break;
+					}else
+						attCategoryCbo.selectedIndex = 0;
+				}
+				switchState(String(attributeDg.selectedItem.@category)==""?"normal":String(attributeDg.selectedItem.@category));
+				var displayAttribute:XMLList = selectedItem.content.attributes.displayAttributes
+					.attribute.(@name == attributeDg.selectedItem.@name);
+				attIsDisplayChk.selected = displayAttribute.length() > 0?true:false;
+				attIsQuickQueryChk.selected  = displayAttribute.length()> 0?(displayAttribute.@isQuickQuery=='true'?true:false):false;
+				attIsNullabelChk.selected = selectedAttribute.@isNullable=='true'?true:false;
+				attLabelTxt.text = selectedAttribute.@label;
+				computeChk.selected = selectedAttribute.@isCompute=="true"?true:false;
+			}
+			
+			private function switchState(state:String):void{
+				switch(state){
+					case "normal":
+						currentState = "normal";
+						break;
+					case "compute":
+						currentState = "compute";
+						computeExprTxt.text = selectedAttribute.@computeExpr;
+						setComputeTypeCbo();
+						break;
+					case "dictionary":
+						currentState = "dictionary";
+						var simpleRefVo:SimpleRefItemVO = new SimpleRefItemVO();
+						simpleRefVo.name = selectedAttribute.@dictionaryRefName;
+						simpleRefVo.code = selectedAttribute.@dictionaryRefCode;
+						dictionaryRefInput.value = simpleRefVo;
+						break;
+					case "entity":
+						currentState = "entity";
+						setRefEntityCbo();
+						refEntityCbo_changeHandler(null);
+						setRefEntityAttCbo();
+						setRefShowAttCbo();
+						break;
+				}
+			}
+			
+			protected function attCategoryCbo_changeHandler(event:ListEvent):void{
+				switchState(attCategoryCbo.selectedItem.data);
+			}
+			
+			public function showHandler():void{
+				if(selectedItem.content.attributes.displayAttributes.length() == 0)
+					selectedItem.content.attributes.appendChild(<displayAttributes />);
+				
+				fixedAttributes();
+				fixedDisplayAtts();
+				initParentAttributes();
+				isShowInheritAttChk.selected = false;
+				currentState = "normal";
+				attributeDp.source = selectedItem.content.attributes.attribute;
+				refreshAttributeDg();
+				initShowInheritDg();
+			}
+			
+			private function synchronizeAttributeMapping():void{
+				if(selectedItem.content.mappingInfo.attributeMapping.length() == 0)
+					selectedItem.content.mappingInfo.appendChild(<attributeMapping />);
+				
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					if(selectedItem.content.mappingInfo.attributeMapping.map.(@attributeName==att.@name).length() == 0
+						&& String(att.@isCompute) == "false"){
+						selectedItem.content.mappingInfo.attributeMapping
+							.appendChild(<map attributeName={att.@name} columnName={att.@name}/>);
+					}else if(selectedItem.content.mappingInfo.attributeMapping.map.(@attributeName==att.@name).length() > 0
+						&& String(att.@isCompute) == "true"){
+						CEPUtils.xmlDeleteNode(selectedItem.content.mappingInfo.attributeMapping.map.(@attributeName==att.@name)[0]);
+					}
+				}
+			}
+			
+			private function setComputeTypeCbo():void{
+				for each(var data:Object in computeTypeDp){
+					if(data.data == String(selectedAttribute.@computeType)){
+						computeTypeCbo.selectedItem = data;
+						break;
+					}else
+						computeTypeCbo.selectedItem = null;
+				}
+			}
+			
+			//从客户端缓存中获取实体元数据
+			private function getEntityMtByCache(mtcode:String):MetadataTemplet{
+				return MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+			}
+			
+			private function setRefEntityCbo():void{
+				for each(var data:Object in allEntityDp){
+					if(String(data.@code) == String(selectedAttribute.@refEntity)){
+						refEntityCbo.selectedItem = data;
+						break;
+					}else
+						refEntityCbo.selectedItem = null;
+				}
+			}
+			
+			private function setRefEntityAttCbo():void{
+				for each(var data:Object in refEnityAttributesDbo){
+					if(String(data.@name) == String(selectedAttribute.@refEntityAtt)){
+						refAttCbo.selectedItem = data;
+						break;
+					}else
+						refAttCbo.selectedItem = null;
+				}
+			}
+			
+			private function setRefShowAttCbo():void{
+				for each(var data:Object in refEnityAttributesDbo){
+					if(String(data.@name) == String(selectedAttribute.@refEntityShowAtt)){
+						refShowAttCbo.selectedItem = data;
+						break;
+					}else
+						refShowAttCbo.selectedItem = null;
+				}
+			}
+			
+			protected function addAttBtn_clickHandler(event:MouseEvent):void{
+				allAtt.removeAll();
+				allAtt.addAll(allInheritAtt);
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					allAtt.addItem(att);
+				}
+				PopUpManager.addPopUp(addAttWindow,desktop,true);
+				PopUpManager.centerPopUp(addAttWindow);
+			}
+			
+			protected function addAttDg_doubleClickHandler(event:MouseEvent):void{
+				if(addAttDg.selectedIndex < 0)
+					return;
+				var content:String = computeExprTxt.text;
+				if(computeExprTxt.selectionBeginIndex == computeExprTxt.selectionEndIndex){
+					var startPart:String = content.substr(0,computeExprTxt.selectionBeginIndex);
+					var endPart:String = content.substr(computeExprTxt.selectionBeginIndex,content.length);
+					var att:String = "";
+					if(String(addAttDg.selectedItem.@entityCode)=="")
+						att = att.concat(selectedItem.content.@code).concat(".").concat(addAttDg.selectedItem.@name);
+					else
+						att = att.concat(addAttDg.selectedItem.@entityCode).concat(".").concat(addAttDg.selectedItem.@name);
+					computeExprTxt.text = startPart.concat(att).concat(endPart);
+				}
+				PopUpManager.removePopUp(addAttWindow);
+			}
+			
+			protected function upAttributeBtn_clickHandler(event:MouseEvent):void{
+				var attSelectedItem:Object = adjustDisplayAttDg.selectedItem;
+				if(attSelectedItem==null || attSelectedItem.parent() ==undefined)
+					return;
+				var index:int = attSelectedItem.childIndex();
+				if(index == 0)
+					return;
+				var newXml:XML = XML(attSelectedItem).copy();
+				CEPUtils.xmlDeleteNode(XML(attSelectedItem));
+				
+				selectedItem.content.attributes.displayAttributes[0].insertChildBefore(
+					selectedItem.content.attributes.displayAttributes[0].children()[index-1],newXml);
+				refreshAdjustDisplayAttDg();
+				
+				callLater(function():void{
+					adjustDisplayAttDg.selectedItem =newXml;
+					if(adjustDisplayAttDg.selectedIndex > 1)
+						adjustDisplayAttDg.scrollToIndex(adjustDisplayAttDg.selectedIndex-1);
+				});
+			}
+			
+			protected function downAttributeBtn_clickHandler(event:MouseEvent):void{
+				var attSelectedItem:Object = adjustDisplayAttDg.selectedItem;
+				if(attSelectedItem==null || attSelectedItem.parent() ==undefined)
+					return;
+				var index:int = attSelectedItem.childIndex();
+				if(index == attSelectedItem.parent().children().length() -1)
+					return;
+				var newXml:XML = XML(attSelectedItem).copy();
+				CEPUtils.xmlDeleteNode(XML(attSelectedItem));
+				selectedItem.content.attributes.displayAttributes[0].insertChildAfter(
+					selectedItem.content.attributes.displayAttributes[0].children()[index],newXml);
+				
+				refreshAdjustDisplayAttDg();
+				
+				callLater(function():void{
+					adjustDisplayAttDg.selectedItem =newXml;
+					adjustDisplayAttDg.scrollToIndex(adjustDisplayAttDg.selectedIndex-1);
+				});
+			}
+			
+			protected function refEntityCbo_changeHandler(event:ListEvent):void{
+				var item:Object = refEntityCbo.selectedItem;
+				if(item){
+					var allRefAttributes:XMLListCollection = new XMLListCollection();
+					var allRefInheritEntity:ArrayCollection = EntityUtil.getAllInheritEntity(XML(item),contentXml);
+					allRefInheritEntity.addItem(XML(item));
+					var refENtityAtt:XML;
+					if(item.@mtcode != ""){//领域实体元数据从客户端缓存中读取
+						
+						for each(var refInhertEntity:XML in allRefInheritEntity){
+							var mt:MetadataTemplet = getEntityMtByCache(String(refInhertEntity.@mtcode));
+							
+							var refEntityXml:XML = mt.contentXML;
+							
+							for each(refENtityAtt in refEntityXml.attributes.attribute){
+								allRefAttributes.addItem(refENtityAtt);
+							}
+						}
+						
+					}else{
+						var allRefAttributesArr:ArrayCollection = 
+							EntityUtil.getInheritAttributes(contentXml.entities.entity.(@code==item.@code)[0],contentXml);
+						for each(refENtityAtt in allRefAttributesArr){
+							allRefAttributes.addItem(refENtityAtt);
+						}
+//						refEnityAttributesDbo = contentXml.entities.entity.(@code==item.@code).attributes.attribute;
+					}
+					
+					refEnityAttributesDbo = allRefAttributes.source;
+				}
+			}
+			
+			private function isQuickQueryLabelFun(item:Object,column:DataGridColumn):String{
+				if(item.@isQuickQuery == "true")
+					return "是";
+				else
+					return "否";
+			}
+			
+			//初始化所有继承属性
+			private function initParentAttributes():void{
+				delete parentAttributes.*;
+				for each(var parentAtt:XML in allInheritAtt){
+					var parentAttTemp:XML = parentAtt.copy();
+					var displayAttributes:XMLList = selectedItem.content.attributes.displayAttributes.attribute.(@name==parentAttTemp.@name);
+					if(displayAttributes.length() > 0){
+						parentAttTemp.@label = displayAttributes[0].@label;
+						parentAttTemp.@isQuickQuery = displayAttributes[0].@isQuickQuery;
+					}
+					parentAttributes.appendChild(parentAttTemp);
+				}
+			}
+			
+			//更改属性(功能调整过程中有些冗余的属性需删除)
+			private function fixedAttributes():void{
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					delete att.@isDisplay;
+					delete att.@isQuickQuery;
+					if(att.@category == "compute"){
+						att.@category = "normal";
+						computeChk.selected = true;
+					}
+				}
+			}
+			
+			
+			//清空属性CARD
+			private function clearAttributeCard():void{
+				attTypeCbo.selectedIndex = 0;
+				attLabelTxt.text = "";
+				attIsDisplayChk.selected = false;
+				attIsNullabelChk.selected = false;
+				attIsQuickQueryChk.selected = false;
+				computeChk.selected = false;
+				attCategoryCbo.selectedIndex = 0;
+				attCategoryCbo_changeHandler(null);
+			}
+			
+			private function adjustDisplayAttribute():void{
+				PopUpManager.addPopUp(adjustDisplayAttWindow,desktop,true);
+				PopUpManager.centerPopUp(adjustDisplayAttWindow);
+				for each(var att:XML in selectedItem.content.attributes.displayAttributes.attribute){
+					if(String(att.@listWidth) == "")
+						att.@listWidth = "120";
+				}
+				refreshAdjustDisplayAttDg();
+			}
+			
+			private function refreshAdjustDisplayAttDg():void{
+				adjustDisplayAttDg.dataProvider = selectedItem.content.attributes.displayAttributes.attribute;
+				defaultLayoutInput_itemClickHandler(null);
+			}
+			
+			private function refreshAttributeDg():void{
+				attributeDg.invalidateList();
+			}
+			
+			private function isShowInheritAttChk_changeHandler(event:Event):void{
+				if(allInheritAtt.length == 0){
+					SmartXMessage.show("无继承属性!");
+					isShowInheritAttChk.selected = false;
+				}
+				initShowInheritDg();
+			}
+			
+			private function initShowInheritDg():void{
+				if(isShowInheritAttChk.selected){
+					if(parentAttributeDg && !attributeListVbox.contains(parentAttributeDg))
+						attributeListVbox.addChildAt(parentAttributeDg,1);
+				}else{
+					if(parentAttributeDg && attributeListVbox.contains(parentAttributeDg))
+						attributeListVbox.removeChild(parentAttributeDg);
+				}
+			}
+			
+			private function isComputeLabelFun(item:Object,column:DataGridColumn):String{
+				if(item.@isCompute == "true")
+					return "是";
+				else
+					return "否";
+			}
+			
+			protected function defaultLayoutInput_itemClickHandler(event:ItemClickEvent):void{
+				selectedItem.content.attributes.displayAttributes.@defaultLayout=defaultLayoutInput.selectedValue==null?"":defaultLayoutInput.selectedValue;
+				if(defaultLayoutInput.selectedValue == BAMConst.LAYOUT_ENTITYCARD_GROUP){
+					if(selectedItem.content.attributes.displayAttributes.groupLayoutInfo.length() == 0){
+						//新建一个group布局描述节点
+						selectedItem.content.attributes.displayAttributes.appendChild(<groupLayoutInfo><layoutTree/></groupLayoutInfo>);
+					}
+					groupLayoutBox.addChild(layoutEditBox);
+					groupLayoutTree.dataProvider=selectedItem.content.attributes.displayAttributes.groupLayoutInfo.layoutTree;
+					groupLayoutEditBox.removeAllChildren();
+					adjustDisplayAttWindow.height = 550;
+					groupLayoutTree.callLater(expandAll);
+				}
+				else{
+					groupLayoutBox.removeAllChildren();
+					adjustDisplayAttWindow.height = 350;
+				}
+			}
+			
+			private function layoutTreeLabelFunction(item:Object):String{
+				if(item.@type == "group"){
+					return item.@name;
+				}
+				else if(item.@type == "vbox" ||
+					item.@type == "hbox"){
+					return item.@type;
+				}
+				else if(item.name()=="attribute"){
+					return item.@name;
+				}
+				else if(item.name()=="layoutTree"){
+					return "根节点";
+				}
+				return "unknown";
+			}
+			
+			protected function layoutTreeAddBtn_clickHandler(event:MouseEvent):void
+			{
+				var treeSelectedItem:Object = groupLayoutTree.selectedItem;
+				var toAddItemType:String = toAddLayoutTypeInput.selectedItem.data;
+				var tmpXml:XML;
+				if(toAddItemType == "vbox"){
+					tmpXml = <node type="vbox" percentWidth="100" percentHeight="100"/>;
+				}
+				else if(toAddItemType == "hbox"){
+					tmpXml = <node type="hbox" percentWidth="100" percentHeight="100"/>;
+				}
+				else{
+					tmpXml = <node type="group" name="属性分组" percentWidth="100" percentHeight="100"/>;
+				}
+				if(treeSelectedItem == null){
+					selectedItem.content.attributes.displayAttributes.groupLayoutInfo.layoutTree.appendChild(tmpXml);
+				}
+				else{
+					treeSelectedItem.appendChild(tmpXml);
+				}
+				groupLayoutTree.callLater(expandAll);
+			}
+			
+			private function expandAll():void{
+				for each(var node:Object in selectedItem.content.attributes.displayAttributes.groupLayoutInfo.layoutTree){
+					groupLayoutTree.expandChildrenOf(node,true);
+				}
+			}
+			
+			protected function layoutTreeRemoveBtn_clickHandler(event:MouseEvent):void{
+				var selectedItem:XML = groupLayoutTree.selectedItem as XML;
+				if(selectedItem == null){
+					return;
+				}
+				CEPUtils.xmlDeleteNode(selectedItem);
+			}
+			
+			protected function adjustDisplayAttWindow_showHandler(event:FlexEvent):void{
+				defaultLayoutInput_itemClickHandler(null);
+			}
+			
+			protected function groupLayoutTree_changeHandler(event:ListEvent):void{
+				var selectedItem:XML = groupLayoutTree.selectedItem as XML;
+				groupLayoutEditBox.removeAllChildren();
+				if(selectedItem == null){
+					return;	
+				}
+				if(selectedItem.@type == "group"){
+					layoutTreeAddBtn.enabled = false;
+					var groupForm:GroupLayoutEditForm = new GroupLayoutEditForm();
+					groupForm.selectedItem = selectedItem;
+					groupForm.formType = "group";
+					groupLayoutEditBox.addChild(groupForm);
+				}
+				else if(selectedItem.name() == "attribute"){
+					layoutTreeAddBtn.enabled = false;
+				}else{
+					layoutTreeAddBtn.enabled = true;
+					if(selectedItem.@type == "vbox" ||
+						selectedItem.@type == "hbox"){
+						var boxForm:GroupLayoutEditForm = new GroupLayoutEditForm();
+						boxForm.selectedItem = selectedItem;
+						boxForm.formType = "box";
+						groupLayoutEditBox.addChild(boxForm);
+					}
+				}
+				
+			}
+			
+			private function sychronizeInheritDisplayAttribute():void{
+				if(allInheritAtt.length == 0){
+					SmartXMessage.show("无继承属性!");
+					return;
+				}
+				SmartXMessage.show("将覆盖所有继承显示属性，是否继续？",SmartXMessage.MESSAGE_CONFIRM,"",this,function(event:CloseEvent):void{
+					if(Alert.YES == event.detail){
+						OperatingTipUtil.startOperat("同步中...",desktop,"同步完成！");
+						//清空所有父类中的显示属性
+						for each(var displayAtt:XML in selectedItem.content.attributes.displayAttributes.attribute){
+							if(displayAtt.attribute(BAMConst.ENTITY_DIS_ATT_PARENT_ENTITYCODE).length() > 0)
+								CEPUtils.xmlDeleteNode(displayAtt);
+							//如果这个属性没有存在于当前实体的属性中，也要清除
+							if(selectedItem.content.attributes.attribute.(@name == displayAtt.@name).length() == 0)
+								CEPUtils.xmlDeleteNode(displayAtt);
+						}
+						
+						for each(var parentDisplayAtt:XML in allInheritDisplayAtt){
+							selectedItem.content.attributes.displayAttributes.appendChild(parentDisplayAtt.copy());
+						}
+						initParentAttributes();
+						OperatingTipUtil.endOperat(true);
+					}
+				});
+			}
+			
+			/**
+			 * 拼装实体引用显示字段名称，规则：实体引用属性名 + "_" + 5位随机数
+			 */ 
+			private function monikerRefEntityDisplayAttName(name:String):String{
+//				var nameMoniker:String = name.concat("_").concat(CEPUtils.randomString(5));
+//				if(nameMoniker.length > 30)
+//					nameMoniker = nameMoniker.substr(0,30);
+				var nameMoniker:String = name.concat("_").concat("refDis");
+				return nameMoniker;
+			}
+			
+			/**
+			 * 修复当前实体显示属性，将字典引用和实体引用显示字段加入
+			 */ 
+			private function fixedDisplayAtts():void{
+				for each(var displayAtt:XML in selectedItem.content.attributes.displayAttributes.attribute){
+					if(displayAtt.attribute(BAMConst.ENTITY_DIS_ATT_PARENT_ENTITYCODE).length() > 0)
+						continue;
+					
+					var att:XML = selectedItem.content.attributes.attribute.(@name==displayAtt.@name)[0];
+					if(att == null)
+						continue;
+					
+					if(String(att.@category) == BAMConst.ENTITY_ATT_CATEGORY_DICT){//字典引用
+						displayAtt.@dictionaryRefName = att.@dictionaryRefName;
+						displayAtt.@dictionaryRefCode = att.@dictionaryRefCode;
+					}else if(String(att.@category) == BAMConst.ENTITY_ATT_CATEGORY_ENTITY)
+						displayAtt.@[BAMConst.ENTITY_ATT_ENTITY_DISPLAY] = att.@[BAMConst.ENTITY_ATT_ENTITY_DISPLAY];
+					
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<entitymodel:states>
+		<s:State name="normal"  />
+		<s:State name="dictionary" />
+		<s:State name="entity" />
+	</entitymodel:states>
+	<mx:VBox id="attributeListVbox" width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%">
+			<mx:Button icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建属性" click="addAttribute()"/>
+			<mx:Button icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除属性" click="deleteAttribute()"/>
+			<mx:Button icon="{AssetsFileLib.editIcon}" width="22" height="22" toolTip="编辑属性" click="editAttribute()"/>
+			<mx:Button icon="{AssetsFileLib.designIcon}" width="22" height="22" toolTip="配置显示信息" click="adjustDisplayAttribute()"/>
+			<mx:Button icon="{AssetsFileLib.switchIcon}" width="22" height="22" toolTip="同步继承显示属性" click="sychronizeInheritDisplayAttribute()"/>
+			<mx:CheckBox id="isShowInheritAttChk" label="是否显示继承属性" labelPlacement="right" change="isShowInheritAttChk_changeHandler(event)" />
+			<mx:HBox width="100%" horizontalAlign="right">
+				<mx:Button label="实时查询" click="onQueryFun()"/>
+			</mx:HBox>
+		</mx:HBox>
+		<mx:DataGrid id="parentAttributeDg" width="100%" height="50%" dataProvider="{parentAttributes.attribute}" doubleClickEnabled="true" editable="true">
+			<mx:columns>
+				<mx:DataGridColumn headerText="名称" dataField="@name" editable="false"/>
+				<mx:DataGridColumn headerText="类型" dataField="@type" labelFunction="attTypeLabelFun" editable="false"/>
+				<mx:DataGridColumn headerText="显示名称" dataField="@label" itemEditor="{labelComponent}" />
+				<mx:DataGridColumn headerText="是否显示" rendererIsEditor="true" itemRenderer="{isDisplayComponent}" />
+				<mx:DataGridColumn headerText="可否为空" dataField="@isNullable" rendererIsEditor="true" itemRenderer="{isNullableComponent}" />
+				<mx:DataGridColumn headerText="是否快速查询" dataField="@isQuickQuery" rendererIsEditor="true" itemRenderer="{isQuickQueryComponent}" />
+				<mx:DataGridColumn headerText="类别" dataField="@category" labelFunction="categoryFun" editable="false" />
+				<mx:DataGridColumn headerText="是否计算属性" dataField="@isCompute" editable="false" labelFunction="isComputeLabelFun" />
+			</mx:columns>
+		</mx:DataGrid>
+		
+		<mx:DataGrid id="attributeDg" width="100%" height="100%" dataProvider="{attributeDp}" 
+					 doubleClickEnabled="true" allowMultipleSelection="true" itemDoubleClick="editAttribute()" 
+					 editable="true">
+			<mx:columns>
+				<mx:DataGridColumn headerText="名称" dataField="@name" editable="false"/>
+				<mx:DataGridColumn headerText="类型" dataField="@type" labelFunction="attTypeLabelFun" editable="false"/>
+				<mx:DataGridColumn headerText="显示名称" dataField="@label" itemEditor="{labelComponent}" />
+				<mx:DataGridColumn headerText="是否显示" rendererIsEditor="true" itemRenderer="{isDisplayComponent}" />
+				<mx:DataGridColumn headerText="可否为空" dataField="@isNullable" rendererIsEditor="true" itemRenderer="{isNullableComponent}" />
+				<mx:DataGridColumn headerText="是否快速查询" dataField="@isQuickQuery" rendererIsEditor="true" itemRenderer="{isQuickQueryComponent}" />
+				<mx:DataGridColumn headerText="类别" dataField="@category" labelFunction="categoryFun" editable="false" />
+				<mx:DataGridColumn headerText="是否计算属性" dataField="@isCompute" editable="false" labelFunction="isComputeLabelFun" />
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+</entitymodel:AbstractTab>

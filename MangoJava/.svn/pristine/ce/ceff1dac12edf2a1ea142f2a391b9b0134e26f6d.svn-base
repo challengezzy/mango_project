@@ -1,0 +1,60 @@
+/**
+ * 
+ */
+package smartx.framework.metadata.ui;
+
+import javax.swing.Action;
+import javax.swing.JComponent;
+
+/**
+ * 自定义控制默认实现
+ * @author James.W
+ *
+ */
+public class CustomerCtrlDefaultImpl implements CustomerCtrlIFC {
+
+	protected JComponent parentComp=null;
+	
+	/**
+	 * 获得自定义控件数组，目的是为了创建一个工具条等类型展现。
+	 * 返回的数组中如果元素为空，则表示在JToolBar中建立一个分隔。
+	 * @return
+	 */
+	public Action[] getActionCtrls() {
+		return null;
+	}
+
+	/**
+	 * 获得自定义Action数组，目的是为了创建一个工具条等类型展现。
+	 * 返回的数组中如果元素为空，则表示在JToolBar中建立一个分隔。
+	 * @return
+	 */
+	public JComponent[] getJComponentCtrls() {
+		return null;
+	}
+
+	/**
+	 * 获得所在组件
+	 * @return
+	 */
+	public JComponent getParentCtrl() {
+		return parentComp;
+	}
+
+	/**
+	 * 设置所在组件
+	 * @param jcomp
+	 */
+	public void setParentCtrl(JComponent jcomp) {
+		parentComp=jcomp;
+	}
+
+}
+
+/**************************************************************************
+ * $RCSfile: CustomerCtrlDefaultImpl.java,v $  $Revision: 1.1.2.1 $  $Date: 2009/12/21 02:57:27 $
+ * $Log: CustomerCtrlDefaultImpl.java,v $
+ * Revision 1.1.2.1  2009/12/21 02:57:27  wangqi
+ * *** empty log message ***
+ *
+ **************************************************************************/

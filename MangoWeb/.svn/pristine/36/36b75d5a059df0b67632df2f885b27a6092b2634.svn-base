@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   layout="absolute" width="100%" height="100%" 
+		   xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+		   initialize="init()"  >
+	<fx:Declarations>
+		<fx:Object id="importButton" label="导入" handler="{importHandler}" icon="{AssetsFileLib.importIcon}" rightClick="true"/>
+		<fx:Object id="exportButton" label="导出" handler="{exportHandler}" icon="{AssetsFileLib.exportIcon}" rightClick="true"/>
+		<fx:Object id="saveAsButton" label="另存为" handler="{saveAsHandler}" icon="{AssetsFileLib.saveasIcon}" rightClick="true"/>
+		<mx:TitleWindow id="window" title="依赖业务视图" width="200" height="200" showCloseButton="true" close="PopUpManager.removePopUp(window)">
+			<mx:VBox width="100%" height="100%">
+				<mx:List id="dependBvList" width="100%" height="100%" dataProvider="{dataProvider}" 
+						 itemDoubleClick="dependBvList_itemDoubleClickHandler(event)" doubleClickEnabled="true"
+						 labelField="label"/>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="编辑" click="edit_clickHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(window)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="saveAsWindow" title="查询视图另存为" width="250" height="150" 
+						showCloseButton="true" close="PopUpManager.removePopUp(saveAsWindow)">
+			<mx:VBox width="100%" height="100%">
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="名称" />
+					<mx:TextInput id="qvName" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="编码" />
+					<mx:TextInput id="qvCode" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="保存" click="saveAs_clickHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(saveAsWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.LinkButton;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.styletemplate.ifc.CardButtonListener;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.FileUploadPanel;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.XMLExportObject;
+			
+			[Bindable]
+			private var treeTempletCode:String = "T_V_BAM_QUERYVIEW_TREE";
+			[Bindable]
+			private var templetCodeMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var loadAll:Boolean = true;
+			[Bindable]
+			private var parentFieldName:String = "PARENTID";
+			[Bindable]
+			private var seqFieldName:String ="NAME";
+			[Bindable]
+			private var labelFieldName:String = "NAME";
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var debugmode:Boolean;
+			[Bindable]
+			public var typeFiledName:String = "TYPE";
+			[Bindable]
+			public var fkFiledName:String = "PID";
+			[Bindable]
+			public var templetCodeParentFieldNameMap:Hashtable = new Hashtable();
+			[Bindable]
+			public var typeLabelMap:Hashtable = new Hashtable();
+			
+			[Bindable]
+			private var queryBtn:Button;
+			
+			private var advBtn:Button;
+			
+			private var mtcode:String;
+			
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var xmlFolder:XMLExportObject;
+			
+			private var xmlMTContent:XMLExportObject;
+			
+			private var flagName:String="queryview";
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			private var bcp:BillCardPanel;
+			[Bindable]
+			private var dataProvider:ArrayCollection = new ArrayCollection();
+			
+			private var deskTopFrame:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var dataValue:Object;
+			
+			private var isQv:Boolean = false;
+			
+			private var insertBfInterceptor:String = "smartx.bam.bs.qvmanager.QvInsertBfFormInterceptor";
+			
+			private function init():void{
+				templetCodeMap.add("4","T_BAM_FOLDER_QUERYVIEW");
+				templetCodeMap.add("QUERYVIEW","T_V_BAM_QUERYVIEW");
+				templetCodeParentFieldNameMap.add("T_BAM_FOLDER_QUERYVIEW","PARENTID");
+				templetCodeParentFieldNameMap.add("T_V_BAM_QUERYVIEW","FOLDERID");
+				typeLabelMap.add("4","查询视图目录");
+				typeLabelMap.add("QUERYVIEW","查询视图");
+				endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				debugmode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				
+				formService = new RemoteObject(destination);
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint != null){
+					formService.endpoint = endpoint;
+					bamService.endpoint = endpoint;
+				}
+				
+				formService.exportXmlToMDFile.addEventListener(ResultEvent.RESULT,exportXmlToMDFileHandler);
+				formService.exportXmlToMDFile.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.queryAllDependBv.addEventListener(ResultEvent.RESULT,queryAllDependBvHandler);
+				bamService.queryAllDependBv.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getMenuIdbyMenuCode.addEventListener(ResultEvent.RESULT,getMenuIdbyMenuCodeHandler);
+				bamService.getMenuIdbyMenuCode.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.copyQueryView.addEventListener(ResultEvent.RESULT,copyQueryViewHandler);
+				bamService.copyQueryView.addEventListener(FaultEvent.FAULT,faultHandler);
+				createTreeBtns();
+			}
+			
+			private function createQueryBtn(bcp:BillCardPanel):Button{
+				queryBtn = new Button();
+				queryBtn.label = "查询结果集";
+				queryBtn.toolTip = "查询结果集";
+				queryBtn.setStyle("icon",AssetsFileLib.queryResultIcon);
+				
+				var listener:QueryButtonListener = new QueryButtonListener();
+				queryBtn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+					listener.buttonClick(bcp);
+				});
+				return queryBtn;
+			}
+			
+			private function createAdvBtn():Button{
+				advBtn = new Button();
+				advBtn.label = "高级属性";
+				advBtn.setStyle("icon",AssetsFileLib.advanceIcon);
+				advBtn.addEventListener(MouseEvent.CLICK,advClickHandler);
+				return advBtn;
+			}
+			
+			private function itemChange(event:StyleTemplateEvent):void{
+				if(treePanel.treePanel.tree.selectedItem == null )
+					return;
+				var obj:DisplayObject;
+				if(treePanel.cardPanelBox.getChildren().length > 0)
+					obj = treePanel.cardPanelBox.getChildAt(0);
+				if(obj && obj is BillCardPanel){
+					bcp = obj as BillCardPanel;
+					dataValue = bcp.getDataValue();
+					if(bcp.templetCode == "T_V_BAM_QUERYVIEW"){
+						bcp.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,cardPanelSaveSuccessful);
+						bcp.insertBfInterceptor = insertBfInterceptor;
+						if(queryBtn==null || (queryBtn != null && !treePanel.buttonBar.contains(queryBtn)))
+							treePanel.buttonBar.addChild(createQueryBtn(bcp));
+						
+						if(advBtn==null || (advBtn != null && !treePanel.buttonBar.contains(advBtn)))
+							treePanel.buttonBar.addChild(createAdvBtn());
+						
+						isQv = true;
+					}else{
+						if(queryBtn && treePanel.buttonBar.contains(queryBtn))
+							treePanel.buttonBar.removeChild(queryBtn);
+						if(advBtn && treePanel.buttonBar.contains(advBtn))
+							treePanel.buttonBar.removeChild(advBtn);
+						
+						isQv = false;
+					}
+				}
+			}
+			
+			private function advClickHandler(event:MouseEvent):void{
+				var designer:QueryViewAdvDesigner = new QueryViewAdvDesigner();
+				PopUpManager.addPopUp(designer,this,true);
+				PopUpManager.centerPopUp(designer);
+			}
+			
+			private function cardPanelSaveSuccessful(event:BillCardPanelEvent):void{
+				var obj:Object = bcp.getDataValue();
+				if(parseInt(obj[bcp.getTempletVO().pkname]) > 0){
+					var item:Object = treePanel.treePanel.tree.selectedItem;
+					var querySql:String = bcp.getTempletVO().pkname+"='"+obj[bcp.getTempletVO().pkname]+"'"
+					bcp.refresh(querySql);
+					bamService.queryAllDependBv(obj["CODE"]);//查询是否有关联的依赖项
+				}
+				if(bcp != null)
+					bcp.removeEventListener(BillCardPanelEvent.SAVESUCCESSFUL,cardPanelSaveSuccessful);
+			}
+			
+			private function queryAllDependBvHandler(event:ResultEvent):void{
+				dataProvider.removeAll();
+				var result:Object = event.result;
+				for(var code:String in result){
+					dataProvider.addItem({label:result[code],data:code});
+				}
+				if(dataProvider.length > 0){
+					PopUpManager.addPopUp(window,deskTopFrame);
+					PopUpManager.centerPopUp(window);
+				}
+			}
+			
+			protected function createTreeBtns():void{
+				treePanel.operationList.addItem({type:"separator"});
+				treePanel.operationList.addItem(importButton);
+				treePanel.operationList.addItem(exportButton);
+				treePanel.operationList.addItem(saveAsButton);
+			}
+			
+			private function importHandler():void{
+				
+				var fup:FileUploadPanel = new FileUploadPanel();
+				
+				fup.addEventListener(BasicEvent.LOADDATA_SUCCESSFUL,uploadSuccessfulHandler);
+				fup.datasource = treePanel.treePanel.datasource;
+				fup.flagName = flagName;
+				
+				PopUpManager.addPopUp(fup,treePanel,true);
+				PopUpManager.centerPopUp(fup);
+			}
+			
+			private function exportHandler():void{
+				if(!treePanel.treePanel.tree.selectedItems.length > 0){
+					SmartXMessage.show("请选择要导出的查询视图！");
+					return ;
+				}
+				
+				//ConfirmUtil.confirm("确定要导出选中的查询视图和查询视图目录下的对象吗?",treePanel.treePanel,confirmHandler);
+				SmartXMessage.show("确定要导出选中的查询视图和查询视图目录下的对象吗?",SmartXMessage.MESSAGE_CONFIRM,null,treePanel,confirmHandler);
+			}
+			
+			private function uploadSuccessfulHandler(event:BasicEvent):void{
+				treePanel.treePanel.load();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endOperat();
+				SmartXMessage.show("远程调用错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private function exportXmlToMDFileHandler(event:ResultEvent):void{
+				var url:String = event.result as String;
+				navigateToURL(new URLRequest(url), "_blank");
+				endOperat();
+			}
+			
+			private function startOperat():void{
+				
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在导出……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,treePanel,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endOperat():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					//计算要导出的仪表盘对象				
+					var selectObjs:Array = treePanel.treePanel.tree.selectedItems;
+					var fetchFolderSql:String ;//查询FOLDER对象
+					var fetchDashSql:String;//查询DASHBOARD对象
+					var fetchFolderIdsSql:String;//查询所有关联的目录ID
+					var dashboardIds:String = "-1";
+					var folderIds:String = "-1";
+					
+					for(var i:int=0;i<selectObjs.length;i++){
+						var tempObj:Object = selectObjs[i];
+						if( "查询视图" == tempObj["TYPECN"]){
+							dashboardIds = dashboardIds + "," + tempObj["PID"];
+						}else if("查询视图目录" == tempObj["TYPECN"]){
+							folderIds = folderIds + "," + tempObj["PID"];
+						}
+					}
+					
+					fetchFolderIdsSql = "select id from bam_folder f connect by prior f.parentid = f.id start with f.id in ( "
+						+ " select o.folderid from BAM_QUERYVIEW o where o.id in (" + dashboardIds + ") )"
+						+ " union all"
+						+ " select id from bam_folder f connect by prior f.parentid = f.id start with f.id in (" + folderIds + ")"
+						+ " union all"
+						+ " select id from bam_folder f connect by prior f.id = f.parentid start with f.id in (" + folderIds + ")";
+					
+					fetchFolderSql = "select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=4 and id in (" + fetchFolderIdsSql + ")"
+					
+					fetchDashSql = "select NAME,CODE,DATASOURCENAME,SQL,DESCRIPTION from BAM_QUERYVIEW o where o.id in (" + dashboardIds + ")"
+						+ " union all "
+						+ " select NAME,CODE,DATASOURCENAME,SQL,DESCRIPTION from BAM_QUERYVIEW o where o.folderid in (" + fetchFolderIdsSql + ")";
+					
+					var xmlExportObject:XMLExportObject = new XMLExportObject();
+					xmlExportObject.tableName="BAM_QUERYVIEW";
+					xmlExportObject.pkName="ID";
+					xmlExportObject.fkName="FOLDERID";
+					xmlExportObject.visiblePkName="code";
+					xmlExportObject.datasource=treePanel.treePanel.datasource;
+					//xmlExportObject.fetchSql = "select NAME,CODE,DESCRIPTION,TYPE,MTCODE from BAM_DASHBOARDOBJECT ";
+					xmlExportObject.fetchSql = fetchDashSql;
+					
+					xmlFolder = new XMLExportObject();
+					xmlFolder.tableName="BAM_FOLDER";
+					xmlFolder.pkName="ID";
+					xmlFolder.fkName="PARENTID";
+					xmlFolder.visiblePkName="code,type";
+					xmlFolder.datasource=treePanel.treePanel.datasource;
+					
+					//xmlFolder.fetchSql = "select NAME,CODE,DESCRIPTION,TYPE,SEQ from BAM_FOLDER where TYPE=2";
+					xmlFolder.fetchSql = fetchFolderSql;
+					xmlFolder.childObjects = [];
+					xmlFolder.childObjects.push(xmlFolder);
+					xmlFolder.childObjects.push(xmlExportObject);
+					
+					startOperat();
+					formService.exportXmlToMDFile([xmlFolder],"queryview_data.MD",flagName);
+				}
+			}
+			
+			private var selectItem:Object;
+			
+			private function edit_clickHandler():void{
+				selectItem = dependBvList.selectedItem;
+				if(selectItem){
+					window.x = 0;
+					window.y = 0;
+					bamService.getMenuIdbyMenuCode("业务视图建模");
+				}else
+					SmartXMessage.show("请选择业务依赖的业务视图！");
+			}
+			
+			private function getMenuIdbyMenuCodeHandler(event:ResultEvent):void{
+				var menuId:int = event.result as int;
+				if(deskTopFrame != null){
+					var so:SharedObject = SharedObject.getLocal(BAMConst.QV_DEPEND_BV_SHAREOBJECT,"/");
+					so.data["qv"] = selectItem;
+					deskTopFrame.openMenuFrame(menuId,selectItem.data);
+				}
+			}
+			
+			private function dependBvList_itemDoubleClickHandler(event:ListEvent):void{
+				edit_clickHandler();
+			}
+			
+			private function saveAs_clickHandler():void{
+				if(StringUtils.trim(qvName.text) == ""){
+					SmartXMessage.show("查询视图名称不能为空！");
+					return;
+				}
+				
+				if(StringUtils.trim(qvCode.text) == ""){
+					SmartXMessage.show("查询视图编码不能为空！");
+					return;
+				}
+				dataValue["NAME"] = qvName.text;
+				dataValue["CODE"] = qvCode.text;
+				bamService.copyQueryView(dataValue);
+			}
+			
+			private function saveAsHandler():void{
+				if(!isQv){
+					SmartXMessage.show("目录不能执行该操作!");
+					return;
+				}
+				if(treePanel.treePanel.tree.selectedItem == null )
+					return;
+				PopUpManager.addPopUp(saveAsWindow,this,true);
+				PopUpManager.centerPopUp(saveAsWindow);
+			}
+			
+			private function copyQueryViewHandler(event:ResultEvent):void{
+				treePanel.treePanel.load();
+				PopUpManager.removePopUp(saveAsWindow);
+			}
+		]]>
+	</fx:Script>
+	<styletemplate:StyleTemplate03 id="treePanel" templetCode="{treeTempletCode}" debugMode="{debugmode}"
+								   templetCodeParentFieldNameMap="{templetCodeParentFieldNameMap}"
+								   endpoint="{endpoint}"
+								   typeTempletCodeMap="{templetCodeMap}"
+								   loadAll="{loadAll}"
+								   parentFieldName="{parentFieldName}"
+								   seqFieldName="{seqFieldName}"
+								   labelFieldName="{labelFieldName}"
+								   typeFieldName="{typeFiledName}"
+								   fkFieldName="{fkFiledName}"
+								   typeLabelMap="{typeLabelMap}"
+								   itemChange="itemChange(event)" />
+</mx:Module>

@@ -1,0 +1,120 @@
+package smartx.flex.components.itemcomponent
+{
+	import flash.utils.getDefinitionByName;
+	
+	import smartx.flex.components.itemcomponent.ItemComboBoxFactory;
+	import smartx.flex.components.itemcomponent.ItemConditionDateRangeFactory;
+	import smartx.flex.components.itemcomponent.ItemConditionNumberRangeFactory;
+	import smartx.flex.components.itemcomponent.ItemDateTimeFieldFactory;
+	import smartx.flex.components.itemcomponent.ItemFormulaFieldFactory;
+	import smartx.flex.components.itemcomponent.ItemNumberFieldFactory;
+	import smartx.flex.components.itemcomponent.ItemPasswordFieldFactory;
+	import smartx.flex.components.itemcomponent.ItemRefPanelFactory;
+	import smartx.flex.components.itemcomponent.ItemTextAreaFieldFactory;
+	import smartx.flex.components.itemcomponent.ItemTextFieldFactory;
+	import smartx.flex.components.util.Hashtable;
+	import smartx.flex.components.vo.GlobalConst;
+	import smartx.flex.components.vo.TempletItemVO;
+
+	public class ItemUIComponentBuilder
+	{
+		private var componentFactoryNameMap:Hashtable = new Hashtable();
+		private var componentFactoryMap:Hashtable = new Hashtable();
+		
+		private static var instance:ItemUIComponentBuilder = new ItemUIComponentBuilder();
+		private var factory:ItemTextFieldFactory;
+		private var factory2:ItemPasswordFieldFactory;
+		private var factory3:ItemComboBoxFactory;
+		private var factory4:ItemDateTimeFieldFactory;
+		private var factory9:ItemDateFieldFactory;
+		private var factory5:ItemFormulaFieldFactory;
+		private var factory6:ItemNumberFieldFactory;
+		private var factory7:ItemRefPanelFactory;
+		private var factory8:ItemTextAreaFieldFactory;
+		private var factory10:ItemListPanelFactory;
+		private var factory11:ItemAutoCompleteFieldFactory;
+		private var factory12:ItemConditionDateRangeFactory;
+		private var factory13:ItemConditionNumberRangeFactory;
+		
+		public function ItemUIComponentBuilder(){
+			registor("文本框","smartx.flex.components.itemcomponent.ItemTextFieldFactory"); 
+			registor("密码框","smartx.flex.components.itemcomponent.ItemPasswordFieldFactory"); 
+			registor("下拉框","smartx.flex.components.itemcomponent.ItemComboBoxFactory"); 
+			registor("时间","smartx.flex.components.itemcomponent.ItemDateTimeFieldFactory"); 
+			registor("日历","smartx.flex.components.itemcomponent.ItemDateFieldFactory"); 
+			registor("公式","smartx.flex.components.itemcomponent.ItemFormulaFieldFactory"); 
+			registor("数字框","smartx.flex.components.itemcomponent.ItemNumberFieldFactory"); 
+			registor("参照","smartx.flex.components.itemcomponent.ItemRefPanelFactory"); 
+			registor("多行文本框","smartx.flex.components.itemcomponent.ItemTextAreaFieldFactory"); 
+			registor("自动填充文本框","smartx.flex.components.itemcomponent.ItemAutoCompleteFieldFactory"); 
+			registor("列表框","smartx.flex.components.itemcomponent.ItemListPanelFactory");
+			registor("日期范围","smartx.flex.components.itemcomponent.ItemConditionDateRangeFactory");
+			registor("数值范围","smartx.flex.components.itemcomponent.ItemConditionNumberRangeFactory");
+			//registor("多选框","");
+		}
+		
+		public static function getBuilder():ItemUIComponentBuilder{
+			return instance;
+		}
+		
+		
+		public function registor(componentType:String, factoryName:String):void{
+			componentFactoryNameMap.add(componentType,factoryName);
+		}
+		
+		public function getFactory(componentType:String):ItemUIComponentFactory{
+			if(componentFactoryMap.containsKey(componentType))
+				return componentFactoryMap.find(componentType) as ItemUIComponentFactory;
+			else{
+				var factoryName:String = componentFactoryNameMap.find(componentType) as String;
+				if(factoryName != null){
+					var classReference:Class = getDefinitionByName(factoryName) as Class;
+					var factory:ItemUIComponentFactory = new classReference() as ItemUIComponentFactory;
+					componentFactoryMap.add(componentType,factory);
+					return factory;
+				}
+				else
+					return null;
+			}
+		}
+		
+		public function getComponent(mode:int,templetItemVO:TempletItemVO,destination:String=null, endpoint:String=null, dataValue:Object=null):ItemUIComponent{
+			var factory:ItemUIComponentFactory;
+			//add by xzl 20121229 增加自定义控件支持
+			if(templetItemVO.itemtype=="自定义控件"){
+				var factoryName:String = templetItemVO.conditionRefDesc;
+				var classReference:Class = getDefinitionByName(factoryName) as Class;
+				factory = new classReference() as ItemUIComponentFactory;
+			}else{
+				factory = getFactory(templetItemVO.itemtype);
+			}
+
+			if(factory != null){
+				factory.init(templetItemVO,destination,endpoint,dataValue);
+				return factory.getComponent(mode);
+			}
+			return null;
+		}
+		
+		public function getConditionComponent(itemtype:String,templetItemVO:TempletItemVO
+							,destination:String=null, endpoint:String=null, dataValue:Object=null):ItemUIComponent{
+			
+			var factory:ItemUIComponentFactory;
+			//获取查询的条件控件 zhangzy 20101020
+			if( itemtype=="自定义控件" ){
+				var factoryName:String = templetItemVO.conditionRefDesc;
+				var classReference:Class = getDefinitionByName(factoryName) as Class;
+				factory = new classReference() as ItemUIComponentFactory;
+			}else{
+				factory = getFactory(itemtype);
+			}
+			
+			if(factory != null){
+				factory.init(templetItemVO,destination,endpoint,dataValue);
+				return factory.getComponent(GlobalConst.ITEMCOMPONENTMODE_CONDITION);
+			}
+			return null;
+		}
+		
+	}
+}

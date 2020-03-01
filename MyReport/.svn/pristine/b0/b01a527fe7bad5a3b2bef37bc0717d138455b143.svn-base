@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				  xmlns:util="myreport.util.*"
+				  xmlns:chart="myreport.design.chart.*"
+				  width="480" height="506" creationComplete="Init()" fontSize="12" fontFamily="Simsun"
+				  title="饼图3D属性编辑器" close="Close()">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.chart.ChartData;
+			import myreport.data.chart.Pie3DData;
+			import myreport.data.report.ReportSettings;
+			import myreport.design.DesignUtil;
+			import myreport.design.ExpressionEditor;
+			import myreport.res.Asset;
+ 
+			private static var g_Instance:Pie3DEditor;
+			private var _Data:Pie3DData;
+			private var _Settings:ReportSettings;
+			public static function get Instance():Pie3DEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new Pie3DEditor();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			
+			private var _Callback:Function;
+			private function Init():void
+			{
+
+			}
+			/**
+			 * @param callback: function(data:Pie3DData):void
+			 */ 
+			public function Show(data:ChartData, settings:ReportSettings, callback:Function):void
+			{
+				_Data = data.Clone();
+				_Callback = callback;
+				_Settings = settings;
+				
+				PopUp();
+				
+				_Colors.Data = _Data;
+				_DataSource.Data = _Data.DataSource;
+				_Normal.Data = _Data;
+				
+				RefreshBindingValues();
+				RefreshChartLabelValues();
+				RefreshPie3DValues();
+			}
+			private function Confirm():void
+			{
+				_Colors.SetValues();
+				_DataSource.SetValues();
+				_Normal.SetValues();
+				SetBindingValues();
+				SetChartLabelValues();
+				SetPie3DValues();
+				if (_Callback != null)
+				{
+					_Callback(_Data);
+				}
+				Close();
+			}
+			private function RefreshBindingValues():void
+			{
+				PieValueField.text = _Data.PieValueField;
+				PieLabelField.text = _Data.PieLabelField;
+				
+				LabelField.text = _Data.LabelField;
+				
+				Title.text = _Data.Title;
+				Subtitle.text = _Data.Subtitle;
+			}
+			
+			private function SetBindingValues():void
+			{
+				_Data.PieValueField = PieValueField.text;
+				_Data.PieLabelField = PieLabelField.text;
+				
+				_Data.LabelField = LabelField.text;
+				
+				_Data.Title = Title.text;
+				_Data.Subtitle = Subtitle.text;
+			}
+			
+			private function RefreshChartLabelValues():void
+			{
+				_Label.LabelVisible.selected = _Data.LabelVisible;
+				_Label.LabelTextColor.selectedColor = _Data.LabelTextColor;
+				_Label.LabelFontSize.text = _Data.LabelFontSize.toString();
+				_Label.LabelFontBold.selected = _Data.LabelFontBold;
+				_Label.LabelWidth.text = _Data.LabelWidth.toString();
+				_Label.LabelGap.text = _Data.LabelGap.toString();
+				_Label.LabelColumn.text = _Data.LabelColumn.toString();
+				
+			}
+			private function SetChartLabelValues():void
+			{
+				_Data.LabelVisible = _Label.LabelVisible.selected;
+				_Data.LabelTextColor = _Label.LabelTextColor.selectedColor;
+				_Data.LabelFontSize = Number(_Label.LabelFontSize.text);
+				_Data.LabelFontBold = _Label.LabelFontBold.selected;
+				_Data.LabelWidth= Number(_Label.LabelWidth.text);
+				_Data.LabelGap = Number(_Label.LabelGap.text);
+				_Data.LabelColumn = uint(_Label.LabelColumn.text);
+				
+			}
+			private function RefreshPie3DValues():void
+			{
+
+				PieRadius.text = _Data.PieRadius.toString();
+				PieYScale.text = _Data.PieYScale.toString();
+				PieHeight.text = _Data.PieHeight.toString();
+				PieBorderThickness.text = _Data.PieBorderThickness.toString();
+				PieBorderAlpha.text = _Data.PieBorderAlpha.toString();
+				PieFillAlpha.text = _Data.PieFillAlpha.toString();
+				
+				PieLabelVisible.selected = _Data.PieLabelVisible;
+				PieLabelTextColor.selectedColor = _Data.PieLabelTextColor;
+				PieLabelFontSize.text = _Data.PieLabelFontSize.toString();
+				PieLabelFontBold.selected = _Data.PieLabelFontBold;
+				PieLabelWidth.text = _Data.PieLabelWidth.toString();
+				PieLabelDistanceScale.text = _Data.PieLabelDistanceScale.toString();
+				
+
+			}
+			private function SetPie3DValues():void
+			{
+
+				_Data.PieRadius = Number(PieRadius.text);
+				_Data.PieYScale = Number(PieYScale.text);
+				_Data.PieHeight = Number(PieHeight.text);
+				_Data.PieBorderThickness = Number(PieBorderThickness.text);
+				_Data.PieBorderAlpha = Number(PieBorderAlpha.text);
+				_Data.PieFillAlpha = Number(PieFillAlpha.text);
+				
+				_Data.PieLabelVisible = PieLabelVisible.selected;
+				_Data.PieLabelTextColor = PieLabelTextColor.selectedColor;
+				_Data.PieLabelFontSize = Number(PieLabelFontSize.text);
+				_Data.PieLabelFontBold = PieLabelFontBold.selected;
+				_Data.PieLabelWidth = Number(PieLabelWidth.text);
+				_Data.PieLabelDistanceScale = Number(PieLabelDistanceScale.text);
+				
+				
+			}
+			private function ShowExpressionEditor(input:TextInput):void
+			{
+				ExpressionEditor.Instance.Show(input.text, _Settings, function(value:String):void
+				{
+					input.text = value;
+				});
+			}
+		]]>
+	</mx:Script>
+ 
+	<mx:TabNavigator width="100%" height="100%" paddingBottom="3" paddingLeft="3" paddingRight="3"
+					 paddingTop="3" creationPolicy="all">
+		<mx:VBox width="100%" height="100%" label="数据源" horizontalAlign="center">
+			<chart:DataSourceEditor id="_DataSource"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="数据绑定" horizontalAlign="center">
+			<mx:Grid width="60%" verticalGap="1">
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="主标题："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="Title" width="100%"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(Title)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="副标题："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="Subtitle" width="100%"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(Subtitle)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="饼图值："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieValueField" width="100%"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(PieValueField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="饼图标签："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieLabelField" width="100%"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(PieLabelField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="图例值："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="LabelField" width="100%"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(LabelField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>	
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="饼图" horizontalAlign="center">
+			<mx:Grid verticalGap="1">
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图半径："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieRadius" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图Y轴半径比例："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieYScale" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图高度："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieHeight" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图线条宽度："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieBorderThickness" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图线条透明度："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieBorderAlpha" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图填充透明度："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieFillAlpha" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+						<mx:CheckBox id="PieLabelVisible" label="显示饼图标签"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图标签文本颜色："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:ColorPicker id="PieLabelTextColor"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图标签字体大小："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieLabelFontSize" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+						<mx:CheckBox id="PieLabelFontBold" label="饼图标签字体加粗"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图标签宽度："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieLabelWidth" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="饼图标签距离比例："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="PieLabelDistanceScale" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				
+			</mx:Grid>	
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="常规" horizontalAlign="center">
+			<chart:ChartNormalEditor id="_Normal"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="图例" horizontalAlign="center">
+			<chart:ChartLabelEditor id="_Label"/>
+			
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="颜色表" horizontalAlign="center">
+			<chart:ColorsEditor width="360" height="100%" id="_Colors"/>
+			
+		</mx:VBox>
+	</mx:TabNavigator>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

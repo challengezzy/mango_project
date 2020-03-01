@@ -1,0 +1,68 @@
+package smartx.system.web.service;
+
+
+import java.io.Serializable;
+
+import smartx.framework.common.vo.HashVO;
+
+/**
+ * 分页查询的时候处理包装对象
+ * @author Administrator
+ *
+ */
+public class PagingVO implements Serializable {
+	private int rowcount=0;
+	private int start=0;
+	private int limit=0;
+	private HashVO[] vos=null;
+	
+	public PagingVO(){
+		
+	}
+	
+	public PagingVO(HashVO[] vos){
+		this.vos=vos;
+		this.rowcount=vos.length;
+		this.start=0;
+		this.limit=vos.length;
+	}
+	public PagingVO(int rowcount,int start,int limit,HashVO[] vos){
+		this.vos=vos;
+		this.rowcount=rowcount;
+		this.start=start;
+		this.limit=limit;
+	}
+
+	public int getRowcount() {
+		return rowcount;
+	}
+
+	public void setRowcount(int rowcount) {
+		this.rowcount = rowcount;
+	}
+
+	public int getStart() {
+		return start;
+	}
+
+	public void setStart(int start) {
+		this.start = start;
+	}
+
+	public int getLimit() {
+		return limit;
+	}
+
+	public void setLimit(int limit) {
+		this.limit = limit;
+	}
+
+	public HashVO[] getVos() {
+		return vos;
+	}
+
+	public void setVos(HashVO[] vos) {
+		this.vos = vos;
+	}
+	
+}

@@ -1,0 +1,18 @@
+package smartx.framework.metadata.ui;
+
+import smartx.framework.metadata.vo.BillVO;
+
+
+/**
+ * BillCardPanel在view状态的时候的字段响应接口
+ * @author James.W
+ *
+ */
+public interface BillCardFieldActionIFC {
+	/**
+	 * 执行动作响应
+	 * @param vo 当前行的数据
+	 */
+	void action(BillVO vo);
+	
+}

@@ -1,0 +1,717 @@
+<mx:VBox xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="25" 
+		 xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+		 xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+		 xmlns:core="smartx.flex.components.core.*"
+		 xmlns:chart="smartx.flex.components.core.chart.*"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:s="library://ns.adobe.com/flex/spark"
+		 >
+	<fx:Declarations>
+		<mx:TitleWindow id="refValuePanel" title="选择字段值" showCloseButton="true" 
+						width="650" height="370" close="PopUpManager.removePopUp(refValuePanel)">
+			<mx:VBox width="100%" height="100%" >
+				<chart:AdvListChart id="refDataList" queryColumns="{queryColumns}" isAllowMultipleSelection="{allowMultipleSelection}"
+									columns="{columns}" doubleClickEnabled="true"
+									doubleClick="refValueclickHandler()"/>
+			</mx:VBox>
+			<mx:HRule width="100%" />
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="refValueclickHandler()"  />
+				<mx:Button label="取消" click="PopUpManager.removePopUp(refValuePanel)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			public var itemXml:XML;
+			
+			[Bindable]
+			public var modelCode:String;
+			
+			[Bindable]
+			public var datasource:String;
+			
+			[Bindable]
+			public var allFieldsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			public var itemsVBox:VBox;
+			
+			[Bindable]
+			public var dicValues:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var filterFieldsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var logicalOptCol:ArrayCollection = new ArrayCollection(
+				[
+					{name:"AND",value:"AND"},
+					{name:"OR",value:"OR"}
+				]
+			);
+			
+			[Bindable]
+			private var relationalOptCol:ArrayCollection = new ArrayCollection(
+				[
+					{name:"=",value:"="},
+					{name:">",value:"gt"},
+					{name:"<",value:"lt"},
+					{name:">=",value:"gt"},
+					{name:"<=",value:"lte"},
+					{name:"<>",value:"ltgt"},
+					{name:"IS",value:"IS"},
+					{name:"IS NOT",value:"IS NOT"},
+					{name:"IN",value:"IN"},
+					{name:"NOT IN",value:"NOT IN"},
+					{name:"LIKE",value:"LIKE"}
+				]
+			);
+			
+			[Bindable]
+			private var currRelationalOptCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var filterTypeCol:ArrayCollection = new ArrayCollection(
+				[
+					{name:"字典过滤",value:"dictionary"},
+					{name:"比较过滤",value:"equalValue"},
+					{name:"空值过滤",value:"nullValue"},
+					{name:"数值范围过滤",value:"numberScope"},
+					{name:"字符长度过滤",value:"stringLength"},
+					{name:"字符模糊匹配",value:"stringSimilar"},
+					{name:"返回行数上限",value:"rowCount"}
+				]
+			);
+			
+			[Bindable]
+			private var isEdit:Boolean  = true;
+			
+			[Bindable]
+			private var isVisible:Boolean  = false;
+			
+			private var metadataTemplet:MetadataTemplet;
+			
+			[Bindable]
+			private var refHeadProvider:Array = new Array();
+			
+			[Bindable]
+			private var refProvider:Array = new Array();
+			
+			[Bindable]
+			private var showValue:String;
+			
+			[Bindable]
+			private var realValue:String;
+			
+			[Bindable]
+			private var columns:Array = new Array();
+			
+			[Bindable]
+			private var queryColumns:Array = new Array();
+			
+			[Bindable]
+			private var allowMultipleSelection:Boolean = false;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var tempDatasource:String;
+			
+			private var tempShowColumn:String;
+			
+			private var tempValueColumn:String;
+			
+			private var isInitData:Boolean = true;
+			
+			private function init():void{
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.generateEntitySqlOriginalDataByMtCode.addEventListener(ResultEvent.RESULT,generateEntitySqlByMtCodeHandler);
+				bamService.generateEntitySqlOriginalDataByMtCode.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("初始化失败!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					this.tempShowColumn = "";
+					this.tempValueColumn = "";
+					this.tempDatasource = "";
+				});
+				
+				refHeadProvider.push("ID#");
+				refHeadProvider.push("名称");
+				refHeadProvider.push("字典值");
+				
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "name";
+				dgColumn.headerText = "名称";
+				columns.push(dgColumn);
+				
+				var dgColumn2:DataGridColumn = new DataGridColumn();
+				dgColumn2.dataField = "value";
+				dgColumn2.headerText = "数值";
+				columns.push(dgColumn2);
+				
+				queryColumns.push("name");
+				queryColumns.push("value");
+				
+				metadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(GlobalConst.MTCODE_SYNONYMS);
+				
+				if(metadataTemplet != null ){
+					for each(var synonymsXml:XML in metadataTemplet.contentXML.synonyms){
+						var values:String ="";
+						for each( var valuesXml:XML in synonymsXml.variable){
+							var value:String = valuesXml.@value;
+							if(values == ""){
+								values = value;
+							}else{
+								values = values+","+value;
+							}
+						}
+						var row:Array = [String(synonymsXml.@code),String(synonymsXml.@name),values];
+						refProvider.push(row);
+					}
+				}
+				
+				filterFieldsCol.removeAll();
+				for each(var obj:Object in allFieldsCol){
+					filterFieldsCol.addItem(obj);
+				}
+				
+				initData();
+				this.isInitData = false;
+			}
+			
+			private function initData():void{
+				
+				if(itemXml != null ){
+					
+					var typeStr:String = itemXml.@type;
+					var columnName:String = itemXml.@column;
+					var logicalOperator:String = itemXml.@logicalOperator;
+					var relationalOperator:String = itemXml.@relationalOperator;
+					var value:String = itemXml.@value;
+					var label:String = itemXml.@label;
+					
+					realValue = value;
+					showValue = value;
+					if(!BAMUtil.isEmpty(label)){
+						showValue = label;
+					}
+					valueInput.text = showValue;
+					
+					if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_DICTIONARY.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 0;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+						isEdit = false;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_EQUALVALUE.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 1;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+						isEdit = true;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_NULLVALUE.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 2;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+						showValue = "NULL";
+						realValue = "NULL";
+						valueInput.text = showValue;
+						setInpurtValue();
+//						valueInput_changeHandler(null);
+						isEdit = false;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_NUMBERSCOPE.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 3;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+						isEdit = true;
+					}else if(typeStr.toLowerCase()== GlobalConst.FILTER_TYPE_STRINGLENGTH.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 4;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+						isEdit = true;
+					}else if(typeStr.toLowerCase() == GlobalConst.FILTER_TYPE_STRINGSIMILAR.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 5;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+						isEdit = true;
+					}else if(typeStr.toLowerCase() == GlobalConst.FILTER_TYPE_ROWCOUNT.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 6;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+						isEdit = true;
+					}else if (typeStr.toLowerCase() == GlobalConst.FILTER_TYPE_RELATION.toLowerCase()){
+						//						filterTypeCob.selectedIndex = 7;
+						filterTypeCob.selectedItem = findFilterByType(typeStr);
+					}
+					
+					filterTypeCob_changeHandler(null);
+					
+					var item:Object = findFieldObjByName(columnName);
+					if( item != null ){
+						fieldNameCob.selectedItem = item;
+						fieldNameCob_changeHandler(null);
+					}
+					
+					
+					if(logicalOperator == "AND" ){
+						logicalOptCob.selectedIndex = 0;
+					}else if(logicalOperator == "OR"){
+						logicalOptCob.selectedIndex = 1;
+					}
+					
+					
+					var optItme:Object = findRelationOptObjByValue(relationalOperator);
+					if(optItme != null ){
+						relationalOptCob.selectedItem = optItme;
+						relationalOptCob_changeHandler(null);
+					}
+					
+				}
+			}
+			
+			private function findFilterByType(filterType:String):Object{
+				var item:Object = null;
+				for each(var obj:Object in filterTypeCol){
+					var tempFilterType:String = obj["value"] as String;
+					if(tempFilterType != null && StringUtil.trim(tempFilterType) != "" 
+						&& filterType != null && StringUtil.trim(filterType) != "" && tempFilterType==filterType){
+						item = obj;
+						break;
+					}
+				}
+				return item;
+			}
+			
+			private function findFieldObjByName(fieldName:String):Object{
+				var item:Object = null;
+				for each(var obj:Object in filterFieldsCol){
+					var tempFieldName:String = obj["columnName"] as String;
+					if(tempFieldName != null && StringUtil.trim(tempFieldName) != "" 
+						&& fieldName != null && StringUtil.trim(fieldName) != "" && tempFieldName==fieldName){
+						item = obj;
+						break;
+					}
+				}
+				return item;
+			}
+			
+			private function findRelationOptObjByValue(value:String):Object{
+				var item:Object = null;
+				for each(var obj:Object in currRelationalOptCol){
+					var tempValue:String = obj["value"] as String;
+					if(tempValue != null && StringUtil.trim(tempValue) != "" 
+						&& value != null && StringUtil.trim(value) != "" && tempValue==value){
+						item = obj;
+						break;
+					}
+				}
+				return item;
+			}
+			
+			protected function isAddCheckBox_changeHandler(event:Event):void
+			{
+				itemXml.@enabled = isAddCheckBox.selected?"true":"false";
+				
+			}
+			
+			protected function logicalOptCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = logicalOptCob.selectedItem;
+				if( item != null ){
+					var value:String = item["value"] as String;
+					itemXml.@logicalOperator = value;
+				}
+				
+			}
+			
+			protected function filterTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = filterTypeCob.selectedItem;
+				if( item != null ){
+					
+					var value:String = item["value"] as String;
+					itemXml.@type = value;
+					
+//					if(showValue=="NULL"&&realValue=="NULL"){
+					if(!isInitData){
+						showValue = "";
+						realValue = "";
+						valueInput.text = showValue;
+						setInpurtValue();
+					}
+//					}
+					
+					filterFieldsCol.removeAll();
+					currRelationalOptCol.removeAll();
+					if(value == GlobalConst.FILTER_TYPE_DICTIONARY){
+						
+						for each(var objStr:Object in allFieldsCol){
+							var fieldTypeStr:String = objStr["columnType"] as String;
+							if(fieldTypeStr.toLowerCase()=="string"||fieldTypeStr.toLowerCase()=="varchar"||fieldTypeStr.toLowerCase()=="varchar2"||fieldTypeStr.toLowerCase()=="char"){
+								filterFieldsCol.addItem(objStr);
+							}
+						}
+						isVisible = true;
+						isEdit = false;
+						
+						for each(var currRltOpt:Object in relationalOptCol){
+							var optValue:String = currRltOpt["value"] as String;
+							
+							if(optValue == "IN"
+								|| optValue =="NOT IN"){
+								
+								currRelationalOptCol.addItem(currRltOpt);
+							}
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_EQUALVALUE){
+						
+						for each(var objNum:Object in allFieldsCol){
+							var typeStr:String = objNum["columnType"] as String;
+							if(typeStr.toLowerCase() != "relationitem"){
+								filterFieldsCol.addItem(objNum);
+							}
+							
+						}
+						isVisible = false;
+						isEdit = true;
+						
+						for each(var currRltOptE:Object in relationalOptCol){
+							var currRltOptEValue:String = currRltOptE["value"] as String;
+							if(currRltOptEValue != "HAVE" && currRltOptEValue != "NOT HAVE"
+							&& currRltOptEValue != "IS" && currRltOptEValue != "IS NOT"){
+								currRelationalOptCol.addItem(currRltOptE);
+							}
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_NULLVALUE){
+						
+						for each(var objBool:Object in allFieldsCol){
+							var boolTypeStr:String = objBool["columnType"] as String;
+							if(boolTypeStr.toLowerCase() != "relationitem"){
+								filterFieldsCol.addItem(objBool);
+							}
+						}
+						
+						showValue = "NULL";
+						realValue = "NULL";
+						valueInput.text = showValue;
+						isVisible = false;
+						isEdit = false;
+						setInpurtValue();
+						valueInput_changeHandler(null);
+						
+						for each(var currNULLRltOpt:Object in relationalOptCol){
+							var optNULLValue:String = currNULLRltOpt["value"] as String;
+							
+							if(optNULLValue == "IS"
+								|| optNULLValue =="IS NOT"){
+								
+								currRelationalOptCol.addItem(currNULLRltOpt);
+							}
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_NUMBERSCOPE ){
+						
+						for each(var objDate:Object in allFieldsCol){
+							var fieldTypeNum:String = objDate["columnType"] as String;
+							if(fieldTypeNum.toLowerCase()=="number"||fieldTypeNum.toLowerCase()=="int"||fieldTypeNum.toLowerCase()=="integer"||fieldTypeNum.toLowerCase()=="float"||fieldTypeNum.toLowerCase()=="double"){
+								filterFieldsCol.addItem(objDate);
+							}
+						}
+						isVisible = false;
+						isEdit = true;
+						
+						for each(var currScopeRltOpt:Object in relationalOptCol){
+							var optScopeValue:String = currScopeRltOpt["value"] as String;
+							
+							if(optScopeValue == "="
+								|| optScopeValue == "gt"
+								|| optScopeValue == "lt"
+								|| optScopeValue == "gte"
+								|| optScopeValue == "lte"
+								|| optScopeValue == "ltgt"){
+								
+								currRelationalOptCol.addItem(currScopeRltOpt);
+							}
+						}
+						
+					}else if(value == GlobalConst.FILTER_TYPE_STRINGLENGTH || value == GlobalConst.FILTER_TYPE_STRINGSIMILAR ){
+						
+						for each(var objLengthStr:Object in allFieldsCol){
+							var fieldLengthStr:String = objLengthStr["columnType"] as String;
+							if(fieldLengthStr.toLowerCase()=="string"||fieldLengthStr.toLowerCase()=="varchar"||fieldLengthStr.toLowerCase()=="char"){
+								filterFieldsCol.addItem(objLengthStr);
+							}
+						}
+						isVisible = false;
+						isEdit = true;
+						
+						if(value == GlobalConst.FILTER_TYPE_STRINGLENGTH){
+							
+							for each(var currLengthRltOpt:Object in relationalOptCol){
+								var optlengthValue:String = currLengthRltOpt["value"] as String;
+								
+								if(optlengthValue == "="
+									|| optlengthValue == "gt"
+									|| optlengthValue == "lt"
+									|| optlengthValue == "gte"
+									|| optlengthValue == "lte"
+									|| optlengthValue == "ltgt"){
+									
+									currRelationalOptCol.addItem(currLengthRltOpt);
+								}
+							}
+						}else if(value == GlobalConst.FILTER_TYPE_STRINGSIMILAR){
+							for each(var currSimilerRltOpt:Object in relationalOptCol){
+								var optsimilerValue:String = currSimilerRltOpt["name"] as String;
+								
+								if(optsimilerValue == "LIKE"){
+									
+									currRelationalOptCol.addItem(currSimilerRltOpt);
+								}
+							}
+						}
+						
+					}else if( value == GlobalConst.FILTER_TYPE_ROWCOUNT){
+						
+						var rowNum:Object = new Object();
+						rowNum["columnName"] = "ROWNUM";
+						rowNum["columnAlias"] = "ROWNUM";
+						rowNum["columnType"] = "number";
+						rowNum["columnLabel"] = "行数";
+						rowNum["columnRef"] = "";
+						filterFieldsCol.addItem(rowNum);
+						
+						isVisible = false;
+						isEdit = true;
+						
+						for each(var currRowRltOpt:Object in relationalOptCol){
+							var optRowValue:String = currRowRltOpt["value"] as String;
+							
+							if(optRowValue == "lte"){
+								currRelationalOptCol.addItem(currRowRltOpt);
+							}
+						}
+						
+					}else if( value == GlobalConst.FILTER_TYPE_RELATION){
+						
+						
+						for each(var currRltObj:Object in relationalOptCol){
+							var currRelationOpt:String = currRltObj["value"] as String;
+							
+							if(currRelationOpt == "HAVE" || currRelationOpt == "NOT HAVE"){
+								currRelationalOptCol.addItem(currRltObj);
+							}
+						}
+					}
+					
+					fieldNameCob_changeHandler(null);
+					relationalOptCob_changeHandler(null);
+				}
+				
+			}
+			
+			protected function fieldNameCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = fieldNameCob.selectedItem;
+				if( item != null ){
+					var value:String = item["columnName"] as String;
+					itemXml.@column = value;
+				}
+				
+			}
+			
+			protected function relationalOptCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = relationalOptCob.selectedItem;
+				if( item != null ){
+					var value:String = item["value"] as String;
+					itemXml.@relationalOperator = value;
+				}
+				
+			}
+			
+			protected function valueInput_changeHandler(event:Event):void
+			{
+				this.realValue = valueInput.text;
+				this.showValue = valueInput.text;
+				this.setInpurtValue();
+			}
+			
+			private function setInpurtValue():void{
+				itemXml.@value = this.realValue;
+				itemXml.@label = this.showValue;
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = filterTypeCob.selectedItem;
+				if( item != null ){
+					
+					var value:String = item["value"] as String;
+					itemXml.@type = value;
+					
+					if(value == GlobalConst.FILTER_TYPE_DICTIONARY){
+						
+						var refDialog:RefDialog = new RefDialog();
+						refDialog.title = "选择字典值";
+						refDialog.allowMultipleSelection = false;
+						refDialog.addEventListener(FlexEvent.CREATION_COMPLETE,function(event:FlexEvent):void{
+							refDialog.init3(refHeadProvider,refProvider);
+						});
+						refDialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+							if(refDialog.closeByConfirm){
+								
+								showValue = refDialog.refCode;
+								realValue = refDialog.refName;
+								valueInput.text = showValue
+								setInpurtValue();
+								
+							}
+						});
+						
+						PopUpManager.addPopUp(refDialog,this,true);
+						PopUpManager.centerPopUp(refDialog);
+						
+					}else{
+						
+						var fieldItem:Object = fieldNameCob.selectedItem;
+						if( fieldItem != null ){
+							
+							var relationItem:Object = relationalOptCob.selectedItem;
+							var relationValue:String = relationItem["value"];
+							if(!BAMUtil.isEmpty(relationValue)&&(relationValue=="IN"||relationValue=="NOT IN")){
+								allowMultipleSelection = true;
+							}
+							
+							var category:String = fieldItem["category"];
+							if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="dictionary"){
+								
+								var dictionaryRefCode:String = fieldItem["dictionaryRefCode"];
+								var dictionaryCol:ArrayCollection = BAMUtil.getSynonymsToArrayCollection(dictionaryRefCode);
+								PopUpManager.addPopUp(refValuePanel,this.root,true);
+								PopUpManager.centerPopUp(refValuePanel);
+								refDataList.dataArray = dictionaryCol;
+								refDataList.refresh();
+								
+							}else if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="entity"){
+								var refEntity:String = fieldItem["refEntity"];
+								var refEntityAtt:String = fieldItem["refEntityAtt"];
+								var refEntityShowAtt:String = fieldItem["refEntityShowAtt"];
+								//								var modelCode:String = fieldItem["modelCode"];
+								var datasource:String = fieldItem["datasource"];
+								
+								this.tempValueColumn = refEntityAtt;
+								this.tempShowColumn = refEntityShowAtt;
+								this.tempDatasource = datasource;
+								
+								OperatingTipUtil.startOperat("正在初始化....");
+								this.bamService.generateEntitySqlOriginalDataByMtCode(BAMConst.ENTITY_MT_PREFIX+this.modelCode+"_"+refEntity,BAMConst.ENTITY_MODEL_MT_PREFIX+this.modelCode,null,null);
+							}
+							
+						}else{
+							SmartXMessage.show("该字段没有可选项,请手动填写!");
+						}
+					}
+				}	
+				
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				if( itemXml != null ){
+					CEPUtils.xmlDeleteNode(itemXml);
+					if(itemsVBox != null ){
+						itemsVBox.removeChild(this);
+					}
+				}
+			}
+			
+			protected function refValueclickHandler():void
+			{
+				
+				var selectItems:Array = refDataList.getSelectedRowValues();
+				
+				PopUpManager.removePopUp(refValuePanel);
+				
+				if(selectItems != null && selectItems.length >0 ){
+					showValue = "";
+					realValue = "";
+					for each(var item:Object in selectItems){
+						var name:String = item["name"];
+						var value:String = item["value"];
+						if(BAMUtil.isEmpty(showValue)){
+							this.showValue = name;
+						}else{
+							this.showValue = this.showValue+","+name;
+						}
+						
+						if(BAMUtil.isEmpty(realValue)){
+							this.realValue = value;
+						}else{
+							this.realValue = this.realValue+","+value;
+						}
+					}
+					valueInput.text  = this.showValue;
+					setInpurtValue();
+				}
+			}
+			
+			private function generateEntitySqlByMtCodeHandler(event:ResultEvent):void{
+				
+				OperatingTipUtil.endOperat();
+				
+				var sql:String = event.result as String;
+				var tempSql:String = "select distinct "+this.tempShowColumn+" as name,"+this.tempValueColumn+" as value from ("+sql+")";
+				
+				PopUpManager.addPopUp(refValuePanel,this.root,true);
+				PopUpManager.centerPopUp(refValuePanel);
+				refDataList.sql = tempSql;
+				refDataList.dataSource = this.tempDatasource;
+				refDataList.refresh();
+				
+				this.tempShowColumn = "";
+				this.tempValueColumn = "";
+				this.tempDatasource = "";
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox id="cti" width="100%" horizontalAlign="left">
+		<mx:CheckBox id="isAddCheckBox" width="25" selected="{itemXml.@enabled=='true'}" change="isAddCheckBox_changeHandler(event)" toolTip="是否使该过滤器生效"/>
+		<mx:ComboBox id="logicalOptCob" width="70" labelField="name" change="logicalOptCob_changeHandler(event)" dataProvider="{logicalOptCol}" toolTip="选择逻辑运算符"/>
+		<mx:ComboBox id="filterTypeCob" width="120" labelField="name" change="filterTypeCob_changeHandler(event)" dataProvider="{filterTypeCol}" toolTip="选择过滤器类型"/>
+		<mx:ComboBox id="fieldNameCob" width="125" labelField="columnLabel" change="fieldNameCob_changeHandler(event)" dataProvider="{filterFieldsCol}" toolTip="选择需要过滤的字段"/>
+		<mx:ComboBox id="relationalOptCob" width="90" labelField="name" change="relationalOptCob_changeHandler(event)" dataProvider="{currRelationalOptCol}" toolTip="选择关系运算符"/>
+		<mx:TextInput id="valueInput" editable="{isEdit}" width="100%" text="{showValue}" change="valueInput_changeHandler(event)" toolTip="输入参数值,多个参数值之间用英文逗号隔开(注:字典过滤器只能从已有数值中选取)" />
+		<mx:LinkButton id="addBtn" width="22" height="22" icon="{AssetsFileLib.refsearchIcon}" toolTip="选择字典参数值" click="addBtn_clickHandler(event)"/>
+		<mx:LinkButton id="musBtn" width="22" height="22" icon="{AssetsFileLib.delete2Icon}" toolTip="删除此字段过滤" click="musBtn_clickHandler(event)"/>
+	</mx:HBox>
+</mx:VBox>

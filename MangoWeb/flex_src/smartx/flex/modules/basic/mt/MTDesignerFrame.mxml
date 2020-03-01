@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%"
+		   initialize="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.containers.TitleWindow;
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.MTDesignerEvent;
+			import smartx.flex.components.mtdesigner.MTDesigner;
+			import smartx.flex.components.mtdesigner.MTDesignerUtils;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private function init():void{
+				var url:String = this.loaderInfo.url;
+				var parameters:Object = StringUtils.parseUrlParameters(url);
+				var mtcode:String = parameters.mtcode;
+				if(mtcode == null){
+					Alert.show("必须指定元数据模板编码(mtcode)");
+					return;
+				}
+				var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+				var mttypeCode:String = metadataTemplet.typeCode;
+				var mtdesigner:MTDesigner = MTDesignerUtils.findMTDesigner(mttypeCode);
+				mtdesigner.mtcode = mtcode;
+				//mtdesigner.sourceXML = metadataTemplet.contentXML;
+				mtdesigner.percentHeight = 100;
+				mtdesigner.percentWidth = 100;
+				mtdesigner.saveAfterConfirm = true;
+				mtdesigner.showCancelButton = false;
+				mtdesigner.setStyle("headerHeight",0);
+				mtdesigner.endpoint =  ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+				mtdesigner.addEventListener(MTDesignerEvent.DESIGN_END,function(event:MTDesignerEvent):void{
+					MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(mtcode,mtdesigner.endpoint);
+					//PopUpManager.removePopUp(parentWindow);
+				});
+				this.addChild(mtdesigner);
+				
+				mtdesigner.callLater(function (md:MTDesigner):void{
+					md.initData();
+				},[mtdesigner]);
+			}
+		]]>
+	</fx:Script>
+</mx:Module>

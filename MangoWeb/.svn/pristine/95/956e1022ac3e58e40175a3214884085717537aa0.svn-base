@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="100%" height="100%"
+		 xmlns:utils="smartx.bam.flex.modules.entitymodel.utils.*" 
+		 xmlns:containers="net.brandonmeyer.containers.*" xmlns:olap="smartx.flex.components.core.olap.*" 
+		 creationComplete="init()" xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" xmlns:styletemplate="smartx.flex.components.styletemplate.*">
+	<fx:Declarations>
+		<containers:SuperPanel id="olapPanel" width="800" height="500" allowClose="true" close="olapPanelCloseHandler()"
+							   allowDrag="true" allowMaximize="true" allowMinimize="true" allowResize="true" title="{olapTitle}">
+			
+		</containers:SuperPanel>
+		<viewStackEffects:CoverFlowPapervision3D id="effect"/>
+		
+		<mx:TitleWindow id="listWindow" width="1000" height="550" showCloseButton="true" close="PopUpManager.removePopUp(listWindow)" >
+			<mx:VBox id="detailListBox" width="100%" height="100%" paddingBottom="5" paddingTop="5" paddingLeft="5" paddingRight="5">
+				<!--<utils:EntityModelListPanel width="100%" height="100%" id="listPanel" pageSize="15" attributesXml="{attributesXml}" sharedObjectCode="{sharedObjectCode}" 
+				isQueryAfterCompleted="false" isVisibleFilter="true" sql="{sql}" dataSource="{datasource}"
+				sharedObjectSpaceName="{sharedObjectSpaceName}" debugMode="{debugMode}"/>-->
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.flexmonster.pivot.events.PivotEvent;
+			import com.flexmonster.pivot.view.ViewType;
+			import com.flexmonster.pivot.view.charts.ChartType;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.bam.flex.modules.entitymodel.event.EntityEditorEvent;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.olap.BillPivotComponent;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			[Bindable]
+			public var attributesXml:XML;
+			[Bindable]
+			public var sharedObjectCode:String;
+			[Bindable]
+			public var sharedObjectSpaceName:String = BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_FILTERINFO;
+			[Bindable]
+			public var sql:String;
+			[Bindable]
+			public var datasource:String;
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var fieldNameMap:Object = {};
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var olapConfigurationSharedObject:SharedObject;
+			[Bindable]
+			public var olapTitle:String;
+			
+			private var lastEntityCode:String;
+			
+			private var pivot:BillPivotComponent;
+			
+			public var templetCodeArr:Array;
+			
+			public var entityXml:XML;
+			
+			public var contentXml:XML;
+			
+			[Bindable]
+			public var relationsXml:XML;
+			
+			public var modelCode:String;
+			
+			private var item:*;
+			
+			private var bamService:RemoteObject;
+			
+			[Bindable]
+			public var countSQL:String;
+			
+			private function init():void{
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				bamService.deleteBatchEntityData.addEventListener(ResultEvent.RESULT,deleteBatchEntityDataHandler);
+				bamService.deleteBatchEntityData.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("删除实体错误！",SmartXMessage.MESSAGE_ERROR,"错误:\n"+event.fault.faultString);
+				});
+				
+				bamService.generateDisplayEntitySqlContainCondition.addEventListener(ResultEvent.RESULT,generateEntitySqlHandler);
+				bamService.generateDisplayEntitySqlContainCondition.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("生成SQL错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				
+				var viewBtn:Object = {label:"查看",handler:onView,icon:AssetsFileLib.viewIcon};
+				listPanel.operationList.addItem(viewBtn);
+				listPanel.rightClickMenuItems.push(viewBtn);
+//				var insertBtn:Object = {label:"新增",handler:onInsert,icon:AssetsFileLib.insertIcon};
+//				listPanel.operationList.addItem(insertBtn);
+//				listPanel.rightClickMenuItems.push(insertBtn);
+//				var editBtn:Object = {label:"编辑",handler:onEdit,icon:AssetsFileLib.editIcon};
+//				listPanel.operationList.addItem(editBtn);
+//				listPanel.rightClickMenuItems.push(editBtn);
+//				var delBtn:Object = {label:"删除",handler:onDelete,icon:AssetsFileLib.deleteIcon};
+//				listPanel.operationList.addItem(delBtn);
+//				listPanel.rightClickMenuItems.push(delBtn);
+				var dataOverviewBtn:Object = {label:"数据概览",handler:dataOverviewBtn_clickHandler,icon:AssetsFileLib.advancedqueryIcon};
+				listPanel.operationList.addItem(dataOverviewBtn);
+				listPanel.rightClickMenuItems.push(dataOverviewBtn);
+				listPanel.dataListGrid.doubleClickEnabled = true;
+				listPanel.dataListGrid.addEventListener(ListEvent.ITEM_DOUBLE_CLICK,function(e:ListEvent):void{
+					onView();
+				});
+			}
+			
+			private function onView():void{
+				item = listPanel.getSelectedItem();
+				if(item == null){
+					SmartXMessage.show("请选择一条记录");
+					return;
+				}
+				cardPanel.refreshData(item);
+				mainStack.selectedChild = cardBox;
+			}
+			
+			private function onEdit():void{
+				item = listPanel.getSelectedItem();
+				if(item == null){
+					SmartXMessage.show("请选择一条记录");
+					return;
+				}
+				
+				if(templetCodeArr == null){
+					SmartXMessage.show("编辑方案错误，不能编辑！");
+					return;
+				}
+				
+				if(templetCodeArr.length == 0){
+					SmartXMessage.show("编辑方案错误，不能编辑！");
+					return;
+				}
+				initEditorCardPanel(false);
+				mainStack.selectedChild = editorCardPanel;
+			}
+			
+			private function onInsert():void{
+				if(templetCodeArr == null){
+					SmartXMessage.show("编辑方案错误，不能新增！");
+					return;
+				}
+				
+				if(templetCodeArr.length == 0){
+					SmartXMessage.show("编辑方案错误，不能新增！");
+					return;
+				}
+				initEditorCardPanel(true)
+				mainStack.selectedChild = editorCardPanel;
+			}
+			
+			private function onDelete():void{
+				item = listPanel.getSelectedItem();
+				if(item == null){
+					SmartXMessage.show("请选择一条记录");
+					return;
+				}
+				SmartXMessage.show("是否删除该条记录？",SmartXMessage.MESSAGE_CONFIRM,"",this,function(event:CloseEvent):void{
+					if(Alert.YES == event.detail)
+						bamService.deleteBatchEntityData(entityXml.toXMLString(),contentXml.toXMLString(),item);
+				});
+			}
+			
+			private function deleteBatchEntityDataHandler(event:ResultEvent):void{
+				SmartXMessage.show("删除实体成功！");
+				refresh();
+			}
+			
+			private function initEditorCardPanel(insertMode:Boolean):void{
+				editorCardPanel.templetCodeArr = ObjectUtil.copy(templetCodeArr) as Array;
+				editorCardPanel.entityXml = entityXml;
+				if(insertMode)
+					editorCardPanel.insertMode = true;
+				else{
+					editorCardPanel.item = item;
+					editorCardPanel.insertMode = false;
+				}
+				editorCardPanel.refresh();
+				
+			}
+			
+			private function dataOverviewBtn_clickHandler():void{
+				PopUpManager.addPopUp(olapPanel,desktop,true);
+				PopUpManager.centerPopUp(olapPanel);
+				olapPanel.removeAllChildren();
+				createPivotComponent();
+				if(!olapPanel.contains(pivot)){
+					olapPanel.addChild(pivot);
+				}
+				pivot.percentHeight = 100;
+				pivot.percentWidth = 100;
+				pivot.refreshData();
+			}
+			
+			private function createPivotComponent():void{
+				pivot = new BillPivotComponent();
+				pivot.addEventListener(BillPivotComponent.BUILDPIVOTCOMPONENT_FINISH,buildPivotComponentFinsishHandler);
+				pivot.fieldNameMap = fieldNameMap;
+				pivot.datasource = datasource;
+				var columnStr:String = "rownum 行号";
+				for each(var itemXml:XML in attributesXml.attribute){
+					var name:String = String(itemXml.@name);
+					if(String(itemXml.@category) == BAMConst.ENTITY_ATT_CATEGORY_DICT){
+						name = EntityUtil.getDictColumnStr(itemXml);
+					}
+					if(BAMUtil.isEmpty(columnStr)){
+						if(!BAMUtil.isEmpty(name)){
+							columnStr = name;
+						}
+					}else{
+						if(!BAMUtil.isEmpty(name)){
+							columnStr = columnStr+","+name;
+						}
+					}
+				}
+				if(BAMUtil.isEmpty(columnStr)){
+					columnStr = " * ";
+				}
+				pivot.sql = "select "+columnStr+" from ("+sql+")";
+				olapConfigurationSharedObject = SharedObject.getLocal(BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_OLAP_CONFIGURATION);
+				if(olapConfigurationSharedObject.data.hasOwnProperty(sharedObjectCode)){
+					var config:Object = olapConfigurationSharedObject.data[sharedObjectCode];
+					pivot.rows = config.rows;
+					pivot.columns = config.columns;
+					pivot.measures = config.measures;
+					pivot.pages = config.pages;
+					pivot.showFieldList = false;
+				}
+				pivot.viewType = ViewType.GRID;
+				pivot.configuratorButton = true;
+				pivot.styleSheetName = "styles/cherry.css" ;
+				pivot.endpoint = endpoint;
+			}
+			
+			private function buildPivotComponentFinsishHandler(event:Event):void{
+				var rows:Array = pivot.pivotComponent.getRows();
+				var columns:Array = pivot.pivotComponent.getColumns();
+				var measures:Array = pivot.pivotComponent.getMeasures();
+				var filters:Array = pivot.pivotComponent.getPages();
+				olapConfigurationSharedObject = SharedObject.getLocal(BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_OLAP_CONFIGURATION);
+				var config:Object;
+				if(measures.length > 0){
+					if(olapConfigurationSharedObject.data.hasOwnProperty(sharedObjectCode)){
+						config = olapConfigurationSharedObject.data[sharedObjectCode];
+						config.rows = rows;
+						config.columns = columns;
+						config.measures = measures;
+						config.pages = filters;
+					}else{
+						config = {rows:rows,columns:columns,measures:measures,pages:filters};
+						olapConfigurationSharedObject.data[sharedObjectCode] = config;
+					}
+				}
+			}
+			
+			public function refresh():void{
+				listPanel.refresh();
+			}
+			
+			private function olapPanelCloseHandler():void{
+				PopUpManager.removePopUp(olapPanel);
+				pivot.destroy();
+			}
+			private function editorCardOnReturnHandler():void{
+				listPanel.refresh(true);
+				mainStack.selectedChild = listPanel;
+			}
+			
+			private function generateEntitySqlHandler(event:ResultEvent):void{
+				
+				var sql:String = event.result as String;
+				
+				var list:EntityModelListPanel = new EntityModelListPanel();
+				list.attributesXml = attributesXml;
+				list.sql = sql;
+				list.sharedObjectCode = sharedObjectCode;
+				list.isQueryAfterCompleted = true;
+				list.isVisibleFilter = true;
+				list.dataSource = datasource;
+				list.sharedObjectSpaceName = sharedObjectSpaceName;
+				list.debugMode = debugMode;
+				
+				PopUpManager.addPopUp(listWindow,this.root,true);
+				PopUpManager.centerPopUp(listWindow);
+				
+				if(detailListBox.getChildren().length>0){
+					detailListBox.removeAllChildren();
+				}
+				detailListBox.addChild(list);
+			}
+			
+			protected function viewBtn_clickHandler():void
+			{
+				var relationItem:Object = relationList.selectedItem;
+				if(relationItem != null){
+					var relationXml:XML = relationItem as XML;
+					var toEntityCode:String = String(relationXml.@toEntityCode);
+					var toEntityIdAttributeName:String = String(relationXml.@toEntityIdAttributeName);
+					var fetchSQL:String = String(relationXml.fetchSQL);
+					
+					var fromEntityKeyName:String = String(entityXml.@idAttributeName);
+					var fromEntityKeyValue:String = "";
+					if(!BAMUtil.isEmpty(fromEntityKeyName)){
+						fromEntityKeyName = fromEntityKeyName.toLowerCase();
+						fromEntityKeyValue = item[fromEntityKeyName];
+					}
+					
+					
+					var toEntityMtCode:String = BAMConst.ENTITY_MT_PREFIX+modelCode+"_"+toEntityCode;
+					var entityTemplete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(toEntityMtCode);
+					if(entityTemplete!=null){
+						var tempEnityXml:XML = entityTemplete.contentXML;
+						sharedObjectCode = String(contentXml.entityModelCode)+"_"+String(tempEnityXml.@code);
+						var displayAtts:XML = EntityUtil.displayAttributeWrap(tempEnityXml,contentXml);
+						attributesXml = String(tempEnityXml.@type) == "virtual"?tempEnityXml.attributes[0]:displayAtts;
+						var condition:String = " where "+toEntityIdAttributeName+" in (select toid from ("+fetchSQL+"))";
+						if(!BAMUtil.isEmpty(fromEntityKeyName)&&!BAMUtil.isEmpty(fromEntityKeyValue)){
+							condition = " where "+toEntityIdAttributeName+" in (select toid from ("+fetchSQL+") where fromid='"+fromEntityKeyValue+"')";
+						}
+						
+						var tempXml:XML = new XML(contentXml.toXMLString());
+						tempXml.entities.appendChild(tempEnityXml.copy());
+						bamService.generateDisplayEntitySqlContainCondition(tempEnityXml.toXMLString(),tempXml.toXMLString(),null,condition);
+					}
+				}else{
+					SmartXMessage.show("需要选中一条关系!");
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all">
+		<utils:EntityModelListPanel width="100%" height="100%" id="listPanel" pageSize="200" attributesXml="{attributesXml}" 
+									sharedObjectCode="{sharedObjectCode}" isQueryAfterCompleted="true" isVisibleFilter="true" sql="{sql}" 
+									dataSource="{datasource}" sharedObjectSpaceName="{sharedObjectSpaceName}" debugMode="{debugMode}" 
+									countSQL="{countSQL}"
+									showEffect="{effect}" hideEffect="{effect}"/>
+		<mx:VBox id="cardBox" width="100%" height="100%" paddingBottom="5" paddingTop="5" paddingLeft="5" paddingRight="5"
+				 showEffect="{effect}" hideEffect="{effect}">
+			<mx:HBox width="100%">
+				<mx:Button label="返回" icon="{AssetsFileLib.returnIcon}" click="{mainStack.selectedChild=listPanel}"/>
+			</mx:HBox>
+			<utils:EntityCardPanel id="cardPanel" width="100%" height="60%" attributesXml="{attributesXml}"/>
+			<mx:TabNavigator width="100%" height="40%" >
+				<mx:VBox id="relationBox" width="100%" height="100%" label="关系列表" >
+					<!--<mx:HBox width="100%" horizontalAlign="left" >
+						<mx:Button label="查看" icon="{AssetsFileLib.viewIcon}" toolTip="查看" click="viewBtn_clickHandler()"/>
+						<mx:Label width="100%" fontWeight="bold" text="关系列表" textAlign="center" />
+					</mx:HBox>-->
+					<mx:DataGrid id="relationList" dataProvider="{relationsXml.relation}" doubleClickEnabled="true" doubleClick="viewBtn_clickHandler()" width="100%" height="100%" >
+						<mx:columns>
+							<mx:DataGridColumn dataField="@name" headerText="关系名称" />
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+			</mx:TabNavigator>
+		</mx:VBox>
+		
+		<utils:EntityEditorCardPanel id="editorCardPanel" width="100%" height="100%" endpoint="{endpoint}" showEffect="{effect}" hideEffect="{effect}"
+									 debugMode="{debugMode}" onReturn="editorCardOnReturnHandler()" />
+	</mx:ViewStack>
+	
+</mx:VBox>

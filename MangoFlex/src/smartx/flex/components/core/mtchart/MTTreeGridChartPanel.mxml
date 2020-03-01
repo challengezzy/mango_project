@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  xmlns:mtchart="smartx.flex.components.core.mtchart.*"
+					  xmlns:flexlib="flexlib.controls.*" fontSize="12"
+					  initialize="preInit()" creationComplete="refresh(null)"
+					  width="100%" height="100%" xmlns:treeGridClasses="flexlib.controls.treeGridClasses.*">
+	<fx:Declarations>
+		<mx:HBox width="100%" id="treeCustomBtnBox" horizontalAlign="right" verticalAlign="middle" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import de.polygonal.ds.HashTable;
+			
+			import flexlib.controls.TreeGrid;
+			import flexlib.controls.treeGridClasses.TreeGridColumn;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.DateField;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.TreeEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.flex.components.core.BillTreeGridPanel;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.listener.MTTreeListCustomButtonListener;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.CompareUtil;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.util.export.ChartExportUtil;
+			import smartx.flex.components.util.export.ListDataExportUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			private var parentFieldName:String;
+			private var pkFieldName:String;
+			
+			private var columns:Array = new Array();
+			
+			private var ro:RemoteObject;
+			
+			public var treeGrid:BillTreeGridPanel;
+			
+			private var exportOptWindow:ComboBoxWindow;
+			
+			private var firstColumn:TreeGridColumn;
+			
+		    override protected function preInit():void{
+				super.preInit();
+				var xml:XML = metadataTemplet.contentXML;
+				parentFieldName = xml.extend.parentfieldname;
+				pkFieldName = xml.extend.pkfieldname;
+				var isFirst:Boolean = true;
+				for each(var item:XML in xml.extend.items.item){
+					var isShow:String = item.@isShowField;
+					if(isFirst){
+						if(isShow == "Y" || isShow =="y"){
+							firstColumn = new TreeGridColumn();
+							firstColumn.headerText = item.@labelField;
+							firstColumn.dataField = item.@dataField;
+							firstColumn.editable = false;
+							firstColumn.sortable = true;
+							firstColumn.sortCompareFunction = CompareUtil.getSortFunction(firstColumn);
+//								function(obj1:Object,obj2:Object):int{
+//								return sort(obj1,obj2,firstColumn.dataField,firstColumn);
+//							};
+							isFirst = false;
+							columns.push(firstColumn);
+						}
+					}else{
+						if(isShow == "Y" || isShow =="y"){
+						
+							var column:DataGridColumn = new DataGridColumn();
+							column.headerText = item.@labelField;
+							column.dataField = item.@dataField;
+							column.editable = false;
+							column.sortable = true;
+							column.sortCompareFunction = CompareUtil.getSortFunction(column);
+//								function(obj1:Object,obj2:Object):int{
+//								return sort(obj1,obj2,column.dataField,column);
+//							};
+							columns.push(column);
+						}
+					}
+				}
+				
+				addChildPanel();
+			}
+			
+			public function sort(obj1:Object,obj2:Object,columnName:String,column:DataGridColumn):int{
+				if(!isNaN(obj1[columnName]) && !isNaN(obj2[columnName])){
+					return sortNumber(obj1,obj2,columnName,column);
+				}
+				return sortString(obj1,obj2,columnName,column);
+				
+			}     
+			
+			private function sortDate(obj1:Object, obj2:Object,columnName:String,inputFormat:String):int {
+				var date1:Date =DateField.stringToDate(obj1[columnName],inputFormat);
+				var date2:Date =DateField.stringToDate(obj2[columnName],inputFormat);
+				return ObjectUtil.dateCompare(date1, date2);
+			}
+			
+			private function sortString(obj1:Object, obj2:Object,columnName:String,column:DataGridColumn):int{
+				var str1:String=obj1[columnName];
+				var str2:String=obj2[columnName];
+				
+				if(CompareUtil.hashTotalColumn(obj1)){
+					return (column.sortDescending?-1:1)*1;
+				}else if(CompareUtil.hashTotalColumn(obj2)){
+					return (column.sortDescending?-1:1)*-1;
+				}
+				
+				if(obj1 != null && obj2 == null)
+					return -1;
+				if(obj1 == null && obj2 != null)
+					return 1;
+				if(obj1 && obj2){
+					return ObjectUtil.stringCompare(CompareUtil.getFirstPinYin(str1),CompareUtil.getFirstPinYin(str2),true);
+				}
+				return 0;
+			}
+			
+			private function sortNumber(obj1:Object, obj2:Object,columnName:String,column:DataGridColumn):int{
+				var num1:Number=Number(obj1[columnName]);
+				var num2:Number=Number(obj2[columnName]);
+				if(CompareUtil.hashTotalColumn(obj1)){
+					return (column.sortDescending?-1:1)*1;
+				}else if(CompareUtil.hashTotalColumn(obj2)){
+					return (column.sortDescending?-1:1)*-1;
+				}else{
+					return ObjectUtil.numericCompare(num1,num2);
+				}
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				
+				mainBox.addChild(treeCustomBtnBox);
+				mainBox.addChild(treeGrid);
+				initCustomButtons();//初始化自定义按钮
+				
+				//treeCustomBtnBox.setStyle("horizontalAlign","right");
+				//treeCustomBtnBox.setStyle("verticalAlign","middle");
+				
+				exportOptArray.removeAll();
+				
+				exportOptArray.addItem(MTChartConst.EXPOPTION_CURDATA_CSV);
+				exportOptArray.addItem(MTChartConst.EXPOPTION_PNG);
+				
+				
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			//自定义按钮
+			private var iconComponentArray:Array = [];			
+			private var listenerMap:Hashtable = new Hashtable();
+			
+			private function initCustomButtons():void{
+				var customButton:XMLList = metadataTemplet.contentXML..customButton;
+				if(customButton.length() > 0){
+					for each(var buttonXML:XML in customButton.button){
+						var button:Button = new Button();
+						button.id = buttonXML.@id;
+						button.label = buttonXML.@label;
+						button.toolTip = buttonXML.@toolTip;
+						var iconUrl:String = buttonXML.@icon;
+						if(iconUrl != null && iconUrl != ""){
+							var cardIcon:Class = IconUtility.getClass(button,iconUrl,16,16);
+							button.setStyle("icon",cardIcon);
+							iconComponentArray.push(button);
+						}
+						
+						var listenerArr:Array = [];						
+						for each(var listener:String in buttonXML.listeners.listener){
+							var classRefrence:Class = getDefinitionByName(listener) as Class;
+							var customButtonListener:MTTreeListCustomButtonListener = new classRefrence() as MTTreeListCustomButtonListener;
+							listenerArr.push(customButtonListener);
+						}
+						listenerMap.add(button.id,listenerArr);
+						
+						button.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var listeners:Array = listenerMap.find(event.target.id) as Array;
+							for each(var listener:MTTreeListCustomButtonListener in listeners){
+								listener.buttonClick(getMTChart());
+							}
+						});
+						treeCustomBtnBox.addChild(button);
+					}
+				}
+			}
+			
+			private function getMTChart():MTTreeGridChartPanel{
+				return this;
+			}
+			
+			private function addChildPanel():void{
+				treeGrid = new BillTreeGridPanel();
+				treeGrid.parentFieldName = parentFieldName;
+				treeGrid.pkFieldName = pkFieldName;
+				treeGrid.columnsArray = columns;
+				if(treeGrid.getTreeGrid()!=null){
+					registerListItemClickListener(treeGrid.getTreeGrid(),this);
+				}
+			}
+			
+			override public function refreshComplete():void{
+				treeGrid.setDataProvider(dataProvider);
+				if(treeGrid.getTreeGrid()!=null){
+					registerListItemClickListener(treeGrid.getTreeGrid(),this);
+				}
+				isLoading =  false;
+			}
+			
+			public function getSelectItem():Object{
+				var item:Object = null;
+				if(treeGrid!=null){
+					item = treeGrid.getSelectItem();
+				}
+				return item;
+			}
+			
+			override protected function export():void{
+				if(exportOptWindow == null)
+					exportOptWindow = new ComboBoxWindow();
+				exportOptWindow.title = "导出方式选择"
+				exportOptWindow.dataProvider = exportOptArray;
+				exportOptWindow.confirmFunc = exportConfirmHandler;
+				
+				if(!exportOptWindow.isPopUp){
+					PopUpManager.addPopUp(exportOptWindow,this,true);
+					PopUpManager.centerPopUp(exportOptWindow);
+				}
+			}
+			
+			override protected function exportConfirmHandler():void{
+				PopUpManager.removePopUp(exportOptWindow);
+				
+				var fileName:String = "treeListChart";
+				if("" != StringUtils.trim(title) )
+					fileName = title;
+				//目前支持3中格式的导出
+				if( exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_PNG)
+					ChartExportUtil.exportChart(exportObj,fileName);
+				else if(exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_CURDATA_CSV){
+					if(treeGrid.getTreeGrid() != null){
+						ListDataExportUtil.dataProviderExport2CSV(treeGrid.dataProvider,treeGrid.columnsArray,fileName);
+					}
+				}
+					
+			}
+			
+		]]>
+	</fx:Script>
+</mtchart:MTChartPanel>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+				layout="vertical" showCloseButton="true" horizontalAlign="center" verticalAlign="middle"
+				fontSize="12" fontFamily="Simsun" width="416" height="276" title="请输入筛选表达式" 
+			    xmlns:util="myreport.util.*" close="Close()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.MsgUtil;
+ 
+			import myreport.data.report.ReportSettings;
+			import myreport.res.Asset;
+ 
+			private static var g_Instance:FilterEditor;
+			
+			public static function get Instance():FilterEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new FilterEditor();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			private var _Callback:Function;
+			private var _Settings:ReportSettings;
+			/**
+			 * callback=>function(filter:String):void
+			 */ 
+			public function Show(settings:ReportSettings, value:String, callback:Function):void
+			{
+				_Callback = callback;
+				
+				PopUp();
+ 
+				_Filter.text = "";
+				if(value)
+					_Filter.text = value;
+				_Settings = settings;
+			}
+			private function Confirm():void
+			{
+				var value:String = _Filter.text;
+				if (_Callback != null)
+				{
+					_Callback(value);
+				}
+				Close();
+			}
+ 
+			private function ShowExpressionEditor():void
+			{
+				ExpressionEditor.Instance.Show(_Filter.text, _Settings, function(value:String):void
+				{
+					_Filter.text = value;
+				});
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="80%">
+		<mx:TextInput width="100%" id="_Filter"/>
+		<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器" 
+						click="ShowExpressionEditor()"/>
+	</mx:HBox>
+	<mx:TextArea editable="false" width="80%" text="例子：&#xd;&#xd;=Fields!金额.Value&gt;0&#xd;&#xd;=Fields!金额.Value&gt;0&amp;&amp;Fields!金额.Value&lt;10000" height="119" borderStyle="none"/>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

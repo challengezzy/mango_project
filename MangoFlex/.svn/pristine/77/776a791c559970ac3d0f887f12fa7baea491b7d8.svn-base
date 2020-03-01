@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:local="com.jivesoftware.spark.*" 
+	xmlns:mx="http://www.adobe.com/2006/mxml" width="800" height="600" close="PopUpManager.removePopUp(this)" 
+	allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true"  
+ 	xmlns:code="http://code.google.com/p/flex-iframe/"
+ 	title="{title}">
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var url:String;
+		]]>
+	</mx:Script>
+	<code:IFrame height="100%" width="100%" source="{url}"/>
+</SuperPanel>

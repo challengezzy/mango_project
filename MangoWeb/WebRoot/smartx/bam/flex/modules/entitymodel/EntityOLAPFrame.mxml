@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%"
+		   creationComplete="init()" removedFromStage="module1_removedFromStageHandler(event)" >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.olap.BillPivotComponent;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var debugMode:Boolean = false;
+			private var billPivotComponent:BillPivotComponent;
+			
+			private var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private function init():void{
+				var url:String = this.loaderInfo.url;
+				var parameters:Object = StringUtils.parseUrlParameters(url);
+				var mtcode:String = parameters.mtcode;
+				if(mtcode == null){
+					Alert.show("必须指定元数据模板编码(mtcode)");
+					return;
+				}
+				var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+				if(metadataTemplet == null){
+					Alert.show("不存在元数据模板[mtcode="+mtcode+"]");
+					return;
+				}
+				
+				if(endpoint == null ){
+					Alert.show("endpoint为空!");
+					return;
+				}
+				
+				if(metadataTemplet.contentXML.debugMode.length() == 0){
+					//如没指定debugMode，根据客户端变量设置
+					if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+						debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+					if(debugMode){
+						var xml:XML = metadataTemplet.contentXML;
+						xml.debugMode = "true";
+						metadataTemplet.contentXML = xml;
+					}
+				}
+				
+				var modelCode:String = "";
+				var entityCode:String = "";
+				var cubeCode:String = "";
+				
+				var tempXml:XML = metadataTemplet.contentXML;
+				if(tempXml.modelCode.length() > 0 && String(tempXml.modelCode) != ""){
+					modelCode = String(tempXml.modelCode);
+				}
+				if(tempXml.entityCode.length() > 0 && String(tempXml.entityCode) != ""){
+					entityCode = String(tempXml.entityCode);
+				}
+				if(tempXml.cubeCode.length() > 0 && String(tempXml.cubeCode) != ""){
+					cubeCode = String(tempXml.cubeCode);
+				}
+				
+				if(modelCode == ""){
+					Alert.show("modeCode为空!");
+					return;
+				}
+				if(entityCode == ""){
+					Alert.show("entityCode为空!");
+					return;
+				}
+				if(cubeCode == ""){
+					Alert.show("cubeCode为空!");
+					return;
+				}
+				
+				var modelMetadataCode:String = "MT_EM_"+modelCode;
+				
+				var modelMetadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(modelMetadataCode);
+				if(modelMetadataTemplet == null){
+					Alert.show("不存在元数据模板[mtcode="+mtcode+"]");
+					return;
+				}
+				
+				var modelXml:XML = modelMetadataTemplet.contentXML;
+				var entitiy:XML = null;
+				for each(var entityXml:XML in modelXml.entities.entity){
+					var tempEntityCode:String = String(entityXml.@code);
+					if(entityCode == tempEntityCode){
+						entitiy = entityXml;
+						break;
+					}
+				}
+				
+				var cube:XML = null;
+				if(entitiy != null ){
+					for each(var cubeXml:XML in entitiy.cubes.Cube){
+						var tempCubeCode:String =  String(cubeXml.@code);
+						if(cubeCode == tempCubeCode){
+							cube = cubeXml;
+							break;
+						}
+					}
+				}
+				
+				var rowArr:Array = new Array();
+				var measureArr:Array = new Array();
+				
+				if(cube != null ){
+					for each(var dimensionXml:XML in cube.Dimension){
+						var rowName:String = String(dimensionXml.@name);
+						rowArr.push({uniqueName:"["+rowName+"]"});
+					}
+					
+					for each(var measureXml:XML in cube.Measure){
+						var mearsureName:String = String(measureXml.@name);
+						measureArr.push({uniqueName:"[Measures].["+mearsureName+"]"});
+					}
+				}
+
+				
+				var urlArr:Array = endpoint.split("messagebroker");
+				
+				var xmlaUrl:String = String(urlArr[0]);
+				
+				billPivotComponent = new BillPivotComponent();
+				
+				billPivotComponent.mode = GlobalConst.MODE_PIVOTCOMPONENT_MONDRIAN;
+				billPivotComponent.styleSheetName = "styles/cherry.css";
+				billPivotComponent.dataSourceInfo ="Provider=Mondrian;DataSource=MondrianDatasource";
+				billPivotComponent.xmlaUrl = xmlaUrl+"xmla";
+				billPivotComponent.catalog = modelCode;
+				billPivotComponent.cubeName = cubeCode;
+				
+				if(rowArr.length>0 ){
+					billPivotComponent.rows = rowArr;
+				}
+				
+				if(measureArr.length >0 ){
+					billPivotComponent.measures = measureArr;
+				}
+				
+				this.addChild(billPivotComponent);
+				
+				reLoad();
+				
+//				desktop.addEventListener(BasicEvent.OPENMENU_SUCCESSFUL,openMenuSuccessful);
+				
+			}
+			
+			protected function module1_removedFromStageHandler(event:Event):void
+			{
+				if(billPivotComponent != null){
+					billPivotComponent.destroy();
+					billPivotComponent = null;
+				}
+			}
+			
+			public function reLoad():void{
+				if(billPivotComponent != null ){
+					billPivotComponent.refreshData();
+				}
+			}
+			
+		]]>
+	</fx:Script>
+</mx:Module>

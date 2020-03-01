@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="350" height="136" title="提示"
+	 creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.workflow.TaskAssign;
+			
+			[Bindable]
+			public var text:String = "";
+			public var taskAssign:TaskAssign;
+			public var userId:String;
+			
+			public var destinationForWorkflow:String = GlobalConst.SERVICE_WORKFLOW;
+		    public var endpointForWorkflow:String;
+		    private var novaWorkflowService:RemoteObject;
+		    
+		    private function init():void{
+		    	novaWorkflowService = new RemoteObject(destinationForWorkflow);
+		        if(endpointForWorkflow!=null)
+		        	novaWorkflowService.endpoint = endpointForWorkflow;
+		        novaWorkflowService.finishTask.addEventListener(ResultEvent.RESULT,finishTaskHandler);
+		        novaWorkflowService.finishTask.addEventListener(FaultEvent.FAULT,faultHandler);
+		    }
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+			
+			private function finishTaskHandler(event:ResultEvent):void{
+				Alert.show("提交成功");
+				PopUpManager.removePopUp(this);
+				dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+			}
+			
+			private function submit():void{
+				if(taskAssign == null)
+					return;
+				novaWorkflowService.finishTask(taskAssign.id,userId);
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" verticalAlign="middle">
+		<mx:Image source="{AssetsFileLib.alertIcon}" width="50" height="50"/>
+		<mx:Label text="{text}" fontSize="14" fontWeight="bold" fontFamily="Verdana"/>
+	</mx:HBox>
+	<mx:ControlBar horizontalAlign="center">
+		<mx:Button label="提交"  click="submit()"/>
+		<mx:Button label="取消"  click="PopUpManager.removePopUp(this)"/>
+	</mx:ControlBar>
+</mx:TitleWindow>

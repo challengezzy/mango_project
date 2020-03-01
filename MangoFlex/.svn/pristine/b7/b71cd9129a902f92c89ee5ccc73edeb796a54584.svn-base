@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" 
+	width="800" height="450" title="高级检索" close="PopUpManager.removePopUp(this)"
+	 showCloseButton="true" creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.itemcomponent.ItemComboBox;
+			import smartx.flex.components.itemcomponent.ItemDateTimeField;
+			import smartx.flex.components.itemcomponent.ItemNumberField;
+			import smartx.flex.components.itemcomponent.ItemPasswordField;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.itemcomponent.ItemTextAreaField;
+			import smartx.flex.components.itemcomponent.ItemTextField;
+			import smartx.flex.components.itemcomponent.ItemUIComponent;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var debugMode:Boolean = true;
+			[Bindable]
+			public var templetCode:String;
+			public var templetVO:TempletVO;
+			public var destination:String = GlobalConst.SERVICE_FORM;
+		    public var endpoint:String;
+		    private var formService:RemoteObject;
+		    [Bindable]
+			public var confirmFunc:Function = function():void{
+				PopUpManager.removePopUp(this);
+			}
+		    
+		    private var queryFieldControls:Array = [];
+		    
+			public function init():void{
+				if(templetCode == null && templetVO == null)
+		        	throw Error("元原模板编号不能为null");
+	        	formService = new RemoteObject(destination);
+	        	if(endpoint!=null)
+	        		formService.endpoint = endpoint;
+	        	formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+		        formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);	
+				
+				if(templetVO == null){
+					//如果没有对templetVO直接赋值，则当服务器读取
+					formService.getTempletVO(templetCode);
+				}
+				else{
+					initQueryFieldPanel();
+				}
+			}
+			
+			private function getTempletVOHandler(event:ResultEvent):void{
+		        templetVO = event.result as TempletVO;
+		        initQueryFieldPanel();
+		    }
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+		    
+			public function initQueryFieldPanel():void{
+				queryFieldControls = [];
+				for each(var itemVO:TempletItemVO in templetVO.itemVos){
+					if(itemVO.delfaultquerylevel == "2" || itemVO.delfaultquerylevel == "1"){
+						//高级查询
+		       	  		var itemtype:String = itemVO.conditionItemType;
+		       	  		if(itemtype == null)
+		       	  			itemtype = itemVO.itemtype;
+		       	  		if(itemtype == "文本框" || itemtype == "公式"){
+		       	  			var novaTextField:ItemTextField = new ItemTextField(itemVO);
+		       	  			queryFieldControls.push(novaTextField);
+		       	  			queryFieldPanel.addChild(novaTextField);
+		       	  			//novaTextField.addEventListener(FlexEvent.ENTER,keyEnterFunction);
+		       	  		}
+		       	  		else if(itemtype == "数字框"){
+		       	  			var novaNumberField:ItemNumberField = new ItemNumberField(itemVO);
+		       	  			queryFieldControls.push(novaNumberField);
+		       	  			queryFieldPanel.addChild(novaNumberField);
+		       	  			//novaNumberField.addEventListener(FlexEvent.ENTER,keyEnterFunction);
+		       	  		}
+		       	  		else if(itemtype == "密码框"){
+		       	  			var novaField:ItemPasswordField = new ItemPasswordField(itemVO);
+		       	  			queryFieldControls.push(novaField);
+		       	  			queryFieldPanel.addChild(novaField);
+		       	  			//novaField.addEventListener(FlexEvent.ENTER,keyEnterFunction);
+		       	  		}
+		       	  		else if(itemtype == "下拉框"){
+		       	  			var novaComboBox:ItemComboBox = new ItemComboBox(itemVO,true);
+		       	  			queryFieldControls.push(novaComboBox);
+		       	  			queryFieldPanel.addChild(novaComboBox);
+		       	  		}
+		       	  		else if(itemtype == "参照"){
+		       	  			var novaRefPanel:ItemRefPanel = new ItemRefPanel(itemVO,formService.destination,formService.endpoint,true);
+		       	  			queryFieldControls.push(novaRefPanel);
+		       	  			queryFieldPanel.addChild(novaRefPanel);
+		       	  		}
+		       	  		else if(itemtype == "时间"){
+		       	  			var novaDateTimeField:ItemDateTimeField = new ItemDateTimeField(itemVO,true);;
+		       	  			queryFieldControls.push(novaDateTimeField);
+		       	  			queryFieldPanel.addChild(novaDateTimeField);
+		       	  		}
+		       	  		else if(itemtype == "多行文本框"){
+		       	  			var novaTextAreaField:ItemTextAreaField = new ItemTextAreaField(itemVO);;
+		       	  			queryFieldControls.push(novaTextAreaField);
+		       	  			queryFieldPanel.addChild(novaTextAreaField);
+		       	  			//novaTextAreaField.addEventListener(FlexEvent.ENTER,keyEnterFunction);
+		       	  		}
+					}
+				}
+			}
+			
+			public function getQueryCondition():String{
+				var quickQueryCondition:String = " 1=1 ";
+				for each (var control:ItemUIComponent in queryFieldControls){
+		        	quickQueryCondition = quickQueryCondition.concat(control.getQueryConditon());
+		        }
+		        return quickQueryCondition;
+			}
+		]]>
+	</mx:Script>
+	<mx:TabNavigator width="100%" height="100%">
+		<mx:Canvas label="查询" width="100%" height="100%">
+			<mx:VBox width="100%" height="100%">
+				<mx:Tile width="100%" height="100%" id="queryFieldPanel" 
+					verticalAlign="middle" horizontalAlign="left" 
+					paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20">
+					
+				</mx:Tile>
+			</mx:VBox>
+		</mx:Canvas>
+	</mx:TabNavigator>
+	<mx:ControlBar horizontalAlign="center">
+		<mx:Button label="确定" click="confirmFunc()"/>
+		<mx:Button label="取消" click="PopUpManager.removePopUp(this)"/>
+	</mx:ControlBar>	
+</mx:TitleWindow>

@@ -1,0 +1,15 @@
+package smartx.publics.cep.vo;
+
+public class CEPConst {
+	//cep服务参数
+	public static String PARA_JDBC_LISTENPORT = "CEP_JDBC_LISTENPORT";
+	public static String PARA_JDBC_SESSIONIDLETIMEOUT = "CEP_JDBC_SESSIONIDLETIMEOUT";
+	public static String PARA_CEP_PERSISTENT_PROVIDERS = "CEP_PERSISTENT_PROVIDERS";
+	public static String PARA_CEP_ENGINECONFIGURATION_FACTORY = "CEP_ENGINECONFIGURATION_FACTORY";
+	public static String DEFAULTPROVIDERNAME_CEP = "DEFAULTPROVIDERNAME";
+	
+	//流模块状态
+	public static int STATUS_STREAMMODULE_STOP = 0;
+	public static int STATUS_STREAMMODULE_START = 1;
+	public static int STATUS_STREAMMODULE_ERROR = 2;
+}

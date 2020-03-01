@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   verticalScrollPolicy="off"
+		   horizontalScrollPolicy="off"
+		   xmlns:mx="library://ns.adobe.com/flex/mx"  fontSize="12" 
+		   creationComplete="init()" 
+		   xmlns:components="smartx.flex.components.*" xmlns:core="smartx.flex.components.core.*"
+		   preinitialize="preinit()">
+	<fx:Declarations>
+		<mx:HBox width="100%" id="listButtonBox">
+			<mx:PopUpMenuButton label="操作" id="operationButton" dataProvider="{operationList}" openAlways="true"
+								itemClick="operationButton_itemClickHandler(event)" icon="{AssetsFileLib.operationIcon}"/>
+		</mx:HBox>
+		<fx:Object id="insertButton" label="新增" handler="{listPanel.insertRow}"  icon="{AssetsFileLib.insertIcon}" rightClick="true"/>
+		<fx:Object id="deleteButton" label="删除" handler="{listPanel.deleteRow}"  icon="{AssetsFileLib.delete2Icon}" rightClick="true"/>
+		<fx:Object id="saveButton" label="保存" handler="{listPanel.save}"  icon="{AssetsFileLib.saveIcon}" rightClick="true"/>
+		
+		<mx:Button id="saveBtn" label="保存" icon="{AssetsFileLib.saveIcon}" />
+		<mx:Button id="insertBtn" label="新增" icon="{AssetsFileLib.insertIcon}" />
+		<mx:Button id="deleteBtn" label="删除" icon="{AssetsFileLib.delete2Icon}" />
+	</fx:Declarations>
+	<fx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+		import mx.controls.Button;
+		import mx.controls.Menu;
+		import mx.events.MenuEvent;
+		
+		import smartx.flex.components.assets.AssetsFileLib;
+		import smartx.flex.components.styletemplate.ifc.ListButtonListener;
+		import smartx.flex.components.vo.GlobalConst;
+		[Bindable]
+		public var templetCode:String;
+		[Bindable]
+		public var editable:Boolean = true;
+		[Bindable]
+		public var debugMode:Boolean = false;
+		[Bindable]
+		public var destination:String = GlobalConst.SERVICE_FORM;
+		[Bindable]
+		public var endpoint:String;
+		
+		[Bindable]
+		public var initQueryCondition:String;
+		
+		//add by caohenghui 2011/07/05 --start
+		[Bindable]
+		public var bfIncList:String;
+		[Bindable]
+		public var afIncList:String;
+		//add by caohenghui 2011/07/05
+		
+		[Bindable]
+		public var clientBfIncList:String;
+		[Bindable]
+		public var clientAfIncList:String;
+		
+		[Bindable]
+		public var showSystemButton:Boolean = true;
+		[Bindable]
+		public var operationList:ArrayCollection = new ArrayCollection();
+		[Bindable]
+		public var isShowAlert:Boolean = true;
+		[Bindable]
+		public var showDataAfterInit:Boolean = false;
+		[Bindable]
+		public var allowMultipleSelection:Boolean;
+		//显示操作按钮的方式（默认为MENU）
+		public var showOperationButtonType:String;
+		
+		public var beforeInitFun:Function;
+		
+		//add by zhangzz 2012-09-29 begin
+		[Bindable]
+		public var customDefineDataGridColumns:Array = [];//列表自定义列
+		//add by zhangzz 2012-09-29 end
+		
+		public var doubleClickHandler:ListButtonListener;
+		
+		[Bindable]
+		public var pageSize:Number = 40;
+		
+		private function preinit():void{
+			if(showOperationButtonType == null ||showOperationButtonType == "")
+				showOperationButtonType = GlobalConst.STYLETEMPLATE_OPERATION_MENU;
+			//初始化操作按钮
+			if(editable){
+				operationList.addItem(insertButton);
+				operationList.addItem(deleteButton);
+				operationList.addItem(saveButton);
+				
+				insertBtn.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+					listPanel.insertRow();
+				});
+				
+				deleteBtn.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+					listPanel.deleteRow();
+				});
+				
+				saveBtn.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+					listPanel.save();
+				});
+				
+				operationList.addItem(insertBtn);
+				operationList.addItem(deleteBtn);
+				operationList.addItem(saveBtn);
+			}
+		}
+		
+	    private function init():void{
+			
+			if(beforeInitFun != null)
+				beforeInitFun();
+			if(templetCode == null)
+        		throw Error("元原模板编号不能为null");
+			
+			listPanel.topArea.addChild(listButtonBox);
+			
+			if(showSystemButton){
+				if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_BUTTON){
+					if(operationButton && listButtonBox.contains(operationButton) )
+						listButtonBox.removeChild(operationButton);
+					for each(var operation:* in operationList){
+						if(operation is Button)
+							listButtonBox.addChild(operation);
+					}
+				}else if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_MENU){
+					operationList.filterFunction = function (item:*):Boolean{
+						if(item is Button)
+							return false;
+						else
+							return true;
+					}
+					operationList.refresh();
+				}
+				
+				//添加右键菜单
+				if(listPanel.rightClickMenu != null){
+					listPanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler,false,0,true);
+					for each(var obj:* in operationList){
+						if(obj is Button)
+							continue;
+						if(obj.rightClick){
+							//需要添加到右键菜单
+							listPanel.rightClickMenuItems.push(obj);
+						}
+					}
+				}
+			}
+			//没有操作菜单是，去除操作按钮
+			if(operationList.length == 0){
+				if(operationButton && listButtonBox.contains(operationButton) )
+					listButtonBox.removeChild(operationButton);
+			}
+			
+			//设置双击事件
+			if(doubleClickHandler != null){
+				listPanel.addEventListener(MouseEvent.DOUBLE_CLICK,function(event:MouseEvent):void{
+					doubleClickHandler.buttonClick(listPanel);
+				});
+			}
+				
+		}
+		
+		protected function operationButton_itemClickHandler(event:MenuEvent):void
+		{
+			var item:* = event.item;
+			if(item.handler != null)
+				item.handler();
+		}
+	]]>
+	</fx:Script>
+	<mx:VBox verticalScrollPolicy="off" horizontalScrollPolicy="off" width="100%" height="100%" id="listBox">
+	    <core:BillListPanel destination="{destination}" endpoint="{endpoint}" templetCode="{templetCode}" id="listPanel" editable="{editable}" width="100%" height="100%"  showEditBox="false" debugMode="{debugMode}" 
+							afInterceptor="{afIncList}" 
+							bfInterceptor="{bfIncList}"
+							clientBfIncList="{clientBfIncList}"
+							clientAfIncList="{clientAfIncList}"
+							isShowAlert ="{isShowAlert}"
+							rowCountPerPage="{pageSize}"
+							initQueryCondition="{initQueryCondition}"
+							showDataAfterInit ="{showDataAfterInit}"
+							allowMultipleSelection="{allowMultipleSelection}"
+							customDefineDataGridColumns="{customDefineDataGridColumns}"/>
+	</mx:VBox>
+</mx:Canvas>

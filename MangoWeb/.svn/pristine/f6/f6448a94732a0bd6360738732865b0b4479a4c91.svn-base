@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitytab:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:entitytab="smartx.bam.flex.modules.entitymodel.entitytab.*" 
+					   width="100%" height="100%" label="基本信息" creationComplete="init()">
+	<fx:Declarations>
+		<fx:Component id="isDisplayComponent">
+			<mx:HBox width="100%" horizontalAlign="center">
+				<fx:Script>
+					<![CDATA[
+						public function get text():String{
+							return isDisplayChk.selected?"true":"false";
+						}
+						
+						override public function set data(value:Object):void{
+							super.data = value;
+							if(value != null){
+								isDisplayChk.selected = value.@isDisplay=='true'?true:false;
+							}else
+								isDisplayChk.selected = false;
+						}
+						
+						protected function isDisplayChk_changeHandler(event:Event):void{
+							if(isDisplayChk.selected)
+								data.@isDisplay = "true";
+							else
+								data.@isDisplay = "false";
+						}
+						
+					]]>
+				</fx:Script>
+				<mx:CheckBox id="isDisplayChk" selected="{data.@isDisplay=='true'?true:false}" change="isDisplayChk_changeHandler(event)"/>
+			</mx:HBox>
+		</fx:Component>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.GisUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			private var rpc:RemoteObject;
+			
+			private var layerMap:Hashtable = new Hashtable();
+			
+			private function init():void{
+				rpc = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint != null)
+					rpc.endpoint = endpoint;
+				rpc.getAllFeatureType.addEventListener(ResultEvent.RESULT,getAllFeatureTypeHandler);
+				rpc.getAllFeatureType.addEventListener(FaultEvent.FAULT,function (event:FaultEvent):void{
+					SmartXMessage.show("查询所有图层失败图层失败！",SmartXMessage.MESSAGE_ERROR,"错误：\n"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				initData();
+				isCreationComplete = true;
+			}
+			
+			private function initData():void{
+				queryAllLayer();
+				var data:Object;
+				for each(data in sridDp){
+					if(data.data == String(selectedItem.content.@srid)){
+						sridCbo.selectedItem = data;
+						break;
+					}else
+						sridCbo.selectedIndex = -1;
+				}
+			}
+			
+			private function getAllFeatureTypeHandler(event:ResultEvent):void{
+				var tempBasicLayers:XML = selectedItem.content.mapInfo.layers.basicLayers[0].copy();
+				var tempEntityLayers:XML = selectedItem.content.mapInfo.layers.entityLayers[0].copy();
+				delete selectedItem.content.mapInfo.layers.basicLayers.*;
+				delete selectedItem.content.mapInfo.layers.entityLayers.*;
+				layerMap.clear();
+				var result:ArrayCollection = event.result as ArrayCollection;
+				for each(var fetureTypeStr:String in result){
+					var fetureTypeXml:XML = null;
+					try{
+						fetureTypeXml = new XML(fetureTypeStr);
+					}catch(e:Error){
+						throw new Error("解析fetureTypeXml错误！");
+					}
+					
+					var layerName:String = String(fetureTypeXml.featureType.name);
+					var title:String = String(fetureTypeXml.featureType.title);
+					//如果是实体图层则判断该图层是否属于当前领域实体模型中
+					if(!GisUtil.layerIsBelongEntityModel(layerName,contentXml.entityModelCode))
+						continue;
+					//判断元数据中是否已经存在该图层
+					if(tempEntityLayers.layer.(@name==layerName).length() > 0)
+						selectedItem.content.mapInfo.layers.entityLayers[0].appendChild(tempEntityLayers.layer.(@name==layerName)[0]);
+					else if(tempBasicLayers.layer.(@name==layerName).length() > 0)
+						selectedItem.content.mapInfo.layers.basicLayers[0].appendChild(tempBasicLayers.layer.(@name==layerName)[0]);
+					else{
+						//判断是实体图层还是基础图层
+						if(StringUtil.beginsWith(layerName,BAMConst.ENTITYGIS_TABLENAME_PREFIX.toLowerCase())){
+							selectedItem.content.mapInfo.layers.entityLayers[0].appendChild(<layer name={layerName} title={title} isDisplay='true' />);
+						}else
+							selectedItem.content.mapInfo.layers.basicLayers[0].appendChild(<layer name={layerName} title={title} isDisplay='true' />);
+					}
+				}
+				dataGridRefresh();
+				OperatingTipUtil.endOperat();
+			}
+			
+			public function showHandler():void{
+				if(isCreationComplete)
+					initData();
+			}
+			
+			protected function appName_changeHandler(event:Event):void{
+				selectedItem.content.@name = appName.text;
+			}
+			
+			protected function centerPointTxt_changeHandler(event:Event):void{
+				selectedItem.content.mapInfo.centerPoint = centerPointTxt.text;
+			}
+			
+			private function dataGridRefresh():void{
+				basicLayerDg.dataProvider = selectedItem.content.mapInfo.layers.basicLayers.layer;
+				entityLayerDg.dataProvider = selectedItem.content.mapInfo.layers.entityLayers.layer;
+			}
+			
+			private function queryAllLayer():void{
+				OperatingTipUtil.startOperat("查询图层中...",this);
+				rpc.getAllFeatureType(String(contentXml.geoServer.@url),String(contentXml.geoServer.@user)
+					,String(contentXml.geoServer.@pwd),String(contentXml.geoServer.store));
+			}
+			
+			protected function zoomTxt_changeHandler(event:Event):void{
+				selectedItem.content.mapInfo.zoom = zoomTxt.text;
+			}
+			
+			private function sridCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.@srid = sridCbo.selectedItem.data;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" 
+			 paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%">
+			<mx:Label text="名称" width="10%" />
+			<mx:TextInput id="appName" width="40%" text="{selectedItem.content.@name}" change="appName_changeHandler(event)"/>
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="编码" width="10%" />
+			<mx:TextInput id="appCode" width="40%" text="{selectedItem.content.@code}" editable="false"/>
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="参考坐标系" width="10%" />
+			<mx:ComboBox id="sridCbo" labelField="name" 
+						 dataProvider="{sridDp}" change="sridCbo_changeHandler(event)"/>
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="中心点坐标" width="10%" />
+			<mx:TextInput id="centerPointTxt" width="40%" change="centerPointTxt_changeHandler(event)" 
+						  toolTip="122.363,40.8" text="{selectedItem.content.mapInfo.centerPoint}"/>
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="缩放比" width="10%" />
+			<mx:TextInput id="zoomTxt" width="40%" change="zoomTxt_changeHandler(event)" 
+						  restrict="0-9" text="{selectedItem.content.mapInfo.zoom}"/>
+		</mx:HBox>
+		<mx:HBox width="100%" height="100%">
+			<mx:VBox width="50%" height="100%" paddingBottom="5" paddingLeft="5" 
+					 paddingRight="5" paddingTop="5">
+				<mx:Label text="基本图层" />
+				<mx:DataGrid id="basicLayerDg" width="100%" height="100%" dataProvider="{selectedItem.content.mapInfo.layers.basicLayers.layer}">
+					<mx:columns>
+						<mx:DataGridColumn headerText="图层名称" dataField="@name" />
+						<mx:DataGridColumn headerText="图层标题" dataField="@title" />
+						<mx:DataGridColumn headerText="是否显示" dataField="@isDisplay" itemRenderer="{isDisplayComponent}"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+			<mx:VBox width="50%" height="100%" 	paddingBottom="5" paddingLeft="5" 
+					 paddingRight="5" paddingTop="5">
+				<mx:Label text="实体图层" />
+				<mx:DataGrid id="entityLayerDg" width="100%" height="100%" dataProvider="{selectedItem.content.mapInfo.layers.entityLayers.layer}">
+					<mx:columns>
+						<mx:DataGridColumn headerText="图层名称" dataField="@name" />
+						<mx:DataGridColumn headerText="图层标题" dataField="@title" />
+						<mx:DataGridColumn headerText="是否显示" dataField="@isDisplay" itemRenderer="{isDisplayComponent}"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+		</mx:HBox>
+	</mx:VBox>
+</entitytab:AbstractTab>

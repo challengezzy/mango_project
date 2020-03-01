@@ -1,0 +1,1169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" fontSize="12" xmlns:viewing="org.alivepdf.viewing.*" xmlns:code="flexlib.containers.*"  creationComplete="init()" xmlns:workflow="smartx.flex.components.core.workflow.*" xmlns:ns1="flexlib.controls.*" xmlns:flowui="smartx.flex.components.util.flowui.*">
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			import com.hurlant.eval.ast.Void;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Image;
+			import mx.core.Container;
+			import mx.core.DragSource;
+			import mx.core.IUIComponent;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.workflow.ActivityTemplate;
+			import smartx.flex.components.core.workflow.AddActivityExtPropertyWindow;
+			import smartx.flex.components.core.workflow.CreateTaskAssignRuleWindow;
+			import smartx.flex.components.core.workflow.StartActivityTemplate;
+			import smartx.flex.components.core.workflow.TaskAssignRuleTmptMgmtWindow;
+			import smartx.flex.components.core.workflow.Utils;
+			import smartx.flex.components.core.workflow.WorkflowDebugWindow;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.flowui.ArrowLine;
+			import smartx.flex.components.util.flowui.FlowIcon;
+			import smartx.flex.components.util.flowui.IconEvent;
+			import smartx.flex.components.util.flowui.RectBorder;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.workflow.Process;
+			import smartx.flex.components.vo.workflow.TaskAssignRule;
+			
+			public var destinationForWorkflow:String = GlobalConst.SERVICE_WORKFLOW;
+		    public var endpointForWorkflow:String;
+		    private var novaWorkflowService:RemoteObject;
+		    public var destination:String = GlobalConst.SERVICE_FORM;
+		    public var endpoint:String;
+			private var formService:RemoteObject;
+			public var datasource:String;
+			
+			private var currentProcess:Process;
+			
+			private var currentXML:XML;
+			
+			private var startLineDrag:Boolean = false;
+			
+			private var sourceIcon:FlowIcon; 
+			
+			private var tempLine:ArrowLine; 
+			
+			[Bindable]
+			private var _editMode:int = EDITMODE_NONE;
+			
+			[Bindable]
+			private var designGraphMode:int = DESIGNGRAPHMODE_SELECT;
+			
+			private static const EDITMODE_NONE:int = 0;
+			private static const EDITMODE_NEW:int = 1;
+			private static const EDITMODE_MODIFY:int = 2;
+			
+			private static const DESIGNGRAPHMODE_SELECT:int = 0;
+			private static const DESIGNGRAPHMODE_LINE:int = 1;
+			
+			private static const CODE_STARTACTIVITY:String = "START";
+			private static const CODE_ENDACTIVITY:String = "END";
+			
+			private var activityIconMap:Object = new Object();//维护环节与环节图标的映射关系
+			private var transitionLineMap:Object = new Object();//维护环节与环节图标的映射关系
+			
+			[Bindable]
+			private static var startIcon:Class = AssetsFileLib.workflow6Icon;
+			
+			[Bindable]
+			private static var endIcon:Class = AssetsFileLib.workflow2Icon;	
+			
+			[Bindable]
+			private static var normalIcon:Class = AssetsFileLib.workflow14Icon;					
+			
+			[Bindable]
+            private var performModeColleciton:ArrayCollection = new ArrayCollection(
+                [ {label:"自动", data:"Automatic"}, 
+                  {label:"手动", data:"Manual"}
+                ]);
+                
+            [Bindable]
+            private var splitTypeColleciton:ArrayCollection = new ArrayCollection(
+                [ {label:"与模式", data:"AND"}, 
+                ]);
+            
+            [Bindable]
+            private var joinTypeColleciton:ArrayCollection = new ArrayCollection(
+                [ {label:"与模式", data:"AND"}, 
+                  {label:"异或模式", data:"XOR"}, 
+                  {label:"条件模式", data:"CONDITIONAL"}
+                ]);
+
+			public var extendActivityTemplates:Array = new Array(0);
+			
+			[Bindable]
+			private var taskAssignRulesDataProvider:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var taskAssignRuleTemplateList:ArrayCollection = new ArrayCollection();
+			
+			private var currentActivityCode:String;//正在编辑的环节
+			
+			private var isSaved:Boolean = false;//暂时不设为true
+			
+			private var isSaveAndClose:Boolean = false;
+			
+			private var loadingWindow:LoadingWindow = new LoadingWindow();
+			
+    		private static const ID_ADVANCEDMENU_TASKASSIGNRULETMPT:int = 1;
+			private static const ID_ADVANCEDMENU_DEBUG:int = 2;
+			
+			[Bindable]
+			public static var tmptIcon:Class = AssetsFileLib.templateIcon;
+			
+			[Bindable]
+			public static var debugIcon:Class = AssetsFileLib.debugIcon;
+			
+			[Bindable]
+			private var advancedButtonDataProvider:ArrayCollection = new ArrayCollection(
+				[
+					{name:"派发规则模板管理",icon:tmptIcon,id:ID_ADVANCEDMENU_TASKASSIGNRULETMPT},
+					{name:"流程调试",icon:debugIcon,id:ID_ADVANCEDMENU_DEBUG},
+				]
+			);
+			
+			[Bindable]
+			private var extPropertiesDataProvider:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				novaWorkflowService = new RemoteObject(destinationForWorkflow);
+		        if(endpointForWorkflow!=null)
+		        	novaWorkflowService.endpoint = endpointForWorkflow;
+		        novaWorkflowService.getProcess.addEventListener(ResultEvent.RESULT,getProcessHandler);
+		        novaWorkflowService.getProcess.addEventListener(FaultEvent.FAULT,faultHandler);
+		        novaWorkflowService.getTaskAssignRuleTemplateList.addEventListener(ResultEvent.RESULT,getTaskAssignRuleTemplateListHandler);
+		        novaWorkflowService.getTaskAssignRuleTemplateList.addEventListener(FaultEvent.FAULT,faultHandler);
+		        novaWorkflowService.saveProcess.addEventListener(ResultEvent.RESULT,saveProcessHandler);
+		        novaWorkflowService.saveProcess.addEventListener(FaultEvent.FAULT,faultHandler);
+		        novaWorkflowService.newProcessInstance.addEventListener(ResultEvent.RESULT,newProcessHandler);
+		        novaWorkflowService.newProcessInstance.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        
+		        formService = new RemoteObject(destination);
+		        if(endpoint!=null)
+		        	formService.endpoint = endpoint;
+
+		        for each(var activityTemplate:ActivityTemplate in extendActivityTemplates){
+		        	var vbox:VBox = new VBox();
+		        	vbox.percentWidth = 90;
+		        	vbox.setStyle("borderStyle","solid");
+		        	vbox.setStyle("horizontalAlign","center");
+		        	vbox.addChild(activityTemplate);
+		        	extendActivityBox.addChild(vbox);
+		        }
+		        //读取派发规则模板
+		        novaWorkflowService.getTaskAssignRuleTemplateList();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+		    
+
+			
+			private function getProcessHandler(event:ResultEvent):void{
+				currentProcess = event.result as Process;
+				if(currentProcess != null){
+					clearGraph();
+					currentXML = Utils.processToXML(currentProcess);
+					
+					editMode = EDITMODE_MODIFY;
+					refreshAll();
+					showProcessProperties();
+				}	
+			}
+			
+			private function saveProcessHandler(event:ResultEvent):void{
+				var processid:Number = event.result as Number;
+				Alert.show("流程保存成功!");
+				
+				if(isSaveAndClose){
+					justCloseProcess();
+					isSaveAndClose = false;
+				}
+				else{
+					novaWorkflowService.getProcess(processid);
+				}
+			}
+			
+			private function getTaskAssignRuleTemplateListHandler(event:ResultEvent):void{
+				taskAssignRuleTemplateList = event.result as ArrayCollection;
+			}
+			
+			//重画流程图，更新xml
+			private function refreshAll():void{
+				//clearGraph();
+				refreshXML();
+				drawGraph();
+			}
+			
+			private function clearAll():void{
+				clearGraph();
+				xmlEditor.text = null;
+				currentActivityCode = null;
+			}
+			
+			private function clearAndrefreshAll():void{
+				clearAll();
+				refreshAll();
+			}
+			
+			
+			private function refreshXML():void{
+				if(currentXML != null){
+					xmlEditor.text = currentXML.toXMLString();
+				}
+			}
+			
+			private function applyXML():void{
+				if(editMode != EDITMODE_NONE){
+					try{
+						currentXML = new XML(xmlEditor.text);
+					}
+					catch(e:Error) { 
+						Alert.show("源代码解析失败，无法应用! "+e);
+						return;
+					}
+					clearAndrefreshAll();
+					Alert.show("应用成功！");
+				}
+			}
+			
+			private function openProcess():void{
+				if(editMode != EDITMODE_NONE){
+					Alert.show("请先关闭你正在编辑的流程!");
+					return;
+				}
+				var dialog:RefDialog = new RefDialog();
+				dialog.init2(formService,"select id id#,code 编码,name 名称 from pub_wf_process",datasource);
+				dialog.title = "打开流程";
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						novaWorkflowService.getProcess(dialog.refPK);
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+			}
+			
+			private function newProcess():void{
+				if(editMode != EDITMODE_NONE){
+					Alert.show("请先关闭你正在编辑的流程!");
+					return;
+				}
+				currentXML = 
+				<process>
+					<activities/>
+					<transitions/>
+				</process>;
+				currentXML.@code = Utils.getNextProcessCode();
+				currentXML.@name = "新建流程";
+				clearAndrefreshAll();
+				editMode = EDITMODE_NEW;
+				showProcessProperties();
+			}
+			
+			private function closeProcess():void{
+				if(editMode != EDITMODE_NONE){
+					if(isSaved){
+						justCloseProcess();
+						return;
+					}
+					Alert.yesLabel = "是";
+					Alert.noLabel = "否";
+					Alert.cancelLabel = "取消";
+					Alert.show("是否保存现有的修改？","提示",Alert.YES | Alert.NO | Alert.CANCEL,this,function(event:CloseEvent):void{
+						if(event.detail == Alert.YES){
+							saveProcess(true);				
+						}
+						else if(event.detail == Alert.NO){
+							justCloseProcess();
+						}
+						else
+							return;
+					});
+					
+				}
+			}
+			
+			private function justCloseProcess():void{
+				currentXML = null;
+				currentProcess = null;
+				clearAll();
+				editMode = EDITMODE_NONE;
+			}
+			
+			private function saveProcess(saveAndClose:Boolean = false):void{
+				if(editMode != EDITMODE_NONE){
+					//先判断一下有没有哦开始，结束环节
+					if(!hasStartActivity()){
+						Alert.show("必须包含一个开始环节");
+						return;
+					}
+					if(!hasEndActivity()){
+						Alert.show("必须包含一个结束环节");
+						return;
+					}
+					isSaveAndClose = saveAndClose;
+					novaWorkflowService.saveProcess(currentXML);
+				}
+			}
+			
+			private function importProcess():void{
+				Alert.show("暂不支持本地文件操作，请使用剪切板导入XML流程定义");
+			}
+			
+			private function exportProcess():void{
+				Alert.show("暂不支持本地文件操作，请使用剪切板导出XML流程定义");
+			}
+			
+			private function mouseDownHandler(event:MouseEvent):void{ 
+			   if(editMode != EDITMODE_NONE){
+		           var dragInitiator:UIComponent=UIComponent(event.currentTarget);
+		
+		           var ds:DragSource = new DragSource();
+		
+		           ds.addData(dragInitiator, "node");
+		           DragManager.showFeedback(DragManager.COPY);
+		           DragManager.doDrag(dragInitiator, ds, event);
+			   }
+       		}
+
+	       private function dragEnterHandler(event:DragEvent):void {
+	       	 if(editMode != EDITMODE_NONE){
+		           if (event.dragSource.hasFormat("node"))
+		           {
+		              DragManager.acceptDragDrop(IUIComponent(event.currentTarget));
+		           }
+	         }
+	       }
+
+       
+
+	       private function dragDropHandler(event:DragEvent):void {
+				if(editMode != EDITMODE_NONE){
+		           var dragObject:ActivityTemplate = ActivityTemplate(event.dragInitiator);
+		           var newCode:String = Utils.getNextActivityCode(currentXML);
+		           if(dragObject is StartActivityTemplate){
+		           		//是开始节点
+		           		if(hasStartActivity()){
+		           			Alert.show("只能有一个开始环节");
+		           			return;
+		           		}
+		           		newCode = CODE_STARTACTIVITY;
+		           }
+		           if(dragObject is EndActivityTemplate){
+		           		//是结束节点
+		           		if(hasEndActivity()){
+		           			Alert.show("只能有一个结束环节");
+		           			return;
+		           		}
+		           		newCode = CODE_ENDACTIVITY;
+		           }
+		           var aXml:XML = dragObject.templateXML.copy();
+		           aXml.code = newCode;
+		           aXml.x = Container(event.currentTarget).mouseX;
+		           aXml.y = Container(event.currentTarget).mouseY;
+		     	   currentXML.activities.appendChild(aXml);
+				   refreshAll();
+	   			}	
+
+	   		}
+	   		
+	   		private function hasStartActivity():Boolean{
+	   			if(currentXML != null){
+	   				for each(var a:XML in currentXML.activities.activity){
+	   					if(a.code == CODE_STARTACTIVITY)
+	   						return true;
+	   				}
+	   			}
+	   			return false;
+	   		}
+	   		
+	   		private function hasEndActivity():Boolean{
+	   			if(currentXML != null){
+	   				for each(var a:XML in currentXML.activities.activity){
+	   					if(a.code == CODE_ENDACTIVITY)
+	   						return true;
+	   				}
+	   			}
+	   			return false;
+	   		}
+	   	
+	   		private function mainGraphMouseDownHandler(event:MouseEvent):void{
+	   			//如果用户点击的是画布,而不是按钮冒泡过来的事件
+				if((event.target is CrossCanvas)){
+					clearBorders(); //删除所有图标的边框
+					showProcessProperties();
+					changeDesignGraphMode(DESIGNGRAPHMODE_SELECT);
+				}
+				else if(event.target is FlowIcon){
+					if(designGraphMode == DESIGNGRAPHMODE_LINE && !startLineDrag){
+						//开始了一次新的转移添加动作
+						sourceIcon = FlowIcon(event.target);
+						clearBorders();
+						sourceIcon.selected = true;
+						startLineDrag = true;
+						var point:Point = new Point(sourceIcon.x+sourceIcon.width/2,sourceIcon.y+sourceIcon.height/2);
+						tempLine = new ArrowLine("temp",point,point,"",0x0000FF);
+						mainGraph.addChild(tempLine);
+					}
+				}
+	   		}
+	   		
+	   		private function mainGraphMouseMoveHandler(event:MouseEvent):void{
+	   			if(designGraphMode == DESIGNGRAPHMODE_LINE && startLineDrag){
+	   				var point:Point;
+	   				if(event.target is CrossCanvas){
+	   					point = new Point(event.localX,event.localY);
+	   				}
+	   				else if(event.target is FlowIcon){
+	   					var icon:FlowIcon = FlowIcon(event.target);
+	   					clearBorders();
+	   					sourceIcon.selected =true;
+	   					icon.selected = true;
+	   					point = new Point(icon.x+icon.width/2,icon.y+icon.height/2);
+	   				}
+	   				else if(event.target is UIComponent){
+	   					var uic:UIComponent = UIComponent(event.target);
+	   					point = new Point(uic.x+event.localX,uic.y+event.localY);
+	   				}
+	   				else
+	   					return;
+	   				tempLine.toPoint = point;
+	   			}
+	   		}
+	   		
+	   		private function mainGraphMouseUpHandler(event:MouseEvent):void{
+	   			if(designGraphMode == DESIGNGRAPHMODE_LINE && startLineDrag){
+	   				clearBorders();
+	   				if(tempLine != null)
+	   					mainGraph.removeChild(tempLine);
+	   				startLineDrag = false;
+	   				if(event.target is FlowIcon){
+	   					var targetIcon:FlowIcon = FlowIcon(event.target);
+	   					var fromCode:String = sourceIcon.identity;
+	   					var toCode:String = targetIcon.identity;
+	   					if(!Utils.transitionExists(currentXML,fromCode,toCode)){
+	   						var newCode:String = Utils.getNextTransitionCode(currentXML);
+	   						var newTransitionXml:XML = 
+	   						<transition>
+	   					      <code></code> 
+  							  <wfname></wfname> 
+							  <uiname></uiname> 
+							  <fromActivityCode></fromActivityCode> 
+							  <toActivityCode></toActivityCode> 
+							  <condition/> 
+	   						</transition>;
+	   						newTransitionXml.code = newCode;
+	   						newTransitionXml.wfname = newCode;
+	   						newTransitionXml.uiname = newCode;
+	   						newTransitionXml.fromActivityCode = fromCode;
+	   						newTransitionXml.toActivityCode = toCode;
+	   						currentXML.transitions.appendChild(newTransitionXml);
+	   						refreshAll();
+	   					}
+	   				}
+	   			}
+	   		}
+	   		//清除所有图标的边框
+			private function clearBorders(): void{
+				for(var i: int = 0; i < mainGraph.numChildren; i ++){
+					if(mainGraph.getChildAt(i) is FlowIcon){
+						//找到当前的图标
+						var currentIcon: FlowIcon = FlowIcon(mainGraph.getChildAt(i));
+						currentIcon.selected = false;
+					}
+					if(mainGraph.getChildAt(i) is ArrowLine){
+						var currentLine:ArrowLine = ArrowLine(mainGraph.getChildAt(i));
+						currentLine.selected = false;
+					}
+				}
+			}
+			
+			private function lineClick(event:MouseEvent):void{
+				if(designGraphMode != DESIGNGRAPHMODE_SELECT)
+					return;
+				var line:ArrowLine = ArrowLine(event.currentTarget);
+				glow1.target = line;
+				glow1.end();
+				glow1.play();
+				clearBorders(); //删除所有图标的边框
+				line.selected = true;
+				showTransitionProperties(line.identity);
+			}
+		
+	   		//当单击流程图画布上的图标时,呈选中状态,并出现发光效果.
+			internal function onIconMouseDown(event: IconEvent): void{	
+				var img: FlowIcon = FlowIcon(event.icon);
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){
+					//添加选中效果(发光)
+					glow1.target = img;//将效果指定到图标上(编程时不是为图标设置效果)
+					glow1.end();
+					glow1.play();
+					
+					clearBorders(); //删除所有图标的边框
+					
+					img.selected=true;
+					showActivityProperties(img.identity);
+					
+					//实施拖动
+					img.startDrag();
+				}
+			}
+			
+			/**
+			 * 拖动图标时重画与该图标相关的线条
+			 */
+			internal function onIconMove(event: IconEvent): void{
+				var img: FlowIcon = FlowIcon(event.icon);
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){			
+					//移动环节的新坐标更新到xml
+					for each(var a:XML in currentXML.activities.activity){
+						if(a.code == img.identity){
+							a.x = img.x;
+							a.y = img.y;
+							break;
+						}
+					}
+					refreshAll();
+				}
+			}
+			
+			internal function onIconMouseUp(event: IconEvent): void{
+				var img: FlowIcon = FlowIcon(event.icon);
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){
+					glow2.target = img;
+					glow2.end();
+					glow2.play();	
+					//停止拖动
+					img.stopDrag();
+					
+					//移动环节的新坐标更新到xml
+					for each(var a:XML in currentXML.activities.activity){
+						if(a.code == img.identity){
+							a.x = img.x;
+							a.y = img.y;
+							break;
+						}
+					}
+					refreshAll();
+				}
+			}
+			
+			private function clearGraph():void{
+				mainGraph.removeAllChildren();
+				xmlEditor.text=null;
+				activityIconMap = new Object();
+				transitionLineMap = new Object();
+			}
+
+			private function drawGraph():void{
+				if(currentXML != null){
+					//先画环节
+					for each(var activityXML:XML in currentXML.activities.activity){
+						var code:String = activityXML.code;
+						if(code == null || code == ""){
+							Alert.show("必须指定环节编码！");
+							return;
+						}
+						if(activityIconMap[code] == null){
+							//还没画过
+							var uiname:String = activityXML.uiname;
+							var icon:FlowIcon;
+							if(code == CODE_STARTACTIVITY)
+								icon = new FlowIcon(startIcon,40,40,code,uiname);
+							else if(code == CODE_ENDACTIVITY)
+								icon = new FlowIcon(endIcon,40,40,code,uiname);
+							else
+								icon = new FlowIcon(normalIcon,40,40,code,uiname);
+							icon.x = activityXML.x;
+							icon.y = activityXML.y;
+							icon.addEventListener(IconEvent.ICON_MOUSE_DOWN, onIconMouseDown);
+			   				icon.addEventListener(IconEvent.ICON_MOUSE_UP, onIconMouseUp);
+			   				icon.addEventListener(IconEvent.ICON_MOVE, onIconMove);
+							mainGraph.addChild(icon);
+							mainGraph.validateDisplayList();
+							activityIconMap[code] = icon;
+						}
+						else{
+							var icon2:FlowIcon = activityIconMap[code];
+							icon2.label = activityXML.uiname;
+							icon2.x = activityXML.x;
+							icon2.y = activityXML.y;
+							mainGraph.validateDisplayList();						
+						}
+					}
+					//再画连线
+					for each(var transitionXML:XML in currentXML.transitions.transition){
+						var transitionCode:String = transitionXML.code;
+						if(transitionCode == null || transitionCode == ""){
+							Alert.show("必须指定转移编码！");
+							return;
+						}
+						var fromActivityCode:String = transitionXML.fromActivityCode;
+						var toActivityCode:String = transitionXML.toActivityCode;
+						var fromActivityIcon:FlowIcon = activityIconMap[fromActivityCode];
+						var toActivityIcon:FlowIcon = activityIconMap[toActivityCode];
+						if(fromActivityIcon == null){
+							Alert.show("转移["+transitionCode+"]的来源环节["+fromActivityCode+"]不存在");
+							return;
+						}
+						
+						if(toActivityIcon == null){
+							Alert.show("转移["+transitionCode+"]的来源环节["+toActivityCode+"]不存在");
+							return;
+						}
+						var points:Array = Utils.getArrowLineAxis(fromActivityIcon,toActivityIcon);
+						
+						if(transitionLineMap[transitionCode] == null){
+							//还没画过
+							//var uiname:String = transitionXML.uiname;
+							
+							var line:ArrowLine = new ArrowLine(transitionCode,
+								points[0],
+								points[1],
+								transitionXML.uiname
+							);
+							line.addEventListener(MouseEvent.CLICK,lineClick);
+							transitionLineMap[transitionCode] = line;
+							mainGraph.addChild(line);
+							mainGraph.validateDisplayList();
+						}
+						else{
+							var line2:ArrowLine = transitionLineMap[transitionCode];
+							line2.fromPoint = points[0];
+							line2.toPoint = points[1];
+							line2.label = transitionXML.uiname;
+							mainGraph.validateDisplayList();
+						}
+					}
+				}
+			}
+			
+			
+			private function showProcessProperties():void{
+				propertiesViewStack.selectedChild = processProperties;//显示流程属性
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					processCodeInput.text = currentXML.@code;
+					processNameInput.text = currentXML.@name;
+				}
+			}
+			
+			private function showActivityProperties(activityCode:String):void{
+				propertiesViewStack.selectedChild = activityProperties;//显示环节属性
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					for each(var a:XML in currentXML.activities.activity){
+						if(a.code == activityCode){
+							//找到了这个环节
+							activityCodeInput.text = a.code;
+							activityWfNameInput.text = a.wfname;
+							activityUiNameInput.text = a.uiname;
+							activityBeforeInterceptorClassNameInput.text = a.beforeInterceptorClassName;
+							activityAfterInterceptorClassNameInput.text = a.afterInterceptorClassName;
+							for each(var temp:Object in performModeColleciton){
+								if(temp.data == a.performMode){
+									activityPerformModeInput.selectedItem = temp;
+									break;
+								}
+							}
+							
+							for each(var temp2:Object in splitTypeColleciton){
+								if(temp2.data == a.splitType){
+									activitySplitTypeInput.selectedItem = temp2;
+									break;
+								}
+							}
+							
+							for each(var temp3:Object in joinTypeColleciton){
+								if(temp3.data == a.joinType){
+									activityJoinTypeInput.selectedItem = temp3;
+									break;
+								}
+							}
+							
+							activityJoinConditionInput.text = a.joinCondition;
+							activityDescriptionInput.text = a.description;
+							
+							//扩展属性
+							extPropertiesDataProvider = new ArrayCollection();
+							for each(var extp:XML in a.property){
+								var extProObj:Object = new Object();
+								extProObj.key = extp.@key;
+								extProObj.value = extp.@value;
+								extPropertiesDataProvider.addItem(extProObj);
+							}
+							extPropertiesDataGrid.dataProvider = extPropertiesDataProvider;
+							
+							//派发规则
+							taskAssignRulesDataProvider = new ArrayCollection();
+							for each(var tar:XML in a.taskAssignRules.taskAssignRule){
+								var taskAssignRule:Object = new Object();
+								taskAssignRule.templateName = tar.@templateName;
+								taskAssignRule.objectId = tar.taskAssignObject.@id;
+								taskAssignRule.objectName = tar.taskAssignObject.@name;//暂时显示派发对象id，后续再根据id到数据库取对象名称
+								taskAssignRule.executorClass = tar.executorClassName;
+								taskAssignRulesDataProvider.addItem(taskAssignRule);
+								
+							}
+							tarDataGrid.dataProvider = taskAssignRulesDataProvider;
+							
+							currentActivityCode = activityCode;
+							break;
+						}
+					}
+				}
+			}
+			
+			
+			
+			private function showTransitionProperties(transitionCode:String):void{
+				propertiesViewStack.selectedChild = transitionProperties;//显示环节属性
+				if(transitionCode != null && editMode != EDITMODE_NONE && currentXML != null){
+					for each(var t:XML in currentXML.transitions.transition){
+						if(t.code == transitionCode){
+							transitionCodeInput.text = t.code;
+							transitionNameInput.text = t.wfname;
+							transitionUiNameInput.text = t.uiname;
+							transitionConditionInput.text = t.condition;
+							break;
+						}
+					}
+				}
+			}
+			
+			private function saveProcessProperties():void{
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					currentXML.@code = processCodeInput.text;
+					currentXML.@name = processNameInput.text;
+					refreshAll();
+				}
+			}
+			
+			
+			private function saveTransitionProperties(transitionCode:String):void{
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					for each(var t:XML in currentXML.transitions.transition){
+						if(t.code == transitionCode){
+							t.wfname = transitionNameInput.text;
+							t.uiname = transitionUiNameInput.text;
+							t.condition = transitionConditionInput.text;
+							refreshAll();
+							break;
+						}
+					}	
+				}
+			}
+						
+			private function saveActivityProperties(activityCode:String):void{
+				if(activityCode != null && editMode != EDITMODE_NONE && currentXML != null){
+					for each(var a:XML in currentXML.activities.activity){
+						if(a.code == activityCode){
+							//找到了这个环节
+							//a.code = activityCodeInput.text;
+							a.wfname = activityWfNameInput.text;
+							a.uiname = activityUiNameInput.text;
+							a.beforeInterceptorClassName = activityBeforeInterceptorClassNameInput.text;
+							a.afterInterceptorClassName = activityAfterInterceptorClassNameInput.text;
+							a.performMode = activityPerformModeInput.selectedItem.data;
+							a.splitType = activitySplitTypeInput.selectedItem.data;
+							a.joinType = activityJoinTypeInput.selectedItem.data;
+							a.joinCondition = activityJoinConditionInput.text;
+							a.description = activityDescriptionInput.text;
+							refreshAll();
+							break;
+						}
+					}
+				}
+			}
+			
+			private function deleteItems():void{
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){
+					if(editMode != EDITMODE_NONE && currentXML != null){
+						for(var i: int = 0; i < mainGraph.numChildren; i ++){
+							if(mainGraph.getChildAt(i) is ArrowLine){
+								var currentLine:ArrowLine = ArrowLine(mainGraph.getChildAt(i));
+								if(currentLine.selected){
+									//删除线条
+									for each(var t:XML in currentXML.transitions.transition){
+										if(t.code == currentLine.identity){
+											Utils.xmlDeleteNode(t);
+											break;
+										}
+									}
+								}
+							}
+							if(mainGraph.getChildAt(i) is FlowIcon){
+								//找到当前的图标
+								var currentIcon: FlowIcon = FlowIcon(mainGraph.getChildAt(i));
+								if(currentIcon.selected){
+									//删除图标
+									for each(var a:XML in currentXML.activities.activity){
+										if(a.code == currentIcon.identity){
+											Utils.xmlDeleteNode(a);
+											//删除图标的同时还要删除该环节相关联的转移
+											for each(var t2:XML in currentXML.transitions.transition){
+												if(t2.fromActivityCode == currentIcon.identity
+													|| t2.toActivityCode == currentIcon.identity)
+													Utils.xmlDeleteNode(t2);
+											}
+											break;
+										}
+									}
+								}
+							}
+							
+						}
+						clearAndrefreshAll();
+					}
+				}
+			}
+			
+			private function changeDesignGraphMode(graphMode:int):void{
+				switch(graphMode){
+					case DESIGNGRAPHMODE_SELECT:
+						selectModeButton.selected = true;
+						lineModeButton.selected = false;
+						designGraphMode = DESIGNGRAPHMODE_SELECT;
+						break;
+					case DESIGNGRAPHMODE_LINE:
+						lineModeButton.selected = true;
+						selectModeButton.selected = false;
+						designGraphMode = DESIGNGRAPHMODE_LINE;
+						clearBorders();
+						break;
+				}
+			}
+			
+			private function showCreateTaskAssignRuleWindow():void{
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					var window:CreateTaskAssignRuleWindow = new CreateTaskAssignRuleWindow();
+					window.taskAssignRuleTemplateList = taskAssignRuleTemplateList;
+					window.destination = destination;
+					window.endpoint = endpoint;
+					window.datasource = datasource;
+					window.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+						if(window.closeByConfirm){
+							//用户确定添加派发规则
+							var tarXML:XML =
+							<taskAssignRule>
+								<taskAssignObject/>						
+							</taskAssignRule>;
+							tarXML.@executorClassName = window.executorClass;
+							tarXML.taskAssignObject.@id = window.taskAssignObjectID;
+							tarXML.taskAssignObject.@name = window.taskAssignObjectName;
+							tarXML.@templateName = window.taskAssignRuleTemplateName;
+							for each(var a:XML in currentXML.activities.activity){
+								if(a.code == currentActivityCode){
+									//找到了当前环节
+									a.taskAssignRules.appendChild(tarXML);
+									refreshAll();
+									showActivityProperties(currentActivityCode);
+									break;
+								}
+							}
+						}
+					});
+					PopUpManager.addPopUp(window,this,true);
+					PopUpManager.centerPopUp(window);
+				}
+			}
+			
+			private function deleteTaskAssignRule():void{
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					//先找当前环节
+					var currentActivityXML:XML;
+					for each(var a:XML in currentXML.activities.activity){
+						if(a.code == currentActivityCode){
+							currentActivityXML = a;
+							break;
+						}
+					}
+					if(currentActivityXML == null)
+						return;
+					for each(var tarObj:Object in tarDataGrid.selectedItems){
+						var tarObjXMLList:XMLList = 
+						currentActivityXML.taskAssignRules.taskAssignRule.(@templateName==tarObj.templateName && taskAssignObject.@id==tarObj.objectId);
+						for each(var tarObjXML:XML in tarObjXMLList){
+							Utils.xmlDeleteNode(tarObjXML);
+						}
+					}
+					refreshAll();
+					showActivityProperties(currentActivityCode);
+				}
+			}
+			
+			private function deleteExtProperty():void{
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					//先找当前环节
+					var currentActivityXML:XML;
+					for each(var a:XML in currentXML.activities.activity){
+						if(a.code == currentActivityCode){
+							currentActivityXML = a;
+							break;
+						}
+					}
+					if(currentActivityXML == null)
+						return;
+					for each(var obj:Object in extPropertiesDataGrid.selectedItems){
+						var objXMLList:XMLList = 
+						currentActivityXML.property.(@key==obj.key);
+						for each(var objXML:XML in objXMLList){
+							Utils.xmlDeleteNode(objXML);
+						}
+					}
+					refreshAll();
+					showActivityProperties(currentActivityCode);
+				}
+			}
+			
+			[Bindable]
+			private function set editMode(_editMode:int):void{
+				this._editMode = _editMode;
+				if(_editMode == EDITMODE_NONE){
+					mainTabNavigator.enabled = false;
+				}
+				else{
+					mainTabNavigator.enabled = true;
+					isSaved = false;
+				}
+			}
+			
+			private function get editMode():int{
+				return _editMode;
+			}
+			
+			private function advancedButtonClickHandler(event:MenuEvent):void{
+				var item:Object = event.item;
+				var menuId:int = item["id"];
+				switch(menuId){
+					case ID_ADVANCEDMENU_TASKASSIGNRULETMPT:
+						var window:TaskAssignRuleTmptMgmtWindow = new TaskAssignRuleTmptMgmtWindow();
+						PopUpManager.addPopUp(window,this);
+						PopUpManager.centerPopUp(window);
+						break;
+					case ID_ADVANCEDMENU_DEBUG:
+						if(currentProcess != null){
+							loadingWindow.text = "正在创建测试流程...";
+							PopUpManager.addPopUp(loadingWindow,this);
+							PopUpManager.centerPopUp(loadingWindow);
+							novaWorkflowService.newProcessInstance(currentProcess.id);
+
+						}
+						break;
+				}
+			}
+			
+			private function newProcessHandler(event:ResultEvent):void{
+				var currentProcessInstanceId:Number = event.result as Number;
+				PopUpManager.removePopUp(loadingWindow);
+				var debugWindow:WorkflowDebugWindow = new WorkflowDebugWindow();
+				debugWindow.processInstanceId = String(currentProcessInstanceId);
+				debugWindow.endpointForWorkflow = this.endpointForWorkflow;//add by zhangzz for issues#SmartX-4 
+				PopUpManager.addPopUp(debugWindow,this);
+				PopUpManager.centerPopUp(debugWindow);		 
+			}
+
+			private function addExtProperty():void{
+				if(editMode != EDITMODE_NONE && currentXML != null){
+					
+					var window:AddActivityExtPropertyWindow = new AddActivityExtPropertyWindow();
+					window.confirmFunc = function():void{
+						var key:String = window.keyInput.text;
+						var value:String = window.valueInput.text;
+						//先找当前环节
+						var currentActivityXML:XML;
+						for each(var a:XML in currentXML.activities.activity){
+							if(a.code == currentActivityCode){
+								currentActivityXML = a;
+								break;
+							}
+						}
+						if(currentActivityXML == null)
+							return;
+						var objXMLList:XMLList = 
+						currentActivityXML.property.(@key==key);
+						if(objXMLList.length()>0){
+							//属性已存在
+							for each(var objXML:XML in objXMLList){
+								objXML.@value = value;
+							}
+						}
+						else{
+							//新建一个属性
+							var newProp:XML = <property/>;
+							newProp.@key = key;
+							newProp.@value = value;
+							currentActivityXML.appendChild(newProp);
+						}
+						refreshAll();
+						showActivityProperties(currentActivityCode);
+						PopUpManager.removePopUp(window);
+					};
+					PopUpManager.addPopUp(window,this,true);
+					PopUpManager.centerPopUp(window);
+				}
+			}
+			
+		]]>
+	</mx:Script>
+
+	<mx:Glow id="glow1" blurXFrom="0" color="0xFF0000" blurXTo="15" blurYFrom="0" blurYTo="15" />
+	<mx:Glow id="glow2" alphaFrom="50" alphaTo="0" blurXFrom="15" color="0x00FF00" blurXTo="0" blurYFrom="15" blurYTo="0" />
+	<mx:ApplicationControlBar width="100%" dock="true">
+		<mx:Button label="新建" icon="{AssetsFileLib.newIcon}" click="newProcess()"/>
+		<mx:Button label="打开" click="openProcess()" icon="{AssetsFileLib.openIcon}"/>
+		<mx:Button label="保存" icon="{AssetsFileLib.saveIcon}" click="saveProcess()"/>
+		<mx:Button label="关闭" icon="{AssetsFileLib.closeIcon}" click="closeProcess()"/>
+		<mx:Button label="导入" icon="{AssetsFileLib.importIcon}" click="importProcess()"/>
+		<mx:Button label="导出" icon="{AssetsFileLib.exportIcon}" click="exportProcess()"/>
+		<mx:PopUpMenuButton label="高级" icon="{AssetsFileLib.serverenvIcon}" 
+			dataProvider="{advancedButtonDataProvider}" labelField="name" itemClick="advancedButtonClickHandler(event)"/>
+	</mx:ApplicationControlBar>
+	<mx:HDividedBox width="100%" height="100%" id="mainBox">
+		<mx:VBox height="100%" width="300">
+			<code:WindowShade label="基本环节" width="100%">
+				<mx:VBox width="100%" horizontalAlign="center">
+					<mx:VBox borderStyle="solid" width="90%" horizontalAlign="center">
+						<workflow:StartActivityTemplate mouseDown="mouseDownHandler(event)"/>
+					</mx:VBox>
+					<mx:VBox borderStyle="solid" width="90%" horizontalAlign="center">
+						<workflow:EndActivityTemplate mouseDown="mouseDownHandler(event)"/>
+					</mx:VBox>
+					<mx:VBox borderStyle="solid" width="90%" horizontalAlign="center">
+						<workflow:ActivityTemplate mouseDown="mouseDownHandler(event)"/>
+					</mx:VBox>
+				</mx:VBox>
+			</code:WindowShade>
+			<code:WindowShade label="扩展环节" width="100%" id="extendActivityBox">
+				
+			</code:WindowShade>
+			<code:WindowShade label="属性" width="100%">
+				<mx:ViewStack id="propertiesViewStack" width="100%" height="300" creationPolicy="all">
+					<code:AdvancedForm id="processProperties" width="100%" height="100%">
+						<mx:FormItem label="编码" enabled="false" required="true"> 
+							<mx:TextInput id="processCodeInput" width="120" borderStyle="solid" change="saveProcessProperties()"/>
+						</mx:FormItem>
+						<mx:FormItem label="名称" required="true">
+							<mx:TextInput id="processNameInput" width="120" borderStyle="solid" change="saveProcessProperties()"/>
+						</mx:FormItem>
+					</code:AdvancedForm>
+					<mx:TabNavigator id="activityProperties" width="100%" height="100%" creationPolicy="all">
+						<code:AdvancedForm label="基本属性" width="100%" height="100%">
+							<mx:FormItem label="编码" enabled="false" required="true">
+								<mx:TextInput id="activityCodeInput" width="120" borderStyle="solid" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="名称" required="true">
+								<mx:TextInput id="activityWfNameInput" width="120" borderStyle="solid" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="显示名称">
+								<mx:TextInput id="activityUiNameInput" width="120" borderStyle="solid" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="前置拦截器">
+								<mx:TextInput id="activityBeforeInterceptorClassNameInput" width="120" borderStyle="solid" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="后置拦截器">
+								<mx:TextInput id="activityAfterInterceptorClassNameInput" width="120" borderStyle="solid" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="执行模式" required="true">
+								<mx:ComboBox id="activityPerformModeInput" width="120" dataProvider="{performModeColleciton}" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="分派模式" required="true">
+								<mx:ComboBox id="activitySplitTypeInput" width="120" dataProvider="{splitTypeColleciton}" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="合并模式" required="true">
+								<mx:ComboBox id="activityJoinTypeInput" width="120" dataProvider="{joinTypeColleciton}" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="合并条件">
+								<mx:TextInput id="activityJoinConditionInput" width="120" borderStyle="solid" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+							<mx:FormItem label="描述">
+								<mx:TextArea id="activityDescriptionInput" width="120" borderStyle="solid" change="saveActivityProperties(activityCodeInput.text)"/>
+							</mx:FormItem>
+						</code:AdvancedForm>
+						<mx:VBox label="扩展属性">
+							<mx:HBox width="100%">
+								<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建扩展属性" click="addExtProperty()"/>
+								<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除扩展属性" click="deleteExtProperty()"/>
+							</mx:HBox>
+							<mx:DataGrid id="extPropertiesDataGrid" width="100%" height="100%" dataProvider="{extPropertiesDataProvider}" allowMultipleSelection="true">
+								<mx:columns>
+									<mx:DataGridColumn headerText="名称" dataField="key"/>
+									<mx:DataGridColumn headerText="值" dataField="value"/>
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:VBox>
+						<mx:VBox label="派发规则">
+							<mx:HBox width="100%">
+								<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建派发规则" click="showCreateTaskAssignRuleWindow()"/>
+								<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除派发规则" click="deleteTaskAssignRule()"/>
+								<mx:LinkButton icon="{AssetsFileLib.refreshIcon}" width="22" height="22" toolTip="刷新派发规则模板" click="novaWorkflowService.getTaskAssignRuleTemplateList()"/>
+							</mx:HBox>
+							<mx:DataGrid id="tarDataGrid" width="100%" height="100%" dataProvider="{taskAssignRulesDataProvider}" allowMultipleSelection="true">
+								<mx:columns>
+									<mx:DataGridColumn headerText="派发模板" dataField="templateName"/>
+									<mx:DataGridColumn headerText="派发对象" dataField="objectName"/>
+								</mx:columns>
+							</mx:DataGrid>
+							
+						</mx:VBox>
+					</mx:TabNavigator>
+					<code:AdvancedForm id="transitionProperties" width="100%" height="100%">
+						<mx:FormItem label="编码" enabled="false" required="true">
+							<mx:TextInput id="transitionCodeInput" width="120" borderStyle="solid" change="saveTransitionProperties(transitionCodeInput.text)"/>
+						</mx:FormItem>
+						<mx:FormItem label="名称" required="true">
+							<mx:TextInput id="transitionNameInput" width="120" borderStyle="solid" change="saveTransitionProperties(transitionCodeInput.text)"/>
+						</mx:FormItem>
+						<mx:FormItem label="显示名称">
+							<mx:TextInput id="transitionUiNameInput" width="120" borderStyle="solid" change="saveTransitionProperties(transitionCodeInput.text)"/>
+						</mx:FormItem>
+						<mx:FormItem label="条件公式">
+							<mx:TextInput id="transitionConditionInput" width="120" borderStyle="solid" change="saveTransitionProperties(transitionCodeInput.text)"/>
+						</mx:FormItem>
+					</code:AdvancedForm>
+				</mx:ViewStack>
+			</code:WindowShade>
+		</mx:VBox>
+		<mx:TabNavigator width="100%" height="100%" enabled="false" id="mainTabNavigator" creationPolicy="all">
+			<mx:VBox label="设计器" width="100%" height="100%" horizontalAlign="center" verticalAlign="top">
+				<mx:ApplicationControlBar width="100%" dock="true">
+					<mx:Button id="selectModeButton" toggle="true" selected="true" icon="{AssetsFileLib.littleArrowIcon}" click="changeDesignGraphMode(DESIGNGRAPHMODE_SELECT)" width="20" height="20"/>
+					<mx:Button id="lineModeButton" toggle="true" icon="{AssetsFileLib.lineIcon}" click="changeDesignGraphMode(DESIGNGRAPHMODE_LINE)" width="20" height="20"/>
+					<!--mx:Button icon="@Embed(source='../assets/images/zoomin.png')" width="20" height="20"/>
+					<mx:Button icon="@Embed(source='../assets/images/zoomout.png')" width="20" height="20"/-->
+					<mx:Button icon="{AssetsFileLib.delete2Icon}" click="deleteItems()" width="20" height="20"/>
+				</mx:ApplicationControlBar>
+				<flowui:CrossCanvas id="mainGraph" width="100%" height="100%"  
+				dragEnter="dragEnterHandler(event)" dragDrop="dragDropHandler(event)" 
+				mouseDown="mainGraphMouseDownHandler(event)" mouseMove="mainGraphMouseMoveHandler(event)" 
+				mouseUp="mainGraphMouseUpHandler(event)"
+				borderStyle="outset"/>
+			</mx:VBox>
+			<mx:VBox label="源代码" width="100%" height="100%" horizontalAlign="center" verticalAlign="top">
+				<mx:ApplicationControlBar width="95%" dock="true">
+					<mx:Button label="应用" click="applyXML()"/>
+					<mx:Button label="重置" click="refreshXML()"/>
+				</mx:ApplicationControlBar>
+				
+				<mx:TextArea id="xmlEditor" width="95%" height="100%" editable="{(editMode != EDITMODE_NONE)}"/>
+			</mx:VBox>
+		</mx:TabNavigator>
+	</mx:HDividedBox>
+	
+	
+</mx:VBox>

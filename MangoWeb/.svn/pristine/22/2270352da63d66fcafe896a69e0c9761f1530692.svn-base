@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitytab:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:entitytab="smartx.bam.flex.modules.entitymodel.entitytab.*" 
+					   width="100%" height="100%" label="配置" creationComplete="creationCompleteHandler()" 
+					   xmlns:util="smartx.flex.components.util.*">
+	<fx:Declarations>
+		<util:ComboBoxWindow id="typeChooseCbo" dataProvider="{entityDataProvider}" width="400"
+							 labelField="@name" title="添加实体" confirmFunc="entityChooseComfirmFun"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.listClasses.ListBase;
+			import mx.core.DragSource;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.CollectionEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			private var emTreeData:XML = <root />;
+			
+			private var entityChooseCbo:ComboBoxWindow = new ComboBoxWindow();
+			[Bindable]
+			public var entityDataProvider:ArrayCollection = new ArrayCollection();
+			
+			public static const ENTITY_TYPE:String = "entity";//实体引用
+			
+			public static const AGGREGATION:String = "aggregation";//聚合字段
+			
+			private var addedEntitiesAlias:Hashtable = new Hashtable();//所有实体别名
+			[Bindable]
+			private var orderbyDp:ArrayCollection = new ArrayCollection();
+			
+			private function creationCompleteHandler():void{
+				orderbyDp.addEventListener(CollectionEvent.COLLECTION_CHANGE,orderbyDpCollectionChanageHandler);
+			}
+			
+			private function orderbyDpCollectionChanageHandler(event:CollectionEvent):void{
+				delete selectedItem.content.orderby.*;
+				var orderbyStr:String = "";
+				for each(var data:Object in orderbyDp){
+					orderbyStr = orderbyStr.concat(data.fieldName).concat(" ").concat(data.type).concat(",");
+				}
+				selectedItem.content.orderby = orderbyStr.substr(0,orderbyStr.length-1);
+			}
+			
+			//添加实体
+			private function addEntity():void{
+				PopUpManager.addPopUp(typeChooseCbo,this,true);
+				PopUpManager.centerPopUp(typeChooseCbo);
+			}
+			
+			private function entityChooseComfirmFun():void{
+				var item:Object = typeChooseCbo.getSelectedItem();
+				var alias:String = getNewEntityAlias(item.@code);
+				addedEntitiesAlias.add(alias,String(item.@code));
+				selectedItem.content.joinEntities.appendChild(<joinEntity code={item.@code} alias={alias} mtcode={item.@mtcode}/>);
+				refreshTreeData();
+				PopUpManager.removePopUp(typeChooseCbo);
+			}
+			
+			//删除实体
+			private function delEntity():void{
+				if(emTree.selectedIndex >-1){
+					var selectEmNode:XML = XML(emTree.selectedItem);
+					if(String(selectEmNode.name()) == "attribute")
+						SmartXMessage.show("请选择该实体名称!");
+					else
+						SmartXMessage.show("是否删除该实体？",SmartXMessage.MESSAGE_CONFIRM,"",this,delEntityConfirmHandler);
+				}else
+					SmartXMessage.show("请选择要删除的实体!");
+			}
+			
+			private function delEntityConfirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					var selectEmNode:XML = XML(emTree.selectedItem);
+					CEPUtils.xmlDeleteNode(selectEmNode);//删除树节点
+					for each(var att:XML in selectedItem.content.attributes.attribute){
+						if(String(att.@entityCodeAlias) == String(selectEmNode.@entityCodeAlias))//将所有该实体的属性删除
+							CEPUtils.xmlDeleteNode(att);
+					}
+					refreshAttDatagrid();
+					//实体别名
+					if(addedEntitiesAlias.find(String(selectEmNode.@entityCodeAlias)))
+						addedEntitiesAlias.remove(String(selectEmNode.@entityCodeAlias));
+					//删除JOIN中引用的实体
+					for each(var joinEntity:XML in selectedItem.content.joinEntities.joinEntity){
+						if(String(joinEntity.@alias) == String(selectEmNode.@entityCodeAlias))
+							CEPUtils.xmlDeleteNode(joinEntity);
+					}
+				}
+			}
+			
+			protected function emTree_dragCompleteHandler(event:DragEvent):void{
+				event.preventDefault();
+			}
+			//添加聚合字段
+			private function addVirtualEntityField():void{
+				var field:XML = <attribute name="" expression="" label="" isGroupby="false" fieldType={AGGREGATION} />;
+				selectedItem.content.attributes[0].appendChild(field);
+				refreshAttDatagrid();
+			}
+			
+			private function refreshAttDatagrid():void{
+				dataGrid.dataProvider = selectedItem.content.attributes.attribute;
+				dataGrid.invalidateList();
+			}
+			//删除字段
+			private function delVirtualEntityField():void{
+				var selectedItems:Array = dataGrid.selectedItems;
+				if(selectedItems.length == 0)
+					return;
+				for each(var data:XML in selectedItems){
+					CEPUtils.xmlDeleteNode(data);
+				}
+				refreshAttDatagrid();
+			}
+			
+			private function dataGrid_dragEnterHandler(event:DragEvent):void{
+				if( event.dragInitiator is Tree ) {
+					DragManager.showFeedback(DragManager.COPY);
+					var ds:DragSource = event.dragSource;
+					if( !ds.hasFormat("treeItems") ) return;
+					
+					var items:Array = ds.dataForFormat("treeItems") as Array;
+					for(var i:Number=0; i < items.length; i++) {
+						var item:XML = XML(items[i]);
+						if( String(item.name()) == "entity" ) return;
+					}
+					DragManager.acceptDragDrop(UIComponent(event.currentTarget)); 
+				} 
+			}
+			
+			private function dataGrid_dragDropHandler(event:DragEvent):void{
+				var dragSource:DragSource = event.dragSource;
+				if(dragSource.hasFormat("treeItems")){
+					var datas:Array = dragSource.dataForFormat("treeItems") as Array;
+					for(var i:Number=0; i < datas.length; i++) {
+						var item:XML = XML(datas[i]);
+						var dgData:XML = item.copy();
+						dgData.@expression = item.@entityCodeAlias+"."+item.@name;
+						dgData.@isGroupBy = "false";
+						for each(var data:XML in selectedItem.content.attributes.attribute){
+							if(data.@name == item.@name)
+								dgData.@name = getNewName("name",item.@name);
+						}
+						dgData.@fieldType = ENTITY_TYPE;
+						selectedItem.content.attributes[0].appendChild(dgData);
+					}
+					refreshAttDatagrid();
+				}
+				onDragExit(event);
+			}
+			
+			private function onDragExit(event:DragEvent) : void{
+				var dropTarget:ListBase=ListBase(event.currentTarget);   
+				dropTarget.hideDropFeedback(event);
+			}
+			
+			private function refreshTreeData():void{
+				delete emTreeData.*;
+				for each(var joinEntity:XML in selectedItem.content.joinEntities.joinEntity){
+					if(contentXml.entities.entity.(@code == joinEntity.@code).length() == 0)
+						continue;
+					var entity:XML = contentXml.entities.entity.(@code == joinEntity.@code)[0];
+					
+					var inheritEntities:ArrayCollection = EntityUtil.getAllInheritEntity(entity,contentXml);
+					var entitiesXml:XML = <root><entities /></root>;
+					for each(var inheritEntity:XML in inheritEntities){
+						if(String(inheritEntity.@mtcode) != "")
+							entitiesXml.entities[0].appendChild(MetadataTempletUtil.getInstance().findMetadataTemplet(String(inheritEntity.@mtcode)).contentXML);
+						else
+							entitiesXml.entities[0].appendChild(inheritEntity);
+					}
+					
+					var inheritAtts:ArrayCollection = EntityUtil.getInheritAttributes(entity,entitiesXml);
+					
+					var entityMetadata:XML;
+					//如果是实体元数据则去缓存中读取
+					if(String(entity.@mtcode) != "")
+						entityMetadata = MetadataTempletUtil.getInstance().findMetadataTemplet(String(entity.@mtcode)).contentXML;
+					else
+						entityMetadata = entity;
+					
+					var entityTemp:XML = entity.copy();
+					delete entityTemp.*;
+					var att:XML;
+					for each(att in inheritAtts){
+						var parentAttCopy:XML = att.copy();
+						parentAttCopy.@entityCodeAlias = joinEntity.@alias;
+						entityTemp.appendChild(parentAttCopy);
+					}
+					
+					for each(att in entityMetadata.attributes.attribute){
+						var attCopy:XML = att.copy();
+						attCopy.@entityCodeAlias = joinEntity.@alias;
+						entityTemp.appendChild(attCopy);
+					}
+					entityTemp.@entityCodeAlias = joinEntity.@alias;
+					emTreeData.appendChild(entityTemp);
+				}
+			}
+			
+			private function fieldTypeLabelFun(item:Object,column:DataGridColumn):String{
+				if(item.@fieldType == ENTITY_TYPE)
+					return "实体字段";
+				else if(item.@fieldType == AGGREGATION)
+					return "聚合字段";
+				else
+					return "";
+			}
+			
+			private function getNewEntityAlias(alias:String):String{
+				if(addedEntitiesAlias.find(alias)){
+					alias = alias + "_1";
+					getNewEntityAlias(alias);
+				}
+				return alias;
+			}
+			
+			private function getNewName(fieldName:String,aliasName:String=null):String{
+				var i:int=1;
+				while(true){
+					var name:String = (aliasName==null?fieldName:aliasName)+i;
+					if(isNameExists(name,fieldName)){
+						i++;
+						continue;
+					}
+					return name;
+				}
+				return null;
+			}
+			
+			private function isNameExists(name:String,fieldName:String):Boolean{
+				for each(var data:XML in selectedItem.content.attributes.attribute){
+					if(String(data.@[fieldName]) == name)
+						return true;
+				}
+				return false;
+			}
+			
+			public function showHandler():void{
+				addedEntitiesAlias.clear();
+				for each(var joinEntity:XML in selectedItem.content.joinEntities.joinEntity){
+					addedEntitiesAlias.add(String(joinEntity.@alias),String(joinEntity.@code));
+				}
+				refreshTreeData();
+				initOrderbyDp();
+			}
+			
+			private function upAttributeBtn_clickHandler(event:MouseEvent):void{
+				var attSelectedItem:Object = dataGrid.selectedItem;
+				if(attSelectedItem==null || attSelectedItem.parent() ==undefined)
+					return;
+				var index:int = attSelectedItem.childIndex();
+				if(index == 0)
+					return;
+				var newXml:XML = XML(attSelectedItem).copy();
+				CEPUtils.xmlDeleteNode(XML(attSelectedItem));
+				
+				selectedItem.content.attributes[0].insertChildBefore(selectedItem.content.attributes[0].children()[index-1],newXml);
+				refreshAttDatagrid();
+				
+				callLater(function():void{
+					dataGrid.selectedItem =newXml;
+					if(dataGrid.selectedIndex > 1)
+						dataGrid.scrollToIndex(dataGrid.selectedIndex-1);
+				});
+			}
+			
+			private function downAttributeBtn_clickHandler(event:MouseEvent):void{
+				var attSelectedItem:Object = dataGrid.selectedItem;
+				if(attSelectedItem==null || attSelectedItem.parent() ==undefined)
+					return;
+				var index:int = attSelectedItem.childIndex();
+				if(index == attSelectedItem.parent().children().length() -1)
+					return;
+				var newXml:XML = XML(attSelectedItem).copy();
+				CEPUtils.xmlDeleteNode(XML(attSelectedItem));
+				selectedItem.content.attributes[0].insertChildAfter(selectedItem.content.attributes[0].children()[index],newXml);
+				refreshAttDatagrid();
+				callLater(function():void{
+					dataGrid.selectedItem =newXml;
+					dataGrid.scrollToIndex(dataGrid.selectedIndex-1);
+				});
+			}
+			
+			private function joinExpressionTxt_changeHandler(event:Event):void{
+				selectedItem.content.joinExpression = StringUtil.trim(joinExpressionTxt.text);
+			}
+			
+			protected function joinExpressionTxt_dragEnterHandler(event:DragEvent):void{
+				if( event.dragInitiator is DataGrid || event.dragInitiator is Tree) {
+					DragManager.showFeedback(DragManager.COPY);
+					var ds:DragSource = event.dragSource;
+					
+					if(ds.hasFormat("treeItems")){
+						var items:Array = ds.dataForFormat("treeItems") as Array;
+						for(var i:Number=0; i < items.length; i++) {
+							var item:XML = XML(items[i]);
+							if( String(item.name()) == "entity" ) return;
+						}
+					}
+					DragManager.acceptDragDrop(UIComponent(event.currentTarget)); 
+				} 
+			}
+			
+			protected function joinExpressionTxt_dragDropHandler(event:DragEvent):void{
+				var dragSource:DragSource = event.dragSource;
+				var datas:Array = [];
+				var data:XML;
+				if(dragSource.hasFormat("items")){
+					datas = dragSource.dataForFormat("items") as Array;
+					for each(data in datas){
+						joinExpressionTxt.text = joinExpressionTxt.text.concat(String(data.@expression));
+					}
+				}else if(dragSource.hasFormat("treeItems")){
+					datas = dragSource.dataForFormat("treeItems") as Array;
+					for each(data in datas){
+						joinExpressionTxt.text = joinExpressionTxt.text.concat(data.@entityCodeAlias+"."+data.@name);
+					}
+				}
+			}
+			
+			private function addOrderBy():void{
+				var data:Object = {fieldName:"",type:"asc"};
+				orderbyDp.addItem(data);
+			}
+			
+			private function delOrderBy():void{
+				if(orderbyDg.selectedIndex > 0)
+					orderbyDp.removeItemAt(orderbyDg.selectedIndex);
+			}
+			
+			private function initOrderbyDp():void{
+				orderbyDp.removeAll();
+				var orderby:String = selectedItem.content.orderby;
+				if(orderby != null && orderby != ""){
+					var orderbyArr:Array  = orderby.split(",");
+					for each(var data:String in orderbyArr){
+						var dataArr:Array = data.split(" ");
+						var orderbyData:Object = {fieldName:dataArr[0],type:dataArr[1]};
+						orderbyDp.addItem(orderbyData);
+					}
+				}
+			}
+			
+			protected function orderbyDg_dragEnterHandler(event:DragEvent):void{
+				if( event.dragInitiator is DataGrid ) {
+					DragManager.showFeedback(DragManager.COPY);
+					DragManager.acceptDragDrop(UIComponent(event.currentTarget)); 
+				}
+			}
+			
+			protected function orderbyDg_dragDropHandler(event:DragEvent):void{
+				var dragSource:DragSource = event.dragSource;
+				var datas:Array = [];
+				var data:XML;
+				if(dragSource.hasFormat("items")){
+					datas = dragSource.dataForFormat("items") as Array;
+					for each(data in datas){
+						var orderbyData:Object = {fieldName:String(data.@name),type:"asc"};
+						orderbyDp.addItem(orderbyData);
+					}
+				}
+			}
+			
+			private function orderbyTypeLabelFun(item:Object, column:DataGridColumn):String{
+				if(item.type == "desc")
+					return "降序";
+				else if(item.type == "asc")
+					return "升序";
+				else
+					return "";
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:VBox width="30%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%" id="treeButtonBox" >
+				<mx:Button icon="{AssetsFileLib.addIcon}" label="添加实体" click="addEntity()"/>
+				<mx:Button icon="{AssetsFileLib.minuseIcon}" label="删除实体" click="delEntity()"/>
+			</mx:HBox>
+			<mx:Tree allowMultipleSelection="true" allowDragSelection="true" dragEnabled="true" width="100%" height="100%" 
+					 id="emTree" labelField="@name" dataProvider="{emTreeData.entity}" dragComplete="emTree_dragCompleteHandler(event)"/>
+		</mx:VBox>
+		<mx:VBox width="70%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%" horizontalAlign="left">
+				<mx:Label text="可从工作集拖动字段" />
+				<mx:HBox width="100%" horizontalAlign="right">
+					<mx:Button icon="{AssetsFileLib.upIcon}" label="上移"
+							   id="upAttributeBtn" click="upAttributeBtn_clickHandler(event)" />
+					<mx:Button icon="{AssetsFileLib.downIcon}" label="下移"
+							   id="downAttributeBtn" click="downAttributeBtn_clickHandler(event)" />
+					<mx:Button icon="{AssetsFileLib.addIcon}" label="添加聚合字段" 
+							   click="addVirtualEntityField()"/>
+					<mx:Button icon="{AssetsFileLib.minuseIcon}" label="删除字段" 
+							   click="delVirtualEntityField()"/>
+				</mx:HBox>
+			</mx:HBox>
+			<mx:DataGrid id="dataGrid" width="100%" height="50%" dataProvider="{selectedItem.content.attributes.attribute}" editable="true" dragEnabled="true"
+						 dragDrop="dataGrid_dragDropHandler(event)" dragEnter="dataGrid_dragEnterHandler(event)" dragExit="onDragExit(event)"
+						 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" allowMultipleSelection="true">
+				<mx:columns>
+					<mx:DataGridColumn headerText="字段名称" editable="true" dataField="@name" />
+					<mx:DataGridColumn headerText="字段表达式" dataField="@expression">
+						<mx:itemEditor>
+							<fx:Component>
+								<mx:HBox width="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+									<fx:Script>
+										<![CDATA[
+											public function get text():String{
+												return fieldNameTxt.text;
+											}
+										]]>
+									</fx:Script>
+									<mx:TextInput id="fieldNameTxt" text="{data.@expression}" width="100%" height="100%" 
+												  editable="{data.@fieldType==VirtualEntityTab.AGGREGATION?true:false}" />
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemEditor>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="显示名称" editable="true" dataField="@label" />
+					<mx:DataGridColumn headerText="是否分组" dataField="@isGroupby" rendererIsEditor="true">
+						<mx:itemRenderer>
+							<fx:Component>
+								<mx:HBox horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+									<fx:Script>
+										<![CDATA[
+											public function get text():String{
+												return isGroupByChk.selected?'true':'false';
+											}
+											
+											override public function set data(value:Object):void{
+												super.data = value;
+												if(value != null){
+													if(value.@fieldType == VirtualEntityTab.AGGREGATION){//如果是聚合字段的话，不能设置是否分组
+														isGroupByChk.selected = false;
+														isGroupByChk.enabled = false;
+														return;
+													}else
+														isGroupByChk.enabled = true;
+													isGroupByChk.selected = value.@isGroupby=='true'?true:false;
+												}else
+													isGroupByChk.selected = false;
+											}
+										]]>
+									</fx:Script>
+									<mx:CheckBox id="isGroupByChk" change="{data.@isGroupby=text}"/>
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="类型" labelFunction="fieldTypeLabelFun" dataField="@fieldType" editable="false" />
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:TabNavigator width="100%" height="50%" creationPolicy="all">
+				<mx:VBox width="100%" height="100%" label="join表达式">
+					<mx:TextArea width="100%" height="100%" id="joinExpressionTxt" change="joinExpressionTxt_changeHandler(event)" 
+								 text="{selectedItem.content.joinExpression}" borderSides="" dragEnter="joinExpressionTxt_dragEnterHandler(event)"
+								 dragDrop="joinExpressionTxt_dragDropHandler(event)" toolTip="支持从属性列表或工作集中拖入"/>
+				</mx:VBox>
+				<mx:VBox width="100%" height="100%" label="排序方式">
+					<mx:HBox width="100%">
+						<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addOrderBy()"/>
+						<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delOrderBy()"/>
+						<mx:Label color="red" text="*可支持从属性列表拖入" />
+					</mx:HBox>
+					<mx:DataGrid id="orderbyDg" width="100%" height="100%" editable="true" dataProvider="{orderbyDp}" 
+								 dragEnter="orderbyDg_dragEnterHandler(event)" dragDrop="orderbyDg_dragDropHandler(event)">
+						<mx:columns>
+							<mx:DataGridColumn dataField="fieldName" headerText="字段名" >
+								<mx:itemEditor>
+									<fx:Component>
+										<mx:HBox width="100%" horizontalAlign="center">
+											<fx:Script>
+												<![CDATA[
+													import mx.events.ListEvent;
+													public function get text():String{
+														if(nameCbox.selectedItem)
+															return nameCbox.selectedItem.@name;
+														else
+															return "";
+													}
+													
+													override public function set data(value:Object):void{
+														super.data = value;
+														nameCbox.selectedItem = outerDocument.selectedItem.content.attributes.attribute.(@name == data.fieldName)[0];
+													}
+												]]>
+											</fx:Script>
+											<mx:ComboBox id="nameCbox" width="100%" labelField="@name" 
+														 dataProvider="{outerDocument.selectedItem.content.attributes.attribute}" />
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemEditor>
+							</mx:DataGridColumn>
+							
+							<mx:DataGridColumn dataField="type" headerText="排序方式" labelFunction="orderbyTypeLabelFun">
+								<mx:itemEditor>
+									<fx:Component>
+										<mx:HBox width="100%" horizontalAlign="center">
+											<fx:Script>
+												<![CDATA[
+													import mx.events.ListEvent;
+													
+													public function get text():String{
+														return typeCbox.selectedItem.data;
+													}
+													
+													override public function set data(value:Object):void{
+														super.data = value;
+														if(value != null){
+															if(data.type == "desc")
+																typeCbox.selectedIndex = 1;
+														}
+													}
+												]]>
+											</fx:Script>
+											<mx:ComboBox id="typeCbox" width="100%" labelField="name" 
+														 dataProvider="{[{name:'升序',data:'asc'},{name:'降序',data:'desc'}]}" />
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemEditor>
+							</mx:DataGridColumn>
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+			</mx:TabNavigator>
+		</mx:VBox>
+	</mx:HDividedBox>
+</entitytab:AbstractTab>

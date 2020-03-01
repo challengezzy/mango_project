@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.styletemplate.ext.DebugUtil;
+			import smartx.flex.components.styletemplate.ifc.EventListenerIFC;
+			import smartx.flex.components.styletemplate.ifc.TreeButtonListener;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			public var metadataTemplet:MetadataTemplet;
+			public var endpoint:String;
+			private var listenerMap:Hashtable = new Hashtable();
+			private var iconComponentArray:Array = [];
+			
+			private var eventHanderMap:Hashtable = new Hashtable();
+			
+			[Bindable]
+			private var styletemplate:StyleTemplate03 = null;
+			
+			private function init():void{
+				if(metadataTemplet == null)
+					throw new Error("元数据模板不能为空");
+				var xml:XML = metadataTemplet.contentXML;
+				styletemplate = new StyleTemplate03();
+				if(xml.templetCode.length() == 0)
+					throw new Error("templetCode不能为空");
+				styletemplate.templetCode = xml.templetCode;
+				styletemplate.editable = false;
+				if(endpoint != null)
+					styletemplate.endpoint = endpoint;
+				if(xml.editable.length() > 0)
+					styletemplate.editable = xml.editable=="true"?true:false;
+				styletemplate.percentWidth = 100;
+				if(xml.percentWidth.length() > 0 && String(xml.percentWidth) != "")
+					styletemplate.percentWidth = xml.percentWidth;
+				styletemplate.percentHeight = 100;
+				if(xml.percentHeight.length() > 0 && String(xml.percentHeight) != "")
+					styletemplate.percentHeight = xml.percentHeight;
+				if(xml.endpoint.length() > 0)
+					styletemplate.endpoint = xml.endpoint;
+				if(xml.debugMode.length() > 0)
+					styletemplate.debugMode = xml.debugMode=="true"?true:false;
+				if(xml.width.length() > 0 && String(xml.width) != "")
+					styletemplate.width = xml.width;
+				if(xml.height.length() > 0 && String(xml.height) != "")
+					styletemplate.height = xml.height;
+				//add by zhangzz begin
+				if(xml.isShowInsertBtn.length() > 0)
+					styletemplate.isShowInsertBtn = xml.isShowInsertBtn=="false"?false:true;
+				//add by zhangzz end
+				
+				if(xml.loadAll.length() > 0)
+					styletemplate.loadAll = xml.loadAll=="false"?false:true;
+				if(xml.parentFieldName.length() > 0)
+					styletemplate.parentFieldName = xml.parentFieldName;
+				if(xml.seqFieldName.length() > 0)
+					styletemplate.seqFieldName = xml.seqFieldName;
+				if(xml.labelFieldName.length() > 0)
+					styletemplate.labelFieldName = xml.labelFieldName;
+				if(xml.typeFieldName.length() > 0)
+					styletemplate.typeFieldName = xml.typeFieldName;
+				if(xml.fkFieldName.length() > 0)
+					styletemplate.fkFieldName = xml.fkFieldName;
+				//初始过滤条件 add by xuzhilin 20130124
+				if(xml.initQueryCondition.length()>0)
+					styletemplate.initQueryCondition = xml.initQueryCondition;
+				
+				if(xml.typeLabelMap.length()>0){
+					var typeMap:Hashtable = new Hashtable();
+					for each(var typeLabeXml:XML in xml.typeLabelMap.item){
+						typeMap.add(String(typeLabeXml.@value),String(typeLabeXml.@["name"]));
+					}
+					styletemplate.typeLabelMap = typeMap;
+				}
+				
+				if(xml.typeTempletCodeMap.length()>0){
+					var typeTempMap:Hashtable = new Hashtable();
+					for each(var typeTempXml:XML in xml.typeTempletCodeMap.item){
+						typeTempMap.add(String(typeTempXml.@value),String(typeTempXml.@["name"]));
+					}
+					styletemplate.typeTempletCodeMap = typeTempMap;
+				}
+				
+				if(xml.templetCodeParentFieldMap.length()>0){
+					var tempPidMap:Hashtable = new Hashtable();
+					for each(var tempPidXml:XML in xml.templetCodeParentFieldMap.item){
+						tempPidMap.add(String(tempPidXml.@value),String(tempPidXml.@["name"]));
+					}
+					styletemplate.templetCodeParentFieldNameMap = tempPidMap;
+				}
+				
+				if(xml.events.length()>0){
+					for each(var eventXml:XML in xml.events.event){
+						var eventType:String = eventXml.@type;
+						var listenerName:String = eventXml.@listener;
+						if(eventType!=null&&eventType!=""&&listenerName!=null&&listenerName!=""){
+							styletemplate.addEventListener(eventType,eventHandler);
+							var classReference:Class = getDefinitionByName(listenerName) as Class;
+							var handerClass:EventListenerIFC = new classReference() as EventListenerIFC;
+							eventHanderMap.add(eventType,handerClass);
+						}
+					}
+				}
+				
+				if(xml.interceptors.length()>0){
+					
+					if(xml.interceptors.insertBfIncCard.length() > 0)
+						styletemplate.insertBfIncCard = xml.interceptors.insertBfIncCard;
+					if(xml.interceptors.insertAfIncCard.length() > 0)
+						styletemplate.insertAfIncCard = xml.interceptors.insertAfIncCard;
+					if(xml.interceptors.updateBfIncCard.length() > 0)
+						styletemplate.updateBfIncCard = xml.interceptors.updateBfIncCard;
+					if(xml.interceptors.updateAfIncCard.length() > 0)
+						styletemplate.updateAfIncCard = xml.interceptors.updateAfIncCard;
+					if(xml.interceptors.deleteBfIncCard.length() > 0)
+						styletemplate.deleteBfIncCard = xml.interceptors.deleteBfIncCard;
+					if(xml.interceptors.deleteAfIncCard.length() > 0)
+						styletemplate.deleteAfIncCard = xml.interceptors.deleteAfIncCard;
+					if(xml.interceptors.deleteBfInc.length() > 0)
+						styletemplate.deleteBfInc = xml.interceptors.deleteBfInc;
+					if(xml.interceptors.deleteAfInc.length() > 0)
+						styletemplate.deleteAfInc = xml.interceptors.deleteAfInc;
+					
+					if(xml.interceptors.clientInsertBfIncCard.length() > 0)
+						styletemplate.clientInsertBfIncCard = xml.interceptors.clientInsertBfIncCard;
+					if(xml.interceptors.clientInsertAfIncCard.length() > 0)
+						styletemplate.clientInsertAfIncCard = xml.interceptors.clientInsertAfIncCard;
+					if(xml.interceptors.clientUpdateBfIncCard.length() > 0)
+						styletemplate.clientUpdateBfIncCard = xml.interceptors.clientUpdateBfIncCard;
+					if(xml.interceptors.clientUpdateAfIncCard.length() > 0)
+						styletemplate.clientUpdateAfIncCard = xml.interceptors.clientUpdateAfIncCard;
+					if(xml.interceptors.clientDeleteBfIncCard.length() > 0)
+						styletemplate.clientDeleteBfIncCard = xml.interceptors.clientDeleteBfIncCard;
+					if(xml.interceptors.clientDeleteAfIncCard.length() > 0)
+						styletemplate.clientDeleteAfIncCard = xml.interceptors.clientDeleteAfIncCard;
+					
+				}
+				
+				
+				
+				this.addChild(styletemplate);
+				
+				if(styletemplate.debugMode){
+					//如果调试模式，添加一个编辑元数据模板的按钮
+					DebugUtil.generateDebugButton(this,metadataTemplet.id);
+					
+				}
+				
+				callLater(function():void{
+					if(xml.customTreeButton.button.length()>0){
+						styletemplate.operationList.addItem({type:"separator"});
+					}
+					//自定义列表按钮
+					for each(var buttonXML:XML in xml.customTreeButton.button){
+						var obj:* = new Object();
+						obj.id = String(buttonXML.@id);
+						obj.label = String(buttonXML.@label);
+						obj.toolTip = String(buttonXML.@toolTip);
+						if(buttonXML.@rightClick=="false")
+							obj.rightClick = false;
+						else
+							obj.rightClick = true;
+						
+						var listeners:Array = [];
+						for each(var listener:XML in buttonXML.listeners.listener){
+							var classReference:Class = getDefinitionByName(listener) as Class;
+							var listenerClass:TreeButtonListener = new classReference() as TreeButtonListener;
+							listeners.push(listenerClass);
+						}
+						listenerMap.add(obj.id,listeners);
+						obj.handler = function():void{
+							var array:Array = listenerMap.find(this.id) as Array;
+							if(array != null){
+								for each(var temp:TreeButtonListener in array){
+									temp.buttonClick(styletemplate.treePanel);
+								}
+							}	
+						};
+						styletemplate.operationList.addItem(obj);
+					}
+				});
+			}
+			
+			private function eventHandler(event:Event):void{
+				var eventType:String = event.type;
+				var eventHandler:EventListenerIFC = eventHanderMap.find(eventType);
+				if(eventHandler!=null){
+					eventHandler.handler(event,styletemplate);
+				}
+			}
+			
+			public function destroy():void{
+				for each (var obj:* in iconComponentArray){
+					IconUtility.destroy(obj);
+				}
+				iconComponentArray = null;
+				removeAllChildren();
+			}
+		]]>
+	</fx:Script>
+</mx:Canvas>

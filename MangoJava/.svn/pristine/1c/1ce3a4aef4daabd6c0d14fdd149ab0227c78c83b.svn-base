@@ -1,0 +1,100 @@
+/**************************************************************************
+ * $RCSfile: TableDataStruct.java,v $  $Revision: 1.2.8.1 $  $Date: 2010/01/20 10:12:40 $
+ **************************************************************************/
+
+package smartx.framework.metadata.vo;
+
+import java.io.*;
+
+
+/**
+ * 数据集的结构（字段列表，二维数据列表）
+ * @author James.W
+ *
+ */
+public class TableDataStruct implements Serializable {
+
+    private static final long serialVersionUID = 7758843430724165925L;
+
+    private String fromtablename = null; //从哪一个取的数,只取第一列的,不支持从多个表取数,除非写视图!!
+
+    private String[] table_body_type = null;
+
+    private String[] table_header = null;
+
+    private String[][] table_body = null; //数据明细
+    
+    //add by zhangzz 2011-12-26 begin 添加列宽度和精度
+    private int[] table_body_type_precision = null;
+    
+    private int[] table_body_type_scale = null;
+    
+    public int[] getTable_body_type_precision() {
+		return table_body_type_precision;
+	}
+
+	public void setTable_body_type_precision(int[] table_body_type_precision) {
+		this.table_body_type_precision = table_body_type_precision;
+	}
+
+	public int[] getTable_body_type_scale() {
+		return table_body_type_scale;
+	}
+
+	public void setTable_body_type_scale(int[] table_body_type_scale) {
+		this.table_body_type_scale = table_body_type_scale;
+	}
+	//add by zhangzz 2011-12-26 end
+
+    public String[][] getTable_body() {
+        return table_body;
+    }
+
+    public void setTable_body(String[][] table_body) {
+        this.table_body = table_body;
+    }
+
+    public String[] getTable_header() {
+        return table_header;
+    }
+
+    public void setTable_header(String[] table_header) {
+        this.table_header = table_header;
+    }
+
+    public String[] getTable_body_type() {
+        return table_body_type;
+    }
+
+    public void setTable_body_type(String[] table_body_type) {
+        this.table_body_type = table_body_type;
+    }
+
+    public String getFromtablename() {
+        return fromtablename;
+    }
+
+    public void setFromtablename(String fromtablename) {
+        this.fromtablename = fromtablename;
+    }
+
+}
+
+/**************************************************************************
+ * $RCSfile: TableDataStruct.java,v $  $Revision: 1.2.8.1 $  $Date: 2010/01/20 10:12:40 $
+ *
+ * $Log: TableDataStruct.java,v $
+ * Revision 1.2.8.1  2010/01/20 10:12:40  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/05/31 07:38:20  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:03:16  qilin
+ * no message
+ *
+ * Revision 1.2  2007/01/30 04:16:43  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

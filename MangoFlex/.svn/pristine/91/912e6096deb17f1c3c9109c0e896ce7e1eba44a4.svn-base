@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="500" height="500"
+	 creationComplete="init()" showCloseButton="true" close="titlewindow1_closeHandler(event)">
+	<mx:Script>
+		<![CDATA[
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+					
+			[Bindable]
+			public var editable:Boolean = true;
+			[Bindable]
+			public var text:String;
+			
+			[Bindable]
+			public var confirmFunc:Function = function():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function init():void{
+				this.textEditor.htmlText=text;
+				if(!editable)
+					buttonBar.removeChild(cancelButton);
+			}
+			
+			protected function titlewindow1_closeHandler(event:CloseEvent):void
+			{
+				PopUpManager.removePopUp(this);				
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:RichTextEditor width="100%" height="100%" id="textEditor" 
+					   enabled="{editable}"/>
+	<mx:HBox horizontalAlign="center" id="buttonBar" verticalAlign="middle" width="100%">
+		<mx:Button id="confirmButton" label="确认" icon="{AssetsFileLib.okIcon}" click="confirmFunc()" height="22"/>
+		<mx:Button id="cancelButton" label="取消" icon="{AssetsFileLib.closeIcon}" click="PopUpManager.removePopUp(this)" height="22"/>
+	</mx:HBox>
+	
+</mx:TitleWindow>

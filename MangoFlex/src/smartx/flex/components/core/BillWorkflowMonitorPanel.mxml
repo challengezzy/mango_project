@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" creationComplete="init()" xmlns:code="http://code.google.com/p/flexlib/" backgroundColor="#FFFFFF" xmlns:components="smartx.flex.components.*" horizontalAlign="center" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.workflow.ProcessVariableWindow;
+			import smartx.flex.components.core.workflow.Utils;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.flowui.ArrowLine;
+			import smartx.flex.components.util.flowui.FlowIcon;
+			import smartx.flex.components.util.flowui.IconEvent;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.workflow.Activity;
+			import smartx.flex.components.vo.workflow.Process;
+			import smartx.flex.components.vo.workflow.Transition;
+			
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			public var showControlBar:Boolean = true;
+			
+			[Bindable]
+			public var showSampleBox:Boolean = true;
+			
+			[Bindable]
+			private var processInstanceState:String;
+			
+			public var processInstanceId:String;
+			public var destinationForWorkflow:String = GlobalConst.SERVICE_WORKFLOW;
+			[Bindable]
+		    public var endpointForWorkflow:String;
+		    private var novaWorkflowService:RemoteObject;
+		    
+			[Bindable]
+			private static var waitIcon:Class = AssetsFileLib.activity_waitIcon;
+			
+			[Bindable]
+			private static var processingIcon:Class = AssetsFileLib.activity_processingIcon;
+
+			[Bindable]
+			private static var passedIcon:Class = AssetsFileLib.activity_passedIcon;
+			
+			[Bindable]
+			private static var startIcon:Class = AssetsFileLib.startWorkflowIcon;	
+
+			[Bindable]
+			private  static var endIcon:Class = AssetsFileLib.endIcon;	
+			
+			[Bindable]
+			private static var wjxIcon:Class = AssetsFileLib.wjxIcon;	
+
+			private static const CODE_STARTACTIVITY:String = "START";
+			private static const CODE_ENDACTIVITY:String = "END";			
+		    
+		    private var currentProcess:Process;
+		    
+		    private var loadingWindow:LoadingWindow = new LoadingWindow();
+		    private var processVariableWindow:ProcessVariableWindow = new ProcessVariableWindow();
+		    
+		    private var activityIconMap:Object = new Object();//维护环节与环节图标的映射关系
+			private var transitionLineMap:Object = new Object();//维护环节与环节图标的映射关系
+			
+			[Bindable]
+			public var editable:Boolean = true;
+						
+			private function init():void{
+				novaWorkflowService = new RemoteObject(destinationForWorkflow);
+		        if(endpointForWorkflow!=null)
+		        	novaWorkflowService.endpoint = endpointForWorkflow;
+		        novaWorkflowService.getProcessByInstance.addEventListener(ResultEvent.RESULT,getProcessHandler);
+		        novaWorkflowService.getProcessByInstance.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.getCurrentActivities.addEventListener(ResultEvent.RESULT,getCurrentActivitiesHandler);
+		        novaWorkflowService.getCurrentActivities.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.getExecutedActivities.addEventListener(ResultEvent.RESULT,getExecutedActivitiesHandler);
+		        novaWorkflowService.getExecutedActivities.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.getExecutedTransition.addEventListener(ResultEvent.RESULT,getExecutedTransitionHandler);
+		        novaWorkflowService.getExecutedTransition.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.startProcessInstance.addEventListener(ResultEvent.RESULT,startProcessHandler);
+		        novaWorkflowService.startProcessInstance.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.getProcessInstanceRunState.addEventListener(ResultEvent.RESULT,getProcessInstanceRunStateHandler);
+		        novaWorkflowService.getProcessInstanceRunState.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.executeNext.addEventListener(ResultEvent.RESULT,executeActivityHandler);
+		        novaWorkflowService.executeNext.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.closeProcessInstance.addEventListener(ResultEvent.RESULT,closeProcessInstanceHandler);
+		        novaWorkflowService.closeProcessInstance.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        
+		        if(!editable){
+		        	controlBar.removeChild(startButton);
+		        	controlBar.removeChild(stopButton);
+		        	controlBar.removeChild(executeButton);
+		        }
+		        
+		        if(!showControlBar)
+		        	this.removeChild(controlBar);
+		        
+		        
+
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+				hideLoadingWindow();
+		    }
+		    
+		    public function startMonitor():void{
+		    	if(processInstanceId == null)
+		    		throw new Error("必须指定流程实例");
+		    	processVariableWindow.processInstanceId = processInstanceId;
+		    	processVariableWindow.editable = editable;
+				processVariableWindow.endpointForWorkflow = endpointForWorkflow;
+		        novaWorkflowService.getProcessByInstance(processInstanceId);
+		    }
+		    
+			private function getProcessHandler(event:ResultEvent):void{
+				currentProcess = event.result as Process;
+				if(currentProcess == null){
+					Alert.show("无法打开流程");
+					return;
+				}
+				drawGraph();
+				showProcessProperties();
+			}
+			
+			private function getCurrentActivitiesHandler(event:ResultEvent):void{
+				var currentActivities:ArrayCollection = event.result as ArrayCollection;
+				if(currentActivities == null){
+					Alert.show("获取当前执行环节失败");
+					return;
+				}
+				for each(var a:Activity in currentActivities){
+					var icon:FlowIcon = activityIconMap[a.code];
+					if(a.code != CODE_STARTACTIVITY && a.code != CODE_ENDACTIVITY && icon != null)
+						icon.icon = processingIcon;
+				}
+				
+			}
+			
+			private function getExecutedTransitionHandler(event:ResultEvent):void{
+				var transitions:ArrayCollection = event.result as ArrayCollection;
+				if(transitions == null){
+					Alert.show("获取已执行转移失败");
+					return;
+				}
+				for each(var t:Transition in transitions){
+					var line:ArrowLine = transitionLineMap[t.code];
+					if(line != null)
+						line.lineColor = 0x0000FF;
+				}
+			}
+			
+			
+			private function getExecutedActivitiesHandler(event:ResultEvent):void{
+				var executedActivities:ArrayCollection = event.result as ArrayCollection;
+				if(executedActivities == null){
+					Alert.show("获取已执行环节失败");
+					return;
+				}
+				for each(var a:Activity in executedActivities){
+					var icon:FlowIcon = activityIconMap[a.code];
+					if(a.code != CODE_STARTACTIVITY && a.code != CODE_ENDACTIVITY && icon != null)
+						icon.icon = passedIcon;
+				}
+				novaWorkflowService.getCurrentActivities(processInstanceId);//读取当前环节
+				novaWorkflowService.getExecutedTransition(processInstanceId);//读取已执行转移
+			}
+			
+			private function drawGraph():void{
+				mainGraph.removeAllChildren();//清空当前的流程图
+				mainGraph.addChild(sampleBox);
+				activityIconMap = new Object();
+				transitionLineMap = new Object();
+				for each(var a:Activity in currentProcess.activityCollection){
+					var uiname:String = a.uiname;
+					var code:String = a.code;
+					var aid:String = String(a.id);
+					var icon:FlowIcon;
+					if(code == CODE_STARTACTIVITY)
+						icon = new FlowIcon(startIcon,20,20,aid,uiname);
+					else if(code == CODE_ENDACTIVITY)
+						icon = new FlowIcon(endIcon,20,20,aid,uiname);
+					else
+						icon = new FlowIcon(waitIcon,32,32,aid,uiname);
+					icon.x = a.x;
+					icon.y = a.y;
+					icon.addEventListener(IconEvent.ICON_MOUSE_DOWN, onIconMouseDown);
+					mainGraph.addChild(icon);
+					mainGraph.validateDisplayList();	
+					activityIconMap[code] = icon;				
+				}
+				for each(var t:Transition in currentProcess.transitionCollection){
+					var transitionCode:String = t.code;
+					var transitionId:String = String(t.id);
+					if(transitionCode == null || transitionCode == ""){
+						Alert.show("必须指定转移编码！");
+						return;
+					}
+					var fromActivityCode:String = t.fromActivity.code;
+					var toActivityCode:String = t.toActivity.code;
+					var fromActivityIcon:FlowIcon = activityIconMap[fromActivityCode];
+					var toActivityIcon:FlowIcon = activityIconMap[toActivityCode];
+					if(fromActivityIcon == null){
+						Alert.show("转移["+transitionCode+"]的来源环节["+fromActivityCode+"]不存在");
+						return;
+					}
+					
+					if(toActivityIcon == null){
+						Alert.show("转移["+transitionCode+"]的来源环节["+toActivityCode+"]不存在");
+						return;
+					}
+					var points:Array = Utils.getArrowLineAxis(fromActivityIcon,toActivityIcon);
+					
+						
+					var line:ArrowLine = new ArrowLine(transitionId,
+							points[0],
+							points[1],
+							t.uiname
+						);
+					line.addEventListener(MouseEvent.CLICK,lineClick);
+					transitionLineMap[transitionCode] = line;
+					mainGraph.addChild(line);
+					mainGraph.validateDisplayList();
+				}
+				novaWorkflowService.getProcessInstanceRunState(processInstanceId);
+				novaWorkflowService.getExecutedActivities(processInstanceId);//获取已执行环节
+			}
+			
+			//当单击流程图画布上的图标时,呈选中状态,并出现发光效果.
+			private function onIconMouseDown(event: IconEvent): void{	
+				var img: FlowIcon = FlowIcon(event.icon);
+				//添加选中效果(发光)
+				glow1.target = img;//将效果指定到图标上(编程时不是为图标设置效果)
+				glow1.end();
+				glow1.play();
+				
+				clearBorders(); //删除所有图标的边框
+				
+				img.selected=true;
+				showActivityProperties(img.identity);
+
+			}
+			
+			
+			private function lineClick(event:MouseEvent):void{
+				var line:ArrowLine = ArrowLine(event.currentTarget);
+				glow1.target = line;
+				glow1.end();
+				glow1.play();
+				clearBorders(); //删除所有图标的边框
+				line.selected = true;
+				showTransitionProperties(line.identity);
+			}
+			
+			private function mainGraphMouseDownHandler(event:MouseEvent):void{
+	   			//如果用户点击的是画布,而不是按钮冒泡过来的事件
+				if((event.target is Canvas)){
+					clearBorders(); //删除所有图标的边框
+					showProcessProperties();
+				}
+			}
+			
+			//清除所有图标的边框
+			private function clearBorders(): void{
+				for(var i: int = 0; i < mainGraph.numChildren; i ++){
+					if(mainGraph.getChildAt(i) is FlowIcon){
+						//找到当前的图标
+						var currentIcon: FlowIcon = FlowIcon(mainGraph.getChildAt(i));
+						currentIcon.selected = false;
+					}
+					if(mainGraph.getChildAt(i) is ArrowLine){
+						var currentLine:ArrowLine = ArrowLine(mainGraph.getChildAt(i));
+						currentLine.selected = false;
+					}
+				}
+			}
+			
+			private function showTransitionProperties(transitionId:String):void{
+				if(currentProcess == null)
+					return;
+				propertiesViewStack.selectedChild = transitionProperties;
+				for each(var t:Transition in currentProcess.transitionCollection){
+					if(t.id == Number(transitionId)){
+						transitionCodeInput.text = t.code;
+						transitionNameInput.text = t.wfname;
+						transitionUinameInput.text = t.uiname;
+						transitionConditionInput.text = t.condition;
+						break;
+					}
+				}
+			}
+
+			private function showActivityProperties(activityId:String):void{
+				if(currentProcess == null)
+					return;
+				propertiesViewStack.selectedChild = activityProperties;
+				for each(var a:Activity in currentProcess.activityCollection){
+					if(a.id == Number(activityId)){
+						activityCodeInput.text = a.code
+						activityNameInput.text = a.wfname;
+						activityUinameInput.text = a.uiname;
+						activityBeforeInput.text = a.beforeInterceptorClassName;
+						activityAfterInput.text = a.afterInterceptorClassName;
+						activityPerformModeInput.text = a.performMode;
+						activitySplitTypeInput.text = a.splitType;
+						activityJoinTypeInput.text = a.joinType;
+						activityJoinConditionInput.text = a.joinCondition;
+						activityDescrInput.text = a.description;
+						break;
+					}
+				}
+				//显示派发任务
+				taskAssignListPanel.initQueryCondition = "PRINSTANCEID="+processInstanceId+" and ACTIVITYID="+activityId;
+				taskAssignListPanel.query();
+				//显示派发任务操作日志
+				taskLogListPanel.initQueryCondition = "PRINSTANCEID="+processInstanceId+" and ACTIVITYID="+activityId;
+				taskLogListPanel.query();
+			}
+			
+			private function showProcessProperties():void{
+				if(currentProcess == null)
+					return;
+				propertiesViewStack.selectedChild = processProperties;
+				processCodeInput.text = currentProcess.code;
+				processNameInput.text = currentProcess.name;
+			}
+			
+			private function showLoadingWindow(text:String = "执行中"):void{
+				loadingWindow.text = text;
+				PopUpManager.addPopUp(loadingWindow,this);
+				PopUpManager.centerPopUp(loadingWindow);
+			}
+			
+			private function hideLoadingWindow():void{
+				PopUpManager.removePopUp(loadingWindow);
+			}
+			
+			private function startProcess():void{
+				novaWorkflowService.startProcessInstance(processInstanceId);
+				showLoadingWindow();
+			}
+						
+			private function startProcessHandler(event:ResultEvent):void{
+				hideLoadingWindow();
+				drawGraph();
+			}
+			
+			private function executeActivity():void{
+				for(var i: int = 0; i < mainGraph.numChildren; i ++){
+					if(mainGraph.getChildAt(i) is FlowIcon){
+						var currentIcon: FlowIcon = FlowIcon(mainGraph.getChildAt(i));
+						if(currentIcon.selected){
+							novaWorkflowService.executeNext(currentIcon.identity,processInstanceId);
+							showLoadingWindow();
+							return;
+						}
+					}
+				}
+			}
+			
+			private function executeActivityHandler(event:ResultEvent):void{
+				hideLoadingWindow();
+				drawGraph();
+			}
+			
+			private function getProcessInstanceRunStateHandler(event:ResultEvent):void{
+				processInstanceState = event.result as String;
+			}
+			
+			private function closeProcess():void{
+				novaWorkflowService.closeProcessInstance(processInstanceId);
+				showLoadingWindow();
+			}
+			
+			private function closeProcessInstanceHandler(event:ResultEvent):void{
+				hideLoadingWindow();
+				drawGraph();
+			}
+			
+			public function showProcessVariableWindow():void{
+				PopUpManager.addPopUp(processVariableWindow,this);
+				PopUpManager.centerPopUp(processVariableWindow);
+			}
+			
+			public function hideProcessVariableWindow():void{
+				PopUpManager.removePopUp(processVariableWindow);
+			}
+		]]>
+	</mx:Script>
+	<mx:Glow id="glow1" blurXFrom="0" color="0xFF0000" blurXTo="15" blurYFrom="0" blurYTo="15" />
+	<mx:Glow id="glow2" alphaFrom="50" alphaTo="0" blurXFrom="15" color="0x00FF00" blurXTo="0" blurYFrom="15" blurYTo="0" />
+	<mx:ApplicationControlBar width="100%" id="controlBar">
+		<mx:Button id="startButton" label="启动" click="startProcess()" enabled="{statusLabel.text=='init'}"/>
+		<mx:Button id="executeButton" label="执行" click="executeActivity()"/>
+		<mx:Button id="stopButton" label="停止" click="closeProcess()" enabled="{statusLabel.text!='closed'}"/>
+		<mx:Button id="variableButton" label="变量" click="showProcessVariableWindow()"/>
+		<mx:Button id="sampleButton" label="图例" click="{showSampleBox=!showSampleBox}"/>
+	</mx:ApplicationControlBar>
+	<mx:VDividedBox width="100%" height="100%">
+		<mx:Canvas width="100%" height="70%" id="mainGraph"  borderStyle="solid" mouseDown="mainGraphMouseDownHandler(event)" borderColor="#1C435E">
+			<mx:VBox x="5" y="5" visible="{showSampleBox}" borderStyle="solid" borderColor="#000000" id="sampleBox" paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5" backgroundColor="#EFF9A9" backgroundAlpha="0.62">
+				<mx:Label text="图例" fontWeight="bold"/>
+				<mx:HBox width="100%" verticalAlign="middle">
+					<mx:Image source="{startIcon}"/>
+					<mx:Label text="开始环节"/>
+				</mx:HBox>
+				<mx:HBox width="100%" verticalAlign="middle">
+					<mx:Image source="{endIcon}"/>
+					<mx:Label text="结束环节"/>
+				</mx:HBox>
+				<mx:HBox width="100%" verticalAlign="middle">
+					<mx:Image source="{waitIcon}"/>
+					<mx:Label text="未执行环节"/>
+				</mx:HBox>
+				<mx:HBox width="100%" verticalAlign="middle">
+					<mx:Image source="{processingIcon}"/>
+					<mx:Label text="正执行环节"/>
+				</mx:HBox>
+				<mx:HBox width="100%" verticalAlign="middle">
+					<mx:Image source="{passedIcon}"/>
+					<mx:Label text="已执行环节"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:Canvas>
+		<mx:TabNavigator width="100%" height="30%" creationPolicy="all">
+			<mx:VBox label="流程属性" width="100%" height="100%">
+				<mx:ViewStack width="100%" height="100%" id="propertiesViewStack" creationPolicy="all">
+					<mx:Tile id="transitionProperties" width="100%" height="100%" verticalAlign="middle" horizontalAlign="left" paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20">
+						<mx:HBox>
+							<mx:Label text="编码"/>
+							<mx:TextInput editable="false" width="150" id="transitionCodeInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="名称"/>
+							<mx:TextInput editable="false" width="150" id="transitionNameInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="显示名称"/>
+							<mx:TextInput editable="false" width="150" id="transitionUinameInput" borderStyle="solid"/>
+						</mx:HBox>		
+						<mx:HBox>
+							<mx:Label text="条件公式"/>
+							<mx:TextInput editable="false" width="150" id="transitionConditionInput" borderStyle="solid"/>
+						</mx:HBox>
+					</mx:Tile>
+					<mx:Tile id="processProperties" width="100%" height="100%" verticalAlign="middle" horizontalAlign="left" paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20">
+						<mx:HBox>
+							<mx:Label text="编码"/>
+							<mx:TextInput editable="false" width="150" id="processCodeInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="名称"/>
+							<mx:TextInput editable="false" width="150" id="processNameInput" borderStyle="solid"/>
+						</mx:HBox>
+					</mx:Tile>
+					<mx:Tile id="activityProperties" width="100%" height="100%" verticalAlign="middle" horizontalAlign="left" paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20">
+						<mx:HBox>
+							<mx:Label text="编码"/>
+							<mx:TextInput editable="false" width="150" id="activityCodeInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="名称"/>
+							<mx:TextInput editable="false" width="150" id="activityNameInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="显示名称"/>
+							<mx:TextInput editable="false" width="150" id="activityUinameInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="前置拦截器"/>
+							<mx:TextInput editable="false" width="150" id="activityBeforeInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="后置拦截器"/>
+							<mx:TextInput editable="false" width="150" id="activityAfterInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="执行模式"/>
+							<mx:TextInput editable="false" width="150" id="activityPerformModeInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="分派模式"/>
+							<mx:TextInput editable="false" width="150" id="activitySplitTypeInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="合并模式"/>
+							<mx:TextInput editable="false" width="150" id="activityJoinTypeInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="合并条件"/>
+							<mx:TextInput editable="false" width="150" id="activityJoinConditionInput" borderStyle="solid"/>
+						</mx:HBox>
+						<mx:HBox>
+							<mx:Label text="描述"/>
+							<mx:TextArea editable="false" width="150" id="activityDescrInput" borderStyle="solid"/>
+						</mx:HBox>
+					</mx:Tile>
+				</mx:ViewStack>
+			</mx:VBox>
+			<mx:VBox label="派发任务" width="100%" height="100%">
+				<core:BillListPanel id="taskAssignListPanel" templetCode="T_PUB_WF_TASKASSIGN" 
+					debugMode="{debugMode}" editable="false" showEditBox="false" 
+					showQuickQueryPanel="false" showLoadingWindow="false" showInitingWindow="false" 
+					width="100%" height="100%"
+					endpoint="{endpointForWorkflow}"/>
+			</mx:VBox>
+			<mx:VBox label="任务操作日志" width="100%" height="100%">
+				<core:BillListPanel id="taskLogListPanel" templetCode="T_PUB_WF_TASKLOG" 
+					debugMode="{debugMode}" 
+					editable="false" showEditBox="false" showQuickQueryPanel="false" 
+					showLoadingWindow="false" showInitingWindow="false" 
+					width="100%" height="100%"
+					endpoint="{endpointForWorkflow}"/>
+			</mx:VBox>
+		</mx:TabNavigator>
+	</mx:VDividedBox>
+	<mx:HBox width="100%"  paddingLeft="10" horizontalGap="1">
+		<mx:Image source="{wjxIcon}"/>
+		<mx:Label text="流程状态:"/>
+		<mx:Label id="statusLabel" text="{processInstanceState}"/>
+	</mx:HBox>
+</mx:VBox>

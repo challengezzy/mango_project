@@ -1,0 +1,558 @@
+/**************************************************************************
+ * $RCSfile: FrameWorkCommServiceImpl.java,v $  $Revision: 1.8.2.9 $  $Date: 2009/10/16 03:48:10 $
+ **************************************************************************/
+
+package smartx.framework.common.bs;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.lang.reflect.*;
+import java.util.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.*;
+import smartx.framework.metadata.bs.*;
+import smartx.framework.metadata.vo.*;
+
+
+/**
+ * 平台通用服务,基本上都是查询数据库存,保存数据库,执行SQL,存储过程等!!
+ * @author user
+ */
+public class FrameWorkCommServiceImpl implements FrameWorkCommService {
+
+    public FrameWorkCommServiceImpl() {
+    }
+
+    /**
+     * 通用调用方法!!
+     */
+    public HashMap commMethod(String _className, String _functionName, HashMap _parMap) throws Exception {
+        try {
+            Class objclass = Class.forName(_className);
+            Method objmethod = objclass.getMethod(_functionName, new Class[] {HashMap.class}); //
+            Object objInstance = Class.forName(_className).newInstance(); //
+            Object returnObj = objmethod.invoke(objInstance, new Object[] {_parMap});
+            return (HashMap) returnObj;
+        } catch (InvocationTargetException ex) {
+            ex.getTargetException().printStackTrace(); //
+            throw new Exception(ex.getTargetException().getMessage());
+        } catch (Exception ex) {
+            throw ex;
+        }
+    } //会抛远程调用异常
+
+    public String getProjectName() throws Exception {
+        return (String)NovaServerEnvironment.getInstance().get("PROJECT_NAME");
+    }
+
+    /* 取得默认数据源名称!!
+     * @see smartx.framework.common.ui.FrameWorkCommService#getDeaultDataSource()
+     */
+    public String getDeaultDataSource() throws Exception {
+        return NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+    }
+
+    /* 取得登录服务实现类名
+     * @see smartx.framework.common.ui.FrameWorkCommService#getLoginServiceName()
+     */
+    public String getLoginServiceName() throws Exception {
+        return (String) NovaServerEnvironment.getInstance().get("LoginServiceName");
+    }
+
+    /**
+     * 取得server端环境参数，使参数的获得封装为一次远程访问
+     * @return HashMap
+     * @throws Exception
+     */
+    public HashMap getEnvironmentParam() throws Exception {
+        //TODO 不能在此设定硬编码，应该是给定访问接口直接获得服务器端参数
+    	//     而这个接口不应该简单的返回，而应该通过其他方式返回。
+    	//     例如远程传递序列化数据，而使用的时候再反序列化
+    	
+    	HashMap result = new HashMap();
+
+        result.put("PROJECT_NAME", getProjectName());
+        result.put("defaultdatasource", getDeaultDataSource());
+        result.put("APPMODULE", StringUtil.joinArray2String(getAppModule()));
+        result.put("APPMODULES", getAppModule());
+        result.put("IMAGE_LOGIN", NovaServerEnvironment.getInstance().get("IMAGE_LOGIN"));
+        result.put("IMAGE_DESKTOPCENTER", NovaServerEnvironment.getInstance().get("IMAGE_DESKTOPCENTER"));
+        result.put("IMAGE_DESKTOPTOP", NovaServerEnvironment.getInstance().get("IMAGE_DESKTOPTOP"));
+        result.put("CLIENTINIT", (Vector) NovaServerEnvironment.getInstance().get("CLIENTINIT"));
+        result.put("CLIENTPANELINIT", (Vector) NovaServerEnvironment.getInstance().get("CLIENTPANELINIT"));
+        result.put("CLIENTAFTERLOGIN", (Vector) NovaServerEnvironment.getInstance().get("CLIENTAFTERLOGIN"));
+        result.put("CLIENTBEFORELOGOUT", (Vector) NovaServerEnvironment.getInstance().get("CLIENTBEFORELOGOUT"));
+        
+        return result;
+    }
+    /**
+     * 系统配置参数原始值获取接口
+     * @param param
+     * @return
+     * @throws Exception
+     */
+    public String getEnvironmentParamStr(String param) throws Exception{
+    	String rt=(String)NovaServerEnvironment.getInstance().get(param);
+    	if(rt==null) rt=(String)Sys.getInfo(param);
+    	return rt;
+    }
+    
+    /**
+     * 系统配置参数原始值获取接口
+     * @param param 参数名
+     * @return Object 返回服务器端对象
+     * @throws Exception
+     */
+    public Object getEnvironmentParamObject(String param) throws Exception {
+    	return NovaServerEnvironment.getInstance().get(param);    
+	}
+
+    /**
+     * 获得用户关联AppModule
+     * @param uid
+     * @return
+     */
+    public String getUserAppModule(String uid)throws Exception{
+    	CommDMO commDMO = new CommDMO();
+    	String sql="select APPMODULE from PUB_USER where id="+uid;    	
+        HashVO[] vos= commDMO.getHashVoArrayByDS(null, sql); //
+        if(vos==null||vos.length==0){
+        	return null;
+        }else{
+        	return vos[0].getStringValue(0);
+        }    	
+    }
+    
+	/**
+     * 模块名称
+     * @return String
+     */
+    public String[] getAppModule()throws Exception {
+        return NovaServerEnvironment.getInstance().getAppModuleName();
+    }
+
+    public String[][] getStringArrayByDS(String _datasourcename, String _sql) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.getStringArrayByDS(_datasourcename, _sql); //
+    }
+
+    public TableDataStruct getTableDataStructByDS(String _datasourcename, String _sql) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+
+        CommDMO commDMO = new CommDMO();
+        return commDMO.getTableDataStructByDS(_datasourcename, _sql); //
+    }
+
+    public HashVO[] getHashVoArrayByDS(String _datasourcename, String _sql) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.getHashVoArrayByDS(_datasourcename, _sql);
+    }
+
+    public Vector getHashVoArrayReturnVectorByDS(String _datasourcename, String[] _sqls) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.getHashVoArrayReturnVectorByDS(_datasourcename, _sqls); //
+    }
+
+    public HashMap getHashVoArrayReturnMapByDS(String _datasourcename, String[] _sqls, String[] _keys) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.getHashVoArrayReturnMapByDS(_datasourcename, _sqls, _keys); //
+    }
+
+    /**
+     * 执行一条SQL
+     * @param _datasourcename
+     * @param _sql
+     * @return int 
+     * @throws Exception
+     */
+    public int executeUpdateByDS(String _datasourcename, String _sql) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.executeUpdateByDS(_datasourcename, _sql); //
+    }
+
+    /**
+     * 执行一批SQL
+     * @param _datasourcename
+     * @param _sqls
+     * @return int[]
+     * @throws Exception
+     */
+    public int[] executeBatchByDS(String _datasourcename, String[] _sqls) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.executeBatchByDS(_datasourcename, _sqls); //
+    }
+
+    /**
+     * 执行一批SQL
+     * @param _datasourcename
+     * @param _sqllist
+     * @return int[]
+     * @throws Exception
+     */
+    public int[] executeBatchByDS(String _datasourcename, java.util.List _sqllist) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.executeBatchByDS(_datasourcename, _sqllist); //
+    }
+
+    //	返回某个序列下一个值
+    public String getSequenceNextValByDS(String _datasourcename, String _sequenceName) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        return new CommDMO().getSequenceNextValByDS(_datasourcename, _sequenceName); //
+    }
+
+    public void callProcedureByDS(String _datasourcename, String procedureName, String[] parmeters) throws Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        commDMO.callProcedureByDS(_datasourcename, procedureName, parmeters);
+    }
+
+    public String callProcedureReturnStrByDS(String _datasourcename, String procedureName, String[] parmeters) throws
+        Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.callProcedureReturnStrByDS(_datasourcename, procedureName, parmeters); //
+    }
+
+    public String callFunctionReturnStrByDS(String _datasourcename, String functionName, String[] parmeters) throws
+        Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.callFunctionReturnStrByDS(_datasourcename, functionName, parmeters); //
+    }
+
+    public String[][] callFunctionReturnTableByDS(String _datasourcename, String functionName, String[] parmeters) throws
+        Exception {
+        if (_datasourcename == null) {
+            _datasourcename = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+        }
+        CommDMO commDMO = new CommDMO();
+        return commDMO.callFunctionReturnTableByDS(_datasourcename, functionName, parmeters); //
+    }
+
+    public HashMap uploadFileFromClient(String _code, String tablename, String fieldname, ClassFileVO _vo) throws Exception {
+        return realUploadFileFromClient(tablename, fieldname, _vo); //
+    }
+
+    public ClassFileVO downloadToClient(String _filename) throws Exception {
+        return realDownloadToClient(_filename);
+    }
+
+    public String[] getImageFileNames() throws Exception {
+    	return (String[]) NovaServerEnvironment.getInstance().get("imagefiles");
+    }
+
+    /**
+     * 取得Afx　JNDI对应的接口名
+     * @param _afxJNDIContextName
+     * @return
+     * @throws Exception
+     */
+    public String getAfxInterfaceName(String _afxJNDIContextName) throws Exception {
+		return AfxJNDIServiceUtil.getInstance().getInterFaceName(_afxJNDIContextName); //
+	}
+    
+    /**
+     * 上传文件!!
+     * @param tablename
+     * @param fieldname
+     * @param _vo
+     * @return
+     */
+    private HashMap realUploadFileFromClient(String tablename, String fieldname,
+                                        smartx.framework.common.vo.ClassFileVO _vo) {
+        CommDMO commDMO = new CommDMO(); //
+        _vo.getClassFileName();
+        File file = new File(NovaServerEnvironment.getInstance().get("WebAppRealPath") + "/" + NovaConstants.UPLOAD_DIRECTORY);
+        if (!file.exists()) {
+            file.mkdir();
+        }
+        String prefix = "";
+        try {
+            prefix = commDMO.getStringArrayByDS(null, "select s_pub_fileupload.nextval from dual")[0][0];
+        } catch (Exception e1) {
+            e1.printStackTrace();
+            HashMap _map = new HashMap();
+            _map.put(NovaConstants.UPLOAD_RESULT, new Boolean(false));
+            return _map;
+        }
+        file = new File(file.getAbsoluteFile() + "/" + prefix + "_" + _vo.getClassFileName());
+        try {
+
+            file.createNewFile();
+            System.out.println("创建文件［ " + file.getAbsolutePath() + "］");
+        } catch (IOException e) {
+            System.out.println("创建文件［ " + file.getAbsolutePath() + "］失败");
+            e.printStackTrace();
+            HashMap _map = new HashMap();
+            _map.put(NovaConstants.UPLOAD_RESULT, new Boolean(false));
+            return _map;
+        }
+        FileOutputStream out = null;
+        try {
+            out = new FileOutputStream(file);
+            try {
+                out.write(_vo.getByteCodes());
+                String insert = "insert into PUB_FILEUPLOAD values(" + prefix + ",'" + _vo.getClassFileName() + "','" +
+                    file.getName() + "','" + tablename + "','" + fieldname + "')";
+                commDMO.executeUpdateByDS(null, insert);
+            } catch (IOException e) {
+                System.out.println("写入文件失败.");
+                e.printStackTrace();
+                HashMap _map = new HashMap();
+                _map.put(NovaConstants.UPLOAD_RESULT, new Boolean(false));
+                return _map;
+            } catch (Exception ex) {
+                System.out.println("插入数据库失败");
+
+                ex.printStackTrace();
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            HashMap _map = new HashMap();
+            _map.put(NovaConstants.UPLOAD_RESULT, new Boolean(false));
+            return _map;
+        } finally {
+            try {
+                out.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        HashMap _map = new HashMap();
+        _map.put(NovaConstants.UPLOAD_RESULT, new Boolean(true));
+        _map.put(NovaConstants.UPLOAD_FILE_NAME, file.getName());
+        return _map;
+    }
+
+    /**
+     * 下载文件!!
+     * @param _filename
+     * @return
+     */
+    private ClassFileVO realDownloadToClient(String _filename) {
+        File downloadfile = new File(NovaServerEnvironment.getInstance().get("WebAppRealPath") + "/" + NovaConstants.UPLOAD_DIRECTORY + "/" + _filename);
+        if (!downloadfile.exists()) {
+            System.out.println("文件[" + _filename + "] 不存在");
+            return null;
+        }
+        FileInputStream fins = null;
+        try {
+            fins = new FileInputStream(downloadfile);
+        } catch (FileNotFoundException e1) {
+            e1.printStackTrace();
+        }
+        if (downloadfile.length() > Runtime.getRuntime().freeMemory()) {
+            System.out.println("文件最大长度不能超过:" + Runtime.getRuntime().freeMemory());
+            return null;
+        }
+        int filelength = new Long(downloadfile.length()).intValue();
+        byte[] filecontent = new byte[filelength];
+        try {
+            fins.read(filecontent);
+        } catch (IOException e) {
+            System.out.println("读取文件失败");
+            e.printStackTrace();
+        } finally {
+            try {
+                fins.close();
+            } catch (IOException e) {
+                System.out.println("关闭文件失败");
+                e.printStackTrace();
+            }
+        }
+        smartx.framework.common.vo.ClassFileVO filevo = new smartx.framework.common.vo.ClassFileVO();
+        filevo.setClassFileName(_filename.substring(_filename.indexOf("_") + 1));
+        filevo.setByteCodes(filecontent);
+        return filevo;
+    }
+    
+
+}
+
+/**************************************************************************
+ * $RCSfile: FrameWorkCommServiceImpl.java,v $  $Revision: 1.8.2.9 $  $Date: 2009/10/16 03:48:10 $
+ *
+ * $Log: FrameWorkCommServiceImpl.java,v $
+ * Revision 1.8.2.9  2009/10/16 03:48:10  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8.2.8  2009/08/13 03:11:27  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8.2.7  2009/03/06 02:36:36  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8.2.6  2009/01/31 12:40:31  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8.2.5  2008/11/25 10:25:35  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8.2.4  2008/10/14 18:16:03  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8.2.3  2008/03/27 05:51:55  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.10  2008/03/17 10:26:53  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.9  2008/01/29 09:37:50  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8  2007/11/09 05:56:22  qilin
+ * no message
+ *
+ * Revision 1.7  2007/09/06 13:12:55  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.6  2007/09/06 13:08:30  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/07/12 03:48:43  shxch
+ * 增加调用Afx JNDI服务名的方法
+ *
+ * Revision 1.4  2007/07/11 03:09:15  qilin
+ * 为当前系统启动另一个nova系统所作的修改
+ *
+ * Revision 1.3  2007/06/05 10:25:09  qilin
+ * no message
+ *
+ * Revision 1.2  2007/05/31 07:38:16  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 05:56:15  qilin
+ * no message
+ *
+ * Revision 1.33  2007/04/27 12:37:51  qilin
+ * no message
+ *
+ * Revision 1.32  2007/03/19 01:35:06  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.31  2007/03/16 06:02:31  qilin
+ * no message
+ *
+ * Revision 1.30  2007/03/14 06:15:54  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.29  2007/03/13 03:11:52  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.28  2007/03/02 05:16:42  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.27  2007/03/02 05:02:49  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.26  2007/03/02 01:36:25  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.25  2007/03/01 09:06:56  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.24  2007/03/01 07:20:47  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.23  2007/03/01 06:44:42  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.22  2007/03/01 02:56:53  shxch
+ * 添加获取图标文件名数组的方法
+ *
+ * Revision 1.21  2007/02/28 06:02:44  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.20  2007/02/28 05:59:18  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.19  2007/02/27 09:38:47  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.18  2007/02/27 08:11:32  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.17  2007/02/27 07:50:58  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.16  2007/02/27 06:03:00  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.15  2007/02/25 09:01:36  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.14  2007/02/25 02:05:33  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.13  2007/02/25 02:04:11  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.12  2007/02/10 04:27:16  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.11  2007/02/02 09:02:44  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.10  2007/02/01 08:08:27  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.9  2007/02/01 08:04:20  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.8  2007/02/01 07:25:21  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.7  2007/02/01 07:17:22  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.6  2007/02/01 02:14:22  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/02/01 01:32:54  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/01/30 08:14:09  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/01/30 03:31:55  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

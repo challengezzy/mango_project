@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" title="提示"
+		 xmlns:s="library://ns.adobe.com/flex/spark" removedEffect="{fadeOut}" addedEffect="{fadeIn}"
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="220" height="170" showCloseButton="true" close="close(event)">
+	<fx:Declarations>
+		<mx:Fade id="fadeOut" duration="1000" alphaFrom="1.0" alphaTo="0.0"/>
+		<mx:Fade id="fadeIn" duration="1000" alphaFrom="0.0" alphaTo="1.0"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.util.HelpUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var formService:RemoteObject;
+			
+			[Bindable]
+			private var dataValue:Object;
+			
+			private var dataMap:Object = new Object();
+			
+			public var isDispatchHelpEvent:Boolean = true;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			public function initData():void{
+				
+				desktop = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				formService.getSimpleHashVoArrayByDS(null,"select t.*,e.code eventcode from pub_helptopic t,pub_helpevent e where t.id=e.helptopicid");
+				
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var array:Array = event.result as Array;
+				if(array != null){
+					dataMap = new Object();
+					for each(var shvo:SimpleHashVO in array){
+						var item:Object = shvo.dataMap;
+						this.addEventListener(item["eventcode"],evengHandler);
+						dataMap[item["eventcode"]] = item;
+					}
+				}
+				
+				this.dispatchEvent(new BasicEvent("refreshHelpEventsComplete"));
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				this.dispatchEvent(new BasicEvent("refreshHelpEventsComplete"));
+				trace("获取帮助事件发生错误!");
+			}
+			
+			private function evengHandler(event:BasicEvent):void{
+				
+//				PopUpManager.removePopUp(this);
+				if(fadeOut.isPlaying){
+					fadeOut.stop();
+				}
+				
+				this.dataValue = event.dataValue;
+				
+				if(this.dataValue != null ){
+					var pt:Point = new Point((desktop.width-this.width),(desktop.height-this.height));
+					pt = desktop.localToGlobal(pt);
+					this.x = pt.x;
+					this.y = pt.y;
+					if(!this.isPopUp)
+						PopUpManager.addPopUp(this,desktop,false);
+					eventCb.selected = false;
+					tipTxt.text = dataValue["tooltip"];
+				}
+			}
+			
+			public function dispatchHelpEvent(type:String):void{
+				if(isDispatchHelpEvent){
+					var tempData:Object = dataMap[type];
+					if(tempData != null ){
+						this.dispatchEvent(new BasicEvent(type,false,false,null,tempData));
+					}
+					
+				}
+			}
+				
+			protected function eventCb_changeHandler(event:Event):void
+			{
+				if(eventCb.selected){
+					isDispatchHelpEvent = false;
+				}else{
+					isDispatchHelpEvent = true;
+				}
+			}
+			
+			protected function tipTxt_clickHandler(event:MouseEvent):void
+			{
+				eventCb_changeHandler(null);
+				
+				if( dataValue != null ){
+					
+					var helpPanel:HelpPanel = HelpUtil.getInstance().getHelpPanel();
+					helpPanel.helpId = dataValue["id"];
+					helpPanel.parentId = dataValue["parentid"];
+					
+					if(!helpPanel.isPopUp){
+						var pt:Point = new Point((desktop.width-helpPanel.withNum),(desktop.height-helpPanel.heightNum));
+						pt = desktop.localToGlobal(pt);
+						helpPanel.x = pt.x;
+						helpPanel.y = pt.y;
+						PopUpManager.addPopUp(helpPanel,desktop,false);
+					}
+					helpPanel.goToHelpSubjectById(helpPanel.helpId);
+					
+					close(null);
+				}
+			}
+			
+			private  function close(event:CloseEvent):void{
+				eventCb_changeHandler(null);
+				PopUpManager.removePopUp(this);
+				if(fadeIn.isPlaying){
+					fadeIn.stop();
+				}
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5"  >
+		<mx:Text id="tipTxt" width="100%" height="100%" buttonMode="true" toolTip="点击查看帮助详情" click="tipTxt_clickHandler(event)" />
+		<mx:CheckBox id="eventCb" label="不再显示" change="eventCb_changeHandler(event)" />
+	</mx:VBox>
+</mx:TitleWindow>

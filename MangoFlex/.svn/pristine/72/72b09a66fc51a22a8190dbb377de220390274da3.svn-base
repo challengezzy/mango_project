@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PodContent xmlns="smartx.flex.components.basic.portal.*" xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%" creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.formatters.DateFormatter;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var formService:RemoteObject;
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			public var endpoint:String;
+			
+			private var formatter:DateFormatter = new DateFormatter();
+			private var formatString:String = "YYYY-MM-DD JJ:NN:SS";
+			
+			private function init():void{
+				formService = new RemoteObject(destination);
+	        	if(endpoint!=null)
+	        		formService.endpoint = endpoint;
+	        		
+	        	formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getUserInfoHandler);
+	    		formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+	    		formatter.formatString = formatString;
+	    		if(userId == null)
+	    			userId = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+	    		formService.getSimpleHashVoArrayByDS("datasource_usermgmt","select * from pub_user where id="+userId);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				 Alert.show(event.fault.faultString, 'Error');
+	       	}
+	       	
+	       	private function getUserInfoHandler(event:ResultEvent):void{
+	       		var result:Array = event.result as Array;
+	       		if(result.length == 1){
+	       			var vo:SimpleHashVO = result[0];
+	       			nameInput.text = vo.dataMap["name"];
+	       			loginnameInput.text = vo.dataMap["loginname"];
+	       			loginnameInput.text = vo.dataMap["loginname"];
+	       			logincountInput.text = vo.dataMap["logincount"];
+	       			createtimeInput.text = formatter.format(vo.dataMap["createdate"]);
+	       			logintimeInput.text = formatter.format(vo.dataMap["logintime"]);
+	       		}
+	       	}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" height="100%" paddingTop="5" paddingBottom="5">
+		<mx:Image source="{AssetsFileLib.infoIcon}" height="100%" scaleContent="false"/>
+		<mx:VBox width="100%" height="100%">
+			<mx:VBox width="100%" height="100%"  paddingLeft="10" paddingRight="10"
+					 borderStyle="solid" paddingBottom="2" paddingTop="2">
+				<mx:HBox width="100%">
+					<mx:Label text="姓名" />
+					<mx:Text id="nameInput"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="登录名"  />
+					<mx:Text id="loginnameInput"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="创建时间"  />
+					<mx:Text id="createtimeInput"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="登录时间" />
+					<mx:Text id="logintimeInput"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="登录次数" />
+					<mx:Text id="logincountInput"/>
+				</mx:HBox>
+			</mx:VBox>
+			<mx:HBox width="100%">
+				<mx:LinkButton icon="{AssetsFileLib.modifyPwdIcon}" label="修改密码"/>
+			</mx:HBox>
+		</mx:VBox>
+	</mx:HBox>
+</PodContent>

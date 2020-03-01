@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" 
+	title="流程状态" allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true"
+	width="600" height="500" xmlns:components="smartx.flex.components.*" creationComplete="init()" initialize="initializeHandler()" close="PopUpManager.removePopUp(this)" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			[Bindable]
+			public var processInstanceId:String;
+			[Bindable]
+			public var endpoint:String;
+			
+			private function init():void{
+				monitorPanel.startMonitor();
+			}
+			
+			protected function initializeHandler():void
+			{
+				endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			}
+
+		]]>
+	</mx:Script>
+	<core:BillWorkflowMonitorPanel endpointForWorkflow="{endpoint}" id="monitorPanel" processInstanceId="{processInstanceId}" editable="false" width="100%" height="100%"/>
+	<mx:ControlBar horizontalAlign="center">
+		<mx:Button label="确定" click="PopUpManager.removePopUp(this)"/>
+		<mx:Button label="刷新" click="monitorPanel.startMonitor()"/>
+	</mx:ControlBar>
+</SuperPanel>

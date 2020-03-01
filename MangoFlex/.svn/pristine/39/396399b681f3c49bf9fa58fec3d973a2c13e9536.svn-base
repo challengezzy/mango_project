@@ -1,0 +1,1150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas  xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:mx="library://ns.adobe.com/flex/mx"
+			verticalScrollPolicy="off" horizontalScrollPolicy="off"
+			width="100%" height="100%" creationComplete="init()"
+			xmlns:containers="flexlib.containers.*" xmlns:ext="smartx.flex.components.core.ext.*">
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Metadata>
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import com.siloon.plugin.rightClick.RightClickManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.HRule;
+			import mx.controls.LinkButton;
+			import mx.controls.Menu;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.MenuEvent;
+			import mx.events.ScrollEvent;
+			import mx.events.ScrollEventDirection;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.ext.AdvQueryWindow;
+			import smartx.flex.components.event.BillListPanelEvent;
+			import smartx.flex.components.itemcomponent.ItemUIComponent;
+			import smartx.flex.components.itemcomponent.ItemUIComponentBuilder;
+			import smartx.flex.components.itemcomponent.ListEditorComponentFactory;
+			import smartx.flex.components.templetmgmt.TempletMgmtWindow;
+			import smartx.flex.components.util.ListItemPanel;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.util.ViewSingleRecordWindow;
+			import smartx.flex.components.util.script.ScriptEvent;
+			import smartx.flex.components.util.script.ScriptExecutor;
+			import smartx.flex.components.util.script.ScriptExecutorFactory;
+			import smartx.flex.components.vo.BillListPanelVO;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			/*
+			Nova的BillListPanel flex版
+			*/
+			
+			private var cacheVO:BillListPanelVO;
+			private var currentData:ArrayCollection;
+			public var templetVO:TempletVO;
+			public var templetCode:String;
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			public var endpoint:String;
+			public var rowCountPerPage:int=5;
+			public var initQueryCondition:String;
+			private var queryCondition:String;
+			private var advancedQueryCondition:String;
+			public var cacheThreshold:int=1000;
+			public var cacheMode:int=0;
+			public static const CACHE_MODE_YES:int=2;
+			public static const CACHE_MODE_NO:int=1;
+			public static const CACHE_MODE_AUTO:int=0;
+			internal var useCache:Boolean=false;
+			private var formService:RemoteObject;
+			private var currentPage:int=1;
+			private var quickQueryControls:Array = new Array();
+			//private var rowCount:int=0;
+			[Bindable]
+			private var pageCount:int=0;
+			[Bindable]
+			public var showQuickQueryPanel:Boolean=true;
+			[Bindable]
+			public var debugMode:Boolean=false;
+			[Bindable]
+			internal var sql:String="n/a";
+			internal var queryStartTimestamp:Date;
+			internal var queryTime:Number=0;
+			[Bindable]
+			private var querying:Boolean=false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var allowMultipleSelection:Boolean = false;
+			
+			public var rightClickMenu:Menu;
+//			private var debugWindow:ListPanelDebugInfoWindow = new ListPanelDebugInfoWindow;
+			[Bindable]
+			public var showEditBox:Boolean=false;
+			[Bindable]
+			public var showDataAfterInit:Boolean=false;
+			[Bindable]
+			public var showRowNum:Boolean = true;
+			//被修改过的数据map
+			private var editedDataMap:Object = new Object();
+			//新增的数据队列
+			private var insertedDataArray:Array = new Array();
+			//新增的数据队列
+			private var deletedDataArray:Array = new Array();
+			//itemkey到templetItemVO的MAP
+			private var templetItemVOMap:Object = new Object;
+			
+			[Bindable]
+			public var showInitingWindow:Boolean = true;
+			[Bindable]
+			public var showLoadingWindow:Boolean = true;
+			
+			[Bindable]
+			public var showSaveButton:Boolean = true;
+			[Bindable]
+			public var showPageBox:Boolean = true;
+			
+			public var rownumWidth:int = 40;
+			
+			//modify by caohenghui --start
+			[Bindable]
+			public var isShowAlert:Boolean = true;
+			
+			//modify by caohenghui --end
+			
+			private var clientEnviorment:Object = new Object();
+			
+			public var rightClickMenuItems:Array = [];
+			
+			//modify by zhangzz start
+			private var queryMode:String;//查询模式
+			private static const SIMPLE:String = "simple";//简单
+			private static const ADV:String = "adv";//高级
+			//modify by zhangzz end
+			
+			//add by caohenghui 2011-09-21 --start
+//			private var filterInfo:SharedObject;
+			//add by caohenghui 200-09-21 --end
+			
+			[Bindable]
+			private var hasUsingFilter:Boolean = false;
+			
+			private var verticalScrollPositionNum:Number = 0;
+			private var horizontalScrollPositionNum:Number = 0;
+			
+			[Bindable]
+			public var bfInterceptor:String;
+			[Bindable]
+			public var afInterceptor:String;
+			
+			[Bindable]
+			public var buttonCol:Array = new Array();
+			[Bindable]
+			public var titleField:String;
+			[Bindable]
+			public var subTitleField:String;
+			[Bindable]
+			public var contentField:String;
+			[Bindable]
+			public var iconField:String;
+			[Bindable]
+			public var imgUrl:String = "images/Report.png";
+			
+			[Bindable]
+			public var showDeleteButton:Boolean;
+			
+			[Bindable]
+			public var heigthInt:Number;
+			
+			
+			private function keyEnterFunction(event:FlexEvent):void{
+				query();
+			}
+			
+			private function getBillListPanelVOByPageResultHandler(event:ResultEvent):void {
+				try{ 
+					var billListPanelVO:BillListPanelVO = event.result as BillListPanelVO;
+					currentPage = billListPanelVO.currentPage;
+					pageCount = billListPanelVO.tableDataPageCount;
+					pagedetail.text = "共"+billListPanelVO.tableDataRowCount+"条记录 第"+currentPage+"页/共"+billListPanelVO.tableDataPageCount+"页";
+//					dataGrid.dataProvider = billListPanelVO.tableDataValues;
+					currentData = billListPanelVO.tableDataValues;
+					sql = billListPanelVO.realSQL;
+					
+					if(dataItemsVbox.getChildren().length>0){
+						dataItemsVbox.removeAllChildren();
+					}
+					
+					for each(var item:Object in billListPanelVO.tableDataValues){
+						var listItemPanel:ListItemPanel = new ListItemPanel();
+						listItemPanel.titleField = titleField;
+						listItemPanel.subTitleField = subTitleField;
+						listItemPanel.contentField = contentField;
+						listItemPanel.iconField = iconField;
+						listItemPanel.buttonCol = buttonCol;
+						listItemPanel.imgUrl = imgUrl;
+						listItemPanel.dataValue = item;
+						listItemPanel.width = (dataItemsVbox.width-20);
+						listItemPanel.billListItemPanel = this;
+						listItemPanel.showDeleteButton = showDeleteButton;
+						listItemPanel.endpoint = endpoint;
+//						listItemPanel.height = 90;
+						
+						dataItemsVbox.addChild(listItemPanel);
+						
+						var hrule:HRule = new HRule();
+						hrule.percentWidth = 100;
+						dataItemsVbox.addChild(hrule);
+					}
+					
+				}
+				finally{
+					endQuery();
+				}
+				
+			}
+			
+			public function getCurrentData():ArrayCollection{
+				return currentData;
+			}
+			
+			//临时动态显示传入的data
+//			public function refreshData():void{
+//				dataGrid.dataProvider=currentData;
+//			}
+			
+			//临时动态显示传入的data
+//			public function refreshByData(currentData:ArrayCollection):void{
+//				this.currentData = currentData;
+//				dataGrid.dataProvider=currentData;
+//			}
+			
+			private function initTableHeader():void{
+				var columns:Array = new Array();
+				quickQueryControls = new Array();
+				queryFieldBox.removeAllChildren();   
+				var rownum:DataGridColumn = new DataGridColumn("行号");
+				rownum.dataField="rownum";
+				rownum.editable = false;
+				rownum.width = rownumWidth;
+				if(showRowNum)
+					columns.push(rownum);
+				
+				for each(var itemVO:TempletItemVO in templetVO.itemVos){
+					templetItemVOMap[itemVO.itemkey] = itemVO;
+					var sortFunction:Function;
+					if(itemVO.delfaultquerylevel == "1"){
+						//快速查询
+						var itemtype:String = itemVO.conditionItemType;
+						if(itemtype == null)
+							itemtype = itemVO.itemtype;
+						var itemComponent:ItemUIComponent = ItemUIComponentBuilder.getBuilder().getComponent(
+							GlobalConst.ITEMCOMPONENTMODE_CONDITION,
+							itemVO,
+							formService.destination,
+							formService.endpoint,
+							null
+						);
+						quickQueryControls.push(itemComponent);
+						queryFieldBox.addChild(itemComponent);
+						itemComponent.addEventListener(FlexEvent.ENTER,keyEnterFunction);
+						sortFunction = itemComponent.getSortFunction(itemVO.itemkey);
+					}
+					if(!itemVO.listisshowable)
+						continue;
+					var temp:DataGridColumn= new DataGridColumn(itemVO.itemname);
+					temp.dataField=itemVO.itemkey;
+					temp.width=itemVO.listwidth;
+					//是否可编辑
+					if(itemVO.listiseditable == "1" || itemVO.listiseditable == "2" || itemVO.listiseditable == "3")//暂时不区分新增可编辑或者修改可编辑
+						temp.editable = true;
+					else
+						temp.editable = false;
+					//if(itemVO.itemtype == "下拉框" ||itemVO.itemtype == "参照"||itemVO.itemtype == "时间"||itemVO.itemtype == "文本框"||itemVO.itemtype == "公式"){
+					temp.itemEditor  = new ListEditorComponentFactory(itemVO,formService.destination,formService.endpoint);
+					temp.editorDataField = "realValue";
+					if(sortFunction != null)
+						temp.sortCompareFunction = sortFunction;
+					//}
+					columns.push(temp);
+				}
+//				dataGrid.columns = columns;
+				this.validateNow();
+				
+				//隐藏初始化等待框
+				if(showInitingWindow)
+					OperatingTipUtil.endOperat();
+				
+				if(showDataAfterInit)
+					query();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endOperat();
+				SmartXMessage.show("执行操作时发生错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString, this);
+			}
+			
+			private function handleRightMenuClicked(event:MenuEvent):void{
+				var item:Object = event.item;
+				if(item == null)
+					return;
+				if(item.keyname == "showDebugInfo"){
+//					PopUpManager.addPopUp(debugWindow,this,false);
+//					PopUpManager.centerPopUp(debugWindow);
+					SmartXMessage.show(this.getQuerySQL(),SmartXMessage.MESSAGE_INFO);
+				}
+				else if(item.keyname == "showRecord"){
+					var o:Object = null;
+					if(o == null){
+						SmartXMessage.show("没有选择任何记录");
+						return;
+					}
+					var pkName:String = templetVO.pkname;
+					if(pkName == null){
+						SmartXMessage.show("没有设置主键");
+						return;
+					}
+					var pkValue:String = o[pkName];
+					var tableName:String = templetVO.tablename;
+					var sql:String = "select * from "+tableName+" where "+pkName+"='"+pkValue+"'";
+					var window:ViewSingleRecordWindow = new ViewSingleRecordWindow();
+					window.destination = this.destination;
+					window.sql = sql;
+					window.datasource = datasourceName;
+					window.endpoint = this.endpoint;
+					PopUpManager.addPopUp(window,this.root,false);
+					PopUpManager.centerPopUp(window);
+				}
+				else if(item.keyname == "showPieChart"){
+					
+				}
+				else if(item.keyname == "editTemplet"){
+					var templetWindow:TempletMgmtWindow = new TempletMgmtWindow();
+					templetWindow.templetCode = templetCode;
+					templetWindow.debugMode = debugMode;
+					templetWindow.height = 768;
+					templetWindow.width = 1024;
+					templetWindow.endpoint = endpoint;
+					PopUpManager.addPopUp(templetWindow,this.root,false);
+					PopUpManager.centerPopUp(templetWindow);
+				}
+//				else if(item.keyname == "exportCurData"){
+//					exportCurData2CSV();
+//				}else if(item.keyname == "exportAllData"){
+//					exportAllData2CSV();
+//				}
+			}
+			private function onRightMouseClick(event:MouseEvent):void{
+//				dataGrid.selectItemByMouseEvent(event);
+				if(rightClickMenu != null){
+					rightClickMenu.hide();
+					rightClickMenu.dataProvider = rightClickMenuItems;
+					var point:Point = new Point(mouseX,mouseY);
+					point = localToGlobal(point);  
+					var xx:Number = point.x;
+					var yy:Number = point.y;
+					if(xx + rightClickMenu.width > this.stage.width)
+						xx = this.stage.width - rightClickMenu.width - 1;
+					if(yy + rightClickMenu.height > this.stage.height)
+						yy = this.stage.height - rightClickMenu.height-1;
+					rightClickMenu.show(xx,yy); 
+				}
+			}
+			
+			
+			private function init():void{
+				queryMode = SIMPLE;
+				if(queryMode == SIMPLE){
+					this.heigthInt = this.height-simpleQueryPanel.height-pageBox.height-10;
+				}else if(queryMode == ADV){
+					this.heigthInt = this.height-simpleQueryPanel.height-quickQueryPanel.height-pageBox.height-15;
+				}
+				
+				if(templetCode == null)
+					throw Error("元原模板编号不能为null");
+				//弹出开始初始化的框
+				if(showInitingWindow)
+					OperatingTipUtil.startOperat("正在初始化...",this);
+				
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				//添加右键菜单
+				RightClickManager.regist();
+				this.addEventListener(RightClickManager.RIGHT_CLICK,onRightMouseClick);
+				
+				if(debugMode){
+					rightClickMenuItems.push({label:"调试信息",keyname:"showDebugInfo"});
+					rightClickMenuItems.push({label:"查看数据库记录",keyname:"showRecord"});
+					rightClickMenuItems.push({label:"编辑元原模板",keyname:"editTemplet"});
+				}
+//				rightClickMenuItems.push({label:"导出当前页数据(CSV)",keyname:"exportCurData"});
+//				rightClickMenuItems.push({label:"导出所有数据(CSV)",keyname:"exportAllData"});
+				rightClickMenu = Menu.createMenu(this,rightClickMenuItems,true);
+				rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,handleRightMenuClicked);
+				rightClickMenu.setStyle("fontSize",12);
+				//初始化远程调用方法
+				formService.getBillListPanelVOByPage.addEventListener(ResultEvent.RESULT,getBillListPanelVOByPageResultHandler);
+				formService.getBillListPanelVOByPage.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.getBillListPanelVO.addEventListener(ResultEvent.RESULT,getBillListPanelVOResultHandler);
+				formService.getBillListPanelVO.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.getBillListPanelRowCount.addEventListener(ResultEvent.RESULT,getBillListPanelRowCountHandler);
+				formService.getBillListPanelRowCount.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+				formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+//				formService.updateBatchDataByTempletVO.addEventListener(ResultEvent.RESULT,updateHandler);
+//				formService.updateBatchDataByTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+//				formService.getSequenceNextValByDS.addEventListener(ResultEvent.RESULT,getSeqHandler);
+//				formService.getSequenceNextValByDS.addEventListener(FaultEvent.FAULT,faultHandler);	
+				
+//				formService.generateBillListCSVFile.addEventListener(ResultEvent.RESULT,generateBillListCSVFileHandler);
+//				formService.generateBillListCSVFile.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+//					SmartXMessage.show("生成CSV文件错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+//					OperatingTipUtil.endOperat();
+//				});	
+				
+				//调试对话框
+//				debugWindow.listPanel = this;
+				//设置显示信息
+				if(!showQuickQueryPanel)
+					topArea.removeChild(queryPanel);
+				if(!showPageBox)
+					mainBox.removeChild(pageBox);
+				
+				queryPanel.removeChild(quickQueryPanel);
+				
+				//add by caohenghui 20110809 --start
+				searchStringClientEnviorment();
+				//add by caohenghui 20110809 --end
+				
+				//add by caoehenghui 2011-09-21 --start
+//				filterInfo = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_FILTERINFO);
+//				if( filterInfo.data.filters == null ){
+//					filterInfo.data.filters = new Object();
+//				}
+				//add by caohenghui 2011-09-21 --end
+				
+				//获取元原模板信息，以便初始化表头等
+				templetVO = TempletDataUtil.findTempletVO(templetCode);
+				if(templetVO == null)//还没缓存过
+					formService.getTempletVO(templetCode,clientEnviorment);
+				else
+					initTableHeader();
+				
+//				dataGrid.dataProvider = new Object();
+				
+				
+			}
+			
+//			private function getFilterSQL():String{
+//				var tempSql:String = "";
+//				var andSql:String = "";
+//				var orSql:String = "";
+//				
+//				//					var rowSql:String ="";
+//				//					var orRow:String ="";
+//				//					var andRow:String ="";
+//				if(filterInfo==null){
+//					return "";
+//				}
+//				
+//				var filterObj:Object = filterInfo.data.filters[templetCode];
+//				if( filterObj != null && filterObj is XML){
+//					for each(var item:XML in filterObj.filterInfo.item){
+//						var isAdd:String = item.@isAdd;
+//						if(isAdd != null && isAdd == "true"){
+//							
+//							var type:String = item.@type;
+//							var column:String = item.@column;
+//							var logicalOperator:String = item.@logicalOperator;
+//							var relationalOperator:String = item.@relationalOperator;
+//							var value:String = item.@value;
+//							
+//							var valueStr:String = dealValue(value,relationalOperator);
+//							
+//							if(logicalOperator == "AND"){
+//								var andTemp:String ="";
+//								//									if(type == "rowCount"){
+//								//										andTemp = column+" "+relationalOperator+" "+valueStr;
+//								//										if(andRow == ""){
+//								//											andRow = andTemp+"";
+//								//										}else{
+//								//											if(andTemp !="")
+//								//												andRow = andRow + " AND "+andTemp;
+//								//										}
+//								//									}else{
+//								andTemp = column+" "+relationalOperator+" "+valueStr;
+//								if(type == "stringLength"){
+//									andTemp = "length("+column+")"+" "+relationalOperator+" "+valueStr;
+//								}
+//								if(andSql == ""){
+//									andSql = andTemp+"";
+//								}else{
+//									if(andTemp !="")
+//										andSql = andSql + " AND "+andTemp;
+//								}
+//								//									}
+//								
+//								
+//							}else if(logicalOperator == "OR"){
+//								var orTemp:String ="";
+//								//									if(type == "rowCount"){
+//								//										orTemp = column+" "+relationalOperator+" "+valueStr;
+//								//										if(orRow == ""){
+//								//											orRow = orTemp+"";
+//								//										}else{
+//								//											if(orTemp !="")
+//								//												orRow = orRow + " OR "+orTemp;
+//								//										}
+//								//									}else{
+//								orTemp = column+" "+relationalOperator+" "+valueStr;
+//								if(type == "stringLength"){
+//									orTemp = "length("+column+")"+" "+relationalOperator+" "+valueStr;
+//								}
+//								if(orSql == ""){
+//									orSql = orTemp+"";
+//								}else{
+//									if(orTemp !="")
+//										orSql = orSql + " OR "+orTemp;
+//								}
+//								//									}
+//							}
+//							
+//						}
+//					}
+//				}
+//				if(andSql !="" && orSql != ""){
+//					tempSql = "AND "+andSql+" OR "+orSql;
+//				}else if(andSql =="" && orSql != ""){
+//					tempSql = "OR "+orSql;
+//				}else if(andSql !="" && orSql == ""){
+//					tempSql = "AND "+andSql;
+//				}
+//				
+//				//					if(andRow !="" && orRow != ""){
+//				//						rowSql = "AND "+andRow+" OR "+orRow;
+//				//					}else if(andRow =="" && orRow != ""){
+//				//						rowSql = "OR "+orRow;
+//				//					}else if(andRow !="" && orRow == ""){
+//				//						rowSql = "AND "+andRow;
+//				//					}
+//				
+//				//					if(tempSql != null && tempSql != ""){
+//				//						tempSql = "("+tempSql+")";
+//				//					}
+//				//					
+//				//					if(rowSql != null && rowSql != ""){
+//				//						rowSql = "("+rowSql+")";
+//				//					}
+//				
+//				//					var sql:String = "";
+//				//					if(tempSql != "" && rowSql != ""){
+//				//						sql = " "+tempSql+" "+rowSql;
+//				//					}else if(tempSql != "" && rowSql == ""){
+//				//						sql = " "+tempSql;
+//				//					}else if(tempSql == "" && rowSql != ""){
+//				//						sql = " "+rowSql;
+//				//					}
+//				
+//				return tempSql;
+//			}
+			
+			private function dealValue(value:String,relationalOperator:String):String{
+				var realValue:String ="";
+				if(value != null && value != ""){
+					var valueArr:Array = value.split(",");
+					for each(var vl:String in valueArr){
+						if(realValue == ""){
+							realValue = "'"+vl+"'";
+						}else{
+							realValue = realValue+","+"'"+vl+"'";
+						}
+					}
+				}
+				
+				if(relationalOperator == "IN" || relationalOperator == "NOT IN"){
+					realValue = " ("+realValue+")";
+				}else if(relationalOperator =="LIKE"){
+					realValue = "'%"+value+"%'";
+				}else if(relationalOperator =="IS" || relationalOperator =="IS NOT"){
+					realValue = value;
+				}
+				return realValue;
+			}
+			
+			private function searchStringClientEnviorment():void{
+				var clientTemp:ClientEnviorment = ClientEnviorment.getInstance();
+				if(clientTemp == null){
+					return;
+				}
+				var map:Object = clientTemp.getVarMap();
+				if(map == null){
+					return;
+				}
+				var objInfo:Object = ObjectUtil.getClassInfo(map);
+				var fieldNameArray:Array = objInfo["properties"] as Array;
+				for each(var qName:QName in fieldNameArray){
+					var tempValue:Object = map[qName.localName];
+					if(tempValue==null){
+						continue;
+					}
+					if(tempValue is String){
+						clientEnviorment[qName.localName] = tempValue;
+					}
+				}
+			}
+			
+			private function getTempletVOHandler(event:ResultEvent):void{
+				templetVO = event.result as TempletVO;
+				TempletDataUtil.putTempletVO(templetVO);
+				initTableHeader();
+			}
+			
+			private function getBillListPanelVOResultHandler(event:ResultEvent):void { 
+				cacheVO = event.result as BillListPanelVO;
+				sql = cacheVO.realSQL;
+				//页总数
+				var tempCount:int = cacheVO.tableDataRowCount/rowCountPerPage;
+				pageCount=cacheVO.tableDataRowCount%rowCountPerPage==0?tempCount:(tempCount+1);
+				//再显示数据
+				displayCacheData();
+			}
+			
+			private function getBillListPanelRowCountHandler(event:ResultEvent):void { 
+				//根据记录总数决定是否使用缓存
+				var rowCount:int = event.result as int;
+				//		        	if(cacheMode == CACHE_MODE_YES)
+				//		        		useCache = true;
+				//		        	else
+//				if(cacheMode == CACHE_MODE_AUTO){
+//					if(rowCount > cacheThreshold)
+//						useCache = false;
+//					else
+//						useCache = true;
+//				}
+				setPager(1);
+			}
+			public function simpleQuery(text:String):void{
+				queryMode = SIMPLE;
+				query(false,false,true,text);
+			}
+			
+			public function query(attachAdvancedQueryCondition:Boolean=false,attachQuickQueryCondition:Boolean=true
+																			 ,attachInitQueryCondition:Boolean=true,simpleQueryText:String=null):void{
+				if(querying)
+					return;
+				startQuery();
+				//清空数据
+//				dataGrid.dataProvider = null;
+				currentData = null;
+				queryCondition = " 1=1 ";
+				if(attachInitQueryCondition){
+					//外部传入的初始化查询条件
+					if(initQueryCondition != null && initQueryCondition != "")
+						queryCondition = queryCondition.concat(" AND "+initQueryCondition);
+				}
+				if(attachQuickQueryCondition){
+					var quickQueryCondition:String = "";
+					//拼装快速查询语句
+					for each (var control:ItemUIComponent in quickQueryControls){
+						quickQueryCondition = quickQueryCondition.concat(control.getQueryConditon(isPreciseQueryChk.selected));
+					}
+					queryCondition = queryCondition.concat(quickQueryCondition);
+				}
+				if(attachAdvancedQueryCondition){
+					//拼装高级查询语句
+					queryCondition = queryCondition.concat(" AND "+advancedQueryCondition);
+				}
+				if(simpleQueryText != null && simpleQueryText != ""){
+					//拼装通用查询语句
+					if(quickQueryControls.length > 0){
+						queryCondition = queryCondition.concat(" AND ((1=0)");
+						for each(var itemVO:TempletItemVO in templetVO.itemVos){
+							if(itemVO.delfaultquerylevel == "1"){//属于快速查询条件的参与查询
+								var key:String = itemVO.itemkey;
+								queryCondition = queryCondition.concat(" OR "+key+" like '%"+simpleQueryText+"%'");
+							}
+						}
+						queryCondition = queryCondition.concat(")");
+					}
+				}
+				
+				//add by caohenghui 2011-09-21 --start
+//				var filterSql:String = getFilterSQL();
+//				if( filterSql != null && filterSql != "" ){
+//					queryCondition = queryCondition.concat(" "+filterSql);
+//					hasUsingFilter = true;
+//				}else{
+//					hasUsingFilter = false;
+//				}
+				//add by caohenghui 2011-09-21 --end
+				
+				//清空缓存
+				cacheVO = null;
+				if(cacheMode != CACHE_MODE_AUTO){
+					//不用取总数了，直接打开第一页了
+					if(cacheMode == CACHE_MODE_NO)
+						useCache = false;
+					else 
+						useCache = true;
+					setPager(1);
+					return;
+				}
+				//先取记录总数
+				formService.getBillListPanelRowCount(templetCode,queryCondition,clientEnviorment);
+			}
+			
+			private function setPager(pageNum:int):void{
+				if(pageNum<=0)
+					return;
+				startQuery();
+				formService.getBillListPanelVOByPage(templetCode,queryCondition,pageNum,rowCountPerPage,clientEnviorment);
+//				if(!useCache)//不使用cache就直接调用
+//					formService.getBillListPanelVOByPage(templetCode,queryCondition,pageNum,rowCountPerPage,clientEnviorment);
+//				else{
+//					currentPage = pageNum;
+//					if(cacheVO == null){
+//						//还没有缓存过
+//						formService.getBillListPanelVO(templetCode,queryCondition,clientEnviorment);
+//					}
+//					else{
+//						//直接读取缓存
+//						displayCacheData();
+//					}
+//				}
+			}
+			
+			private function displayCacheData():void{
+				try{
+					if(cacheVO == null)
+						throw Error("无法获取缓存数据");
+					if(currentPage>pageCount)
+						currentPage = pageCount;
+					pagedetail.text = "共"+cacheVO.tableDataRowCount+"条记录 第"+currentPage+"页/共"+pageCount+"页";	
+					if(pageCount > 0){
+						var startRow:int = (currentPage-1)*rowCountPerPage;
+						var endRow:int = currentPage==pageCount?(cacheVO.tableDataRowCount-1):(currentPage*rowCountPerPage-1);
+						var dataArray:ArrayCollection = new ArrayCollection();
+						for(var i:int = startRow;i<=endRow;i++){
+							dataArray.addItem(cacheVO.tableDataValues.getItemAt(i));
+						}
+//						dataGrid.dataProvider = dataArray;
+						currentData = dataArray;
+					}
+				}
+				finally{
+					endQuery();
+				}
+			}	
+			
+			private function startQuery():void{
+				if(querying)
+					return;
+				querying = true;
+				queryStartTimestamp = new Date();
+				if(showLoadingWindow)
+					OperatingTipUtil.startOperat("正在查询....",this);
+				
+				dispatchEvent(new BillListPanelEvent(BillListPanelEvent.QUERY_START));
+			}
+			
+			private function endQuery():void{
+				clearEditStatus();
+				querying = false;
+				var nowDate:Date = new Date();
+				queryTime = (nowDate.getTime() - queryStartTimestamp.getTime())/1000;
+				if(showLoadingWindow)
+					OperatingTipUtil.endOperat();
+				
+//				dataGrid.horizontalScrollPosition = horizontalScrollPositionNum;
+//				dataGrid.verticalScrollPosition = verticalScrollPositionNum;
+				
+				dispatchEvent(new BillListPanelEvent(BillListPanelEvent.QUERY_END));
+			}
+			
+			private function startOperat():void{
+				if(showLoadingWindow)
+					OperatingTipUtil.startOperat("正在执行....",this);
+			}
+			
+			private function endOperat():void{
+				if(showLoadingWindow )
+					OperatingTipUtil.endOperat();
+				querying = false;
+			}
+			
+			public function clearEditStatus():void{
+				editedDataMap = new Object();
+				insertedDataArray = new Array();
+				deletedDataArray = new Array();
+			}
+			
+			public function getRowValue(index:int):Object{
+				if(currentData == null || index < 0 || index >= currentData.length)
+					throw new Error("输入index不在有效范围内");
+				return currentData.getItemIndex(index);
+			}
+			
+//			public function getSelectedRowValue():Object{
+//				if(currentData == null || dataGrid.selectedIndex < 0)
+//					return null;
+//				return dataGrid.selectedItem;
+//			}
+//			
+//			public function getSelectedRowValues():Array{
+//				if(currentData == null)
+//					return null;
+////				return dataGrid.selectedItems;
+//			}
+			
+			public function dataGridEdited(event:DataGridEvent):void{
+				var editedRowIndex:int = event.rowIndex;
+				var rowData:Object = currentData.getItemAt(editedRowIndex);
+				if(insertedDataArray.indexOf(rowData)<0)//不在insert队列中才需要update
+					editedDataMap[editedRowIndex]=rowData;
+			}
+			
+			public function validateData():Boolean{
+				//必输项检查
+				var isValid:Boolean = true;
+				var errorStr:String = "";
+				
+				for each (var itemVO:TempletItemVO in templetVO.itemVos){
+					if(itemVO.isMustInput){
+						//是必输项，检查编辑或插入的记录是否都填了改项
+						for each(var temp:Object in insertedDataArray){
+							if(temp[itemVO.itemkey] == null){
+								isValid = false;
+								errorStr += "第"+temp["rownum"]+"行记录中["+itemVO.itemname+"]为必输项\n";
+							}
+						}
+						for(var index:Object in editedDataMap){
+							var temp2:Object = editedDataMap[index];
+							if(temp2[itemVO.itemkey] == null){
+								isValid = false;
+								errorStr += "第"+temp2["rownum"]+"行记录中["+itemVO.itemname+"]为必输项\n";
+							}
+						}
+						
+					}
+				}
+				if(!isValid){
+					SmartXMessage.show("提交检查错误",SmartXMessage.MESSAGE_ERROR,errorStr,this);
+					return false;
+				}
+				return true;
+			}
+			
+			public function getSaveDataValueList():Array{
+				var dataValueList:Array = new Array();
+				for each(var insertObject:Object in insertedDataArray){
+					if(insertObject[templetVO.pkname] == null){
+						throw new Error("还有待插入记录未通过主键序列获得主键号，无法保存","错误");
+					}						
+					insertObject[GlobalConst.KEYNAME_MODIFYFLAG] = "insert";
+					insertObject[GlobalConst.KEYNAME_TEMPLETCODE] = templetCode;
+					dataValueList.push(insertObject);
+				}
+				for(var index:Object in editedDataMap){
+					var updateObject:Object = editedDataMap[index];
+					updateObject[GlobalConst.KEYNAME_MODIFYFLAG] = "update";
+					updateObject[GlobalConst.KEYNAME_TEMPLETCODE] = templetCode;
+					dataValueList.push(updateObject);
+				}
+				for each(var deleteObject:Object in deletedDataArray){
+					deleteObject[GlobalConst.KEYNAME_MODIFYFLAG] = "delete";
+					deleteObject[GlobalConst.KEYNAME_TEMPLETCODE] = templetCode;
+					dataValueList.push(deleteObject);
+				}
+				return dataValueList;
+			}
+			
+//			public function save(noNeedSaveAlert:Boolean=false):void{
+//				if(!validateData())
+//					return;
+//				//保存修改的数据
+//				var dataValueList:Array = getSaveDataValueList();
+//				
+//				if(dataValueList.length>0){
+//					startOperat();
+//					ClientEnviorment.getInstance().execInterceptor(clientBfIncList,this);
+//					formService.updateBatchDataByTempletVO(templetVO, dataValueList,bfInterceptor,afInterceptor);
+//				}else{
+//					if(noNeedSaveAlert)
+//						SmartXMessage.show("无需保存");
+//				}
+//			}
+			
+//			public function updateHandler(event:ResultEvent):void{
+//				ClientEnviorment.getInstance().execInterceptor(clientAfIncList,this);
+//				clearEditStatus();
+//				endOperat();
+//				if(isShowAlert){
+//					SmartXMessage.show("保存成功!");
+//				}
+//			}
+			
+//			public function insertRow():void{
+//				if(templetVO.pksequencename == null){
+//					SmartXMessage.show("没有指定主键序列名，无法insert");
+//					return;
+//				}
+//				var selectedIndex:int = dataGrid.selectedIndex;
+//				var newObject:Object = new Object();
+//				if(currentData == null){
+//					currentData = new ArrayCollection();
+//				}
+//				if(selectedIndex>=0)
+//					currentData.addItemAt(newObject,selectedIndex);
+//				else
+//					currentData.addItem(newObject);
+//				var i:int = 1;
+//				for each(var temp:Object in currentData){
+//					temp.rownum = i++;
+//				}
+//				setDefaultValue(newObject);
+//				refreshData();
+//				dataGrid.selectedItem = newObject;
+//				insertedDataArray.push(newObject);	
+//				formService.getSequenceNextValByDS(templetVO.datasourcename,templetVO.pksequencename);
+//				dispatchEvent(new BillListPanelEvent(BillListPanelEvent.INSERT,newObject));
+//			}
+			
+			//新增记录时赋默认值，暂不支持公式
+			private function setDefaultValue(dataValue:Object):void{
+				for each(var itemVO:TempletItemVO in templetVO.itemVos){
+					if(itemVO.defaultvalueformula != null && itemVO.defaultvalueformula != ""){
+						//通过脚本解析器，获取默认值
+						var executor:ScriptExecutor = ScriptExecutorFactory.createNewExecutor();
+						executor.registorVarMap(dataValue);//将当前记录的字段值都作为脚本执行器的环境变量
+						//这里有个小trick，如果脚本中已还有输出语句，则认为是用户自己控制输出，否则认为这个公式只是一个表达式，我们帮他在外面套一层输出
+						if(itemVO.defaultvalueformula.indexOf("sysOutput")>=0)
+							executor.scriptText = itemVO.defaultvalueformula;
+						else
+							executor.scriptText = "sysOutput("+itemVO.defaultvalueformula+");";
+						//标识executor处理的itemkey
+						executor.registorVar("itemKey",itemVO.itemkey);
+						executor.addEventListener(ScriptEvent.OUTPUT_VALUE,function(event:ScriptEvent):void{
+							var returnValue:String = String(event.outputValue);
+							var exec:ScriptExecutor = event.target as ScriptExecutor;
+							if(exec == null)
+								return;
+							var itemKey:String = String(exec.getVar("itemKey"));
+							TempletDataUtil.setTempletValue(itemKey,returnValue,dataValue,templetVO);
+//							refreshData();
+						});
+						executor.execute();
+					}
+				}
+			}
+			
+//			private function getSeqHandler(event:ResultEvent):void{
+//				//取得序列号后赋给待插入的记录
+//				var newIdStr:String = event.result as String;
+//				var newId:Number = parseInt(newIdStr);
+//				for each(var insertObject:Object in insertedDataArray){
+//					if(insertObject[templetVO.pkname] == null){
+//						insertObject[templetVO.pkname] = newId;
+//						break;
+//					}
+//				}
+//			}
+			
+//			public function deleteRow(needConfirm:Boolean = true):void{
+//				var selectedIndices:Array = dataGrid.selectedIndices;
+//				if(selectedIndices.length == 0){
+//					SmartXMessage.show("请选择要删除的记录",SmartXMessage.MESSAGE_WARN);
+//					return;
+//				}
+//				if(needConfirm)
+//					SmartXMessage.show("是否确认删除选中的记录？",SmartXMessage.MESSAGE_CONFIRM,"",this,function(event:CloseEvent):void{
+//						if(event.detail == Alert.YES){
+//							deleteRowsForIndices(selectedIndices);
+//							save();
+//						}
+//					});
+//				else
+//					deleteRowsForIndices(selectedIndices);
+//			}
+			
+//			private function deleteRowsForIndices(selectedIndices:Array):void{
+//				for each(var selectedIndex:int in selectedIndices){
+//					var deleteData:Object = currentData.getItemAt(selectedIndex);
+//					var insertIndex:int = insertedDataArray.indexOf(deleteData);
+//					if(insertIndex>=0)//是新插入的记录，则直接去掉
+//						insertedDataArray.splice(insertIndex,1);
+//					else
+//						deletedDataArray.push(deleteData);
+//					currentData.removeItemAt(selectedIndex);
+//				}
+//				if(currentData.length>0){
+//					var i:int = currentData.getItemAt(0).rownum;
+//					for each(var temp:Object in currentData){
+//						temp.rownum = i++;
+//					}
+//				}
+//				refreshData();
+//			}
+			
+			public function get primaryKey():String{
+				return templetVO.pkname;
+			}
+			
+			public function get datasourceName():String{
+				return templetVO.datasourcename;
+			}
+			
+			public function get saveTableName():String{
+				return templetVO.savedtablename;
+			}
+			
+			public function get dataObjectsWaitingForInsert():Array{
+				return insertedDataArray;
+			}
+			
+			public function advancedQuery():void{
+				var window:AdvQueryWindow = new AdvQueryWindow();
+				window.destination = destination;
+				window.endpoint = endpoint;
+				window.templetVO = templetVO;
+				window.confirmFunc = function():void{
+					queryMode = ADV;
+					advancedQueryCondition = window.getQueryCondition();
+					query(true,false,true);
+					PopUpManager.removePopUp(window);
+				}
+				PopUpManager.addPopUp(window,this,true);
+				PopUpManager.centerPopUp(window);
+			}
+			
+			public function getQuerySQL():String{
+				return sql;
+			}
+			
+			protected function switchQuickQueryPanel():void{
+				if(queryPanel.contains(quickQueryPanel)){
+					queryPanel.removeChild(quickQueryPanel);
+					this.heigthInt = this.height-simpleQueryPanel.height-pageBox.height-10;
+				}
+				else{
+					this.heigthInt = this.height-simpleQueryPanel.height-quickQueryPanel.height-pageBox.height-15;
+					queryPanel.addChild(quickQueryPanel);
+				}
+					
+			}
+			
+//			private function editFilter():void{
+//				
+//				var flp:FilterPanel = new FilterPanel();
+//				flp.templeteCode = templetCode;
+//				flp.templetVO = templetVO;
+//				flp.billListPanel = this;
+//				
+//				PopUpManager.addPopUp(flp,this,true);
+//				PopUpManager.centerPopUp(flp);
+//				
+//			}
+			
+			protected function simpleQueryTextInput_enterHandler(event:FlexEvent):void{
+				simpleQuery(simpleQueryTextInput.text);
+			}
+			
+			public function getQueryCondition():String{
+				return queryCondition;
+			}
+			
+			public function returnQuery():void{
+				if(queryMode == SIMPLE)
+					simpleQuery(simpleQueryTextInput.text);
+				else if(queryMode == ADV)
+					query(true,false,true);
+				else
+					query();
+			}
+			
+//			private function generateBillListCSVFileHandler(event:ResultEvent):void{
+//				var fileUrl:String = event.result as String;
+//				//下载生成的csv文件
+//				navigateToURL(new URLRequest(encodeURI(fileUrl)));
+//				OperatingTipUtil.endOperat();
+//			}
+//			
+//			public function exportCurData2CSV():void{
+//				//只有在响应用户事件（例如，在鼠标单击或按键事件的事件处理函数中）时才能成功调用此方法
+//				ListDataExportUtil.dataGridExport2CSV(dataGrid,templetVO.templetname);
+//			}
+//			
+//			public function exportAllData2CSV():void{
+//				formService.generateBillListCSVFile(templetCode,queryCondition,clientEnviorment,templetVO.templetname+".csv");
+//				OperatingTipUtil.startOperat("正在生成CSV数据文件",this);
+//			}
+			
+			protected function dataGrid_scrollHandler(event:ScrollEvent):void
+			{
+				if(event.direction == ScrollEventDirection.HORIZONTAL){
+					horizontalScrollPositionNum = event.position;
+				}else if(event.direction == ScrollEventDirection.VERTICAL){
+					verticalScrollPositionNum = event.position;
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox fontSize="12" width="100%" height="100%" id="mainBox" verticalScrollPolicy="off" horizontalScrollPolicy="off" >
+		<mx:Canvas id="topArea" width="100%">
+			<mx:VBox width="100%" id="queryPanel">
+				<mx:HBox width="100%" id="simpleQueryPanel" horizontalAlign="right" paddingRight="20" paddingTop="2" paddingBottom="2" horizontalGap="3" verticalAlign="middle">
+					<!--<mx:Label id="filterMsgLab" text="正在使用过滤器查询" toolTip="可单击'编辑过滤器'按钮对当前过滤条件进行配置" color="red" visible="{hasUsingFilter}" />-->
+					<mx:TextInput id="simpleQueryTextInput" width="150" borderStyle="solid" enter="simpleQueryTextInput_enterHandler(event)"/>
+					<mx:LinkButton icon="{AssetsFileLib.quicQueryIcon}" 
+								   toolTip="查询" width="20" height="20" click="simpleQuery(simpleQueryTextInput.text)"/>
+					<mx:LinkButton icon="{AssetsFileLib.switchIcon}" 
+								   toolTip="切换查询模式" width="20" height="20" click="switchQuickQueryPanel()"/>
+					<!--<mx:LinkButton icon="{AssetsFileLib.filterIcon}" 
+								   toolTip="编辑过滤器" width="20" height="20" click="editFilter()"/>-->
+				</mx:HBox>
+				<mx:VBox width="100%" id="quickQueryPanel" borderStyle="solid" paddingTop="5" paddingBottom="5">
+					<!--<mx:Spacer height="5"/>-->
+					<mx:Tile id="queryFieldBox" verticalAlign="middle" width="100%" horizontalAlign="left" paddingLeft="20" paddingRight="20"/>
+					<mx:HBox width="100%" horizontalAlign="right" paddingLeft="20" paddingRight="20">
+						<mx:CheckBox label="精确查询" labelPlacement="right" id="isPreciseQueryChk" />
+						<mx:Button label="检索" labelPlacement="right" icon="{AssetsFileLib.quicQueryIcon}" click="query()"/>
+						<mx:Button label="高级检索" labelPlacement="right" icon="{AssetsFileLib.advancedqueryIcon}" click="advancedQuery()"/>
+					</mx:HBox>	
+				</mx:VBox>
+			</mx:VBox>
+		</mx:Canvas>
+		
+		<mx:VBox id="dataItemsVbox" verticalScrollPolicy="on" horizontalScrollPolicy="auto" width="100%" height="{heigthInt}" borderStyle="solid" 
+				 />
+		<mx:Spacer width="100%" height="1"></mx:Spacer>
+		<mx:HBox id="pageBox" width="100%" height="30" horizontalAlign="right">
+			<!--<mx:HBox id="editBox" visible="{showEditBox}">
+				<mx:Button id="insertToolButton" toolTip="新增记录"  icon="{AssetsFileLib.insertIcon}" click="insertRow()"  width="20" height="20" enabled="{editable}"/>
+				<mx:Button id="deleteToolButton" toolTip="删除记录"  icon="{AssetsFileLib.deleteIcon}" click="deleteRow(false)"  width="20" height="20" enabled="{editable}"/>
+				<mx:Button id="saveToolButton" toolTip="保存"  icon="{AssetsFileLib.saveIcon}" click="save()"  width="20" height="20" enabled="{editable}" visible="{showSaveButton}"/>
+			</mx:HBox>-->
+			<mx:Label text="共0条记录 第0页/共0页" id="pagedetail"/>
+			<mx:Image toolTip="首页"  source="{AssetsFileLib.pageFirstIcon}" click="setPager(1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+			<mx:Image toolTip="末页" source="{AssetsFileLib.pageLastIcon}" click="setPager(pageCount)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+			<mx:Image toolTip="上一页" source="{AssetsFileLib.pagePrevIcon}" click="setPager(currentPage-1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+			<mx:Image toolTip="下一页" source="{AssetsFileLib.pageNextIcon}" click="setPager(currentPage+1)" buttonMode="true" width="20" height="20" scaleContent="true"/>      
+			<mx:NumericStepper id="inputpage" stepSize="1" minimum="1" maximum="{pageCount}" cornerRadius="0" height="20" width="60"/>
+			<mx:Image toolTip="跳转" source="{AssetsFileLib.pageJumpIcon}" click="setPager(inputpage.value)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		</mx:HBox>
+	</mx:VBox>   
+	
+</mx:Canvas>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="300" xmlns:mydg="*">
+    <mx:Script>
+        <![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+            [Bindable]
+            private var mypagedata:ArrayCollection = new ArrayCollection();//当前也没种该显示的记录
+            [Bindable]
+            public var mygridcolumns:Array;
+            public var mydata:ArrayCollection;//所有的数据
+            public var pagecount:int=10;//表示每页记录的条数,默认10条,可以由用户自行定义
+            public var curpage:int;//当前的页码
+            public var totalpage:int;//一共的页数
+            public var totalcount:int;//一共的记录条数
+            
+            public function initdata(value:ArrayCollection):void
+            {
+                mydata = value;//将所有数据都赋值给mydata变量
+                mypagedata.removeAll();//移出当前页面中所有数据记录
+                
+                if(mydata.length>0 && null!=mydata)
+                {
+                    totalcount = mydata.length;
+                    totalpage = (totalcount + pagecount - 1) / pagecount;
+                    setPager(0);
+                    inputpage.minimum=1;
+                    inputpage.maximum=totalpage;
+                }else{
+                    totalcount = 0;
+                    totalpage = 0;
+                    curpage = 0;
+                     inputpage.minimum = 0;
+                     inputpage.maximum = 0;
+                    pagedetail.text = "第0页/共0页   共0条纪录";
+                }
+            }
+            public function setPager(value:int):void
+            {
+                if(value<0 || value>=totalpage) return;
+                curpage = value;
+                var curNum:int = value*pagecount;//计算出要跳转到的页面种的第一条记录在所有的记录种是第几条记录
+                mypagedata.removeAll();//移出变量中的数据,以便插入新数据,页面中显示的是这个变量中的数据
+                for(var i:int=0;curNum<mydata.length&&i<pagecount;i++,curNum++)
+                //循环的次数既要小于所有的记录数,也要小于每个页面能显示的记录数;并且curNum变量中的值也要增加
+                {
+                    mypagedata.addItem(mydata.getItemAt(curNum));//依次抽取记录
+                }
+				cudg.invalidateList();
+                var temp:int = curpage+1;//页码中第一张页面是0,也就是说实际显示的页码是+1后的值
+                pagedetail.text = "第"+temp+"页/共"+totalpage+"页   共"+totalcount+"条记录";
+            }
+			public function clear():void{
+				initdata(new ArrayCollection());
+			}
+        ]]>
+    </mx:Script>
+    
+    <mx:DataGrid id="cudg" dataProvider="{mypagedata}"  
+        columns="{mygridcolumns}" width="100%" height="100%">
+    </mx:DataGrid>
+    <mx:HBox width="100%" horizontalAlign="left" verticalAlign="middle">
+        <!--<mx:LinkButton label="全选"/>
+        <mx:LinkButton label="全不选"/>-->
+        <mx:Spacer width="100%" height="1"></mx:Spacer>
+        <mx:Label text="第0页/共0页"  id="pagedetail"/>
+        <!--<mx:LinkButton label="首页" click="setPager(0)"/>
+        <mx:LinkButton label="上一页" click="setPager(curpage-1)"/>
+        <mx:LinkButton label="下一页" click="setPager(curpage+1)"/>
+        <mx:LinkButton label="末页" click="setPager(totalpage-1)"/>
+        <mx:NumericStepper id="inputpage" stepSize="1" minimum="0" maximum="0" cornerRadius="0"/>
+        <mx:LinkButton label="跳转" click="setPager(inputpage.value-1)"/>-->
+	    <mx:Image toolTip="首页"  source="{AssetsFileLib.pageFirstIcon}" click="setPager(0)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+	    <mx:Image toolTip="末页" source="{AssetsFileLib.pageLastIcon}" click="setPager(totalpage-1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+	    <mx:Image toolTip="上一页" source="{AssetsFileLib.pagePrevIcon}" click="setPager(curpage-1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+	    <mx:Image toolTip="下一页" source="{AssetsFileLib.pageNextIcon}" click="setPager(curpage+1)" buttonMode="true" width="20" height="20" scaleContent="true"/>      
+	    <mx:NumericStepper id="inputpage" stepSize="1" minimum="0" maximum="0" cornerRadius="0" height="20" width="60"/>
+	    <mx:Image toolTip="跳转" source="{AssetsFileLib.pageJumpIcon}" click="setPager(inputpage.value-1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+    </mx:HBox>
+</mx:VBox>
+
+

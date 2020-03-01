@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						 xmlns:mx="library://ns.adobe.com/flex/mx" 
+						 xmlns:containers="flexlib.containers.*" 
+						 width="100%" height="100%"
+						 borderStyle="solid" fontSize="12" horizontalAlign="center"
+						 creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.jaspersoft.reports.model.impl.Text;
+			
+			import mx.containers.HBox;
+			import mx.controls.Label;
+			import mx.controls.TextArea;
+			import mx.controls.TextInput;
+			
+			import smartx.flex.components.util.Hashtable;
+			//数据
+			public var dataValue:Object;
+			//类型(text、textfield)
+			public var textTypeMap:Hashtable = new Hashtable();
+			//隐藏列
+			public var hideColumnMap:Hashtable = new Hashtable();
+			//
+			public var aliasMap:Hashtable = new Hashtable();
+			
+			private function init():void{
+				
+			}
+			
+			public function loadData():void{
+				controlBox.removeAllChildren();
+				if(dataValue){
+					for(var property:String in dataValue){
+						if(!hideColumnMap.find(property))
+							controlBox.addChild(createRow(property,String(dataValue[property])));
+					}
+				}
+			}
+			
+			private function createRow(name:String,data:String):HBox{
+				var hbox:HBox = new HBox();
+				hbox.percentWidth = 100;
+				var txtArea:TextArea;
+				var txt:TextInput;
+				var label:Label = new Label();
+                if(aliasMap.find(name))
+					label.text = String(aliasMap.find(name));
+				else
+					label.text = name;
+				label.percentWidth = 30;
+				hbox.addChild(label);
+				var textType:Object = textTypeMap.find(name)
+				if(textType && textType.type == "textarea"){
+					txtArea = new TextArea();
+					if(textType.height && !isNaN(Number(textType.height)))
+						txtArea.height = textType.height;
+					if(textType.width && !isNaN(Number(textType.width)))
+						txtArea.width = textType.width;
+					txtArea.editable = false;
+					txtArea.text= data;
+					hbox.addChild(txtArea);
+				}else{
+					txt = new TextInput();
+					txt.editable = false;
+					txt.percentWidth = 70;
+					txt.text = data;
+					hbox.addChild(txt);
+				}
+				return hbox;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox height="100%" id="controlBox" 
+			 verticalAlign="top" horizontalAlign="left" width="100%"
+			 paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20" 
+			 borderStyle="none"/>
+</mx:VBox>

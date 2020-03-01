@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				xmlns:entitytab="smartx.bam.flex.modules.entitymodel.entitytab.*" 
+				width="720" height="400" title="图层管理" creationComplete="init()" showCloseButton="true"
+				close="PopUpManager.removePopUp(this)"
+				xmlns:ext="smartx.flex.components.core.ext.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.effects.Effect;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.GisUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			public var endpoint:String;
+			
+			public var contentXml:XML;
+			[Bindable]
+			private var switchEffect:Effect;
+			[Bindable]
+			private var allLayerDp:ArrayCollection = new ArrayCollection();
+			
+			internal var rpc:RemoteObject;
+			[Bindable]
+			private var selectedLayer:Object;//选中图层
+			
+			internal var restUrl:String;
+			
+			internal var restUser:String;
+			
+			internal var restPwd:String;
+			
+			internal var workSpace:String;
+			
+			internal var store:String;
+			
+			private var entityModelCode:String;
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				rpc = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint != null)
+					rpc.endpoint = endpoint;
+				
+				rpc.publishDBLayer.addEventListener(ResultEvent.RESULT,function (event:ResultEvent):void{
+					SmartXMessage.show("保存图层成功！");
+					OperatingTipUtil.endOperat();
+				});
+				rpc.publishDBLayer.addEventListener(FaultEvent.FAULT,function (event:FaultEvent):void{
+					SmartXMessage.show("保存图层失败！",SmartXMessage.MESSAGE_ERROR,"错误：\n"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				rpc.removeLayer.addEventListener(ResultEvent.RESULT,function (event:ResultEvent):void{
+					SmartXMessage.show("删除图层成功！");
+					OperatingTipUtil.endOperat();
+					queryAllLayer();
+				});
+				rpc.removeLayer.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("删除图层失败！",SmartXMessage.MESSAGE_ERROR,"错误：\n"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				rpc.getAllFeatureType.addEventListener(ResultEvent.RESULT,getAllFeatureTypeHandler);
+				rpc.getAllFeatureType.addEventListener(FaultEvent.FAULT,function (event:FaultEvent):void{
+					SmartXMessage.show("查询所有图层失败图层失败！",SmartXMessage.MESSAGE_ERROR,"错误：\n"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				initParam();
+				queryAllLayer();
+			}
+			
+			private function initParam():void{
+				restUrl = String(contentXml.geoServer.@url);
+				restUser = String(contentXml.geoServer.@user);
+				restPwd = String(contentXml.geoServer.@pwd);
+				workSpace = contentXml.geoServer.workspace;
+				store = contentXml.geoServer.store;
+				entityModelCode = contentXml.entityModelCode;
+			}
+			
+			private function getAllFeatureTypeHandler(event:ResultEvent):void{
+				var result:ArrayCollection = event.result as ArrayCollection;
+				initLayer(result);
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function initLayer(result:ArrayCollection):void{
+				allLayerDp.removeAll();
+				for each(var fetureTypeStr:String in result){
+					var fetureTypeXml:XML = null;
+					try{
+						fetureTypeXml = new XML(fetureTypeStr);
+					}catch(e:Error){
+						throw new Error("解析fetureTypeXml错误！");
+					}
+					var data:Object = {};
+					data.name = String(fetureTypeXml.featureType.name);
+					
+					var entity:XML = getEntityNameByLayerName(data.name);
+					data.entityName = entity==null?"":String(entity.@name);
+					//如果是实体图层则判断该图层是否属于当前领域实体模型中
+					if(!GisUtil.layerIsBelongEntityModel(data.name,entityModelCode))
+						continue;
+					data.title = String(fetureTypeXml.featureType.title);
+					data.type = String(fetureTypeXml.defaultStyle);
+					data.fetureTypeXml = fetureTypeXml.featureType;
+					data.entityXml = entity;
+					allLayerDp.addItem(data);
+				}
+			}
+			
+			/**
+			 * 通过图层图层名称查询实体
+			 */ 
+			private function getEntityNameByLayerName(layerName:String):XML{
+				for each(var entity:XML in contentXml.entities.entity){
+					if(String(entity.@mtcode) == null || String(entity.@mtcode) == "")
+						continue;
+					const mt:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(String(entity.@mtcode));
+					if(mt == null)
+						continue;
+					const entityXml:XML = mt.contentXML;
+					if(entityXml.gisInfo.length() == 0)
+						continue;
+					else if(String(entityXml.gisInfo.@tableName).toLowerCase() == layerName)
+						return entityXml;
+				}
+				return null;
+			}
+			
+			private function layerManagerDg_doubleClickHandler(event:MouseEvent):void{
+				selectedLayer = layerManagerDg.selectedItem;
+			}
+			
+			private function queryAllLayer():void{
+				OperatingTipUtil.startOperat("查询图层中...",this);
+				rpc.getAllFeatureType(restUrl,restUser,restPwd,String(contentXml.geoServer.store));
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:ViewStack id="layerManagerVs" width="100%" height="100%">
+		<mx:VBox id="layerManagerVbox" width="100%" height="100%" paddingBottom="5" paddingLeft="5"
+				 paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+			<ext:DataGridWrapper id="layerManagerDg" width="100%" height="100%" editable="true" dataProvider="{allLayerDp}"
+								 doubleClickEnabled="true" doubleClick="layerManagerDg_doubleClickHandler(event)">
+				<ext:columns>
+					<mx:DataGridColumn headerText="图层名称" dataField="name" editable="false" width="250"/>
+					<mx:DataGridColumn headerText="标题" dataField="title" width="200">
+						<mx:itemEditor>
+							<fx:Component>
+								<mx:HBox width="100%" horizontalAlign="center">
+									<fx:Script>
+										<![CDATA[
+											public function get text():String{
+												return titleTxt.text;
+											}
+											
+											override public function set data(value:Object):void{
+												super.data = value;
+												if(value != null){
+													if(value.entityName == null || value.entityName == "")
+														titleTxt.editable = false;
+													else
+														titleTxt.editable = true;
+												}
+											}
+											
+											protected function titleTxt_changeHandler(event:Event):void{
+												data.title = titleTxt.text;
+											}
+											
+										]]>
+									</fx:Script>
+									<mx:TextInput id="titleTxt" width="100%" text="{data.title}" change="titleTxt_changeHandler(event)" />
+								</mx:HBox> 
+							</fx:Component>
+						</mx:itemEditor>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="实体" dataField="entityName" editable="false"  />
+					<mx:DataGridColumn headerText="操作" editable="false" width="470">
+						<mx:itemRenderer>
+							<fx:Component>
+								<mx:HBox width="100%" horizontalAlign="center">
+									
+									<fx:Script>
+										<![CDATA[
+											import mx.controls.Alert;
+											import mx.events.CloseEvent;
+											
+											import smartx.bam.flex.modules.entitymodel.utils.GisUtil;
+											import smartx.flex.components.util.OperatingTipUtil;
+											import smartx.flex.components.util.SmartXMessage;
+											
+											override public function set data(value:Object):void{
+												super.data = value;
+												if(value != null){
+													if(value.entityName == null || value.entityName == "")
+														currentState="basicLayer";
+													else
+														currentState = "entityLayer";
+												}
+											}
+											
+											protected function delBtn_clickHandler(event:MouseEvent):void{
+												SmartXMessage.show("是否删除图层["+data.name+"]？",SmartXMessage.MESSAGE_CONFIRM,null,outerDocument,
+													function(event:CloseEvent):void{
+														if(Alert.YES == event.detail)
+															outerDocument.rpc.removeLayer(outerDocument.restUrl,outerDocument.restUser
+																,outerDocument.restPwd,outerDocument.workSpace,data.name);
+													});
+											}
+											
+											protected function previewBtn_clickHandler(event:MouseEvent):void{
+												var latLonBoundingBox:XML = data.fetureTypeXml.latLonBoundingBox[0];
+												GisUtil.layerPreview(outerDocument.restUrl,outerDocument.workSpace,data.name
+													,latLonBoundingBox.minx,latLonBoundingBox.maxx,latLonBoundingBox.miny
+													,latLonBoundingBox.maxy,latLonBoundingBox.crs);
+											}
+											
+											protected function stylerBtn_clickHandler(event:MouseEvent):void{
+												GisUtil.editStyler(outerDocument.restUrl,outerDocument.workSpace,data.name);
+											}
+											
+											protected function saveBtn_clickHandler(event:MouseEvent):void{
+												OperatingTipUtil.startOperat("保存中...",outerDocument);
+												outerDocument.rpc.publishDBLayer(outerDocument.restUrl,outerDocument.restUser,outerDocument.restPwd,outerDocument.workSpace
+													,outerDocument.store,data.name,String(data.fetureTypeXml.srs),String(data.entityXml.gisInfo.@type)
+													,data.title);
+											}
+											
+											protected function cacheBtn_clickHandler(event:MouseEvent):void{
+												SmartXMessage.show("缓存还没实现^-^！");
+											}
+											
+										]]>
+									</fx:Script>
+									<mx:states>
+										<s:State name="basicLayer" />
+										<s:State name="entityLayer" />
+									</mx:states>
+									<mx:Button id="saveBtn" label="保存" click="saveBtn_clickHandler(event)" excludeFrom="basicLayer"/>
+									<mx:Button id="delBtn" label="删除" click="delBtn_clickHandler(event)" excludeFrom="basicLayer"/>
+									<mx:Button id="previewBtn" label="预览" click="previewBtn_clickHandler(event)" />
+									<mx:Button id="stylerBtn" label="样式" click="stylerBtn_clickHandler(event)" />
+									<mx:Button id="cacheBtn" label="缓存" click="cacheBtn_clickHandler(event)"/>
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+				</ext:columns>
+			</ext:DataGridWrapper>
+		</mx:VBox>
+		<mx:VBox id="layerManagerDetailVbox" width="100%" height="100%" paddingBottom="5" paddingLeft="5"
+				 paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+		</mx:VBox>
+	</mx:ViewStack>
+</mx:TitleWindow>

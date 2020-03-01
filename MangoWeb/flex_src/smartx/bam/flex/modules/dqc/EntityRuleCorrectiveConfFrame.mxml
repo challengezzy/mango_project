@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:chart="smartx.flex.components.core.chart.*"
+		   layout="absolute" width="100%" height="100%"
+		   initialize="init()"
+		   creationComplete="creationCompleteHandler(event)"
+		   >
+	<fx:Declarations>
+		<mx:TitleWindow id="addTw" showCloseButton="true"  width="450" height="240"
+						close="PopUpManager.removePopUp(addTw)" >
+			<mx:VBox width="100%" height="100%" >
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="检查规则编码:" width="25%" /><mx:TextInput id="ruleCheckCodeTxt" enabled="{!isEdit}" width="70%" /><mx:LinkButton enabled="{!isEdit}" icon="{AssetsFileLib.refsearchIcon}" click="ruleCodeClickHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="EXCEL格式定义:" width="25%" /><mx:TextInput id="excelmtcodeTxt" width="70%" /><mx:LinkButton icon="{AssetsFileLib.refsearchIcon}" click="excelMtCodeClickHandler(event)" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="检查明细主键:" width="25%" /><mx:TextInput id="detailPkTxt" width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="EXCEL导出主键:" width="25%" /><mx:TextInput id="xlsViewPkTxt" width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left" >
+					<mx:Label text="XLS文件名:" width="25%" /><mx:TextInput id="fileNameTxt" width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" >
+					<mx:Button label="确定" click="addClickHandler(event)" /><mx:Button label="取消" click="PopUpManager.removePopUp(addTw)" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.bam.flex.vo.DQCConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.MetadataTempletUtilEvent;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private var bamService:RemoteObject
+			
+			private var formService:RemoteObject;
+			
+			private var columnsArr:Array = new Array();
+			private var queryColumnsArr:Array = new Array();
+			
+			private var dataCol:ArrayCollection = new ArrayCollection();
+			
+			private var metaDataTemplet:MetadataTemplet = null;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			[Bindable]
+			private var isEdit:Boolean = false;
+			
+			private var tempContentXml:XML = null;
+			
+			private function init():void{
+				
+
+			}
+			
+			protected function creationCompleteHandler(event:FlexEvent):void
+			{
+				
+				if(BAMUtil.isEmpty(endpoint)){
+					endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+				}
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.saveOrUpdateMetadataTemplet.addEventListener(ResultEvent.RESULT,saveOrUpdateMetadataTempletHandler);					
+				bamService.saveOrUpdateMetadataTemplet.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("保存或更新元数据错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				var ruleCol:DataGridColumn = new DataGridColumn();
+				ruleCol.dataField = "ruleCheckCode";
+				ruleCol.headerText = "检查规则编码";
+				ruleCol.width = 150;
+				columnsArr.push(ruleCol);
+				queryColumnsArr.push("ruleCheckCode");
+				
+				var detailPkCol:DataGridColumn = new DataGridColumn();
+				detailPkCol.dataField = "detailPk";
+				detailPkCol.headerText = "检查明细主键";
+				detailPkCol.width = 150;
+				columnsArr.push(detailPkCol);
+				queryColumnsArr.push("detailPk");
+				
+				var excelmtcodeCol:DataGridColumn = new DataGridColumn();
+				excelmtcodeCol.dataField = "excelmtcode";
+				excelmtcodeCol.headerText = "EXCEL格式定义";
+				excelmtcodeCol.width = 150;
+				columnsArr.push(excelmtcodeCol);
+				queryColumnsArr.push("excelmtcode");
+				
+				var xlsViewPkCol:DataGridColumn = new DataGridColumn();
+				xlsViewPkCol.dataField = "xlsViewPk";
+				xlsViewPkCol.headerText = "EXCEL导出主键";
+				xlsViewPkCol.width = 150;
+				columnsArr.push(xlsViewPkCol);
+				queryColumnsArr.push("xlsViewPk");
+				
+				var fileNameCol:DataGridColumn = new DataGridColumn();
+				fileNameCol.dataField = "fileName";
+				fileNameCol.headerText = "XLS文件名";
+				fileNameCol.width = 150;
+				columnsArr.push(fileNameCol);
+				queryColumnsArr.push("fileName");
+				
+				listPanel.columns = columnsArr;
+				listPanel.queryColumns = queryColumnsArr;
+				
+				
+				var addBtn:Button = new Button();
+				addBtn.label = "新增";
+				addBtn.setStyle("icon",AssetsFileLib.addIcon);
+				addBtn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+					isEdit = false;
+					PopUpManager.addPopUp(addTw,desktop,true);
+					PopUpManager.centerPopUp(addTw);
+					addTw.title = "新增";
+					ruleCheckCodeTxt.text = "";
+					excelmtcodeTxt.text = "";
+					detailPkTxt.text = "";
+					xlsViewPkTxt.text = "";
+					fileNameTxt.text = "";
+				});
+				listPanel.leftBtnBox.addChild(addBtn);
+				
+				var editBtn:Button = new Button();
+				editBtn.label = "编辑";
+				editBtn.setStyle("icon",AssetsFileLib.editIcon);
+				editBtn.addEventListener(MouseEvent.CLICK,editHandler);
+				listPanel.leftBtnBox.addChild(editBtn);
+				
+				var delBtn:Button = new Button();
+				delBtn.label = "删除";
+				delBtn.setStyle("icon",AssetsFileLib.minuseIcon);
+				delBtn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+					var obj:Object = listPanel.getSelectedRowValue();
+					if(obj != null ){
+						SmartXMessage.show("确定要删除吗?",SmartXMessage.MESSAGE_CONFIRM,"",desktop,function(event:CloseEvent):void{
+							if(event.detail == Alert.YES || event.detail == Alert.OK){
+								CEPUtils.xmlDeleteNode(obj["content"]);
+								metaDataTemplet.contentXML = tempContentXml;
+								OperatingTipUtil.startOperat("正在删除....");
+								bamService.saveOrUpdateMetadataTemplet(getMetadatObject(metaDataTemplet));
+							}
+						});
+
+					}
+				});
+				listPanel.leftBtnBox.addChild(delBtn);
+				
+				MetadataTempletUtil.getInstance().addEventListener(MetadataTempletUtilEvent.FLUSH_MTCODE_COMPLETE,flushMetadataTempletByMtcodeHandler);
+				
+				metaDataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(DQCConst.RULECHECK_EXCELEXPORT_CONFIG);
+				if(metaDataTemplet == null ){
+					metaDataTemplet = new MetadataTemplet();
+					metaDataTemplet.name = "规则检查数据导出元数据";
+					metaDataTemplet.code = DQCConst.RULECHECK_EXCELEXPORT_CONFIG;
+					metaDataTemplet.owner = "admin";
+					metaDataTemplet.scope = "DQC";
+					metaDataTemplet.type = 0;
+					metaDataTemplet.content = "<root />";
+				}
+				
+				refresh();
+			}
+			
+			private function flushMetadataTempletByMtcodeHandler(event:MetadataTempletUtilEvent):void{
+				metaDataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(DQCConst.RULECHECK_EXCELEXPORT_CONFIG);
+				refresh();
+			}
+			
+			private function saveOrUpdateMetadataTempletHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(DQCConst.RULECHECK_EXCELEXPORT_CONFIG,endpoint);
+			}
+			
+			private function refresh():void{
+				
+				if(metaDataTemplet.contentXML != null ){
+					dataCol.removeAll();
+					tempContentXml = metaDataTemplet.contentXML.copy();
+					for each(var xml:XML in tempContentXml.DataExport ){
+						
+						var item:Object = new Object();
+						
+						item["ruleCheckCode"] = String(xml.@ruleCheckCode);
+						item["detailPk"] = String(xml.@detailPk);
+						item["xlsViewPk"] = String(xml.@xlsViewPk);
+						item["excelmtcode"] = String(xml.@excelmtcode);
+						item["fileName"] = String(xml.@fileName);
+						
+						item["content"] = xml;
+						
+						dataCol.addItem(item);
+					}
+				}
+				listPanel.dataArray = dataCol;
+				listPanel.refresh();
+			}
+			
+			protected function ruleCodeClickHandler(event:MouseEvent):void
+			{
+				var ruleDialog:RefDialog = new RefDialog();
+				ruleDialog.title = "选择规则";
+				ruleDialog.allowMultipleSelection = false;
+				ruleDialog.init2(formService,"select t.code id#,t.code 编码,t.name 名称 from dq_entity_rule t","datasource_smartdq");
+				ruleDialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(ruleDialog.closeByConfirm){
+						var refValue:String = ruleDialog.refPK;
+						ruleCheckCodeTxt.text = refValue;
+					}
+				});
+				
+				PopUpManager.addPopUp(ruleDialog,desktop,true);
+				PopUpManager.centerPopUp(ruleDialog);
+				
+			}
+			
+			protected function excelMtCodeClickHandler(event:MouseEvent):void
+			{
+				var excelDialog:RefDialog = new RefDialog();
+				excelDialog.title = "选择EXCEL格式";
+				excelDialog.allowMultipleSelection = false;
+				excelDialog.init2(formService,"select t.code id#,t.code 编码,t.name 名称 from pub_metadata_templet t where t.type=110","datasource_default");
+				excelDialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(excelDialog.closeByConfirm){
+						var refValue:String = excelDialog.refPK;
+						excelmtcodeTxt.text = refValue;
+					}
+				});
+				
+				PopUpManager.addPopUp(excelDialog,desktop,true);
+				PopUpManager.centerPopUp(excelDialog);
+			}
+			
+			protected function addClickHandler(event:MouseEvent):void
+			{
+				var ruleCheckCode:String = ruleCheckCodeTxt.text;
+				if(BAMUtil.isEmpty(ruleCheckCode)){
+					SmartXMessage.show("规则编码不能为空!");
+					return;
+				}
+				var excelmtcode:String = excelmtcodeTxt.text;
+				if(BAMUtil.isEmpty(excelmtcode)){
+					SmartXMessage.show("EXCEL格式定义编码不能为空!");
+					return;
+				}
+				var detailPk:String = detailPkTxt.text;
+				if(BAMUtil.isEmpty(detailPk)){
+					SmartXMessage.show("检查明细主键不能为空!");
+					return;
+				}
+				var xlsViewPk:String = xlsViewPkTxt.text;
+				if(BAMUtil.isEmpty(xlsViewPk)){
+					SmartXMessage.show("EXCEL导出主键不能为空!");
+					return;
+				}
+				var fileName:String = fileNameTxt.text;
+				if(BAMUtil.isEmpty(fileName)){
+					SmartXMessage.show("导出文件名不能为空!");
+					return;
+				}
+				
+				if(isEdit){
+					var selectedItem:Object = listPanel.getSelectedRowValue();
+					var xml:XML = selectedItem["content"];
+					xml.@ruleCheckCode = ruleCheckCode;
+					xml.@excelmtcode = excelmtcode;
+					xml.@detailPk = detailPk;
+					xml.@xlsViewPk = xlsViewPk;
+					xml.@fileName = fileName;
+					
+					metaDataTemplet.contentXML = tempContentXml;
+					
+					OperatingTipUtil.startOperat("正在更新....");
+					bamService.saveOrUpdateMetadataTemplet(getMetadatObject(metaDataTemplet));
+					
+				}else{
+					
+					var flag:Boolean = false;
+					for each(var obj:Object in dataCol){
+						var code:String = obj["ruleCheckCode"];
+						if(!BAMUtil.isEmpty(code)&&!BAMUtil.isEmpty(ruleCheckCode) && code == ruleCheckCode ){
+							flag = true;
+							break;
+						}
+					}
+					
+					if(flag){
+						SmartXMessage.show("该规则的导出配置已存在!");
+						return;
+					}
+					
+					var newXml:XML = new XML("<DataExport />");
+					newXml.@ruleCheckCode = ruleCheckCode;
+					newXml.@excelmtcode = excelmtcode;
+					newXml.@detailPk = detailPk;
+					newXml.@xlsViewPk = xlsViewPk;
+					newXml.@fileName = fileName;
+					tempContentXml.appendChild(newXml);
+					metaDataTemplet.contentXML = tempContentXml;
+					OperatingTipUtil.startOperat("正在保存....");
+					bamService.saveOrUpdateMetadataTemplet(getMetadatObject(metaDataTemplet));
+				}
+				
+				PopUpManager.removePopUp(addTw);
+				
+			}
+			
+			private function getMetadatObject(temp:MetadataTemplet):Object{
+				var obj:Object = new Object();
+				if(temp != null ){
+					obj["id"] = temp.id;
+					obj["name"] = temp.name;
+					obj["code"] = temp.code;
+					obj["owner"] = temp.owner;
+					obj["scope"] = temp.scope;
+					obj["content"] = temp.content;
+					obj["type"] = temp.type;
+					obj["typeCode"] = temp.typeCode;
+					obj["versionCode"] = temp.versionCode;
+				}
+				return obj;
+			}
+			
+			private function editHandler(event:MouseEvent):void{
+				var item:Object = listPanel.getSelectedRowValue();
+				if(item != null ){
+					isEdit = true;
+					PopUpManager.addPopUp(addTw,desktop,true);
+					PopUpManager.centerPopUp(addTw);
+					addTw.title = "编辑";
+					ruleCheckCodeTxt.text = item["ruleCheckCode"];
+					excelmtcodeTxt.text = item["excelmtcode"];
+					detailPkTxt.text = item["detailPk"];
+					xlsViewPkTxt.text = item["xlsViewPk"];
+					fileNameTxt.text = item["fileName"];
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" >
+		<chart:AdvListChart id="listPanel" width="100%" height="100%" doubleClickEnabled="true" doubleClick="editHandler(event)" />
+	</mx:VBox>
+</mx:Module>

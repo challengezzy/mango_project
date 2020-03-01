@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 width="200" height="100%" fontFamily="Simsun" fontSize="12" horizontalAlign="center" 
+		  xmlns:design="myreport.design.*"  xmlns:util="myreport.util.*" creationComplete="Init()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.report.Define;
+			import myreport.data.report.ReportSettings;
+			import myreport.data.report.TableRowSetting;
+			import myreport.res.Asset;
+			private static var g_Instance:TableRowEditor;
+			
+			public static function get Instance():TableRowEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new TableRowEditor();
+					g_Instance.initialize();
+					g_Instance.percentHeight = 100;
+					g_Instance.percentWidth = 100;
+				}
+				return g_Instance;
+			}
+			private var _Data:TableRowSetting;
+			private var _Settings:ReportSettings;
+			private function Init():void
+			{
+				if(_Data)
+					Refresh();
+			}
+ 
+			public function SetData(settings:ReportSettings, item:Object):void
+			{
+				_Settings = settings;
+				_Data = item as TableRowSetting;
+				Refresh();
+			}
+			
+			public function Refresh():void
+			{
+				if(_Data)
+				{
+					_Height.text = _Data.Height.toString();
+					_SubReportRow.selected = _Data.SubReportRow;
+					_SubReportStyle.text = _Data.SubReportStyle;
+					_SubReportParameters.text = _Data.SubReportParameters;
+					_SubReportTable.text = _Data.SubReportTable;
+					_AdjustMainReport.selected = _Data.AdjustMainReport;
+				}
+			}
+			
+			private function OnEdit(event:Event):void
+			{
+				var value:Number;
+				if (event.currentTarget == _Height)
+				{
+					value = Number(event.currentTarget.text);
+					if (isNaN(value))
+						return;
+					EditProperty(Define.PRO_HEIGHT, value);
+				}
+				else if(event.currentTarget == _SubReportRow)
+				{
+					EditProperty(Define.PRO_SUB_REPORT_ROW, _SubReportRow.selected);
+				}
+				else if(event.currentTarget == _SubReportStyle)
+				{
+					EditProperty(Define.PRO_SUB_REPORT_STYLE, _SubReportStyle.text);
+				}
+				else if(event.currentTarget == _SubReportParameters)
+				{
+					EditProperty(Define.PRO_SUB_REPORT_PARAMETERS, _SubReportParameters.text);
+				}
+				else if(event.currentTarget == _SubReportTable)
+				{
+					EditProperty(Define.PRO_SUB_REPORT_TABLE, _SubReportTable.text);
+				}
+				else if(event.currentTarget == _AdjustMainReport)
+				{
+					EditProperty(Define.PRO_ADJUST_MAIN_REPORT, _AdjustMainReport.selected);
+				}
+			}
+			private function EditProperty(target:Object, value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_PROPERTY, true);
+				e.Target = target;
+				e.Value = value;
+				dispatchEvent(e);
+				
+			}
+			private function ShowExpressionEditor(input:TextInput):void
+			{
+				ExpressionEditor.Instance.Show(input.text, _Settings, function(value:String):void
+				{
+					input.text = value;
+	 
+					if(input == _SubReportStyle)
+					{
+						EditProperty(Define.PRO_SUB_REPORT_STYLE, _SubReportStyle.text);
+					}
+					else if(input == _SubReportParameters)
+					{
+						EditProperty(Define.PRO_SUB_REPORT_PARAMETERS, _SubReportParameters.text);
+					}
+					else if(input == _SubReportTable)
+					{
+						EditProperty(Define.PRO_SUB_REPORT_TABLE, _SubReportTable.text);
+					}
+				});
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="行高度(单位：cm)"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:TextInput width="100" id="_Height" enter="OnEdit(event)" focusOut="OnEdit(event)"/>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="子报表"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:CheckBox label="子报表行" id="_SubReportRow" change="OnEdit(event)"/>
+	<mx:HBox width="90%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="报表样式"/>
+		<mx:TextInput width="100%" id="_SubReportStyle" enter="OnEdit(event)"
+					  focusOut="OnEdit(event)"/>
+		<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+						 click="ShowExpressionEditor(_SubReportStyle)"/>
+	</mx:HBox>
+	<mx:HBox width="90%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="参数数据"/>
+		<mx:TextInput width="100%" id="_SubReportParameters" enter="OnEdit(event)"
+					  focusOut="OnEdit(event)"/>
+		<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+						 click="ShowExpressionEditor(_SubReportParameters)"/>
+	</mx:HBox>
+	<mx:HBox width="90%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="表格数据"/>
+		<mx:TextInput width="100%" id="_SubReportTable" enter="OnEdit(event)"
+					  focusOut="OnEdit(event)"/>
+		<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+						 click="ShowExpressionEditor(_SubReportTable)"/>
+	</mx:HBox>
+	<mx:CheckBox label="适应主报表列宽" id="_AdjustMainReport" change="OnEdit(event)"/>
+</mx:VBox>

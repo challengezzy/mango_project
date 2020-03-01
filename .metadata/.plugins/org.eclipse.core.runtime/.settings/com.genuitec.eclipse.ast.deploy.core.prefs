@@ -1,0 +1,14 @@
+#Fri Sep 12 17:14:21 CST 2014
+tomcat6Server.MangoWeb.contextRoot=/MangoWeb
+tomcat6Server.MangoWeb.altContextRoot=
+tomcat6Server.MangoWeb.shouldOverwrite=false
+tomcat6Server.MangoWeb.shouldBackup=false
+tomcat6Server.MangoWeb.deploymentPath=D\:\\tomcat6_8080\\webapps\\MangoWeb
+tomcat6Server.MangoWeb.IEARProjectName=
+tomcat6Server.MangoWeb.type=WebDeployment
+tomcat6Server.MangoWeb.deployIsOverProject=false
+tomcat6Server.MangoWeb.isExploded=true
+tomcat6Server.MangoWeb.isUptoDate=true
+eclipse.preferences.version=1
+tomcat6Server.MangoWeb.isDeployed=true
+tomcat6Server.MangoWeb.noFileCopy=false

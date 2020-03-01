@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<filter:AbstraceBaseFilter xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						   xmlns:s="library://ns.adobe.com/flex/spark" 
+						   xmlns:mx="library://ns.adobe.com/flex/mx" 
+						   xmlns:filter="smartx.bam.flex.modules.queryview.filter.*" 
+						   creationComplete="init()"
+						   width="100%" height="100%">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.states.OverrideBase;
+			
+			import smartx.bam.flex.modules.queryview.vo.QueryViewConst;
+			
+			import spark.components.TextArea;
+			
+			private function init():void{
+				this.label = "等值过滤";
+				
+				if(! basicBox.contains(choiseBox) )
+					basicBox.addChild(choiseBox);
+			}
+			
+			//生成XML
+			override public function getFilterXml():XML{
+				filterXml = <filter type={QueryViewConst.FILTER_EQUALS} column=""></filter>;
+				filterXml.@column = columnsList.selectedItem as String;
+				filterXml.appendChild(<acceptValue>{valueText.text}</acceptValue>);
+				
+				return filterXml;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:Box id="basicBox" width="100%" height="100%"/>
+	<mx:HRule width="100%" height="3"/>
+	<mx:FormItem label="等值条件" required="true" paddingBottom="5">
+		<mx:TextArea id="valueText" width="300" height="100" toolTip="等值过滤条件，可填多个，用英文逗号分开"/>
+	</mx:FormItem>
+</filter:AbstraceBaseFilter>

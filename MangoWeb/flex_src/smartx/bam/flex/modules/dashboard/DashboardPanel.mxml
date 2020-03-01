@@ -1,0 +1,1170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   xmlns:core="smartx.flex.components.core.*" 
+		   xmlns:styletemplate="smartx.flex.components.styletemplate.*" 
+		   xmlns:portal="smartx.flex.components.basic.portal.*" creationComplete="creationCompleteHandler()"
+		   width="100%" height="100%" xmlns:mtpod="smartx.flex.components.core.mtpod.*" 
+		   xmlns:mtchart="smartx.flex.components.core.mtchart.*" xmlns:dashboard="smartx.bam.flex.modules.dashboard.*"
+		   horizontalScrollPolicy="off" xmlns:message="smartx.bam.flex.modules.message.*" 
+		   xmlns:variableControl="smartx.bam.flex.modules.common.variableControl.*" xmlns:containers="net.brandonmeyer.containers.*" >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<containers:SuperPanel width="500" height="350" title="设置动态变量" id="variableWindow" allowClose="true"
+						allowDrag="true" allowResize="true" allowMaximize="true" close="PopUpManager.removePopUp(variableWindow)">
+			<variableControl:VariableControlContainer id="variableControlTile" variableDataProvider="{variableControlArr}" width="100%" height="100%"
+												 endpoint="{endpoint}" destination="{destination}" nullTip="没有可设置的动态变量！"/>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="设置" click="setVar_clickHandler()"/>
+				<mx:Button label="取消" click="{PopUpManager.removePopUp(variableWindow)}"/>
+			</mx:HBox>
+		</containers:SuperPanel>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ComboBox;
+			import mx.controls.Menu;
+			import mx.controls.PopUpMenuButton;
+			import mx.controls.TextInput;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.core.Container;
+			import mx.core.UIComponent;
+			import mx.effects.Effect;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.events.TreeEvent;
+			import mx.managers.PopUpManager;
+			import mx.printing.FlexPrintJobScaleType;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.bam.flex.modules.common.variableControl.VariableControlBuilder;
+			import smartx.bam.flex.modules.common.variableControl.VariableControlComponent;
+			import smartx.bam.flex.modules.common.variableControl.VariableControlRefPanel;
+			import smartx.bam.flex.modules.common.variableControl.vo.VariableVo;
+			import smartx.bam.flex.modules.dashboardobject.DashboardObject;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.utils.DBLayoutManagerUtil;
+			import smartx.bam.flex.utils.DODesignerUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.bam.flex.vo.dashboard.DashBoardConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.chart.AdvListChart;
+			import smartx.flex.components.core.mtchart.MTChartPanel;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.utils.FilterParseUtil;
+			import smartx.flex.components.core.mtchart.utils.MTChartFactory;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.core.mtchart.vo.MTChartType;
+			import smartx.flex.components.core.mtpod.MTPodLayoutPanel;
+			import smartx.flex.components.core.mtpod.vo.MTPods;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.MetadataTempletUtilEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.print.SmartXPrintJob;
+			import smartx.flex.components.styletemplate.StyleTemplate03;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.util.export.ChartExportUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			public static const DASHBOARDOBJECT_TYPE:String = "dashboardobject"; 
+			[Bindable]
+			private var editable:Boolean = false;
+			[Bindable]
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			
+			private var destinationBam:String = BAMConst.BAM_Service;
+			
+			private var treeTempletCode:String = "T_BAM_FOLDER_DASHBOARD_TREE";
+			[Bindable]
+			private var styletemple02templetCode:String = "T_BAM_EVENTDATASOURCE";
+			[Bindable]
+			private var loadAll:Boolean = true;
+			[Bindable]
+			private var parentFieldName:String = "PARENTID";
+			[Bindable]
+			private var seqFieldName:String = "SEQ";
+			[Bindable]
+			private var labelFieldName:String = "NAME";
+			[Bindable]
+			public var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			
+			private var dbReadWriteAuth:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_DBREADWRITE) as String;
+			
+			private var listenerMap:Hashtable = new Hashtable();
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var templetVO:TempletVO;
+			
+			private var metadataTemplet:MetadataTemplet;
+			[Bindable]
+			private var mtPods:ArrayCollection = new ArrayCollection();
+			
+			private var mtcharts:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var charts:Hashtable = new Hashtable();
+			
+			private var refreshinterval:Number = -1000;
+			
+			private var providerName:String = GlobalConst.DEFAULTPROVIDERNAME_CEP;
+			
+			private var cepDatasource:String = GlobalConst.CEP_DATASOURCE_PREFIX.concat(providerName);
+			
+			public var userName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME))
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var indexMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var treeWidth:Number = 0;
+			
+			private var layoutXml:XML;
+			
+			private var layoutType:String;
+			
+			private var loadWindow:LoadingWindow = new LoadingWindow();
+			
+			[Bindable]
+			public var switchEffect:Effect;
+			
+			private var dashboardObjTreeTempletCode:String = "T_BAM_FOLDER_DASHBOARDOBJECT_TREE";
+			
+			private var returnAfterSave:Boolean = false;
+			
+			private var alreadyCompleteDboCount:Number;//已经加载完成的仪表盘对象数量
+			
+			private var dashboardCode:String;//仪表盘编码
+			
+			private var layoutPodrefs:ArrayCollection = new ArrayCollection();
+			
+			private var listChartPanel:AdvListChart;
+			
+			private var podLayoutPanel:MTPodLayoutPanel;
+			
+			private var setVarPanelTarget:MTChartPanel;//当前设置变量的仪表盘
+			private var setVarTarget:String;//设置变量目标
+			private var isDBPriorVar:Boolean = false;//变量解析时，是否仪表盘变量优先
+			
+			private var exportFileName:String;//导出文件默认名称
+			[Bindable]
+			private var menuArrayCol:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			public var dbcodeFromUrl:String;//仪表盘作为单个菜单使用时所传入的仪表盘编码
+			[Bindable]
+			private var isShowMessageBox:Boolean = false;//是否显示告警栏
+			
+			//add by caohenghui --start
+			[Bindable]
+			public var params:Object;
+			[Bindable]
+			public var needDbTool:Boolean = true;
+			[Bindable]
+			public var isNeedRefreshMessageBox:Boolean = true;
+			//add by caohenghui --end
+			
+			//变量控件集合
+			[Bindable]
+			private var variableControlArr:ArrayCollection = new ArrayCollection();
+			
+			private function creationCompleteHandler():void{
+				if(dbReadWriteAuth == GlobalConst.DBAUTH_READWRITE)
+					currentState = GlobalConst.DBAUTH_READWRITE;
+				else
+					currentState = GlobalConst.DBAUTH_READONLY;
+				
+				formService = new RemoteObject(destination);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(destinationBam);
+				bamService.endpoint = endpoint;
+				bamService.getMtCodeByCode.addEventListener(ResultEvent.RESULT,getMtCodeByCodeHandler);
+				bamService.getMtCodeByCode.addEventListener(FaultEvent.FAULT,faultHandler);
+				bamService.getChartData.addEventListener(ResultEvent.RESULT,getChartDataHandler);
+				bamService.getChartData.addEventListener(FaultEvent.FAULT,faultHandler);
+				bamService.getChartDataByMtContent.addEventListener(ResultEvent.RESULT,getChartDataHandler);
+				bamService.getChartDataByMtContent.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				dbToolBox.removeChild(startBtn);
+				
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				var menuPop:Menu = popUpMenuButton.popUp as Menu;
+				menuPop.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHander);
+				
+				if(dbcodeFromUrl != null && dbcodeFromUrl != ""){
+					treeWidth = 0;
+				}else{
+					desktop.addEventListener(BasicEvent.CLOSE,tabClose);
+					bamService.getAttributeSimpleHashVo.addEventListener(ResultEvent.RESULT,getAttributeSimpleHashVoHandler);
+					bamService.getAttributeSimpleHashVo.addEventListener(FaultEvent.FAULT,faultHandler);
+					bamService.findSysSettingByKey.addEventListener(ResultEvent.RESULT,function(event:ResultEvent):void{
+						treeWidth = Number(event.result);
+					});
+					bamService.findSysSettingByKey.addEventListener(FaultEvent.FAULT,faultHandler);
+					bamService.findSysSettingByKey(BAMConst.DB_NAVIGATE_TREE);
+				}
+				var loginUserId:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+				var dbTreeSql:String = "select * from v_bam_dashboard_tree start with ID in "
+					+ "( SELECT ID FROM V_BAM_DASHBOARD_AUTHTREE WHERE PID IN "
+					+ "(select DASHBOARDID from BAM_USER_DASHBOARD where USERID= "+ loginUserId
+					+ " union "
+					+ " select dashboardid from bam_role_dashboard where roleid in (select roleid from pub_user_role where userid = "+ loginUserId+")"
+					+ " union "
+					+ " select dashboardid from bam_workposition_dashboard where workpositionid in (select workpositionid from pub_user_workposition where userid = "+ loginUserId+")"
+					+ " )  AND ISFOLDER = 'N') CONNECT BY ID = PRIOR PARENTID";
+				if(!BAMUtil.isEmpty(dbcodeFromUrl)){
+					dbTreeSql ="select * from v_bam_dashboard_tree start with code ='"+dbcodeFromUrl+"' CONNECT BY ID = PRIOR PARENTID";
+				}
+				treePanel.tree.addEventListener(ListEvent.ITEM_CLICK,itemClick);
+				treePanel.pkFieldName = "ID";
+				treePanel.treeSql = dbTreeSql;
+				treePanel.load();
+			}
+			
+			private function setDbItem(item:Object):void{
+				dbCardPanel.initQueryCondition = dbCardPanel.getTempletVO().pkname+"='"+item["PID"]+"'";
+				dbCardPanel.insertMode = false;
+				dbCardPanel.setDataValueByQuery();
+			}
+			
+			private function clearAll():void{
+				//stop();
+				if(dbToolBox.contains(startBtn))
+					dbToolBox.removeChild(startBtn);
+				if(dbToolBox.contains(stopBtn))
+					dbToolBox.removeChild(stopBtn);
+				mtPods.removeAll();
+				mtPods = new ArrayCollection();
+				charts.clear();
+				charts = new Hashtable();
+				//清理已加载的MTChartPanel
+				for each(var panel:MTChartPanel in mtcharts){
+					panel.destroy();
+				}
+				mtcharts.removeAll();
+				mtcharts = new ArrayCollection();
+				if(podLayoutPanel !=null){
+					podBox.removeChild(podLayoutPanel);
+				}
+				
+				if(podLayoutPanel != null)
+					podLayoutPanel.destroy();
+				podLayoutPanel = null;
+				alreadyCompleteDboCount = 0;
+			}
+			
+			private function removeLoadWindow():void{
+				if(loadWindow.isPopUp)
+					PopUpManager.removePopUp(loadWindow);
+			}
+			
+			private function itemClick(event:ListEvent):void{
+				if(!loadWindow.isPopUp){
+					PopUpManager.addPopUp(loadWindow,this,true);
+					PopUpManager.centerPopUp(loadWindow);
+				}
+				try{
+					mainStack.selectedChild = rightVBox;
+					clearAll();
+					var item:Object = treePanel.tree.selectedItem;
+					exportFileName = item["NAME"];
+					if(item["REFRESHINTERVAL"] != null && StringUtil.trim(item["REFRESHINTERVAL"]) != "")
+						refreshinterval = Number(item["REFRESHINTERVAL"]) * 1000;
+					else
+						refreshinterval = -1000;
+					//仪表盘
+					if(item["TYPE"] == "DASHBOARD"){
+						if(dbCardPanel.isInitCompleted)
+							setDbItem(item);
+						var mtcode:String = item["MTCODE"];
+						dashboardCode = item["CODE"];
+						metadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+						if(metadataTemplet && metadataTemplet.contentXML.length() > 0){
+							var contentXml:XML = metadataTemplet.contentXML;
+							layoutXml = contentXml.layout[0];
+							layoutType = layoutXml.@type;
+							isShowMessageBox = layoutXml.@isShowAlert=="true"?true:false;
+							if(!isShowMessageBox)
+								messageBox.stopWithNoAlert();
+							else
+								messageBox.startWithNoAlert();
+							parseLayout();
+							if(layoutPodrefs.length > 0){
+								//设置变量解析优先级
+								var isDBPrior:String = contentXml.variables.isDBPrior;
+								if( isDBPrior == 'Y' || isDBPrior== 'y')
+									isDBPriorVar = true;
+								else
+									isDBPriorVar = false;
+								
+								initShareObjVariable("",contentXml,true);
+								menuArrayCol.removeAll();
+								for each(var tempXml:XML in contentXml.guides.guide){
+									var itemtemp:Object = new Object();
+									itemtemp["label"] = tempXml.@name;
+									itemtemp["code"] = tempXml.@code;
+									menuArrayCol.addItem(itemtemp);
+								}
+								if(menuArrayCol.length == 0 && dbToolBox.contains(popUpMenuButton))
+									dbToolBox.removeChild(popUpMenuButton);
+								else if(menuArrayCol.length > 0 && !dbToolBox.contains(popUpMenuButton))
+									dbToolBox.addChildAt(popUpMenuButton,0);
+		
+								//加载podlayoutpanel
+								dbToolBox.visible = true;
+								if(!needDbTool){
+									if(rightBox.contains(dbToolBox))
+										rightBox.removeChild(dbToolBox);
+									//dbToolBox.removeAllChildren();
+								}else{
+									if(!rightBox.contains(dbToolBox))
+										rightBox.addChild(dbToolBox);
+								}
+							}
+							podLayoutPanel = new MTPodLayoutPanel();
+							var dbHeight:Number = Number(layoutXml.@height);
+							if(!isNaN(dbHeight) && dbHeight > 0){
+								podLayoutPanel.percentWidth = 100;
+								podLayoutPanel.height = dbHeight;
+							}else{
+								podLayoutPanel.percentWidth = 100;
+								podLayoutPanel.percentHeight = 100;
+							}
+							
+							podLayoutPanel.horizontalScrollPolicy = "off";
+							//podLayoutPanel.verticalScrollPolicy = "off";
+							podBox.addChild(podLayoutPanel);
+	
+							for each(var podXml:XML in contentXml.pods.pod){
+								var dbocode:String = podXml.@dbocode;
+								var code:String = podXml.@code;
+								if(layoutPodrefs.contains(code))
+									bamService.getMtCodeByCode(dbocode,podXml.toXMLString());
+							}
+							//若没有仪表盘对象，则可能只包含swf和图片，直接进入下一步初始化
+							if(layoutPodrefs.length==0){
+								removeLoadWindow();
+								podLayoutPanel.loadBoxLayout(layoutXml);
+							}
+							
+							if(!needDbTool){
+								if(rightBox.contains(dbToolBox))
+									rightBox.removeChild(dbToolBox);
+								//dbToolBox.removeAllChildren();
+							}else{
+								dbToolBox.visible = true;
+								if(!rightBox.contains(dbToolBox)){
+									rightBox.addChild(dbToolBox);
+								}
+							}
+							
+						}else
+							removeLoadWindow();
+					}else{
+						dbToolBox.visible = false;
+						removeLoadWindow();
+					}
+				}catch(error:Error){
+					throw error;
+					removeLoadWindow();
+				}
+			}
+			
+			private function getMtCodeByCodeHandler(event:ResultEvent):void{
+				try{
+					var dashboardObj:Object = event.result;
+					var podXml:XML = new XML(dashboardObj.config);
+					if(podXml.length() > 0){
+						var mtpod:MTPods = new MTPods();
+						mtpod.id = podXml.@code;
+						mtpod.title =podXml.title;
+						var code:String = podXml.@code;
+						mtpod.index = Number(indexMap.find(code));
+						var mtchart:MTChartPanel = MTChartFactory.getInstance().getChart(dashboardObj.type,dashboardObj.mtcode,mtpod.id
+							,refreshChartData,endpoint,refreshinterval,stopListener,startListener,editListener,detailListener);
+						//监听仪表盘对象是否被初始化完毕
+						mtchart.addEventListener(MTChartEvent.INIT_COMPLETE,function(event:MTChartEvent):void{
+							var panel:MTChartPanel = event.target as MTChartPanel;
+							panel.isShowAlert = false;
+							panel.isLoadComplete = true;
+							panel.start();
+							//仪表盘对象加载完成后，如果有联动则添加
+							for each(var subject:MTChartPanel in panel.getSubjects()){
+								subject.addrelatedMtChart(panel);
+								subject.selectedEvent();
+							}
+							alreadyCompleteDboCount++;
+							if(layoutPodrefs.length == alreadyCompleteDboCount)//如果所有的仪表盘对象都加载完成
+								allMtChartPanelCompleteHandle();
+						});
+						mtchart.isDBPriorVar = isDBPriorVar;
+						mtchart.dboCode = podXml.@dbocode;
+						mtchart.dashboardCode = dashboardCode;
+						mtchart.dbReadWriteAuth = dbReadWriteAuth;
+						mtchart.accessFilter = dashboardObj.accessFilter;
+						mtchart.addEventListener(MTChartEvent.SET_VARIABLE,setVariableListener);
+						initShareObjVariable(mtchart.chartId,mtchart.metadataTemplet.contentXML);
+						mtpod.child = mtchart;
+						mtPods.addItem(mtpod);
+						mtcharts.addItem(mtchart);
+						charts.add(mtpod.id,mtpod);
+						if(podLayoutPanel != null){
+							podLayoutPanel.mtPods = mtPods;
+							podLayoutPanel.chartMap = charts;
+						}
+					}
+					if(mtPods.length == layoutPodrefs.length){
+						if(layoutType == BAMConst.LAYOUTTYPE_MDIWINDOW)
+							podLayoutPanel.loadPodLayout();
+						else if(layoutType == BAMConst.LAYOUTTYPE_BOX)
+							podLayoutPanel.loadBoxLayout(layoutXml);
+						parseRelationsDBO();
+						removeLoadWindow();
+					}
+				}catch(error:Error){
+					throw error;
+					removeLoadWindow();
+				}
+			}
+			
+			private function popUpMenuButtonClickHander(event:MenuEvent):void{
+				var clickItem:Object = event.item;
+				var code:String = clickItem["code"];
+				if(code != null ){
+					var treeDatas:ArrayCollection = treePanel.getTreeData();
+					var selectItem:Object = findDashboardByCode(code,treeDatas);
+					if(selectItem != null){
+						treePanel.tree.selectedItem = selectItem;
+						var index:int = treePanel.tree.selectedIndex;
+						treePanel.tree.scrollToIndex(index);
+						treePanel.tree.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK));
+					}
+				}
+			}
+			
+			private function findDashboardByCode(code:String,dataProvider:ArrayCollection):Object{
+				var tempItem:Object = null;
+				for each(var obj:Object in dataProvider){
+					var tempCode:String = obj["CODE"];
+					var type:String = obj["TYPE"];
+					if(type == "DASHBOARD" && tempCode == code){
+						tempItem = obj;
+						break;
+					}
+					
+					var childData:ArrayCollection = obj.children;
+					if(childData != null){
+						tempItem = findDashboardByCode(code,childData);
+						if(tempItem != null){
+							break;
+						}
+					}
+				}
+				return tempItem;
+			}
+			
+			private function allMtChartPanelCompleteHandle():void{
+				if(isAutoRefresh())
+					start();
+				
+//				removeLoadWindow();
+//				parseRelationsDBO();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				SmartXMessage.show("仪表盘数据展现错误！",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				removeLoadWindow();
+				stop();
+			}
+			
+			private function refresh():void{
+				treePanel.load();
+			}
+			
+			private function refreshChartData(event:MTChartEvent):void{
+				var mtchart:MTChartPanel = event.currentTarget as MTChartPanel;
+				var dboChartId:String = dashboardCode.concat("_").concat(event.id);
+				var accessFilter:String = "";
+				try{
+					accessFilter = MTChartUtil.parseFilterVariable(event.id,mtchart.accessFilter,event.dataValues,dboChartId,isDBPriorVar);
+				}catch(e:Error){
+					trace(e.message);
+					mtchart.isAccessFilterError = true;
+					if( !mtchart.isIgnoreAccessParamError){
+						mtchart.isLoading = false;
+						return;
+					}
+				}
+				
+				try{
+					var filter:String = MTChartUtil.parseFilter(event.id,event.dataValues,dboChartId,mtchart,isDBPriorVar);
+					var tempMT:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(event.mtcode);
+					if(tempMT.contentXML != null ){
+						bamService.getChartDataByMtContent(MTChartUtil.convertFormulaMacPars(tempMT.content),providerName,event.chartType,event.id,filter,accessFilter);
+					}else{
+						bamService.getChartData(event.mtcode,providerName,event.chartType,event.id,filter,accessFilter);
+					}
+					
+				}
+				catch(e:Error){
+					mtchart.isLoading = false;
+					trace(e.message);
+					//SmartXMessage.er("仪表盘对象数据刷新异常！",SmartXMessage.MESSAGE_INFO,e.getStackTrace());
+				}	
+			}
+			
+			private function getChartDataHandler(event:ResultEvent):void{
+				var chartDataMap:Object = event.result;
+				var mtchartPanel:MTChartPanel;
+				for(var id:String in chartDataMap){
+					var chartDataArr:Array = chartDataMap[id] as Array;
+					var mtpod:MTPods = charts.find(id) as MTPods;
+					if(mtpod)
+						mtchartPanel = mtpod.child as MTChartPanel;
+					if(mtchartPanel){
+						mtchartPanel.dataProvider =MTChartUtil.parseSynonyms(new ArrayCollection(chartDataArr),mtchartPanel.metadataTemplet.contentXML);
+						if(currentDetailChartId == mtchartPanel.chartId && listChartPanel){
+							listChartPanel.dataArray = mtchartPanel.dataProvider; 
+						}
+						mtchartPanel.refreshComplete();
+					}
+				}
+				
+			}
+			
+			private function stop():void{
+				for each(var mtchartPanel:MTChartPanel in mtcharts){
+					if(mtchartPanel){
+						mtchartPanel.isShowAlert = false;
+						mtchartPanel.stop();
+					}
+				}
+				startConvertToStop();
+				for each(var mtChartPanel:MTChartPanel in mtcharts){
+					if(mtChartPanel){
+						mtChartPanel.isShowAlert = true;
+					}
+				}
+			}
+			
+			//刷新仪表盘对象数据
+			public function refreshDOData():void{
+				for each(var mtchartPanel:MTChartPanel in mtcharts){
+					if(mtchartPanel && mtchartPanel.isLoadComplete){
+						mtchartPanel.refresh(null);
+					}
+				}
+			}
+			
+			private function start():void{
+				for each(var mtchartPanel:MTChartPanel in mtcharts){
+					if(mtchartPanel && mtchartPanel.isLoadComplete){
+						mtchartPanel.isShowAlert = false;
+						mtchartPanel.start();
+					}
+				}
+				stopConvertToStart();
+				
+				for each(var mtChartPanel:MTChartPanel in mtcharts){
+					if(mtChartPanel && mtchartPanel.isLoadComplete)
+						mtChartPanel.isShowAlert = true;
+				}
+			}
+			
+			//启动按钮切换为停止按钮
+			private function startConvertToStop():void{
+				if(dbToolBox.contains(stopBtn))
+					dbToolBox.removeChild(stopBtn);
+				if(!dbToolBox.contains(startBtn)){
+					dbToolBox.addChildAt(startBtn,dbToolBox.getChildIndex(setVarBtn)+1);
+				}
+			}
+			
+			//停止按钮切换为启动按钮
+			private function stopConvertToStart():void{
+				if(dbToolBox.contains(startBtn))
+					dbToolBox.removeChild(startBtn);
+				if(!dbToolBox.contains(stopBtn))
+					dbToolBox.addChildAt(stopBtn,dbToolBox.getChildIndex(setVarBtn)+1);
+			}
+			
+			private function stopListener(event:MTChartEvent):void{
+				var flag:Boolean = true;
+				for each(var mtChartPanel:MTChartPanel in mtcharts){
+					if(mtChartPanel && mtChartPanel.timer && mtChartPanel.timer.running)
+						flag = false;
+				}
+				if(flag)
+					startConvertToStop();
+			}
+			
+			private function startListener(event:MTChartEvent):void{
+				for each(var mtChartPanel:MTChartPanel in mtcharts){
+					if(mtChartPanel && mtChartPanel.timer && mtChartPanel.timer.running){
+						stopConvertToStart();
+						break;
+					}
+				}
+				
+			}
+			
+			private function tabClose(event:BasicEvent):void{
+				if(event.menuId == "menu_dashboard"){
+					for each(var mtchartPanel:MTChartPanel in mtcharts){
+						if(mtchartPanel){
+							mtchartPanel.isShowAlert = false;
+							mtchartPanel.stop();
+						}
+					}
+					
+					messageBox.stopWithNoAlert();//停止消息刷新
+	
+					clearAll();
+				}
+			}
+			
+			//返回查找结果
+			private function selectDefaultItem(arrayCollection:ArrayCollection,dbCode:String):void{
+				var childrenArray:ArrayCollection = new ArrayCollection();
+				for each( var obj:Object in arrayCollection){
+					if(obj["CODE"]==dbCode && obj["TYPE"] == "DASHBOARD"){
+						treePanel.tree.selectedItem = obj;
+						var index:int = treePanel.tree.selectedIndex;
+						treePanel.tree.scrollToIndex(index);
+						treePanel.tree.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK));
+						setResult = true;
+					}
+					childrenArray = obj["children"];
+					if(childrenArray !=null && childrenArray.length>0)
+						selectDefaultItem(childrenArray,dbCode);
+				}
+			}
+			
+			private function getAttributeSimpleHashVoHandler(event:ResultEvent):void{
+				var array:Array = event.result as Array;
+				for each(var simpleHashVO:SimpleHashVO in  array){
+					var dbCode:String = simpleHashVO.dataMap["dashbordcode"];
+					if(dbCode !=null && dbCode != "")
+						selectDefaultItem(treePanel.getTreeData(),dbCode);
+				}
+			}
+			
+			private var setResult:Boolean = false;
+			
+			protected function treePanel_loadDataSuccessfulHandler(event:BasicEvent):void{
+				if(dbcodeFromUrl != null && dbcodeFromUrl != ""){
+					setResult = false;
+					selectDefaultItem(treePanel.getTreeData(),dbcodeFromUrl);
+					mainBox.removeChild(treeBox);
+					if( !setResult)
+						SmartXMessage.show("未找到【" +dbcodeFromUrl+"】对应的仪表盘，请检查仪表盘权限是否存在或用户仪表盘权限!");
+				}
+				else if(treePanel.tree.selectedItem == null)
+					bamService.getAttributeSimpleHashVo(null,userName);
+			}
+			
+			private function parseLayout():void{
+				layoutPodrefs.removeAll();
+				if(layoutType == BAMConst.LAYOUTTYPE_MDIWINDOW){
+					indexMap.clear();
+					var index:int = 1;
+					for each(var podref:XML in layoutXml..podref){
+						var code:String = podref.@code;
+						indexMap.add(code,index);
+						index++;
+					}
+				}
+				getAllPodref(layoutXml);
+				if(String(layoutXml..@isHideDBTool) == "true")
+					needDbTool = false;
+			}
+			
+			private function getAllPodref(layoutXml:XML):void{
+				for each(var child:XML in layoutXml.children()){
+					if(child.name() == "podref")
+						layoutPodrefs.addItem(String(child.@code));
+					else
+						getAllPodref(child);
+				}
+			}
+			
+			/**
+			 * 解析仪表盘关系联动
+			 */ 
+			private function parseRelationsDBO():void{
+				for each(var relation:XML in metadataTemplet.contentXML.relations.relation){
+					var src:String = relation.@src;
+					var dest:String = relation.@dest;
+					var mtpodSrc:MTPods = charts.find(src) as MTPods;
+					if(mtpodSrc){
+						var mtchartSrc:MTChartPanel = mtpodSrc.child as MTChartPanel;
+						var mtpodDest:MTPods = charts.find(dest) as MTPods;
+						if(mtpodDest){
+							var mtchartDest:MTChartPanel = mtpodDest.child as MTChartPanel;
+//							mtchartSrc.addrelatedMtChart(mtchartDest);
+							mtchartDest.addSubject(mtchartSrc);
+						}
+					}
+				}
+			}
+			
+			private var cardPanel:BillCardPanel;
+			
+			private function editListener(chartEvent:MTChartEvent):void{
+				cardPanel = doCardPanel;
+				editMtcode = chartEvent.mtcode;
+				doCardPanel.initQueryCondition = "MTCODE"+"='"+  chartEvent.mtcode +"'";
+				doCardPanel.insertMode = false;
+				doCardPanel.setDataValueByQuery();
+				verticalScrollPosition = 0;
+				
+				mainStack.selectedChild = cardBox;
+			}
+			
+			private var editMtcode:String;			
+			private var isSaved:Boolean = false;
+			
+			private function onSave():void{
+				isSaved = true;
+				doCardPanel.isShowAlert = true;
+				dbCardPanel.isShowAlert = true;
+				cardPanel.save();
+			}
+			
+			private function onSaveAndReturn():void{
+				onSave();
+				doCardPanel.isShowAlert = false;
+				dbCardPanel.isShowAlert = false;
+				returnAfterSave = true;
+			}
+			
+			private function onSaveSuccessful():void{
+				if(editMtcode!= null && editMtcode != ""){
+					if(returnAfterSave)
+						addFlushMtcodeCompleteListener();
+					MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(editMtcode,endpoint);
+				}else if(returnAfterSave)
+					onReturn();
+				cardPanel.insertMode = false;
+				returnAfterSave = false;
+			}
+			
+			private function onReturn():void{
+				if(isSaved)
+					itemClick(null);
+				mainStack.selectedChild = rightVBox;
+				isSaved = false;
+			}
+			
+			private function addFlushMtcodeCompleteListener():void{
+				MetadataTempletUtil.getInstance().addEventListener(MetadataTempletUtilEvent.FLUSH_MTCODE_COMPLETE,flushMtcodeCompleteHandler);
+			}
+			
+			private function removeFlushMtcodeCompleteListener():void{
+				MetadataTempletUtil.getInstance().removeEventListener(MetadataTempletUtilEvent.FLUSH_MTCODE_COMPLETE,flushMtcodeCompleteHandler);
+			}
+			
+			private function flushMtcodeCompleteHandler(event:MetadataTempletUtilEvent):void{
+				onReturn();
+				removeFlushMtcodeCompleteListener();
+			}
+			
+			private function advClick():void{
+				var dashboardObjectMTUtil:DODesignerUtil = new DODesignerUtil(desktop,cardPanel);
+				dashboardObjectMTUtil.advClick(null);
+			}
+			
+			private var mtchartParent:DisplayObjectContainer;
+			
+			private var mtchartInDetail:MTChartPanel;
+			
+			private var detailDataProvider:ArrayCollection;
+			
+			private var currentDetailChartId:String;
+			
+			private function detailListener(event:MTChartEvent):void{
+				var mtchart:MTChartPanel = event.currentTarget as MTChartPanel;
+				currentDetailChartId = event.id;
+				if(mtchart){
+					detailDataProvider = mtchart.dataProvider;
+					mtchart.hideChartButtonBox();
+					mtchartParent = mtchart.parent;
+					mtchartInDetail = mtchart;
+					detailChartBox.removeAllChildren();
+					detailChartBox.addChild(mtchart);
+					if(detailDataProvider && detailDataProvider.length > 0){
+						var data:Object = detailDataProvider.getItemAt(0);
+						var columns:Array = new Array();
+						for(var header:String in data){
+							if(header == "mx_internal_uid")
+								continue;
+							var dataGridColumn:DataGridColumn = new DataGridColumn(header);
+							dataGridColumn.dataField = header.toLowerCase();
+							columns.push(dataGridColumn);
+						}
+						if(listChartPanel && detailResultBox.contains(listChartPanel))
+							detailResultBox.removeChild(listChartPanel);
+						listChartPanel = new AdvListChart();
+						listChartPanel.percentHeight = 100;
+						listChartPanel.percentWidth = 100;
+						detailResultBox.addChild(listChartPanel);
+						listChartPanel.columns = columns;
+						listChartPanel.dataArray = detailDataProvider;
+						listChartPanel.setPager(1);
+					}
+					else
+						SmartXMessage.show("该视图没有数据！");
+				}
+				mainStack.selectedChild = detailBox;
+				verticalScrollPosition = 0;
+			}
+			
+			private function detailOnReturn():void{
+				mtchartInDetail.showChartButtonBox();
+				mtchartParent.addChild(mtchartInDetail);
+				mainStack.selectedChild = rightVBox;
+			}
+			
+			//初始化shareobj中的变量
+			private function initShareObjVariable(mtchartId:String,contentXml:XML,isDashboard:Boolean=false):void{
+				var shareObj:SharedObject= SharedObject.getLocal(MTChartConst.SHAREOBJ_DBO_VARIABLE,"/");
+				var id:String = isDashboard?dashboardCode:dashboardCode.concat("_").concat(mtchartId);
+				var data:XML;
+				var soData:Object;
+				var newData:Object;
+				var replaceDataMap:Hashtable = new Hashtable();
+				if(contentXml.variables.length() > 0){
+					var replaceDatas:Array = new Array();
+					if(shareObj.data.hasOwnProperty(id)){//判断是否有该仪表盘对象的变量集合
+						var datas:Array = shareObj.data[id] as Array;
+						for each(data in contentXml.variables.variable){
+							var addFlag:Boolean = true;
+							for each(soData in datas){
+								//判断在ShareObject中是否已经存在该变量，如存在则替换变量中的默认值
+								if(data.@name == soData.name){
+									newData = {name:String(data.@name),type:String(data.@type),defaultValue:soData.defaultValue
+												,defaultValueLabel:soData.defaultValueLabel,label:String(data.@alias)
+												,isUseSynonyms:String(data.@isUseSynonyms)=="Y"?true:false,defineCbo:String(data.@defineCbo)
+												,defineRefPanel:String(data.@defineRefPanel)};
+									replaceDatas.push(newData);
+									addFlag = false;
+									break;
+								}
+							}
+							//如果不存在，则将初始化一个新的变量放入ShareObject中
+							if(addFlag){
+								newData = {name:String(data.@name),type:String(data.@type),defaultValue:String(data.@defaultValue)
+											,defaultValueLabel:String(data.@defaultValueLabel),label:String(data.@alias)
+											,isUseSynonyms:String(data.@isUseSynonyms)=="Y"?true:false,defineCbo:String(data.@defineCbo)
+											,defineRefPanel:String(data.@defineRefPanel)};
+								replaceDatas.push(newData);
+							}
+						}
+						
+						//融合datas和replaceDatas的相同数据
+						if(replaceDatas.length >0){
+							for each(var obj:Object in datas){
+								for each(var tempObj:Object in replaceDatas){
+									if(tempObj.name != obj.name){
+										//将外部参数放入替换容器中
+										if(!replaceDataMap.containsKey(String(obj.name)) && obj.isParameter)
+											replaceDatas.push(obj);
+									}
+								}
+							}
+						}else
+							replaceDatas = datas;
+						
+					}else{
+						for each(data in contentXml.variables.variable){
+							newData = {name:String(data.@name),type:String(data.@type),defaultValue:String(data.@defaultValue)
+										,defaultValueLabel:String(data.@defaultValueLabel)
+										,label:String(data.@alias),isUseSynonyms:String(data.@isUseSynonyms)=="Y"?true:false
+										,defineCbo:String(data.@defineCbo),defineRefPanel:String(data.@defineRefPanel)};
+							replaceDatas.push(newData);
+						}
+					}
+					shareObj.data[id] = replaceDatas;
+				}
+				//将输入参数作为变量传入仪表盘
+				if(isDashboard){
+					var valSo:Array = shareObj.data[id]==null?[]:shareObj.data[id] as Array;
+					var url:String = this.loaderInfo.url;
+					var parameters:Object = smartx.flex.components.util.StringUtils.parseUrlParameters(url);
+					for(var paraname:String in parameters){
+						if(paraname != "dbcode"){
+							//是否在ShareObject中存在相同变量名的参数，存在则将旧值替换，不存在则将参数加入ShareObject中
+							var isExist:Boolean = false;
+							for each(var val:Object in valSo){
+								if(val["isParameter"] && val["name"] == paraname){//判断是外部参数并且参数名相同
+									isExist = true;
+									val["defaultValue"] = parameters[paraname];
+								}
+							}
+							if(!isExist)
+								valSo.push({name:paraname,defaultValue:parameters[paraname],isParameter:true});
+						}
+					}
+					shareObj.data[id] = valSo;
+				}
+				shareObj.flush();
+			}
+			
+			//shareObjectID
+			private var soId:String;
+			
+			//设置仪表盘对象的变量设置界面
+			private function setVariableListener(event:MTChartEvent):void{
+				setVarPanelTarget = event.target as MTChartPanel;
+				setVarTarget = DashBoardConst.TARGET_SETVAR_DO;
+				
+				soId = dashboardCode.concat("_").concat(event.id);
+				PopUpManager.addPopUp(variableWindow,this.root,true);
+				PopUpManager.centerPopUp(variableWindow);
+				var variableNames:Array = [];
+				var contentXml:XML = MetadataTempletUtil.getInstance().findMetadataTemplet(event.mtcode).contentXML;
+				for each(var variable:XML in contentXml.variables.variable){
+					variableNames.push(String(variable.@name));
+				}
+				initVariableControl(variableNames);
+			}
+			
+			//初始化动态变量组件
+			private function initVariableControl(variableControlNames:Array):void{
+				variableControlArr.removeAll();
+				var shareObj:SharedObject= SharedObject.getLocal(MTChartConst.SHAREOBJ_DBO_VARIABLE,"/");
+				if(shareObj.data.hasOwnProperty(soId) && (shareObj.data[soId] as Array).length > 0){
+					var datas:Array = shareObj.data[soId] as Array;
+					for each(var soData:Object in datas){
+						//是外部传入的参数或变量不属于当前仪表盘或仪表盘对象变量集合中则不能生成控件
+						if(soData.isParameter || variableControlNames.indexOf(soData.name) < 0)
+							continue;
+						
+						var data:VariableVo = new VariableVo(soData.name,soData.type,soData.label,soData.defaultValue,soData.defaultValueLabel
+										,soData.defineRefPanel,soData.isUseSynonyms,soData.defineCbo);
+						variableControlArr.addItem(data);
+					}
+				}
+				variableControlTile.refreshControl();
+			}
+			
+			private function setVar_clickHandler():void{
+				var shareObj:SharedObject= SharedObject.getLocal(MTChartConst.SHAREOBJ_DBO_VARIABLE,"/");
+				if(shareObj.data.hasOwnProperty(soId)){
+					var datas:Array = shareObj.data[soId] as Array;
+					for each(var keys:String in variableControlTile.variableControlMap.getKeySet()){
+						var ui:VariableControlComponent = variableControlTile.variableControlMap.find(keys) as VariableControlComponent;
+						var value:String = "";
+						var valueLabel:String = "";
+						if(ui is VariableControlRefPanel){
+							if(ui.realValue != null){
+								value = ui.realValue.id;
+								valueLabel = ui.realValue.name;
+							}
+							else{
+								value = null;
+								valueLabel = null;
+							}
+						}else{
+							value = String(ui.realValue);
+						}
+						
+						for each(var data:Object in datas){
+							if(data.name == keys){
+								data.defaultValue = value;
+								if(valueLabel != "")
+									data.defaultValueLabel = valueLabel;
+							}
+						}
+					}
+				}
+				
+				PopUpManager.removePopUp(variableWindow);
+				
+				//变量设置后刷新数据
+				if(setVarTarget == DashBoardConst.TARGET_SETVAR_DO){
+					setVarPanelTarget.refresh(null);
+				}else if(setVarTarget == DashBoardConst.TARGET_SETVAR_DASHBOARD){
+					//如果设置仪表盘变量，仪表盘对象全部刷新
+					for each(var panel:MTChartPanel in mtcharts){
+						panel.refresh(null);
+					}
+				}
+			}
+			
+			//设置仪表盘变量
+			private function setDBVar(event:Event):void{
+				setVarTarget = DashBoardConst.TARGET_SETVAR_DASHBOARD;
+				soId = dashboardCode;
+				PopUpManager.addPopUp(variableWindow,this,true);
+				PopUpManager.centerPopUp(variableWindow);
+				var variableNames:Array = [];
+				var contentXml:XML = metadataTemplet.contentXML;
+				for each(var variable:XML in contentXml.variables.variable){
+					variableNames.push(String(variable.@name));
+				}
+				initVariableControl(variableNames);
+			}
+			
+			private function editDb():void{
+				cardPanel = dbCardPanel;
+				var item:Object = treePanel.tree.selectedItem;
+				if(item && item["TYPE"] == "DASHBOARD"){
+					editMtcode = item["MTCODE"];
+					mainStack.selectedChild = dbmTreePanel;
+				}
+			}
+			
+			private function dbAdvClick():void{
+				var dbLayoutManagerUtil:DBLayoutManagerUtil = new DBLayoutManagerUtil(desktop,cardPanel);
+				dbLayoutManagerUtil.advClick(null);
+			}
+			
+			//以图片形式导出仪表盘
+			protected function export():void{
+				var fileName:String = "dashboard";
+				if("" != StringUtil.trim(exportFileName) )
+					fileName = exportFileName;
+				ChartExportUtil.exportChart(podLayoutPanel,fileName);
+			}
+			
+			//打印
+			protected function print():void{
+				var smartPrint:SmartXPrintJob = new SmartXPrintJob();
+				//smartPrint.container = this;
+				smartPrint.clearPrintObject();
+				smartPrint.addPrintObject(podLayoutPanel);
+				smartPrint.preview();
+			}
+			//仪表盘是否需要自动刷新
+			private function isAutoRefresh():Boolean{
+				var isAutoRefresh:Boolean = false;
+				for each(var mtchartPanel:MTChartPanel in mtcharts){
+					if(mtchartPanel && mtchartPanel.isLoadComplete && mtchartPanel.isAutoRefresh)
+						isAutoRefresh = true;
+				}
+				return isAutoRefresh;
+			}
+			
+			private function dbCardPanel_initCompleteHandler(event:BillCardPanelEvent):void{
+				var item:Object = treePanel.tree.selectedItem;
+				if(item && item["TYPE"] == "DASHBOARD")
+					setDbItem(treePanel.tree.selectedItem);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:states>
+		<s:State name="readonly" />
+		<s:State name="readwrite" />
+	</mx:states>
+
+	<mx:HDividedBox id="mainBox" width="100%"  height="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+		<mx:VBox width="{treeWidth}" height="100%" id="treeBox">
+			<mx:HBox width="100%" borderStyle="solid" id="treeButtonBox">
+				<mx:LinkButton icon="{AssetsFileLib.refreshIcon}" width="22" height="22" toolTip="刷新" click="refresh()"/>
+			</mx:HBox>
+			<core:BillTreePanel id="treePanel" destination="{destination}" endpoint="{endpoint}"
+								loadAll="{loadAll}" parentFieldName="{parentFieldName}" labelFieldName="{labelFieldName}"
+								seqFieldName="{seqFieldName}" width="100%" height="100%" 
+								loadDataSuccessful="treePanel_loadDataSuccessfulHandler(event)"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" verticalScrollPolicy="off" id="rightBox">
+			<mx:HBox width="100%"  id="dbToolBox" visible="false" horizontalAlign="left" borderStyle="solid"
+					 paddingLeft="5">
+				<mx:PopUpMenuButton label="导航" id="popUpMenuButton" dataProvider="{menuArrayCol}" openAlways="true" />
+				<mx:LinkButton id="dbmBtn" icon="{AssetsFileLib.editIcon}" width="22" height="22" 
+							   toolTip="编辑仪表盘" click="editDb()" includeIn="readwrite"/>
+				<mx:LinkButton id="setVarBtn" icon="{AssetsFileLib.setIcon}" width="22" height="22" toolTip="设置仪表盘变量" click="setDBVar(event)"/>
+				<mx:LinkButton id="startBtn" icon="{AssetsFileLib.startIcon}" width="22" height="22" toolTip="启动" click="start()"/>
+				<mx:LinkButton id="stopBtn" icon="{AssetsFileLib.stopIcon}" width="22" height="22" toolTip="停止" click="stop()"/>
+				<mx:LinkButton id="exportBtn" icon="{AssetsFileLib.exportIcon}" width="22" height="22" toolTip="导出仪表盘" click="export()"/>
+				<mx:LinkButton id="printBtn" icon="{AssetsFileLib.printIcon}" width="22" height="22" toolTip="打印" click="print()"/>
+				<s:Spacer width="100%" />
+				<message:MessageBox id="messageBox" isNeedRefresh="{isNeedRefreshMessageBox}" visible="{isShowMessageBox}" height="22"/>
+			</mx:HBox>
+			<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all" >
+				<mx:VBox width="100%" height="100%" id="rightVBox" horizontalScrollPolicy="off"  showEffect="{switchEffect}" hideEffect="{switchEffect}">
+					<!-- 各种仪表盘对象布局 -->
+					<mx:Label height="1" text=""/>
+					<mx:VBox width="100%" height="100%" id="podBox" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+					</mx:VBox>
+					<!--mtpod:MTPodLayoutPanel width="100%" height="100%" id="podLayoutPanel" mtPods="{mtPods}" chartMap="{charts}"/-->
+				</mx:VBox>
+				<mx:VBox width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+					<mx:HBox width="100%" height="100%">
+						<mx:VBox width="100%" height="100%">
+							<mx:HBox width="100%" id="cardButtonBox">
+								<mx:Button id="returnButton" label="返回" click="onReturn()" icon="{AssetsFileLib.returnIcon}"/>
+								<mx:Button id="saveAndReturnButton" label="保存并返回" click="onSaveAndReturn()" icon="{AssetsFileLib.savereturnIcon}"/>
+								<mx:Button id="cardSaveButton" label="保存"  click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+								<mx:Button id="advBtn" label="高级属性"  click="advClick()" icon="{AssetsFileLib.advanceIcon}"/>
+							</mx:HBox>
+							<core:BillCardPanel updateBfInterceptor="smartx.bam.bs.dashboardobj.DboUpdateBfFormInterceptor"
+												destination="{destination}" endpoint="{endpoint}" 
+												templetCode="T_BAM_DASHBOARDOBJECT" id="doCardPanel" width="100%" height="100%" title="详细信息" 
+												debugMode="{debugMode}" saveSuccessful="onSaveSuccessful()" showInitingWindow="false" />
+						</mx:VBox>
+					</mx:HBox>
+				</mx:VBox>
+				<mx:VBox width="100%" height="100%" id="detailBox" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+					<mx:Button id="detailReturnButton" label="返回" click="detailOnReturn()" icon="{AssetsFileLib.returnIcon}"/>
+					<mx:VDividedBox width="100%" height="100%">
+						<mx:VBox width="100%" height="60%" maxHeight="600" id="detailChartBox" />
+						<mx:VBox width="100%" height="40%" id="detailResultBox">
+							<mx:Label text="原始数据" width="100%" textAlign="center" fontSize="14" fontWeight="bold" />
+						</mx:VBox>
+					</mx:VDividedBox>
+				</mx:VBox>
+				<mx:VBox width="100%" height="100%" id="dbmTreePanel" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+					<mx:HBox width="100%">
+						<mx:Button label="返回" click="onReturn()" icon="{AssetsFileLib.returnIcon}"/>
+						<mx:Button label="保存并返回" click="onSaveAndReturn()" icon="{AssetsFileLib.savereturnIcon}"/>
+						<mx:Button label="保存"  click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+						<mx:Button label="布局管理"  click="dbAdvClick()" icon="{AssetsFileLib.layoutIcon}"/>
+					</mx:HBox>
+					<core:BillCardPanel updateBfInterceptor="smartx.bam.bs.dashboard.DbUpdateBfFormInterceptor"
+										destination="{destination}" endpoint="{endpoint}" initComplete="dbCardPanel_initCompleteHandler(event)"
+										templetCode="T_BAM_DASHBOARD" id="dbCardPanel" width="100%" height="100%" title="详细信息" 
+										debugMode="{debugMode}" saveSuccessful="onSaveSuccessful()" showInitingWindow="false" />
+				</mx:VBox>
+			</mx:ViewStack>
+		</mx:VBox>
+		
+	</mx:HDividedBox>
+</mx:Canvas>

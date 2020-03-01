@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   xmlns:chart="smartx.flex.components.core.chart.*"
+		   xmlns:entity="smartx.bam.flex.modules.entitymodel.utils.*"
+		   xmlns:ext="smartx.flex.components.core.ext.*"
+		   xmlns:core="smartx.flex.components.core.*"
+		   width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<mx:HBox id="dsHbox" width="100%" horizontalAlign="center" verticalAlign="middle" >
+			<mx:Label text="数据源:"/>
+			<mx:ComboBox id="dsCob" dataProvider="{datasourceCol}" change="dsCob_changeHandler(event)" />
+			<mx:Label text="类型:"/>
+			<mx:ComboBox id="typeCob" labelField="name" dataProvider="{typeCol}" change="typeCob_changeHandler(event)" />
+			<mx:Button id="exportBtn" label="导出" toolTip="导出" icon="{AssetsFileLib.exportIcon}" click="exportBtn_clickHandler(event)" />
+			<mx:Button id="viewBtn" label="查看" toolTip="查看定义" icon="{AssetsFileLib.viewIcon}" click="dataList_doubleClickHandler()" />
+		</mx:HBox>
+		
+		<mx:TitleWindow id="contentWindow" width="800" height="450" showCloseButton="true" close="{PopUpManager.removePopUp(contentWindow)}" >
+			<mx:TextArea id="contentTxt" width="100%" height="100%" editable="false"  />
+		</mx:TitleWindow>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			private var formService:RemoteObject;
+			
+			[Bindable]
+			private var datasourceCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var typeCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var userSourceCol:ArrayCollection = new ArrayCollection();
+			
+			private var fileName:String = "script.sql";
+			
+			private function init():void{
+				
+				typeCol.removeAll();
+				
+				var obj1:Object = new Object();
+				obj1["name"] = "存储过程";
+				obj1["code"] = "PROCEDURE";
+				typeCol.addItem(obj1);
+				
+				var obj2:Object = new Object();
+				obj2["name"] = "自定义函数";
+				obj2["code"] = "FUNCTION";
+				typeCol.addItem(obj2);
+				
+				var columns:Array = new Array();
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "name";
+				dgColumn.headerText = "名称";
+				dgColumn.width = 255;
+				columns.push(dgColumn);
+				
+				var queryColumns:Array = new Array();
+				queryColumns.push("name");
+				
+				if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+					debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.queryAllRelationDsName.addEventListener(ResultEvent.RESULT,queryAllRelationDsNameHandler);					
+				formService.queryAllRelationDsName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据源错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				});
+				
+				formService.getUserSource.addEventListener(ResultEvent.RESULT,getUserSourceHandler);					
+				formService.getUserSource.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				});
+				
+				formService.generateFile.addEventListener(ResultEvent.RESULT,generateFileHandler);			
+				formService.generateFile.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("导出发生错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				});
+				
+				dataList.dataListGrid.doubleClickEnabled = true;
+				dataList.dataListGrid.addEventListener(MouseEvent.DOUBLE_CLICK,function(event:MouseEvent):void{
+					dataList_doubleClickHandler();
+				});
+				
+				dataList.queryColumns = queryColumns;
+				dataList.columns = columns;
+				dataList.dataArray = new ArrayCollection();
+				
+				formService.queryAllRelationDsName();
+				
+				dataList.leftBtnBox.addChild(dsHbox);
+				
+			}
+			
+			private function queryAllRelationDsNameHandler(event:ResultEvent):void{
+				var array:Array = event.result as Array;
+				datasourceCol.removeAll();
+				if(array != null){
+					for each(var dsName:String in array){
+						datasourceCol.addItem(dsName);
+					}
+				}
+				
+				dsCob_changeHandler(null);
+			}
+			
+			protected function dsCob_changeHandler(event:ListEvent):void
+			{
+				queryUserSource();
+			}
+			
+			private function getUserSourceHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var array:Array = event.result as Array;
+				userSourceCol.removeAll();
+				if(array != null){
+					userSourceCol = new ArrayCollection(array);
+				}
+				dataList.dataArray = userSourceCol;
+				dataList.refresh();
+			}
+			
+			private function queryUserSource():void{
+				OperatingTipUtil.startOperat("正在查询...");
+				var dataSource:String = dsCob.selectedItem as String;
+				var item:Object = typeCob.selectedItem;
+				var type:String = item["code"];
+				
+				fileName = dataSource + "_" + type + ".sql";
+				formService.getUserSource(dataSource,type);
+			}
+			
+			
+			protected function exportBtn_clickHandler(event:MouseEvent):void
+			{
+				var content:String = "";
+				var array:Array = dataList.getSelectedRowValues();
+				if(array != null && array.length>0){
+					for each(var item:Object in array){
+						var tempContent:String = item["content"];
+						if(content == ""){
+							content = tempContent+ "\n" + "/" + "\n";
+						}else{
+							content = content+tempContent+ "\n" + "/" + "\n";
+						}
+					}
+					SmartXMessage.show("确定要导出选中项?",SmartXMessage.MESSAGE_CONFIRM,"",this,function(eve:CloseEvent):void{
+						OperatingTipUtil.startOperat("正在导出....");
+						formService.generateFile(content,"user_source.sql","sql");
+					});
+				}else{
+					for each(var item2:Object in userSourceCol){
+						var tempContent2:String = item2["content"];
+						if(content == ""){
+							content = tempContent2 + "\n" + "/" + "\n";
+						}else{
+							content = content+tempContent2+ "\n" + "/" + "\n";
+						}
+					}
+					SmartXMessage.show("确定要导出查询出的所有?",SmartXMessage.MESSAGE_CONFIRM,"",this,function(eve:CloseEvent):void{
+						OperatingTipUtil.startOperat("正在导出....");
+						formService.generateFile(content,fileName,"sql");
+					});
+				}
+				
+				
+			}
+			
+			private function generateFileHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var fileUrl:String = event.result as String;				
+				navigateToURL(new URLRequest(fileUrl));
+			}
+			
+			protected function dataList_doubleClickHandler():void
+			{
+				var array:Array = dataList.getSelectedRowValues();
+				if(array != null && array.length>0){
+					
+					PopUpManager.addPopUp(contentWindow,this.root,true);
+					PopUpManager.centerPopUp(contentWindow);
+					contentTxt.text = "";
+					for each(var item:Object in array){
+						var name:String = item["name"];
+						var content:String = item["content"];
+						contentTxt.text = contentTxt.text+content + "\n / \n";
+					}
+					
+				}else{
+					SmartXMessage.show("没有选中任何记录!");
+				}
+				
+			}
+			
+			protected function typeCob_changeHandler(event:ListEvent):void
+			{
+				queryUserSource();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" >
+		<chart:AdvListChart width="100%" height="100%" id="dataList"
+							isAllowMultipleSelection = "true"
+							/>
+	</mx:VBox>
+</mx:Module>

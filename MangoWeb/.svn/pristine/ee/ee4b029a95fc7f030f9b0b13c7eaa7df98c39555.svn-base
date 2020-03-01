@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   xmlns:chart="smartx.flex.components.core.chart.*"
+		   xmlns:entity="smartx.bam.flex.modules.entitymodel.utils.*"
+		   xmlns:ext="smartx.flex.components.core.ext.*"
+		   xmlns:core="smartx.flex.components.core.*"
+		   width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<mx:HBox id="dsHbox" width="100%" horizontalAlign="center" verticalAlign="middle" >
+			<mx:Button id="deleteBtn" label="删除" toolTip="删除文件" icon="{AssetsFileLib.closeIcon}" click="deleteBtn_clickHandler(event)" />
+			<mx:Button id="renameBtn" label="重命名" toolTip="重命名" icon="{AssetsFileLib.switchIcon}" click="renameBtn_clickHandler(event)" />
+			<mx:Button id="refreshBtn" label="刷新" toolTip="刷新文件列表" icon="{AssetsFileLib.refreshIcon}" click="refreshBtn_clickHandler(event)" />
+			<mx:Button id="uploadBtn" label="上传" toolTip="上传文件" icon="{AssetsFileLib.uploadIcon}" click="uploadBtn_clickHandler(event)" />
+		</mx:HBox>
+		
+		<mx:TitleWindow id="renameWindow" width="260" height="178" showCloseButton="true" close="{PopUpManager.removePopUp(renameWindow)}" >
+			<mx:VBox width="100%" height="100%" verticalAlign="middle" horizontalAlign="center" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%" >
+					<mx:Label text="原名称:" />
+					<mx:TextInput id="oldNameTxt" width="100%" editable="false" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="新名称:" />
+					<mx:TextInput id="newNameTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox verticalAlign="middle" horizontalAlign="center" width="100%">
+					<mx:Button id="okBtn" label="确定" click="okBtn_clickHandler(event)" />
+					<mx:Button label="取消" click="{PopUpManager.removePopUp(renameWindow)}" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.util.FileUploadComponent;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			private var formService:RemoteObject;
+			
+			[Bindable]
+			private var datasourceCol:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				
+				var columns:Array = new Array();
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "filename";
+				dgColumn.headerText = "文件名称";
+				dgColumn.width = 255;
+				columns.push(dgColumn);
+				
+				var queryColumns:Array = new Array();
+				queryColumns.push("filename");
+				
+				if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+					debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.getFileNamesFromFileUpload.addEventListener(ResultEvent.RESULT,getFileNamesFromFileUploadHandler);					
+				formService.getFileNamesFromFileUpload.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取文件名错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				});
+				
+				formService.deleteFile.addEventListener(ResultEvent.RESULT,deleteFileHandler);					
+				formService.deleteFile.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("删除文件错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				});
+				
+				formService.renameFile.addEventListener(ResultEvent.RESULT,renameFileHandler);					
+				formService.renameFile.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("重命名文件错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				});
+				
+				dataList.queryColumns = queryColumns;
+				dataList.columns = columns;
+				dataList.dataArray = datasourceCol;
+				
+				formService.getFileNamesFromFileUpload();
+				
+				dataList.leftBtnBox.addChild(dsHbox);
+				
+			}
+			
+			private function getFileNamesFromFileUploadHandler(event:ResultEvent):void{
+				var array:Array = event.result as Array;
+				datasourceCol.removeAll();
+				if(array != null){
+					for each(var dsName:String in array){
+						var item:Object = new Object();
+						item["filename"] = dsName;
+						datasourceCol.addItem(item);
+					}
+					dataList.dataArray = datasourceCol;
+					dataList.refresh();
+				}
+			}
+			
+			private function deleteFileHandler(event:ResultEvent):void{
+				SmartXMessage.show("删除成功!");
+				formService.getFileNamesFromFileUpload();
+			}
+			
+			private function renameFileHandler(event:ResultEvent):void{
+				PopUpManager.removePopUp(renameWindow);
+				SmartXMessage.show("重命名成功!");
+				formService.getFileNamesFromFileUpload();
+			}
+
+			protected function deleteBtn_clickHandler(event:MouseEvent):void
+			{
+				var array:Array = dataList.getSelectedRowValues();
+				if(array != null && array.length >0){
+					var tempArr:Array = new Array();
+					for each(var item:Object in array){
+						tempArr.push(item["filename"]);
+					}
+					formService.deleteFile(tempArr);
+				}
+			}
+			
+			protected function uploadBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				var fileUpload:FileUploadComponent = new FileUploadComponent();
+				fileUpload.addEventListener(BasicEvent.LOADDATA_SUCCESSFUL,function(event:BasicEvent):void{
+					formService.getFileNamesFromFileUpload();
+				});
+				PopUpManager.addPopUp(fileUpload,this,true);
+				PopUpManager.centerPopUp(fileUpload);
+				
+			}
+			
+			protected function renameBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = dataList.getSelectedRowValue();
+				if(item != null ){
+					var name:String = item["filename"];
+					PopUpManager.addPopUp(renameWindow,this,true);
+					PopUpManager.centerPopUp(renameWindow);
+					oldNameTxt.text = name;
+					newNameTxt.text = "";
+				}else{
+					SmartXMessage.show("需要选中一条记录!");
+				}
+			}
+			
+			protected function okBtn_clickHandler(event:MouseEvent):void
+			{
+				formService.renameFile(oldNameTxt.text,newNameTxt.text);
+			}
+			
+			protected function refreshBtn_clickHandler(event:MouseEvent):void
+			{
+				formService.getFileNamesFromFileUpload();
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" >
+		<chart:AdvListChart width="100%" height="100%" id="dataList"
+							isAllowMultipleSelection = "true"
+							/>
+	</mx:VBox>
+</mx:Module>

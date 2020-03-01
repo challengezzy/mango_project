@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Button;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.core.ext.DataValidator;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.styletemplate.ifc.CardButtonListener;
+			import smartx.flex.components.styletemplate.ifc.ListButtonListener;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			public var metadataTemplet:MetadataTemplet;
+			public var endpoint:String;
+			private var listenerMap:Hashtable = new Hashtable();
+			private var iconComponentArray:Array = [];
+			
+			private var firstAutoQuery:Boolean = false;
+			
+			public var insertMode:Boolean = true;
+			public var initQueryCondition:String;
+			
+			[Bindable]
+			private var cardPanel:BillCardPanel = new BillCardPanel();
+			
+			public function get getCardPanel():BillCardPanel
+			{
+				return cardPanel;
+			}
+			
+			private function init():void{
+				if(metadataTemplet == null)
+					throw new Error("元数据模板不能为空");
+				var xml:XML = metadataTemplet.contentXML;
+				
+				if(xml.templetCode.length() == 0)
+					throw new Error("templetCode不能为空");
+				cardPanel.templetCode = xml.templetCode;
+				cardPanel.editable = false;
+				if(endpoint != null)
+					cardPanel.endpoint = endpoint;
+				if(xml.editable.length() > 0)
+					cardPanel.editable = xml.editable=="true"?true:false;
+				cardPanel.percentWidth = 100;
+				if(xml.percentWidth.length() > 0 && String(xml.percentWidth) != "")
+					cardPanel.percentWidth = xml.percentWidth;
+				cardPanel.percentHeight = 100;
+				if(xml.percentHeight.length() > 0 && String(xml.percentHeight) != "")
+					cardPanel.percentHeight = xml.percentHeight;
+				if(xml.endpoint.length() > 0)
+					cardPanel.endpoint = xml.endpoint;
+				if(xml.debugMode.length() > 0)
+					cardPanel.debugMode = xml.debugMode=="true"?true:false;
+				if(xml.width.length() > 0 && String(xml.width) != "")
+					cardPanel.width = xml.width;
+				if(xml.height.length() > 0 && String(xml.height) != "")
+					cardPanel.height = xml.height;
+//				if(xml.firstAutoQuery.length() > 0)
+//					styletemplate.showDataAfterInit = xml.firstAutoQuery =="true"?true:false;
+				if(xml.isShowAlert.length() > 0)
+					cardPanel.isShowAlert = xml.isShowAlert =="false"?false:true;
+//				if(xml.allowMultipleSelection.length() > 0)
+//					styletemplate.allowMultipleSelection = xml.allowMultipleSelection =="true"?true:false;
+				
+				if(xml.initQueryCondition.length() > 0 && String(xml.initQueryCondition) != "")
+					cardPanel.initQueryCondition = xml.initQueryCondition;
+				
+				//add by zhangzz 20110402 begin
+				if(xml.interceptors.length()>0){
+					if(xml.interceptors.insertBfIncCard.length() > 0)
+						cardPanel.insertBfInterceptor = xml.interceptors.insertBfIncCard;
+					if(xml.interceptors.insertAfIncCard.length() > 0)
+						cardPanel.insertAfInterceptor = xml.interceptors.insertAfIncCard;
+					if(xml.interceptors.updateBfIncCard.length() > 0)
+						cardPanel.updateBfInterceptor = xml.interceptors.updateBfIncCard;
+					if(xml.interceptors.updateAfIncCard.length() > 0)
+						cardPanel.updateAfInterceptor = xml.interceptors.updateAfIncCard;
+//					if(xml.interceptors.bfIncList.length() > 0)
+//						styletemplate.bfIncList = xml.interceptors.bfIncList;
+//					if(xml.interceptors.afIncList.length() > 0)
+//						styletemplate.afIncList = xml.interceptors.afIncList;
+					
+					if(xml.interceptors.clientInsertBfIncCard.length() > 0)
+						cardPanel.clientInsertBfIncCard = xml.interceptors.clientInsertBfIncCard;
+					if(xml.interceptors.clientInsertAfIncCard.length() > 0)
+						cardPanel.clientInsertAfIncCard = xml.interceptors.clientInsertAfIncCard;
+					if(xml.interceptors.clientUpdateBfIncCard.length() > 0)
+						cardPanel.clientUpdateBfIncCard = xml.interceptors.clientUpdateBfIncCard;
+					if(xml.interceptors.clientUpdateAfIncCard.length() > 0)
+						cardPanel.clientUpdateAfIncCard = xml.interceptors.clientUpdateAfIncCard;
+//					if(xml.interceptors.clientBfIncList.length() > 0)
+//						styletemplate.clientBfIncList = xml.interceptors.clientBfIncList;
+//					if(xml.interceptors.clientAfIncList.length() > 0)
+//						styletemplate.clientAfIncList = xml.interceptors.clientAfIncList;
+					
+				}
+				
+				//add by zhangzz 20110402 end
+				cardPanel.isShowAlert = false;
+				cardPanel.addEventListener(BillCardPanelEvent.INITCOMPLETE,function(e:BillCardPanelEvent):void{
+					if(insertMode){
+						cardPanel.setDataValue(new Object());
+						cardPanel.insertMode = true;
+					}
+					else{
+						cardPanel.initQueryCondition = initQueryCondition;
+						cardPanel.setDataValueByQuery();
+					}
+					dispatchEvent(new Event("initcomplete"));
+				});
+				cardPanel.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,function(e:BillCardPanelEvent):void{
+					dispatchEvent(new Event("confirm"));
+				});
+				
+				for each(var dataValidatorXML:XML in xml.cardDataValidators.dataValidator){
+					var classname:String = dataValidatorXML.@classname;
+					var validatorclassReference:Class = getDefinitionByName(classname) as Class;
+					var dataValidator:DataValidator = new validatorclassReference() as DataValidator;
+					if(dataValidator != null)
+						cardPanel.addDataValidator(dataValidator);
+				}
+				
+				this.addChild(cardPanel);
+				
+				callLater(function():void{
+
+					//自定义卡片按钮
+					for each(var cardButtonXML:XML in xml.customCardButton.button){
+						var cardButton:Button = new Button();
+						cardButton.id = cardButtonXML.@id;
+						cardButton.label = cardButtonXML.@label;
+						cardButton.toolTip = cardButtonXML.@toolTip;
+						var cardIconUrl:String = cardButtonXML.@icon;
+						if(cardIconUrl != null && cardIconUrl != ""){
+							var cardIcon:Class = IconUtility.getClass(cardButton,cardIconUrl,16,16);
+							cardButton.setStyle("icon",cardIcon);
+							iconComponentArray.push(cardButton);
+						}
+						var cardListeners:Array = [];
+						for each(var cardListener:XML in cardButtonXML.listeners.listener){
+							var cardClassReference:Class = getDefinitionByName(cardListener) as Class;
+							var cardListenerClass:CardButtonListener = new cardClassReference() as CardButtonListener;
+							cardListeners.push(cardListenerClass);
+						}
+						listenerMap.add(cardButton.id,cardListeners);
+						cardButton.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var array:Array = listenerMap.find(event.target.id) as Array;
+							if(array != null){
+								for each(var temp:CardButtonListener in array){
+									temp.buttonClick(cardPanel);
+								}
+							}	
+						});
+						cardButtonBox.addChild(cardButton);
+					}
+				});
+			}
+			
+			public function destroy():void{
+				for each (var obj:* in iconComponentArray){
+					IconUtility.destroy(obj);
+				}
+				iconComponentArray = null;
+				listenerMap.clear();
+				removeAllChildren();
+			}
+			
+			
+			private function onConfirm():void{
+				cardPanel.save();
+			}
+			
+			private function onCancel():void{
+				dispatchEvent(new Event("cancel"));
+			}
+			
+			public function getDataValue():*{
+				return cardPanel.getDataValue();
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%" id="cardButtonBox">
+		<mx:Button id="confirmButton" label="确定" toolTip="保存信息并返回" click="onConfirm()" icon="{AssetsFileLib.saveIcon}"/>
+		<mx:Button id="cancelButton" label="取消" toolTip="取消" click="onCancel()" icon="{AssetsFileLib.returnIcon}"/>
+	</mx:HBox>
+</mx:VBox>

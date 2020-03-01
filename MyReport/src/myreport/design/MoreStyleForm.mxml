@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				  xmlns:util="myreport.util.*"
+				  width="274" height="306" close="Close()" creationComplete="Init()"
+				  fontFamily="Simsun" fontSize="12" layout="vertical" showCloseButton="true"
+				  horizontalAlign="center"
+				  title="更多样式">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.ComboBox;
+			
+			import myreport.data.report.StyleSetting;
+			private static var g_Instance:MoreStyleForm;
+			
+			public static function get Instance():MoreStyleForm
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new MoreStyleForm();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			private var _Callback:Function;
+			private var _Data:StyleSetting;
+			private function Init():void
+			{
+				var borderStyles:ArrayCollection = DesignUtil.GetBorderStyleSource();
+				LeftBorderStyle.dataProvider = borderStyles;
+				RightBorderStyle.dataProvider = borderStyles;
+				TopBorderStyle.dataProvider = borderStyles;
+				BottomBorderStyle.dataProvider = borderStyles;
+				
+			}
+			/**
+			 * callback=>function(data:StyleSetting):void
+			 */ 
+			public function Show(data:StyleSetting, callback:Function):void
+			{
+				_Callback = callback;
+				_Data = data;
+				PopUp();
+ 
+				LetterSpacing.text = _Data.LetterSpacing.toString();
+				Leading.text = _Data.Leading.toString();
+				TextUnderline.selected = _Data.TextUnderline;
+				
+				LeftBorder.selected = _Data.LeftBorder;
+				RightBorder.selected = _Data.RightBorder;
+				TopBorder.selected = _Data.TopBorder;
+				BottomBorder.selected = _Data.BottomBorder;
+				
+				SelectBorderStyle(LeftBorderStyle, _Data.LeftBorderStyle);
+				SelectBorderStyle(RightBorderStyle, _Data.RightBorderStyle);
+				SelectBorderStyle(TopBorderStyle, _Data.TopBorderStyle);
+				SelectBorderStyle(BottomBorderStyle, _Data.BottomBorderStyle);
+			}
+			
+			private function SelectBorderStyle(combo:ComboBox, value:String):void
+			{
+				var borderStyles:ArrayCollection = combo.dataProvider as ArrayCollection;
+				for each(var item:Object in borderStyles)
+				{
+					if(item.data == value)
+					{
+						combo.selectedItem = item;
+						return;
+					}
+				}
+			}
+			
+			private function Confirm():void
+			{
+				_Data.LetterSpacing = Number(LetterSpacing.text);
+				_Data.Leading = Number(Leading.text);
+				_Data.TextUnderline = TextUnderline.selected
+				
+				_Data.LeftBorder = LeftBorder.selected;
+				_Data.RightBorder = RightBorder.selected;
+				_Data.TopBorder = TopBorder.selected;
+				_Data.BottomBorder = BottomBorder.selected;
+				
+				_Data.LeftBorderStyle = LeftBorderStyle.selectedItem.data;
+				_Data.RightBorderStyle = RightBorderStyle.selectedItem.data;
+				_Data.TopBorderStyle = TopBorderStyle.selectedItem.data;
+				_Data.BottomBorderStyle = BottomBorderStyle.selectedItem.data;
+				
+				if (_Callback != null)
+				{
+					_Callback(_Data);
+				}
+				Close();
+			}
+		]]>
+	</mx:Script>
+ 
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="文字样式"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:HBox verticalAlign="middle">
+		<mx:Label text="字距："/>
+		<mx:TextInput id="LetterSpacing" width="64"/>
+		<mx:Label text="行距："/>
+		<mx:TextInput id="Leading" width="64"/>
+	</mx:HBox>
+ 		<mx:CheckBox id="TextUnderline" label="文字下划线"/>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="边框显示"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:HBox>
+		<mx:CheckBox id="LeftBorder" label="左"/>
+		<mx:CheckBox id="RightBorder" label="右"/>
+		<mx:CheckBox id="TopBorder" label="上"/>
+		<mx:CheckBox id="BottomBorder" label="下"/>
+	</mx:HBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="边框线条"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:HBox verticalAlign="middle">
+		<mx:Label text="左："/>
+		<mx:ComboBox id="LeftBorderStyle" width="72"/>
+		<mx:Label text="右："/>
+		<mx:ComboBox id="RightBorderStyle" width="72"/>
+	</mx:HBox>
+	<mx:HBox verticalAlign="middle">
+		<mx:Label text="上："/>
+		<mx:ComboBox id="TopBorderStyle" width="72"/>
+		<mx:Label text="下："/>
+		<mx:ComboBox id="BottomBorderStyle" width="72"/>
+	</mx:HBox>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

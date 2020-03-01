@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" creationComplete="init()" xmlns:components="smartx.flex.components.*" xmlns:templetmgmt="smartx.flex.components.templetmgmt.*" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import com.hurlant.eval.ast.Void;
+			import com.searchcoders.ui.syntax.Selector;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.core.DragSource;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.IndexChangedEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.templetmgmt.DropTreeEvent;
+			import smartx.flex.components.util.DataGridWindow;
+			import smartx.flex.components.util.PageDataGrid;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.util.TextAreaWindow;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.ItemVO;
+			import smartx.flex.components.vo.SimpleComboxItemVO;
+			import smartx.flex.components.vo.TempletItemGroupVO;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			private var treeData:ArrayCollection = new ArrayCollection();
+			[Bindable]
+        	public var templetCode:String;
+			private var formService:RemoteObject;
+        	[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			private var templetVO:TempletVO; 
+			[Bindable]
+			public var editable:Boolean = true;
+			[Bindable]
+			public var debugMode:Boolean = true;
+			
+			private var clientEnviorment:Object = new Object();
+			
+			private var selectedIndexBeforeRefresh:int = -1;
+			
+			private var selectCard:BillCardPanel;
+			
+			private function init():void{
+				if(templetCode == null)
+		        	throw Error("元原模板编号不能为null");
+				//刷新缓存
+				TempletDataUtil.flushTempletVO(templetCode);
+				
+        		formService = new RemoteObject(destination);
+		        if(endpoint!=null)
+		        	formService.endpoint = endpoint;
+		       	formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+		        formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+		        formService.executeBatchByDS.addEventListener(ResultEvent.RESULT,updateHandler);
+		        formService.executeBatchByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+		        formService.exportTempletScript.addEventListener(ResultEvent.RESULT,exportTempletScriptHandler);
+		        formService.exportTempletScript.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.refreshTempletCacheByCode.addEventListener(ResultEvent.RESULT,refreshTempletCacheByCodeHandler);
+				formService.refreshTempletCacheByCode.addEventListener(FaultEvent.FAULT,faultHandler);
+		        if(!editable){
+		        	cardBox.removeChild(cardButtonBox);
+		        }
+				
+				searchStringClientEnviorment();
+				
+		        refresh();
+				
+				templetCard.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,saveSuccessfulHandler);
+				groupCard.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,saveSuccessfulHandler);
+				itemCard.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,saveSuccessfulHandler);
+			}
+			
+			private function searchStringClientEnviorment():void{
+				var clientTemp:ClientEnviorment = ClientEnviorment.getInstance();
+				if(clientTemp == null){
+					return;
+				}
+				var map:Object = clientTemp.getVarMap();
+				if(map == null){
+					return;
+				}
+				var objInfo:Object = ObjectUtil.getClassInfo(map);
+				var fieldNameArray:Array = objInfo["properties"] as Array;
+				for each(var qName:QName in fieldNameArray){
+					var tempValue:Object = map[qName.localName];
+					if(tempValue==null){
+						continue;
+					}
+					if(tempValue is String){
+						clientEnviorment[qName.localName] = tempValue;
+					}
+				}
+			}
+			
+			private function refresh():void{
+				selectedIndexBeforeRefresh = tree.selectedIndex;
+				formService.getTempletVO(templetCode,clientEnviorment);
+			}
+			
+			private function refreshAfterSaveSuccessful():void{
+				templetCode = selectCard.getDataValue()["TEMPLETCODE"]; 
+				selectedIndexBeforeRefresh = tree.selectedIndex;
+				formService.getTempletVO(templetCode,clientEnviorment);
+			}
+			
+			private function getTempletVOHandler(event:ResultEvent):void{
+		        templetVO = event.result as TempletVO;
+		        treeData.removeAll();
+		        if(templetVO == null)
+		        	throw new Error("获取模板失败!");
+		        var rootObject:Object = {name:templetVO.templetname,type:"TempletVO",realObject:templetVO,children:new ArrayCollection()};
+		        treeData.addItem(rootObject);
+		    	for each(var itemVO:TempletItemVO in templetVO.directItemVOs){
+		    		var itemObject:Object = {name:itemVO.itemkey,type:"TempletItemVO",realObject:itemVO,children:null};
+		    		rootObject.children.addItem(itemObject);
+		    	}
+		    	for each(var groupVO:TempletItemGroupVO in templetVO.itemGroups){
+		    		var groupObjectRoot:Object = {name:groupVO.name,type:"TempletItemGroupVO",realObject:groupVO,children:new ArrayCollection()};
+		    		rootObject.children.addItem(groupObjectRoot);
+		    		for each(var itemVO2:TempletItemVO in groupVO.itemVOs){
+		    			var itemObject2:Object = {name:itemVO2.itemkey,type:"TempletItemVO",realObject:itemVO2,children:null};
+		    			groupObjectRoot.children.addItem(itemObject2);
+		    		}
+		    	}
+		    	expandAll();
+		    	if(selectedIndexBeforeRefresh>0){
+		    		tree.selectedIndex = selectedIndexBeforeRefresh;
+		    		tree.scrollToIndex(selectedIndexBeforeRefresh);
+		    	}
+		    	itemClick();
+		    }
+			
+			private function faultHandler(event:FaultEvent):void{   
+				SmartXMessage.show("Error",SmartXMessage.MESSAGE_ERROR,event.fault.faultString,this);
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in treeData){
+					tree.expandChildrenOf(item,true);
+				}
+			}
+			
+			private function save():void{
+				selectCard = cardViewStack.selectedChild as BillCardPanel;
+				if(selectCard != null && selectCard.getDataValue() != null){
+					selectCard.save();	
+				}
+			}
+			
+			private function saveSuccessfulHandler(event:BillCardPanelEvent):void{
+				var obj:Object = templetCard.getDataValue();
+				if(obj != null ){
+					var templeteCode:String = obj["TEMPLETCODE"] as String;
+					TempletDataUtil.flushTempletVO(templeteCode);
+					formService.refreshTempletCacheByCode(templeteCode);
+				}
+			}
+			
+			private function itemClick():void{
+				var item:Object = tree.selectedItem;
+				if(item != null){
+					var type:String = item.type;
+					
+					if(type == "TempletItemVO"){
+						//点击了属性
+						var itemVO:TempletItemVO = item.realObject;
+						cardViewStack.selectedChild = itemCard;
+						itemCard.initQueryCondition="PK_PUB_TEMPLET_1=(Select PK_PUB_TEMPLET_1 from pub_templet_1 where " + 
+								"templetcode='"+templetVO.templetcode+"') and itemkey='"+itemVO.itemkey+"'";
+						itemCard.setDataValueByQuery();
+						itemCard.insertMode = false;
+						return;
+					}
+					else if(type == "TempletItemGroupVO"){
+						//点击了分组
+						cardViewStack.selectedChild = groupCard;
+						var groupVO:TempletItemGroupVO = item.realObject;
+						groupCard.initQueryCondition="id="+groupVO.id;
+						groupCard.setDataValueByQuery();
+						groupCard.insertMode = false;
+						return;
+					}
+				}
+				//点击了模板或啥都没点
+				cardViewStack.selectedChild = templetCard;
+				templetCard.initQueryCondition="templetcode='"+templetCode+"'";
+				templetCard.setDataValueByQuery();
+				templetCard.insertMode = false;
+				
+			}
+			
+			
+			private function onDragDrop(event:DropTreeEvent):void{
+				var item:* = event.currentItem;
+				var targetParentItem:* = event.targetParentItem;
+				var sqlList:Array;
+				var sql:String;
+				if(item.type == "TempletItemGroupVO"){
+					//分组被移动了，只需要更新排序
+					var j:int = 1;
+					sqlList = [];
+					for each(var itemGroupObject:* in targetParentItem.children){
+						if(itemGroupObject.type == "TempletItemGroupVO"){
+							sql = "update PUB_TEMPLET_1_ITEM_GROUP set seq="+j+" where id="+itemGroupObject.realObject.id;
+							trace("updateSql:"+sql);
+							j++;
+							sqlList = sqlList.concat(sql);
+						}
+					}
+					formService.executeBatchByDS(null,sqlList);
+				}
+				else if(item.type == "TempletItemVO"){
+					//属性被移动，更改groupid，重排顺序
+					var groupId:String = "TEMPLETITEMGROUPID";
+					if(targetParentItem.type == "TempletVO")
+						groupId = "NULL";
+					else if(targetParentItem.type == "TempletItemGroupVO")
+						groupId = targetParentItem.realObject.id;	
+					sqlList = [];
+					sql = "update PUB_TEMPLET_1_ITEM set TEMPLETITEMGROUPID="+groupId+" where" + 
+							" PK_PUB_TEMPLET_1=(Select PK_PUB_TEMPLET_1 from pub_templet_1 where " + 
+								"templetcode='"+templetCode+"') and itemkey='"+item.realObject.itemkey+"'" ;
+					trace("updateSql:"+sql);
+					sqlList = sqlList.concat(sql);
+					var i:int=1;
+					for each(var itemObject:* in targetParentItem.children){
+						if(itemObject.type == "TempletItemVO"){
+							var itemVO:TempletItemVO = itemObject.realObject;
+							sql = "update PUB_TEMPLET_1_ITEM set SHOWORDER="+i+" where" + 
+									" PK_PUB_TEMPLET_1=(Select PK_PUB_TEMPLET_1 from pub_templet_1 where " + 
+										"templetcode='"+templetCode+"') and itemkey='"+itemVO.itemkey+"'" ;
+							trace("updateSql:"+sql);
+							sqlList = sqlList.concat(sql);			
+							i++;
+						}
+					}
+					formService.executeBatchByDS(null,sqlList);
+				}
+			}
+			
+			private function updateHandler(event:ResultEvent):void{
+				saveSuccessfulHandler(null);
+				refresh();
+			}
+			
+			private function addItem():void{
+				var obj:Object = new Object();
+				itemCard.setDataValue(obj);
+				//根据当前选中group赋值
+				var selectedObject:* = tree.selectedItem;
+				if(selectedObject != null){
+					if(selectedObject.type=="TempletItemGroupVO"){
+						obj["TEMPLETITEMGROUPID"] = selectedObject.realObject.id;
+					}
+				}
+				obj["PK_PUB_TEMPLET_1"] = templetVO.id;
+				itemCard.insertMode = true;
+				cardViewStack.selectedChild = itemCard;
+				SmartXMessage.show("请在右边窗口编辑，并点击保存");
+			}
+			
+			private function addGroup():void{
+				var obj:Object = new Object();
+				groupCard.setDataValue(obj);
+				obj["TEMPLETID"] = templetVO.id;
+				groupCard.insertMode = true;
+				cardViewStack.selectedChild = groupCard;
+				SmartXMessage.show("请在右边窗口编辑，并点击保存");
+			}
+			
+			private function deleteItems():void{
+				var sqlList:Array = [];
+				var sql:String;
+				var selectItems:Array = tree.selectedItems;
+				for each(var itemObject:Object in selectItems){
+					if(itemObject.type == "TempletItemVO"){
+						sql = "delete from pub_templet_1_item where PK_PUB_TEMPLET_1_ITEM="+itemObject.realObject.id;
+						sqlList = sqlList.concat(sql);
+						trace("updateSql:"+sql);
+					}
+					else if(itemObject.type == "TempletItemGroupVO"){
+						//删除分组和其所拥有的属性
+						sql = "delete from pub_templet_1_item where TEMPLETITEMGROUPID="+itemObject.realObject.id;
+						sqlList = sqlList.concat(sql);
+						trace("updateSql:"+sql);
+						sql = "delete from pub_templet_1_item_group where id="+itemObject.realObject.id;
+						sqlList = sqlList.concat(sql);
+						trace("updateSql:"+sql);
+					}
+				} 
+				if(sqlList.length > 0)
+					formService.executeBatchByDS(null,sqlList);
+			}
+			
+			private function export():void{
+				formService.exportTempletScript(templetCode);
+			}
+			
+			private function exportTempletScriptHandler(event:ResultEvent):void{
+				var result:String = event.result as String;
+				var window:TextAreaWindow = new TextAreaWindow();
+				window.editable = false;
+				window.width = 800;
+				window.height = 370;
+				window.text = result;
+				window.title = "模板导出脚本";
+				PopUpManager.addPopUp(window,this);
+				PopUpManager.centerPopUp(window);
+			}
+			
+			private function refreshTempletCacheByCodeHandler(event:ResultEvent):void{
+				trace("该元模板在服务端的缓存已刷新!");
+			}
+			
+			private function viewEnviorment():void{
+				
+				var varMap:Object = ClientEnviorment.getInstance().getVarMap();
+				var paramArray:ArrayCollection = new ArrayCollection();
+				for(var key:String in varMap){
+					var temp:Object = new Object();
+					temp["key"] = key;
+					temp["value"] = varMap[key];
+					if(temp["value"]!=null){
+						var tempValue:Object = temp["value"];
+						if(tempValue is String){
+							if(tempValue.length > 300){
+								temp["value"] = tempValue.substr(0,300)+"...";
+							}
+							paramArray.addItem(temp);
+						}
+					}
+					
+				}
+				var window:DataGridWindow = new DataGridWindow();
+				window.title = "查看可用客户端变量";
+				window.initialize();
+				var dataGrid:PageDataGrid = window.dataGrid;
+				dataGrid.mygridcolumns = new Array();
+				var column:DataGridColumn = new DataGridColumn("变量名");
+				column.dataField = "key";
+				dataGrid.mygridcolumns = dataGrid.mygridcolumns.concat(column);
+				column = new DataGridColumn("变量值");
+				column.dataField = "value";
+				dataGrid.mygridcolumns = dataGrid.mygridcolumns.concat(column);
+				
+				dataGrid.pagecount = 20;
+				dataGrid.initdata(paramArray);
+				
+				window.showCloseButton = true;
+				window.addEventListener(CloseEvent.CLOSE,function():void{
+					PopUpManager.removePopUp(window);
+				});
+				
+				PopUpManager.addPopUp(window,this,true);
+				PopUpManager.centerPopUp(window);
+			}
+			
+			private function setDictionary():void{
+				var dataValue:Object = itemCard.getDataValue();
+				
+				//var templetVO:TempletVO = itemCard.getTempletVO();
+				var tableName:String = templetVO.savedtablename;
+				if(tableName == null || tableName == ""){
+					Alert.show("没有填写表名，无法自动设置字典");
+					return;
+				}
+				
+				tableName = tableName.toUpperCase();
+				
+				var itemKey:String = dataValue["ITEMKEY"];
+				
+				if(itemKey == null || itemKey == ""){
+					Alert.show("没有填写字段值，无法自动设置字典");
+					return;
+				}
+				itemKey = itemKey.toUpperCase();
+				
+				dataValue["COMBOXDESC"] = "select S.VALUE,S.VALUEEN,S.VALUECN  from BFBIZ_SYSDICTIONARY s where S.CLASSID='"+tableName+"' and S.ATTRIBUTEID='"+itemKey+"'";
+				
+				var itemTypeVo:SimpleComboxItemVO = new SimpleComboxItemVO();
+				itemTypeVo.id = itemTypeVo.code = itemTypeVo.name = "下拉框";
+				dataValue["ITEMTYPE"] = itemTypeVo;
+				
+				itemCard.setDataValue(dataValue);
+				
+			}
+			
+			
+			
+			protected function cardViewStack_changeHandler(event:IndexChangedEvent):void
+			{
+				if(cardViewStack.selectedChild == itemCard){
+					setDictBtn.setVisible(true);
+				}
+				else 
+					setDictBtn.setVisible(false);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:VBox width="30%" height="100%">
+			<mx:HBox width="100%" borderStyle="solid" id="buttonBox">
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" enabled="{editable}" click="addItem()"/>
+				<mx:LinkButton icon="{AssetsFileLib.addaddIcon}" width="22" height="22" toolTip="新建分组" enabled="{editable}" click="addGroup()"/>
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" enabled="{editable}" click="deleteItems()"/>
+				<mx:LinkButton icon="{AssetsFileLib.refreshIcon}" width="22" height="22" toolTip="刷新" click="refresh()"/>
+				<mx:LinkButton icon="{AssetsFileLib.exportIcon}" width="22" height="22" toolTip="导出" click="export()"/>
+			</mx:HBox>
+			<mx:VBox width="100%" height="100%" id="treeBox">
+				<templetmgmt:DraggableTreeForTempletMgmt width="100%" height="100%" id="tree" 
+					dataProvider="{treeData}" labelField="name" itemClick="itemClick()" 
+					dropFinished="onDragDrop(event)"
+				/>
+			</mx:VBox>
+		</mx:VBox>
+		<mx:VBox width="70%" height="100%" id="cardBox">
+			<mx:HBox width="100%" id="cardButtonBox">
+				<mx:Button label="保存"  click="save()" icon="{AssetsFileLib.saveIcon}"/>
+				<mx:Button id="setDictBtn" label="自动设为字典"  click="setDictionary()" icon="{AssetsFileLib.viewIcon}" visible="false"/>
+			</mx:HBox>
+			<mx:ViewStack id="cardViewStack" creationPolicy="all" width="100%" height="100%" change="cardViewStack_changeHandler(event)">
+				<core:BillCardPanel title="模板信息" id="templetCard" width="100%" height="100%" templetCode="T_PUB_TEMPLET_1" 
+					editable="{editable}" showInitingWindow="false" 
+					debugMode="{debugMode}" saveSuccessful="refreshAfterSaveSuccessful()"
+					endpoint="{endpoint}" />
+				<core:BillCardPanel title="属性组信息" id="groupCard" width="100%" height="100%" templetCode="T_PUB_TEMPLET_1_ITEM_GROUP" 
+					editable="{editable}" showInitingWindow="false" 
+					debugMode="{debugMode}" saveSuccessful="refresh()"
+					endpoint="{endpoint}"/>
+				<core:BillCardPanel title="属性信息" id="itemCard" width="100%" height="100%" templetCode="T_PUB_TEMPLET_1_ITEM" 
+					editable="{editable}" showInitingWindow="false" 
+					debugMode="{debugMode}" saveSuccessful="refresh()"
+					endpoint="{endpoint}"/>
+			</mx:ViewStack>
+		</mx:VBox>
+	</mx:HDividedBox>
+	
+</mx:Canvas>

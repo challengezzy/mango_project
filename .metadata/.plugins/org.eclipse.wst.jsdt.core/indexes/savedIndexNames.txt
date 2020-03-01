@@ -1,0 +1,5 @@
+INDEX VERSION 1.122+D:\workspace\workspace_mango\.metadata\.plugins\org.eclipse.wst.jsdt.core\indexes
+910416676.index
+1553655683.index
+1115510805.index
+3590820455.index

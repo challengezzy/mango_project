@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 平台最重要的配置文件,本来想放在ClassPath下的,但考虑到方便修改以及与web.xml的密切关系,还是放在这里,其他的资源可以放在classpath下,唯独这个最重要的可以特殊对待! -->
+<root>
+	<init-param key="PROJECT_NAME" value="SmartX" descr="项目名称" />
+	<init-param key="log4jfile" value="Log4j.properties" descr="日志属性文件" />
+	<init-param key="APPMODULE" value="smartx.framework.metadata.bs.NovaAppModuleConfig" descr="模块名称" />
+	<init-param key="LogService" value="smartx.system.log.bs.LogWriter" descr="系统日志服务" />
+	<init-param key="JOB_SERVICE" value="true" descr="是否启用自动JOB服务" />        <!-- 处理数据库连接池设置 -->
+	<init-param key="DS_RCONN_TIMES" value="5" descr="数据库连接重试次数【-1代表无限次】" />
+	<init-param key="DS_RCONN_DELAY" value="6000" descr="数据库连接重试延迟【单位ms】" />
+	<init-param key="DS_REPAIR_TIMES" value="600" descr="数据库连接池的尝试次数，达到此次数就重建连接池【-1不控制】" />
+	<init-param key="DS_PRINTSQL" value="true" descr="是否打印所有执行的SQL信息" />
+	<init-param key="CHAT_SERVER" value="127.0.0.1" descr="聊天服务器地址，必须是客户端可直接访问的地址，建议使用域名" />    <!-- 工作流引擎2.0的参数 -->
+	<init-param key="WF_USE_CACHE" value="true" descr="工作流引擎是否使用缓存(多人开发模式设成false)" />        <!-- CEP服务参数 -->
+	<init-param key="CEP_JDBC_LISTENPORT" value="8450" descr="CEP JDBC服务的监听端口" />
+
+	<init-param key="DATATASK_SERVICE" value="false" descr="是否启用数据预处理服务" />
+	<init-param key="CEP_SERVICE" value="false" descr="是否启用CEP服务" />
+	<!-- init-param key="CEP_JDBC_SESSIONIDLETIMEOUT" value="-1" descr="会话超时，默认无限"/ -->
+	<init-param key="CEP_PERSISTENT_PROVIDERS" value="" descr="需要持久化的CEP容器，逗号分隔" />
+	<init-param key="CEP_ENGINECONFIGURATION_FACTORY" value="smartx.publics.cep.bs.configuration.DefaultCEPEngineConfigurationFactory" descr="CEP引擎配置生成工厂" />
+	
+	<init-param key="DELETE_TEMPFILE" value="true" descr="清理临时文件" />        
+	<!-- 系统超级用户 -->
+	<default-user name="sa" pwd="sa" adminpwd="sa" />	
+	<!-- 所有的数据源 -->
+	<datasources>
+		<datasource name="datasource_default"> 
+	      <driver>oracle.jdbc.driver.OracleDriver</driver>  
+	      <url>jdbc:oracle:thin:apms140819/apms140819@121.197.15.177:1521:ORCL</url>
+	      <initsize>2</initsize>  
+	      <poolsize>10</poolsize>
+	      <validationQuery>select 1 from dual</validationQuery> 
+	    </datasource>  
+	    <datasource name="datasource_usermgmt"> 
+	      <driver>oracle.jdbc.driver.OracleDriver</driver>  
+	      <url>jdbc:oracle:thin:apms140819/apms140819@121.197.15.177:1521:ORCL</url>  
+	      <initsize>2</initsize>  
+	      <poolsize>10</poolsize> 
+	      <validationQuery>select 1 from dual</validationQuery> 
+	    </datasource>
+	    <datasource name="datasource_apms"> 
+	      <driver>oracle.jdbc.driver.OracleDriver</driver>  
+	      <url>jdbc:oracle:thin:apms140819/apms140819@121.197.15.177:1521:ORCL</url>  
+	      <initsize>2</initsize>  
+	      <poolsize>10</poolsize> 
+	      <validationQuery>select 1 from dual</validationQuery> 
+	    </datasource> 
+    
+	</datasources>
+	<!-- 二次开发项目Boot启动类!平台会自动调用其默认构造方法,凡是在该类中写的利用BSUtil处理数据库的代码平台会自动进行提交(这也是写在这里的目的)!! -->
+	<secondprojectboot>
+		<bootclassname>smartx.publics.form.bs.service.InitMetaDataService</bootclassname>
+		<bootclassname>smartx.publics.datatask.CommTaskManager</bootclassname>
+		<bootclassname>smartx.bam.bs.BamService</bootclassname>
+		<!-- 
+		<bootclassname>smartx.publics.cep.bs.service.SmartXCEPService</bootclassname>
+		<bootclassname>smartx.publics.report.bs.ReportService</bootclassname>
+		<bootclassname>smartx.publics.clustercompute.sample.SampleClusterCompute</bootclassname>
+		 -->
+	</secondprojectboot>
+	<!-- 自定义flex监听器等 -->
+	<additionalLibs>
+		<swfList>
+			<file path="smartx/bam/flex/modules/CustomLibrary.swf" />
+		</swfList>
+	</additionalLibs>
+	<!-- 所有远程模块服务
+	<moduleservices>
+		<service name="smartx.publics.clustercompute.service.ClusterComputeNodeService" descr="集群计算子节点服务">
+			<implclass>smartx.publics.clustercompute.service.ClusterComputeNodeServiceImpl</implclass>
+			<initsize>1</initsize>
+			<poolsize>10</poolsize>
+		</service>
+		<service name="smartx.publics.clustercompute.service.ClusterComputeServerService" descr="集群计算服务端服务">
+			<implclass>smartx.publics.clustercompute.service.ClusterComputeServerServiceImpl</implclass>
+			<initsize>1</initsize>
+			<poolsize>10</poolsize>
+		</service>
+	</moduleservices>
+	<clusterComputeService returnURL="http://localhost:8181/SmartXWeb">
+		<node id="node1" url="http://localhost:8181/SmartXWeb"/>
+		<node id="node2" url="http://gisserver:8888/SmartXWeb"/>
+		<node id="node3" url="http://gisserver:8888/SmartXWeb"/>
+	</clusterComputeService>
+	 -->
+	 
+	<log4j>
+		<logpath>d:/novalog/</logpath>
+		<level>DEBUG</level>
+		<outputtype>3</outputtype>
+		<clspath>smartx</clspath>
+	</log4j>
+	<init-metadata-files initialize="false">
+		<file name="smartx-patch" datasource="datasource_default" desc="SmartX初始化数据" />
+	</init-metadata-files>
+</root>

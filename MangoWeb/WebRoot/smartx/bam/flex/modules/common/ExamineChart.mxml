@@ -1,0 +1,877 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		  creationComplete="init()"
+		  >
+	<fx:Declarations>
+		<mx:VBox id="groupUserVbox" width="100%" >
+			<mx:HBox width="100%"  >
+				<mx:Label id="userNameLab" fontStyle="italic" />
+			</mx:HBox>
+			<mx:HBox width="100%" verticalAlign="bottom" >
+				<mx:Label text="你最近的考核的分:" fontStyle="italic" fontWeight="bold" fontSize="14" /><mx:Label fontSize="21" fontWeight="bold" id="userScoreLab" fontFamily="Arial"/>
+			</mx:HBox>
+			<mx:HBox width="100%" verticalAlign="bottom" >
+				<mx:Label text="排名:" fontStyle="italic" fontWeight="bold" fontSize="14" /><mx:Label fontSize="21" fontWeight="bold" id="userRankLab" fontFamily="Arial"/>
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label id="suggestLab" color="0xFF9900" />
+			</mx:HBox>
+		</mx:VBox>
+		
+		<mx:VBox id="provinceUserVbox" width="100%" >
+			<mx:HBox width="100%"  >
+				<mx:Label id="provinceUserNameLab" fontStyle="italic" />
+			</mx:HBox>
+			<mx:HBox width="100%" verticalAlign="bottom" >
+				<mx:Label text="最近考核平均分:" fontStyle="italic" fontWeight="bold" fontSize="14" /><mx:Label fontSize="21" fontWeight="bold" id="avgScoreLab" fontFamily="Arial"/>
+			</mx:HBox>
+			<mx:HBox width="100%" verticalAlign="bottom" >
+				<mx:Label text="排名第一的是:" fontStyle="italic" fontWeight="bold" fontSize="14" /><mx:Label fontSize="21" fontWeight="bold" id="provinceRankLab" color="0xDD0000" />
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label id="provinceInfoLab" color="0xFF9900" />
+			</mx:HBox>
+		</mx:VBox>
+		
+		<mx:TitleWindow id="groupUserDetail" title="考核结果分析报告" showCloseButton="true" 
+						 close="PopUpManager.removePopUp(groupUserDetail)" layout="vertical">
+			<mx:VBox width="580" height="500" paddingBottom="5" paddingTop="5" paddingLeft="5" paddingRight="5"  >
+				
+				<mx:VBox id="headVbox" width="100%" >
+					<mx:Label id="examineDateLab" fontSize="18" fontWeight="bold" />
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label fontStyle="italic" text="您的考核得分" />
+						<mx:Label fontSize="22" fontWeight="bold" id="groupUserScoreLab" color="0x009911" fontFamily="Arial"/>
+						<mx:Label fontStyle="italic" id="groupUserScoreTxtLab" />
+					</mx:HBox>
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label fontStyle="italic" text="您的考核排名" />
+						<mx:Label fontSize="22" fontWeight="bold" id="groupUserRankLab" color="0x009911" fontFamily="Arial"/>
+						<mx:Label fontStyle="italic" id="groupUserRankTxtLab" />
+					</mx:HBox>
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label  text="共考核了" color="0x999999" />
+						<mx:Label  color="0xBB1100" id="totalCountLab" />
+						<mx:Label  text="项指标，其中" color="0x999999" />
+						<mx:Label  color="0xBB1100" id="reCountLab" />
+						<mx:Label  text="项有扣分" color="0x999999" />
+					</mx:HBox>
+				</mx:VBox>
+				
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%">
+					<mx:HBox width="100%" verticalAlign="middle">
+						<mx:Label fontSize="23" fontWeight="bold" text="严重问题" color="0xDD0000" />
+						<mx:Label fontStyle="italic" text="–您在这些问题上得分极低,严重影响了总得分,请立即着手改进" color="0x999999" />
+					</mx:HBox>
+					<mx:VBox id="highRankVbox" width="100%" >
+						
+					</mx:VBox>
+				</mx:VBox>
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%">
+					<mx:HBox width="100%" verticalAlign="middle" >
+						<mx:Label fontSize="23" fontWeight="bold" text="优先问题" color="0x0011AA" />
+						<mx:Label fontStyle="italic" text="–这些问题严重影响了您的得分,请优先改进" color="0x999999" />
+					</mx:HBox>
+					<mx:VBox id="middleRankVbox" width="100%" >
+						
+					</mx:VBox>
+				</mx:VBox>
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%">
+					<mx:HBox width="100%" verticalAlign="middle" >
+						<mx:Label fontSize="23" fontWeight="bold" text="普通问题" color="0x007711" />
+						<mx:Label fontStyle="italic" text="–以下这些问题您都有扣分,请及时改进" color="0x999999" />
+					</mx:HBox>
+					<mx:VBox id="lowRankVbox" width="100%" >
+						
+					</mx:VBox>
+				</mx:VBox>
+				
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		
+		<mx:TitleWindow id="provinceReportWindow" title="考核结果分析报告" showCloseButton="true" 
+						 close="PopUpManager.removePopUp(provinceReportWindow)" layout="vertical">
+			<mx:VBox width="750" height="500" paddingBottom="5" paddingTop="5" paddingLeft="5" paddingRight="5"  >
+				
+				<mx:VBox  width="100%" >
+					<mx:Label id="ProexamineDateLab" fontSize="18" fontWeight="bold" />
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label fontStyle="italic" text="考核平均得分:" />
+						<mx:Label fontSize="22" fontWeight="bold" id="proviceUserScoreLab" color="0x009911" fontFamily="Arial"/>
+						<mx:Label fontStyle="italic" id="provinceUserScoreTxtLab" />
+					</mx:HBox>
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label fontStyle="italic" text="考核排名第一的是:" />
+						<mx:Label fontSize="22" fontWeight="bold" id="proviceUserRankLab" color="0xDD0000"/>
+					</mx:HBox>
+					<mx:HBox width="100%" verticalAlign="bottom">
+						<mx:Label  text="共考核了" color="0x999999" />
+						<mx:Label  color="0xBB1100" id="PrototalCountLab" />
+						<mx:Label  text="项指标，其中" color="0x999999" />
+						<mx:Label  color="0xBB1100" id="ProreCountLab" />
+						<mx:Label  text="项有扣分" color="0x999999" />
+					</mx:HBox>
+				</mx:VBox>
+				
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%" >
+					<mx:Label fontSize="23" fontWeight="bold" text="考核排名榜" color="0x007711" />
+					<mx:VBox id="rankVbox" width="100%" >
+						
+					</mx:VBox>
+				</mx:VBox>
+				
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%" id="tbgzVbox" horizontalAlign="left" >
+					<mx:Label fontSize="23" fontWeight="bold" text="特别关注:" color="0xFFCC00" />
+				</mx:VBox>
+				
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%">
+					<mx:HBox width="100%" verticalAlign="middle">
+						<mx:Label fontSize="23" fontWeight="bold" text="严重问题" color="0xDD0000" />
+						<mx:Label fontStyle="italic" text="–您在这些问题上得分极低,严重影响了总得分,请立即着手改进" color="0x999999" />
+					</mx:HBox>
+					<mx:VBox id="highQestionVbox" width="100%" >
+						
+					</mx:VBox>
+				</mx:VBox>
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%">
+					<mx:HBox width="100%" verticalAlign="middle" >
+						<mx:Label fontSize="23" fontWeight="bold" text="优先问题" color="0x0011AA" />
+						<mx:Label fontStyle="italic" text="–这些问题严重影响了您的得分,请优先改进" color="0x999999" />
+					</mx:HBox>
+					<mx:VBox id="middleQuestionVbox" width="100%" >
+						
+					</mx:VBox>
+				</mx:VBox>
+				<mx:HRule width="100%" />
+				<mx:VBox width="100%">
+					<mx:HBox width="100%" verticalAlign="middle" >
+						<mx:Label fontSize="23" fontWeight="bold" text="普通问题" color="0x007711" />
+						<mx:Label fontStyle="italic" text="–以下这些问题您都有扣分,请及时改进" color="0x999999" />
+					</mx:HBox>
+					<mx:VBox id="lowQuestionVbox" width="100%" >
+						
+					</mx:VBox>
+				</mx:VBox>
+				
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		
+		<mx:HBox id="hbox11" width="100%" >
+			<mx:Label id="hbox1Lab" color="0xDD0000" />
+			<mx:Label  text="已在考核中连续" />
+			<mx:Label id="hbox1TimesLab" color="0xDD0000" />
+			<mx:Label  text="次排名第一" />
+		</mx:HBox>
+		<mx:HBox id="hbox12" width="100%" >
+			<mx:Label id="hbox2Lab" color="0xDD0000" />
+			<mx:Label  text="在本次考核中进步最快，排名上升了" />
+			<mx:Label id="hbox2TimesLab" color="0xDD0000" />
+			<mx:Label  text="位" />
+		</mx:HBox>
+		<mx:HBox id="hbox13" width="100%" >
+			<mx:Label id="hbox3Lab" color="0xDD0000" />
+			<mx:Label   text="已在连续" />
+			<mx:Label id="hbox3TimesLab" color="0xDD0000" />
+			<mx:Label   text="次的考核中排名上升" />
+		</mx:HBox>
+		<mx:HBox id="hbox14" width="100%" >
+			<mx:Label id="hbox4Lab" color="0x007788" />
+			<mx:Label   text="已在考核中连续" />
+			<mx:Label id="hbox4TimesLab" color="0x007788" />
+			<mx:Label   text="次排名最后" />
+		</mx:HBox>
+		<mx:HBox id="hbox15" width="100%" >
+			<mx:Label id="hbox5Lab" color="0x007788" />
+			<mx:Label   text="在本次考核中退步较大，排名下降了" />
+			<mx:Label id="hbox5TimesLab" color="0x007788" />
+			<mx:Label   text="位" />
+		</mx:HBox>
+		<mx:HBox id="hbox16" width="100%" >
+			<mx:Label id="hbox6Lab" color="0x007788" />
+			<mx:Label   text="已在连续" />
+			<mx:Label id="hbox6TimesLab" color="0x007788" />
+			<mx:Label   text="次的考核中排名下降" />
+		</mx:HBox>
+		
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.controls.LinkButton;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.bam.flex.modules.common.variableControl.vo.VariableVo;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.HelpUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private var bamService:RemoteObject;
+			
+			private var isGroupUser:Boolean = true;
+			
+			private var userName:String;
+			
+			private var dataObject:Object;
+			
+			protected function init():void
+			{
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.getGroupUserData.addEventListener(ResultEvent.RESULT,getGroupUserDataHandler);					
+				bamService.getGroupUserData.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.getProvinceData.addEventListener(ResultEvent.RESULT,getProvinceDataHandler);					
+				bamService.getProvinceData.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				var url:String = this.loaderInfo.url;
+				var parameters:Object = StringUtils.parseUrlParameters(url);
+				var groupField:String = parameters["groupField"];
+				var tempValue:String = ClientEnviorment.getInstance().getVar(groupField) as String;
+				
+				if(middleVbox.getChildren().length>0){
+					middleVbox.removeAllChildren();
+				}
+				
+				userName = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME) as String;
+				
+				if(tempValue == null || tempValue == "" || tempValue == VariableVo.IGNORE_VALUE ){
+					isGroupUser = false;
+					bamService.getProvinceData();
+				}else{
+					isGroupUser = true;
+					bamService.getGroupUserData(tempValue);
+				}
+				
+				
+			}
+			
+			protected function viewReportImg_clickHandler(event:MouseEvent):void
+			{
+				var detailObj:Object = dataObject["detail"];
+				
+				if(isGroupUser){
+					
+					PopUpManager.addPopUp(groupUserDetail,this.root,false);
+					PopUpManager.centerPopUp(groupUserDetail);
+					
+					
+					
+					groupUserScoreLab.text = dataObject["score"];
+					if(parseInt(dataObject["score"])>=parseInt(detailObj["lastScore"])){
+						groupUserScoreTxtLab.text = "比上次提升了"+(parseInt(dataObject["score"])-parseInt(detailObj["lastScore"]))+"分";
+					}else{
+						groupUserScoreTxtLab.text = "比上次下降了"+(parseInt(detailObj["lastScore"])-parseInt(dataObject["score"]))+"分";
+					}
+					
+					groupUserRankLab.text = dataObject["rank"];
+					if(parseInt(dataObject["rank"])>=parseInt(detailObj["lastRank"])){
+						groupUserRankTxtLab.text = "比上次提升了"+(parseInt(dataObject["rank"])-parseInt(detailObj["lastRank"]))+"位";
+					}else{
+						groupUserRankTxtLab.text = "比上次下降了"+(parseInt(detailObj["lastRank"])-parseInt(dataObject["rank"]))+"位";
+					}
+					
+					totalCountLab.text = detailObj["totalcount"];
+					reCountLab.text = detailObj["recount"];
+					examineDateLab.text = "考核日期:"+detailObj["createtime"];
+					
+					var highRankArr:Array = detailObj["highRank"] as Array;
+					if(highRankArr != null ){
+						if(highRankVbox.getChildren().length>0){
+							highRankVbox.removeAllChildren();
+						}
+						for each(var highItem:SimpleHashVO in highRankArr){
+							var hbox:HBox = new HBox();
+							hbox.percentWidth = 100;
+							
+							var subjectLab:Label = new Label();
+							subjectLab.text = highItem.dataMap["indicatorname"];
+							hbox.addChild(subjectLab);
+							
+							var rescoreLab:Label = new Label();
+							rescoreLab.text = highItem.dataMap["rescore"];
+							rescoreLab.setStyle("color","0xDD0000");
+							hbox.addChild(rescoreLab);
+							
+							var fixBtn:LinkButton = new LinkButton();
+							fixBtn.label = "整改建议";
+							fixBtn.data = highItem.dataMap["indicatorcode"];
+							fixBtn.addEventListener(MouseEvent.CLICK,fixBtnHandler);
+							fixBtn.setStyle("color","0x007788");
+							var btnBox:HBox = new HBox();
+							btnBox.percentWidth = 100;
+							btnBox.setStyle("horizontalAlign","right");
+							btnBox.addChild(fixBtn);
+							
+							hbox.addChild(btnBox);
+							
+							highRankVbox.addChild(hbox);
+						}
+					}
+					
+					var middleRankArr:Array = detailObj["middleRank"] as Array;
+					if(middleRankArr != null ){
+						if(middleRankVbox.getChildren().length>0){
+							middleRankVbox.removeAllChildren();
+						}
+						for each(var middleItem:SimpleHashVO in middleRankArr){
+							var hbox2:HBox = new HBox();
+							hbox2.percentWidth = 100;
+							
+							var subjectLab2:Label = new Label();
+							subjectLab2.text = middleItem.dataMap["indicatorname"];
+							hbox2.addChild(subjectLab2);
+							
+							var rescoreLab2:Label = new Label();
+							rescoreLab2.text = middleItem.dataMap["rescore"];
+							rescoreLab2.setStyle("color","0xDD0000");
+							hbox2.addChild(rescoreLab2);
+							
+							var fixBtn2:LinkButton = new LinkButton();
+							fixBtn2.label = "整改建议";
+							fixBtn2.data = middleItem.dataMap["indicatorcode"];
+							fixBtn2.addEventListener(MouseEvent.CLICK,fixBtnHandler);
+							fixBtn2.setStyle("color","0x007788");
+							var btnBox2:HBox = new HBox();
+							btnBox2.percentWidth = 100;
+							btnBox2.setStyle("horizontalAlign","right");
+							btnBox2.addChild(fixBtn2);
+							hbox2.addChild(btnBox2);
+							
+							middleRankVbox.addChild(hbox2);
+						}
+					}
+					
+					var lowRankArr:Array = detailObj["lowRank"] as Array;
+					if(lowRankArr != null ){
+						if(lowRankVbox.getChildren().length>0){
+							lowRankVbox.removeAllChildren();
+						}
+						for each(var lowItem:SimpleHashVO in lowRankArr){
+							var hbox3:HBox = new HBox();
+							hbox3.percentWidth = 100;
+							
+							var subjectLab3:Label = new Label();
+							subjectLab3.text = lowItem.dataMap["indicatorname"];
+							hbox3.addChild(subjectLab3);
+							
+							var rescoreLab3:Label = new Label();
+							rescoreLab3.text = lowItem.dataMap["rescore"];
+							rescoreLab3.setStyle("color","0xDD0000");
+							hbox3.addChild(rescoreLab3);
+							
+							var fixBtn3:LinkButton = new LinkButton();
+							fixBtn3.label = "整改建议";
+							fixBtn3.data = lowItem.dataMap["indicatorcode"];
+							fixBtn3.addEventListener(MouseEvent.CLICK,fixBtnHandler);
+							fixBtn3.setStyle("color","0x007788");
+							var btnBox3:HBox = new HBox();
+							btnBox3.percentWidth = 100;
+							btnBox3.setStyle("horizontalAlign","right");
+							btnBox3.addChild(fixBtn3);
+							hbox3.addChild(btnBox3);
+							
+							lowRankVbox.addChild(hbox3);
+						}
+					}
+					
+				}else{
+					PopUpManager.addPopUp(provinceReportWindow,this.root,false);
+					PopUpManager.centerPopUp(provinceReportWindow);
+					
+//					var detailObj:Object = dataObject["detail"];
+					
+					proviceUserScoreLab.text = dataObject["avgScore"];
+					if(parseInt(dataObject["avgScore"])>=parseInt(detailObj["lastAvgScore"])){
+						provinceUserScoreTxtLab.text = "比上次提升了"+(parseInt(dataObject["avgScore"])-parseInt(detailObj["lastAvgScore"]))+"分";
+					}else{
+						provinceUserScoreTxtLab.text = "比上次下降了"+(parseInt(detailObj["lastAvgScore"])-parseInt(dataObject["avgScore"]))+"分";
+					}
+					
+					proviceUserRankLab.text = dataObject["firstGroup"];
+					
+					PrototalCountLab.text = detailObj["totalcount"];
+					ProreCountLab.text = detailObj["recount"];
+					ProexamineDateLab.text = "考核日期:"+detailObj["createtime"];
+					
+					var rankDetailArr:Array = detailObj["rankDetail"] as Array;
+					if(rankDetailArr != null ){
+						if(rankVbox.getChildren().length>0){
+							rankVbox.removeAllChildren();
+						}
+						var last_rn:Number = 1;
+						var new_rn:Number = 1;
+						var itemCount:Number = 0;
+						for each(var rankItem:SimpleHashVO in rankDetailArr){
+							
+							itemCount++;
+							
+							var rankhbox:HBox = new HBox();
+							rankhbox.percentWidth = 100;
+							
+							var rankLab:Label = new Label();
+							var temp_rn:Number = rankItem.dataMap["rn"];
+							if(temp_rn == last_rn){
+								rankLab.text = new_rn+". ";
+							}else{
+								new_rn = itemCount;
+								rankLab.text = new_rn+". ";
+							}
+							last_rn = temp_rn;
+							
+							rankhbox.addChild(rankLab);
+							
+							var rankSubjectLab:Label = new Label();
+							rankSubjectLab.text = rankItem.dataMap["grouplabel"]+" ";
+							rankhbox.addChild(rankSubjectLab);
+							
+							var scoreLab:Label = new Label();
+							scoreLab.text = rankItem.dataMap["score"]+" ";
+							rankhbox.addChild(scoreLab);
+							
+
+							if(rankItem.dataMap["status"]=="rise"){
+								var rlLabr:Label = new Label();
+								rlLabr.text = rankItem.dataMap["scale"];
+								rlLabr.setStyle("color","0xDD0000");
+								rankhbox.addChild(rlLabr);
+							}
+							if(rankItem.dataMap["status"]=="fall"){
+								var rlLabf:Label = new Label();
+								rlLabf.text = rankItem.dataMap["scale"];
+								rlLabf.setStyle("color","0x009911");
+								rankhbox.addChild(rlLabf);
+							}
+							if(rankItem.dataMap["status"]=="normal"){
+								var rlLabn:Label = new Label();
+								rlLabn.text = rankItem.dataMap["scale"];
+								rlLabn.setStyle("color","0x007788");
+								rankhbox.addChild(rlLabn);
+							}
+							
+							
+							rankVbox.addChild(rankhbox);
+						}
+					}
+					
+					if(!BAMUtil.isEmpty(detailObj["firstGroupLabel"]) && parseInt(detailObj["firstGroupCount"])>0){
+						if(!tbgzVbox.contains(hbox11)){
+							tbgzVbox.addChild(hbox11);
+						}
+						hbox1Lab.text = detailObj["firstGroupLabel"];
+						hbox1TimesLab.text = detailObj["firstGroupCount"];
+					}else{
+						if(tbgzVbox.contains(hbox11)){
+							tbgzVbox.removeChild(hbox11);
+						}
+					}
+					
+					if(!BAMUtil.isEmpty(detailObj["fastLabel"]) && parseInt(detailObj["fastScale"])>0){
+						if(!tbgzVbox.contains(hbox12)){
+							tbgzVbox.addChild(hbox12);
+						}
+						hbox2Lab.text = detailObj["fastLabel"];
+						hbox2TimesLab.text = detailObj["fastScale"];
+					}else{
+						if(tbgzVbox.contains(hbox12)){
+							tbgzVbox.removeChild(hbox12);
+						}
+					}
+					
+					if(!BAMUtil.isEmpty(detailObj["serialRiseLabel"]) && parseInt(detailObj["serialRiseCount"])>0){
+						if(!tbgzVbox.contains(hbox13)){
+							tbgzVbox.addChild(hbox13);
+						}
+						hbox3Lab.text = detailObj["serialRiseLabel"];
+						hbox3TimesLab.text = detailObj["serialRiseCount"];
+					}else{
+						if(tbgzVbox.contains(hbox13)){
+							tbgzVbox.removeChild(hbox13);
+						}
+					}
+					
+					if(!BAMUtil.isEmpty(detailObj["lastGroupLabel"]) && parseInt(detailObj["lastGroupCount"])>0){
+						if(!tbgzVbox.contains(hbox14)){
+							tbgzVbox.addChild(hbox14);
+						}
+						hbox4Lab.text = detailObj["lastGroupLabel"];
+						hbox4TimesLab.text = detailObj["lastGroupCount"];
+					}else{
+						if(tbgzVbox.contains(hbox14)){
+							tbgzVbox.removeChild(hbox14);
+						}
+					}
+					
+					if(!BAMUtil.isEmpty(detailObj["slowestLabel"]) && parseInt(detailObj["slowestScale"])>0){
+						if(!tbgzVbox.contains(hbox15)){
+							tbgzVbox.addChild(hbox15);
+						}
+						hbox5Lab.text = detailObj["slowestLabel"];
+						hbox5TimesLab.text = detailObj["slowestScale"];
+					}else{
+						if(tbgzVbox.contains(hbox15)){
+							tbgzVbox.removeChild(hbox15);
+						}
+					}
+					
+					if(!BAMUtil.isEmpty(detailObj["serialLowLabel"]) && parseInt(detailObj["serialLowCount"])>0){
+						if(!tbgzVbox.contains(hbox16)){
+							tbgzVbox.addChild(hbox16);
+						}
+						hbox6Lab.text = detailObj["serialLowLabel"];
+						hbox6TimesLab.text = detailObj["serialLowCount"];
+					}else{
+						if(tbgzVbox.contains(hbox16)){
+							tbgzVbox.removeChild(hbox16);
+						}
+					}
+					
+					var highQestionArr:Array = detailObj["highQuestion"] as Array;
+					if(highQestionArr != null ){
+						if(highQestionVbox.getChildren().length>0){
+							highQestionVbox.removeAllChildren();
+						}
+						for each(var hItem:SimpleHashVO in highQestionArr){
+							
+							var hvbox:VBox = new VBox();
+							hvbox.percentWidth = 100;
+							
+							var hhbox:HBox = new HBox();
+							hhbox.percentWidth = 100;
+							
+							var hSubjectLab:Label = new Label();
+							hSubjectLab.text = hItem.dataMap["indicatorname"];
+							hhbox.addChild(hSubjectLab);
+							
+							var hrescoreLab:Label = new Label();
+							hrescoreLab.text = hItem.dataMap["rescore"];
+							hrescoreLab.setStyle("color","0xDD0000");
+							hhbox.addChild(hrescoreLab);
+							
+							var hfixBtn:LinkButton = new LinkButton();
+							hfixBtn.label = "整改建议";
+							hfixBtn.data = hItem.dataMap["indicatorcode"];
+							hfixBtn.addEventListener(MouseEvent.CLICK,fixBtnHandler);
+							hfixBtn.setStyle("color","0x007788");
+							var hbtnBox:HBox = new HBox();
+							hbtnBox.percentWidth = 100;
+							hbtnBox.setStyle("horizontalAlign","right");
+							hbtnBox.addChild(hfixBtn);
+							
+							hhbox.addChild(hbtnBox);
+							
+							hvbox.addChild(hhbox);
+							
+							var subMinhhbox:HBox = new HBox();
+							subMinhhbox.percentWidth = 100;
+							
+							var subLabelMin:Label = new Label();
+							subLabelMin.text = "– 扣分最少："+hItem.dataMap["mingrouplabel"];
+							subLabelMin.setStyle("color","0x999999");
+							subLabelMin.setStyle("fontSize","11");
+							subMinhhbox.addChild(subLabelMin);
+							
+							var subLabelMinScore:Label = new Label();
+							subLabelMinScore.text = hItem.dataMap["minrescore"];
+							subLabelMinScore.setStyle("color","0xDD0000");
+							subLabelMinScore.setStyle("fontSize","11");
+							subMinhhbox.addChild(subLabelMinScore);
+							
+							hvbox.addChild(subMinhhbox);
+							
+							var subMaxhhbox:HBox = new HBox();
+							subMaxhhbox.percentWidth = 100;
+							
+							var subLabelMax:Label = new Label();
+							subLabelMax.text = "– 扣分最多："+hItem.dataMap["maxgrouplabel"];
+							subLabelMax.setStyle("color","0x999999");
+							subLabelMax.setStyle("fontSize","11");
+							subMaxhhbox.addChild(subLabelMax);
+							
+							var subLabelMaxScore:Label = new Label();
+							subLabelMaxScore.text = hItem.dataMap["maxrescore"];
+							subLabelMaxScore.setStyle("color","0xDD0000");
+							subLabelMaxScore.setStyle("fontSize","11");
+							subMaxhhbox.addChild(subLabelMaxScore);
+							
+							hvbox.addChild(subMaxhhbox);
+							
+							highQestionVbox.addChild(hvbox);
+						}
+					}
+					
+					var middleQestionArr:Array = detailObj["middleQuestion"] as Array;
+					if(middleQestionArr != null ){
+						if(middleQuestionVbox.getChildren().length>0){
+							middleQuestionVbox.removeAllChildren();
+						}
+						for each(var mItem:SimpleHashVO in middleQestionArr){
+							
+							var mvbox:VBox = new VBox();
+							mvbox.percentWidth = 100;
+							
+							var mhbox:HBox = new HBox();
+							mhbox.percentWidth = 100;
+							
+							var mSubjectLab:Label = new Label();
+							mSubjectLab.text = mItem.dataMap["indicatorname"];
+							mhbox.addChild(mSubjectLab);
+							
+							var mrescoreLab:Label = new Label();
+							mrescoreLab.text = mItem.dataMap["rescore"];
+							mrescoreLab.setStyle("color","0xDD0000");
+							mhbox.addChild(mrescoreLab);
+							
+							var mfixBtn:LinkButton = new LinkButton();
+							mfixBtn.label = "整改建议";
+							mfixBtn.data = mItem.dataMap["indicatorcode"];
+							mfixBtn.addEventListener(MouseEvent.CLICK,fixBtnHandler);
+							mfixBtn.setStyle("color","0x007788");
+							var mbtnBox:HBox = new HBox();
+							mbtnBox.percentWidth = 100;
+							mbtnBox.setStyle("horizontalAlign","right");
+							mbtnBox.addChild(mfixBtn);
+							
+							mhbox.addChild(mbtnBox);
+							
+							mvbox.addChild(mhbox);
+							
+							var msubMinhhbox:HBox = new HBox();
+							msubMinhhbox.percentWidth = 100;
+							
+							var msubLabelMin:Label = new Label();
+							msubLabelMin.text = "– 扣分最少："+mItem.dataMap["mingrouplabel"];
+							msubLabelMin.setStyle("color","0x999999");
+							msubLabelMin.setStyle("fontSize","11");
+							msubMinhhbox.addChild(msubLabelMin);
+							
+							var msubLabelMinScore:Label = new Label();
+							msubLabelMinScore.text = mItem.dataMap["minrescore"];
+							msubLabelMinScore.setStyle("color","0xDD0000");
+							msubLabelMinScore.setStyle("fontSize","11");
+							msubMinhhbox.addChild(msubLabelMinScore);
+							
+							mvbox.addChild(msubMinhhbox);
+							
+							var msubMaxhhbox:HBox = new HBox();
+							msubMaxhhbox.percentWidth = 100;
+							
+							var msubLabelMax:Label = new Label();
+							msubLabelMax.text = "– 扣分最多："+mItem.dataMap["maxgrouplabel"];
+							msubLabelMax.setStyle("color","0x999999");
+							msubLabelMax.setStyle("fontSize","11");
+							msubMaxhhbox.addChild(msubLabelMax);
+							
+							var msubLabelMaxScore:Label = new Label();
+							msubLabelMaxScore.text = mItem.dataMap["maxrescore"];
+							msubLabelMaxScore.setStyle("color","0xDD0000");
+							msubLabelMaxScore.setStyle("fontSize","11");
+							msubMaxhhbox.addChild(msubLabelMaxScore);
+							
+							mvbox.addChild(msubMaxhhbox);
+							
+							middleQuestionVbox.addChild(mvbox);
+						}
+					}
+					
+					var lowQuestionArr:Array = detailObj["lowQuestion"] as Array;
+					if(lowQuestionArr != null ){
+						if(lowQuestionVbox.getChildren().length>0){
+							lowQuestionVbox.removeAllChildren();
+						}
+						for each(var lItem:SimpleHashVO in lowQuestionArr){
+							
+							var lvbox:VBox = new VBox();
+							lvbox.percentWidth = 100;
+							
+							var lhbox:HBox = new HBox();
+							lhbox.percentWidth = 100;
+							
+							var lSubjectLab:Label = new Label();
+							lSubjectLab.text = lItem.dataMap["indicatorname"];
+							lhbox.addChild(lSubjectLab);
+							
+							var lrescoreLab:Label = new Label();
+							lrescoreLab.text = lItem.dataMap["rescore"];
+							lrescoreLab.setStyle("color","0xDD0000");
+							lhbox.addChild(lrescoreLab);
+							
+							var lfixBtn:LinkButton = new LinkButton();
+							lfixBtn.label = "整改建议";
+							lfixBtn.data = lItem.dataMap["indicatorcode"];
+							lfixBtn.addEventListener(MouseEvent.CLICK,fixBtnHandler);
+							lfixBtn.setStyle("color","0x007788");
+							var lbtnBox:HBox = new HBox();
+							lbtnBox.percentWidth = 100;
+							lbtnBox.setStyle("horizontalAlign","right");
+							lbtnBox.addChild(lfixBtn);
+							
+							lhbox.addChild(lbtnBox);
+							
+							lvbox.addChild(lhbox);
+							
+							var lsubMinhhbox:HBox = new HBox();
+							lsubMinhhbox.percentWidth = 100;
+							
+							var lsubLabelMin:Label = new Label();
+							lsubLabelMin.text = "– 扣分最少："+lItem.dataMap["mingrouplabel"];
+							lsubLabelMin.setStyle("color","0x999999");
+							lsubLabelMin.setStyle("fontSize","11");
+							lsubMinhhbox.addChild(lsubLabelMin);
+							
+							var lsubLabelMinScore:Label = new Label();
+							lsubLabelMinScore.text = lItem.dataMap["minrescore"];
+							lsubLabelMinScore.setStyle("color","0xDD0000");
+							lsubLabelMinScore.setStyle("fontSize","11");
+							lsubMinhhbox.addChild(lsubLabelMinScore);
+							
+							lvbox.addChild(lsubMinhhbox);
+							
+							var lsubMaxhhbox:HBox = new HBox();
+							lsubMaxhhbox.percentWidth = 100;
+							
+							var lsubLabelMax:Label = new Label();
+							lsubLabelMax.text = "– 扣分最多："+lItem.dataMap["maxgrouplabel"];
+							lsubLabelMax.setStyle("color","0x999999");
+							lsubLabelMax.setStyle("fontSize","11");
+							lsubMaxhhbox.addChild(lsubLabelMax);
+							
+							var lsubLabelMaxScore:Label = new Label();
+							lsubLabelMaxScore.text = lItem.dataMap["maxrescore"];
+							lsubLabelMaxScore.setStyle("color","0xDD0000");
+							lsubLabelMaxScore.setStyle("fontSize","11");
+							lsubMaxhhbox.addChild(lsubLabelMaxScore);
+							
+							lvbox.addChild(lsubMaxhhbox);
+							
+							lowQuestionVbox.addChild(lvbox);
+						}
+					}
+				}
+			}
+			
+			private function fixBtnHandler(event:MouseEvent):void{
+				var tempBtn:LinkButton = event.currentTarget as LinkButton;
+				var ruleCode:String = tempBtn.data as String;
+				HelpUtil.getInstance().dispatchHelpEvent("DQC_RULE_ONCHECK_"+ruleCode);
+			}
+			
+			private function getGroupUserDataHandler(event:ResultEvent):void{
+				
+				var dataObj:Object = event.result;
+				
+				dataObject = dataObj;
+				
+				middleVbox.addChild(groupUserVbox);
+				userNameLab.text = userName;
+				userScoreLab.text = dataObj["score"];
+				
+				if(parseInt(dataObj["score"])>=60){
+					userScoreLab.setStyle("color","0x00AA00");
+				}else{
+					userScoreLab.setStyle("color","0xDD0000");
+				}
+				
+				if(dataObj["rankRate"] == "first20"){
+					userRankLab.setStyle("color","0xDD0000");
+				}else if(dataObj["rankRate"] == "last20"){
+					userRankLab.setStyle("color","0x00AA00");
+				}else{
+					userRankLab.setStyle("color","0xFFDD00");
+				}
+				userRankLab.text = dataObj["rank"];
+				
+				
+				var tempStr:String;
+				if(dataObj["rankRate"] == "first20"){
+					tempStr = "您的数据质量名列前茅,再接再厉啊！";
+				}else if(dataObj["rank"] == "1"){
+					tempStr = "您的数据质量排名暂列第一，努力保持啊！";
+				}else if(parseInt(dataObj["score"])<60){
+					tempStr = "您的数据质量得分较低，快查看一下原因吧！";
+				}else if(dataObj["rankRate"] == "last20"){
+					tempStr = "您的数据质量排名很靠后哦，要加油了！";
+				}else{
+					tempStr = "您的数据质量还有提升的空间，赶快动手改进吧！";
+				}
+				
+				suggestLab.text = tempStr;
+			}
+			
+			private function getProvinceDataHandler(event:ResultEvent):void{
+				var dataObj:Object = event.result;
+				dataObject = dataObj;
+				
+				middleVbox.addChild(provinceUserVbox);
+				provinceUserNameLab.text = userName;
+				avgScoreLab.text = dataObj["avgScore"];
+				
+				if(parseInt(dataObj["avgScore"])>=60){
+					avgScoreLab.setStyle("color","0x00AA00");
+				}else{
+					avgScoreLab.setStyle("color","0xDD0000");
+				}
+				
+				var str:String = dataObj["firstGroup"] as String;
+				var content:String = str;
+				var tootipStr:String = str;
+				if(str != null){
+					var array:Array = str.split(",");
+					if(array != null && array.length>3){
+						content = array[0]+","+array[1]+","+array[2]+".....";
+					}
+				}
+				
+				provinceRankLab.text = content;
+				provinceRankLab.toolTip = tootipStr;
+				
+				provinceInfoLab.text = "共"+dataObj["examineCount"]+"条指标,"+dataObj["groupCount"]+"个分组!";
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%"  verticalAlign="middle" horizontalAlign="center"  borderThickness="1" borderStyle="solid" >
+		<mx:VBox id="leftVbox"  horizontalAlign="left" verticalAlign="middle">
+			<mx:Image source="@Embed('../../assets/image/earth-scan.png')" />
+		</mx:VBox>
+		
+		<mx:VBox id="middleVbox" width="100%" paddingBottom="3" paddingTop="3"  horizontalAlign="left" verticalAlign="middle" >
+			<mx:Label text="济南用户" fontSize="15" />
+			<mx:Label text="当前评分:0" fontSize="15" />
+			<mx:Label text="排名:1" fontSize="12" />
+			<mx:Label text="dfsfsdfsdfsdfds" fontSize="12" />
+		</mx:VBox>
+		<mx:VBox id="rightVbox"  horizontalAlign="right" verticalAlign="middle">
+			<mx:Image id="viewReportImg" buttonMode="true" toolTip="分析报告"
+					  source="@Embed('../../assets/image/view_report.png')" 
+					  click="viewReportImg_clickHandler(event)"/>
+		</mx:VBox>
+		
+	</mx:HBox>
+</mx:Module>

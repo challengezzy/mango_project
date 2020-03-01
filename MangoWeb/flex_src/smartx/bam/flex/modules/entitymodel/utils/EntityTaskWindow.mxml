@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				layout="vertical" width="380" height="135"
+				close="close()" showCloseButton="true" title="规则任务调度"
+				creationComplete="init()">
+	<fx:Declarations>
+		<mx:TitleWindow id="createDatataskPanel" title="新建数据循环任务模板" showCloseButton="true" 
+						width="450" height="130" close="PopUpManager.removePopUp(createDatataskPanel)">
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="任务模板名称" width="30%" />
+				<mx:TextInput id="taskNameTxt" width="70%" change="taskNameTxt_changeHandler(event)" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="调度表达式" width="30%" />
+				<mx:TextInput id="taskExpTxt" text="0 30 23 * * ?" width="70%" change="taskExpTxt_changeHandler(event)" 
+							  toolTip="默认每天23点30分执行;注:从左到右,空格间的字符依次表示:秒(0-59),分(0-59),时(0-23),日(1-31),月(1-12),日(星期周期1-7)" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+				<mx:Button id="subBtn" label="确定" click="subBtn_clickHandler(event)" />
+				<mx:Button label="取消" click="PopUpManager.removePopUp(createDatataskPanel)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="editDatataskPanel" title="编辑数据循环任务模板" showCloseButton="true" 
+						width="450" height="130" close="PopUpManager.removePopUp(editDatataskPanel)">
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="任务模板名称" width="30%" />
+				<mx:TextInput id="editTaskNameTxt" width="70%" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="调度表达式" width="30%" />
+				<mx:TextInput id="editTaskExpTxt" text="0 30 23 * * ?" width="70%" 
+							  toolTip="默认每天23点30分执行;注:从左到右,空格间的字符依次表示:秒(0-59),分(0-59),时(0-23),日(1-31),月(1-12),日(星期周期1-7)" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+				<mx:Button id="editSubBtn" label="确定" click="editSubBtn_clickHandler(event)" />
+				<mx:Button label="取消" click="PopUpManager.removePopUp(editDatataskPanel)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var bamService:RemoteObject;
+			
+			private var formService:RemoteObject;
+			
+			public var endpoint:String;
+			
+			public var loginName:String;
+			
+			private var taskInfo:Object;
+			[Bindable]
+			public var entityModelCode:String;
+			[Bindable]
+			public var entityCode:String;
+			[Bindable]
+			public var taskCode:String;
+			
+			public var taskSQL:String;
+			[Bindable]
+			private var taskTempletCol:ArrayCollection = new ArrayCollection();
+			
+			private var taskTempletXml:XML;
+			
+			private var mtCode:String;
+			
+			private var oldTaskTempletXml:XML;
+			
+			private var oldMtCode:String;
+			[Bindable]
+			private var newTaskCode:String;
+			
+			public var content:XML;
+			
+			public var dataTaskDesc:String;
+			
+			public var code:String;
+			
+			public var codeDesc:String;
+			
+			public var entityTaskType:String;
+			[Bindable]
+			public var tempContent:XML;
+			[Bindable]
+			public var saveNoAlertFun:Function;
+			
+			private function init():void{
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint != null ){
+					bamService.endpoint = endpoint;
+					formService.endpoint = endpoint;
+				}
+				
+				bamService.saveEntityRuleTask.addEventListener(ResultEvent.RESULT,saveEntityRuleTaskHandler);
+				bamService.saveEntityRuleTask.addEventListener(FaultEvent.FAULT,function (event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("任务模板创建失败!",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.updateTaskMetaDatabyCode.addEventListener(ResultEvent.RESULT,updateTaskMetaDatabyCodeHandler);
+				bamService.updateTaskMetaDatabyCode.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.editTaskTemplet.addEventListener(ResultEvent.RESULT,editTaskTempletHandler);
+				bamService.editTaskTemplet.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				formService.getSimpleHashVoArrayByDS(null,taskSQL);
+			}
+			
+			private function updateTaskMetaDatabyCodeHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("操作已成功",SmartXMessage.MESSAGE_INFO);
+				content.@taskCode = newTaskCode;
+				if(entityTaskType == BAMConst.ENTITY_DATATASK_DIMENSION){
+					tempContent.@taskCode = newTaskCode;
+					saveNoAlertFun();
+				}else if(entityTaskType == BAMConst.ENTITY_DATATASK_CUBE)
+					saveNoAlertFun();
+				close();
+			}
+			
+			private function editTaskTempletHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("任务模板编辑成功",SmartXMessage.MESSAGE_INFO);
+				PopUpManager.removePopUp(editDatataskPanel);
+				formService.getSimpleHashVoArrayByDS(null,taskSQL);
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var temArr:Array = event.result as Array;
+				taskTempletCol.removeAll();
+				var selectItem:Object = null;
+				for each(var sp:SimpleHashVO in temArr){
+					var tempItem:Object = sp.dataMap;
+					var tempTaskCode:String = tempItem["code"] as String;
+					if(taskCode != null && taskCode != "" && taskCode == tempTaskCode )
+						selectItem = tempItem;
+					
+					taskTempletCol.addItem(sp.dataMap);
+				}
+				if(selectItem != null )
+					taskTempleteCob.selectedItem = selectItem;
+				
+				taskTempleteCob_changeHandler(null);
+				
+			}
+			
+			private function saveEntityRuleTaskHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("任务模板创建成功",SmartXMessage.MESSAGE_INFO);
+				PopUpManager.removePopUp(createDatataskPanel);
+				formService.getSimpleHashVoArrayByDS(null,taskSQL);
+				
+			}
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function subBtn_clickHandler(event:MouseEvent):void{
+				if(BAMUtil.isEmpty(taskNameTxt.text)){
+					SmartXMessage.show("名称不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				if(BAMUtil.isEmpty(taskExpTxt.text)){
+					SmartXMessage.show("表达式不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				
+				taskInfo = new Object();
+				taskInfo["taskExp"] = taskExpTxt.text;
+				taskInfo["taskCode"] = entityModelCode+"_"+entityCode;
+				taskInfo["taskName"] = taskNameTxt.text;
+				taskInfo["loginName"] = loginName;
+				
+				OperatingTipUtil.startOperat("正在保存....",this);
+				bamService.saveEntityRuleTask(taskInfo,entityTaskType);
+				
+			}
+			
+			private function taskNameTxt_changeHandler(event:Event):void{
+				if(taskInfo != null )
+					taskInfo["taskName"] = taskNameTxt.text;
+			}
+			
+			private function taskExpTxt_changeHandler(event:Event):void{
+				if(taskInfo != null )
+					taskInfo["taskExp"] = taskExpTxt.text;
+			}
+			
+			private function taskTempleteCob_changeHandler(event:ListEvent):void{
+				var item:Object = taskTempleteCob.selectedItem;
+				if(item != null ){
+					var content:String = item["content"] as String;
+					var code:String = item["code"] as String;
+					
+					if(taskTempletXml == null ){
+						oldTaskTempletXml = new XML(content);
+						oldMtCode = item["mtcode"] as String;
+					}else{
+						oldTaskTempletXml = taskTempletXml.copy();
+						oldMtCode = new String(mtCode.toString());
+					}
+					
+					mtCode = item["mtcode"] as String;
+					
+					taskTempletXml = new XML(content);
+					newTaskCode = code;
+					
+					expTxt.text = item["cronexpression"] as String;
+				}
+			}
+			
+			
+			private function createNewTaskBtn_clickHandler(event:MouseEvent):void{
+				PopUpManager.addPopUp(createDatataskPanel,this,true);
+				PopUpManager.centerPopUp(createDatataskPanel);
+				
+			}
+			
+			private function addTaskBtn_clickHandler(event:MouseEvent):void{
+				if(taskTempletXml != null ){
+					var xml:XML = (entityTaskType==BAMConst.ENTITY_DATATASK_DIMENSION)?getCustomTaskXmlDimension(taskTempletXml)
+																						:getCustomTaskXml(taskTempletXml);
+					if(xml != null)
+						CEPUtils.xmlDeleteNode(xml);
+					
+					var customXml:XML = new XML("<custom_task />");
+					customXml.@hasChildren = "false";
+					if(entityTaskType == BAMConst.ENTITY_DATATASK_RULE){
+						customXml.@name = "数据规则检查";
+						customXml.@implclass = "smartx.bam.bs.entitymodel.EntityRuleDataTaskImpl";
+					}else if(entityTaskType == BAMConst.ENTITY_DATATASK_DIMENSION){
+						customXml.@name = "维度数据抽取";
+						customXml.@implclass = "smartx.bam.bs.entitymodel.EntityDimensionDataTaskImpl";
+					}else if(entityTaskType == BAMConst.ENTITY_DATATASK_CUBE){
+						customXml.@name = "实体事实表抽取";
+						customXml.@implclass = "smartx.bam.bs.entitymodel.EntityCubeDataTaskImpl";
+					}else if(entityTaskType == BAMConst.ENTITY_DATATASK_GIS){
+						customXml.@name = "计算GIS数据抽取";
+						customXml.@implclass = "smartx.bam.bs.gis.GisDataImportDataTask";
+					}
+					customXml.modelCode = entityModelCode;
+					customXml.entityCode = entityCode;
+					customXml.@desc = dataTaskDesc;
+					customXml[codeDesc] = code;
+					taskTempletXml.datatask.appendChild(customXml);
+					
+					
+					var odlTaskTempletStr:String = "";
+					if(oldTaskTempletXml != null ){
+						var oldXml:XML = (entityTaskType==BAMConst.ENTITY_DATATASK_DIMENSION)?getCustomTaskXmlDimension(oldTaskTempletXml)
+																								:getCustomTaskXml(oldTaskTempletXml);
+						if(oldXml != null )
+							CEPUtils.xmlDeleteNode(oldXml);
+							
+						odlTaskTempletStr = oldTaskTempletXml.toXMLString();
+					}
+					OperatingTipUtil.startOperat("正在发布....",this);
+					bamService.updateTaskMetaDatabyCode(mtCode,taskTempletXml.toXMLString(),oldMtCode,odlTaskTempletStr,entityTaskType);
+					
+				}else
+					SmartXMessage.show("任务模板元数据为空,不能发布任务!",SmartXMessage.MESSAGE_WARN);
+			}
+			
+			private function editTaskBtn_clickHandler(event:MouseEvent):void{
+				var item:Object = taskTempleteCob.selectedItem;
+				if(item != null ){
+					var name:String =  item["name"] as String;
+					var code:String = item["code"] as String;
+					var exp:String = item["cronexpression"] as String;
+					
+					PopUpManager.addPopUp(editDatataskPanel,this,true);
+					PopUpManager.centerPopUp(editDatataskPanel);
+					
+					editTaskNameTxt.text = name;
+					editTaskExpTxt.text = exp;
+					
+				}else{
+					SmartXMessage.show("请先选择一个任务模板!",SmartXMessage.MESSAGE_WARN);
+				}
+				
+			}
+			
+			private function editSubBtn_clickHandler(event:MouseEvent):void{
+				if(BAMUtil.isEmpty(editTaskNameTxt.text)){
+					SmartXMessage.show("名称不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				if(BAMUtil.isEmpty(editTaskExpTxt.text)){
+					SmartXMessage.show("表达式不能为空!",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				
+				var item:Object = taskTempleteCob.selectedItem;
+				if(item != null ){
+					var id:String = item["id"] as String;
+					var name:String = editTaskNameTxt.text;
+					var code:String = item["code"] as String;
+					var exp:String = editTaskExpTxt.text;
+					bamService.editTaskTemplet(id,name,code,exp,entityTaskType);
+				}
+			}
+			
+			private function getCustomTaskXml(taskXml:XML):XML{
+				var xml:XML;
+				if(taskXml != null ){
+					for each(var customTaskXml:XML in taskXml.datatask.custom_task ){
+						var tempModelCode:String = String(customTaskXml.modelCode);
+						var tempEntityCode:String = String(customTaskXml.entityCode);
+						var tempCode:String = String(customTaskXml[codeDesc]);
+						if(!BAMUtil.isEmpty(tempModelCode) && !BAMUtil.isEmpty(tempEntityCode)
+							&& !BAMUtil.isEmpty(tempCode) && tempModelCode == entityModelCode 
+							&& tempEntityCode == entityCode && tempCode == code){
+							xml = customTaskXml;
+						}
+					}
+				}
+				return xml;
+			}
+			
+			private function getCustomTaskXmlDimension(taskXml:XML):XML{
+				var xml:XML;
+				if(taskXml != null ){
+					for each(var customTaskXml:XML in taskXml.datatask.custom_task ){
+						var tempModelCode:String = String(customTaskXml.modelCode);
+						var tempCode:String = String(customTaskXml[codeDesc]);
+						if(!BAMUtil.isEmpty(tempModelCode) && !BAMUtil.isEmpty(tempCode) 
+							&& tempModelCode == entityModelCode && tempCode == code){
+							xml = customTaskXml;
+						}
+					}
+				}
+				return xml;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%" height="100%" horizontalAlign="left" >
+			<mx:Label text="任务模板:" width="30%" />
+			<mx:ComboBox id="taskTempleteCob" labelField="name" dataProvider="{taskTempletCol}" 
+						 change="taskTempleteCob_changeHandler(event)" toolTip="选择一个任务模板,发布后该规则会自动在任务引擎中生成数据集"/>
+			<mx:Button id="createNewTaskBtn" label="新建" click="createNewTaskBtn_clickHandler(event)" />
+			<mx:Button id="editTaskBtn" label="编辑" click="editTaskBtn_clickHandler(event)" />
+		</mx:HBox>
+		<mx:HBox width="100%" height="100%" >
+			<mx:Label text="表达式:" width="25%" />
+			<mx:Label id="expTxt" color="blue" width="75%" />
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+			<mx:Button id="addTaskBtn" label="确定"  click="addTaskBtn_clickHandler(event)" />
+			<mx:Button id="delTaskBtn" label="取消"  click="close()" />
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

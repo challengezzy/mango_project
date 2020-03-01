@@ -1,0 +1,86 @@
+package smartx.framework.common.bs;
+
+
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.util.zip.GZIPOutputStream;
+
+import smartx.applet.vo.ClassFileVO;
+import smartx.applet.vo.RequestVO;
+import smartx.applet.vo.ResponseVO;
+
+
+/**
+ * 序列化下载服务
+ * @author All
+ *
+ */
+public class SynchronizerServlet extends javax.servlet.http.HttpServlet {
+
+	private static final long serialVersionUID = -9048920957188137553L;
+
+	/**.
+	 * SynchronizerServlet 构造子注解。
+	 */
+	public SynchronizerServlet() {
+		super();
+	}
+
+	/**
+	 * 下载包服务
+	 * @param req
+	 * @param res
+	 * @throws javax.servlet.ServletException
+	 * @throws java.io.IOException
+	 * @throws ClassNotFoundException 
+	 */
+	private synchronized void downPackage(javax.servlet.ServletRequest req, javax.servlet.ServletResponse res) throws javax.servlet.ServletException, java.io.IOException {
+		try {
+			//		读取入参..
+			InputStream request_in = req.getInputStream();
+			ObjectInputStream request_in_objStream = new ObjectInputStream(request_in);
+			RequestVO par_vo = (RequestVO) request_in_objStream.readObject();
+			request_in_objStream.close();
+			String str_clientip1 = par_vo.getClientIP();
+			String className = par_vo.getClassname(); //类名
+			String packageName = par_vo.getPackagename(); //包名
+			String str_clientip2 = req.getRemoteAddr();
+
+			String str_tmp = this.getServletConfig().getServletContext().getRealPath("/");
+			str_tmp = str_tmp.replace('\\', '/');
+			String str_downloadPath = str_tmp + "WEB-INF/";
+			long ll_1 = System.currentTimeMillis();
+			ClassFileVO[] cfVOs = new DownLoadTool(str_downloadPath).getClassFileVOS(className, packageName, str_clientip1, str_clientip2);
+			long ll_2 = System.currentTimeMillis();
+			ResponseVO returnVO = new ResponseVO(); //
+			returnVO.setFileVOs(cfVOs);
+			returnVO.setReadFileTime(ll_2 - ll_1); ////
+
+			OutputStream out = res.getOutputStream(); //输出
+			//GZIP压缩 James.W 2008.2.27 实验程序
+			//System.out.println(">>>>>>>>>>>使用GZIP压缩传输！");
+			//GZIPOutputStream gzip = new GZIPOutputStream(out); //GZIP输出流!!
+			//ObjectOutputStream objStream = new ObjectOutputStream(gzip); //输出对象流!!
+			//GZIP压缩 James.W 2008.2.27 实验程序 end
+			ObjectOutputStream objStream = new ObjectOutputStream(out); //输出对象流!!			
+			objStream.writeObject(returnVO); //输出对象!!
+			
+			objStream.flush(); //
+			objStream.close(); //
+			//
+			//gzip.close();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
+
+	/**
+	 * service 方法注解。
+	 */
+	public void service(javax.servlet.ServletRequest arg1, javax.servlet.ServletResponse arg2) throws javax.servlet.ServletException, java.io.IOException {
+		downPackage(arg1, arg2);
+
+	}
+}

@@ -1,0 +1,17 @@
+/**
+ * $RCSfile: LookAndFeelIFC.java,v $  $Revision: 1.1.2.1 $  $Date: 2010/01/13 02:27:13 $
+ */
+package smartx.framework.metadata.lookandfeel;
+
+import java.awt.Component;
+
+/**
+ * 插入式界面管理器接口
+ * @author James.W
+ */
+public interface LookAndFeelIFC {
+	/**
+	 * 更新界面风格
+	 */
+	public void updateUI();
+}

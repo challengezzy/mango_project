@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="net.brandonmeyer.containers.*" 
+					   layout="vertical" width="800" height="500"
+					   allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true"
+					   title="视图结果集" close="close()" xmlns:chart="smartx.flex.components.core.chart.*">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var columns:Array = new Array();
+			[Bindable]
+			public var queryColumns:Array = new Array();
+			[Bindable]
+			public var sql:String;
+			[Bindable]
+			public var datasource:String;
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			public function refresh():void{
+				listChartPanel.refresh();
+			}
+			
+			public function initDate(dataProvider:ArrayCollection):void{
+				listChartPanel.minColumnWidth = 100;
+				listChartPanel.dataArray = dataProvider;
+				listChartPanel.refresh();
+			}
+			
+		]]>
+	</fx:Script>
+	<chart:AdvListChart id="listChartPanel" columns="{columns}" 
+						queryColumns="{queryColumns}" width="100%" height="100%"
+						sql="{sql}" dataSource="{datasource}" />
+</containers:SuperPanel>

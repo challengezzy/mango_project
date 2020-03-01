@@ -1,0 +1,1044 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*"
+				xmlns:util="smartx.flex.components.util.*"
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:containers="flexlib.containers.*"
+				xmlns:itemcomponent="smartx.flex.components.itemcomponent.*"
+				width="750" height="450" close="PopUpManager.removePopUp(this)" initialize="init()"
+				creationComplete="createComplete()"
+				showCloseButton="true" title="仪表盘布局管理" xmlns:common="smartx.bam.flex.modules.common.variableControl.*">
+	
+	<fx:Declarations>
+		<mx:HBox id="variblePanelHbox">
+			<mx:VRule height="22"/>
+			<mx:Label text="仪表盘变量优先" paddingRight="2"/>
+			<mx:CheckBox id="isDBPriorCheckBox"	 toolTip="若勾选，变量解析时，同名变量仪表盘定义优先"/>
+		</mx:HBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.esria.samples.dashboard.view.Pod;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.controls.listClasses.IListItemRenderer;
+			import mx.events.CloseEvent;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.events.SliderEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.XMLUtil;
+			
+			import smartx.bam.flex.modules.common.variableControl.vo.VariableVo;
+			import smartx.bam.flex.modules.dataanalyze.DboBillCardPanel;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.Datasource;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.itemcomponent.ListEditorComponentFactory;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			import spark.components.supportClasses.ItemRenderer;
+			
+			private var formService:RemoteObject;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			[Bindable]
+			private var isShowAlert:Boolean = false;
+			
+			[Bindable]
+			private var isMaxAlert:Boolean = false;
+			
+			[Bindable]
+			private var dataProvider:ArrayCollection = new ArrayCollection();
+			
+			private var tempIndex:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var layoutTypes:ArrayCollection = new ArrayCollection( 
+				[
+					{name:BAMConst.LAYOUTTYPE_MDIWINDOW, label:"平铺窗口"},
+					{name:BAMConst.LAYOUTTYPE_BOX, label:"Box"}
+				]
+			);
+			
+			[Bindable]
+			private var mdiWindowSequenceProvider:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var relatedPodsCboData:ArrayCollection = new ArrayCollection(); 
+			[Bindable]
+			public var contentXml:XML;
+			[Bindable]
+			public var confirmFunc:Function;
+			
+			protected var destination:String = GlobalConst.SERVICE_FORM;
+			
+			protected var endpoint:String;
+			
+			[Bindable]
+			private var boxlayoutType:ArrayCollection = new ArrayCollection([
+				{label:"竖列容器",data:"vbox"},
+				{label:"横列容器",data:"hbox"},
+				{label:"TAB页",data:"tab"},
+				{label:"仪表盘对象",data:"podref"},
+				{label:"SWF模块",data:"swf"},
+				{label:"网页",data:"html"},
+				{label:"图片",data:"image"}
+			]);
+			//初始的仪表盘对象集合
+			public var doCodes:Array;
+			[Bindable]
+			public var selectedLayoutXml:XML;//当前布局类型XML
+			
+			[Bindable]
+			private var selectedBoxItem:XML;//box布局当前选中项
+			
+			public var queryDboSql:String = "";
+			
+			public var queryDbSql:String = "select v.code as id#,v.code 编码,v.name 名称 from bam_dashboard v";
+			
+			private function init():void{
+				if(endpoint == null)
+					endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				addEventListener(KeyboardEvent.KEY_DOWN,boxlayoutTreeKeyDownHandler);
+				if(contentXml == null || contentXml == "" ||contentXml.children().length() == 0){
+					contentXml = <dashboard>
+									<layout/>
+									<pods/>
+									<relations />
+									<guides />
+								 </dashboard>;
+				}else{
+					if(contentXml.layout.@type == BAMConst.LAYOUTTYPE_BOX){
+						layoutTypeBox.selectedIndex = 1;
+						setBoxLayoutXml(contentXml.layout.boxLayout.children());
+					}else
+						layoutTypeBox.selectedIndex = 0;
+					getVarXml();
+				}
+				layoutTypeBox_changeHandler(null);
+			}
+			
+			private function createComplete():void{
+				if(!setVar.buttonBox.contains(variblePanelHbox))
+					setVar.buttonBox.addChild(variblePanelHbox);
+				var isDBPrior:String = contentXml.variables.isDBPrior;
+				if( isDBPrior == 'Y' || isDBPrior== 'y')
+					isDBPriorCheckBox.selected = true;
+			}
+			
+			private function boxlayoutTreeKeyDownHandler(event:KeyboardEvent):void{
+				if(event.charCode == Keyboard.ESCAPE)
+					boxlayoutTree.selectedIndex = -1;
+			}
+			
+			protected function addClickHandler(event:MouseEvent):void{
+				var dialog:RefDialog = new RefDialog();
+				if(doCodes == null && queryDboSql == "")
+					queryDboSql = "select v.code as id#,v.code 编码#,v.name 名称 from v_BAM_DASHBOARDOBJECT v";
+				else if(doCodes != null){
+					var doCodesStr:String = "";
+					for(var i:int=0;i<doCodes.length;i++){
+						if(i == doCodes.length-1)
+							doCodesStr = doCodesStr.concat("'").concat(doCodes[i]).concat("'");
+						else
+							doCodesStr = doCodesStr.concat("'").concat(doCodes[i]).concat("'").concat(",");
+					}
+					if(doCodesStr != "")
+						queryDboSql = "select v.code as id#,v.code 编码#,v.name 名称 from v_BAM_DASHBOARDOBJECT v where v.code in("+doCodesStr+")";
+					else
+						queryDboSql = "select v.code as id#,v.code 编码#,v.name 名称 from v_BAM_DASHBOARDOBJECT v where 1=2"
+				}
+				dialog.init2(formService,queryDboSql,null);
+				dialog.title = "选择仪表盘对象";
+				dialog.allowMultipleSelection = true;
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						for each(var item:Object in dialog.seletedItemsArray){
+							var newPod:XML = new XML("<pod/>");
+							newPod.@dbocode = item[RefDialog.itemId];
+							newPod.@dboname = item[RefDialog.itemName];
+							newPod.@code = getNextPodCode();
+							contentXml.pods.appendChild(newPod);
+							if(contentXml.layout.@type == BAMConst.LAYOUTTYPE_MDIWINDOW){
+								var newPodRef:XML = new XML("<podref/>");
+								newPodRef.@code = newPod.@code;
+								selectedLayoutXml.sequence.appendChild(newPodRef);
+							}
+						}
+						sequenceDataGrid.invalidateList();
+						dataGrid.invalidateList();
+						
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+			}
+			
+			public function deleteClickHandler(event:MouseEvent):void{
+				var doArr:Array = dataGrid.selectedItems;
+				//				var rowIndex:int = dataGrid.selectedIndex;
+				if(doArr.length == 0)//未选中要删除的对象
+					return;
+				for each(var podXML:XML in doArr){
+					if(layoutTypeBox.selectedItem.name == BAMConst.LAYOUTTYPE_MDIWINDOW){
+						for each(var podRefXML:XML in selectedLayoutXml..podref.(@code==podXML.@code)){
+							CEPUtils.xmlDeleteNode(podRefXML);
+						}
+					}else if(layoutTypeBox.selectedItem.name == BAMConst.LAYOUTTYPE_BOX){
+						getAllPodref(selectedLayoutXml,podXML.@code);
+					}
+					for each(var relPodSrcXml:XML in contentXml.relations.relation.(@src== podXML.@code)){
+						CEPUtils.xmlDeleteNode(relPodSrcXml);
+					}
+					for each(var relPodDestXml:XML in contentXml.relations.relation.(@dest== podXML.@code)){
+						CEPUtils.xmlDeleteNode(relPodDestXml);
+					}
+					CEPUtils.xmlDeleteNode(podXML);
+				}
+				dataGrid.invalidateList();
+			}
+			
+			protected function createDOBtnClickHandler(event:MouseEvent):void{
+				var tw:TitleWindow = new TitleWindow();
+				tw.width = 650;
+				tw.height = 450;
+				tw.title = "新建仪表盘对像";
+				tw.showCloseButton = true;
+				tw.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					PopUpManager.removePopUp(tw);
+				});
+				
+				var tempPanel:DboBillCardPanel = new DboBillCardPanel();
+				tempPanel.templetCode = "T_BAM_DASHBOARDOBJECT2";
+				tempPanel.insertbfIncCard = "smartx.bam.bs.dataanalyze.DboBfFormInterceptor";
+				tempPanel.insertafIncCard = "smartx.bam.bs.dataanalyze.DboAfFormInterceptor";
+				tempPanel.updatebfIncCard = "smartx.bam.bs.dataanalyze.DboBfFormInterceptor";
+				tempPanel.updateafIncCard = "smartx.bam.bs.dataanalyze.DboAfFormInterceptor";
+				tempPanel.deleteafIncCard = "smartx.bam.bs.dataanalyze.DboAfFormInterceptor";
+				tempPanel.clientInsertBfIncCard = "smartx.bam.flex.modules.dataanalyze.DboInsertClientInterceptor";
+				tempPanel.addEventListener("initComplete",function(event:BillCardPanelEvent):void{
+					tempPanel.cardPanel.enterInsertMode();
+				});
+				tempPanel.addEventListener("deleteSuccessful",function(event:BillCardPanelEvent):void{
+					deleteClickHandler(null);
+					PopUpManager.removePopUp(tw);
+				});
+				tempPanel.addEventListener("saveSuccessful",function(event:StyleTemplateEvent):void{
+					if(event.saveObject != null ){
+						var tempMtCode:String = event.saveObject["MTCODE"];
+						var newPod:XML = new XML("<pod/>");
+						newPod.@dbocode = event.saveObject["CODE"];
+						newPod.@dboname =  event.saveObject["NAME"];
+						newPod.@code = getNextPodCode();
+						contentXml.pods.appendChild(newPod);
+						if(contentXml.layout.@type == BAMConst.LAYOUTTYPE_MDIWINDOW){
+							var newPodRef:XML = new XML("<podref/>");
+							newPodRef.@code = newPod.@code;
+							selectedLayoutXml.sequence.appendChild(newPodRef);
+						}
+						dataGrid.invalidateList();
+						MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(tempMtCode,endpoint);
+						
+						PopUpManager.removePopUp(tw);
+					}
+				});
+				
+				tw.addChild(tempPanel);
+				
+				PopUpManager.addPopUp(tw,desktop,true);
+				PopUpManager.centerPopUp(tw);
+			}
+			
+			protected function editDOBtnClickHandler(event:MouseEvent):void{
+				var item:Object = dataGrid.selectedItem;
+				
+				if(item  == null){//未选中要删除的对象
+					SmartXMessage.show("请选中一个仪表盘对象！");
+					return;
+				}
+				var itemXml:XML = item as XML;
+				var dboCode:String = String(itemXml.@dbocode);
+				
+				var tw:TitleWindow = new TitleWindow();
+				tw.width = 650;
+				tw.height = 450;
+				tw.title = "编辑仪表盘对像";
+				tw.showCloseButton = true;
+				tw.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					PopUpManager.removePopUp(tw);
+				});
+				
+				var tempPanel:DboBillCardPanel = new DboBillCardPanel();
+				tempPanel.templetCode = "T_BAM_DASHBOARDOBJECT2";
+				tempPanel.initQueryCondition = " code='"+dboCode+"'";
+				tempPanel.insertbfIncCard = "smartx.bam.bs.dataanalyze.DboBfFormInterceptor";
+				tempPanel.insertafIncCard = "smartx.bam.bs.dataanalyze.DboAfFormInterceptor";
+				tempPanel.updatebfIncCard = "smartx.bam.bs.dataanalyze.DboBfFormInterceptor";
+				tempPanel.updateafIncCard = "smartx.bam.bs.dataanalyze.DboAfFormInterceptor";
+				tempPanel.deleteafIncCard = "smartx.bam.bs.dataanalyze.DboAfFormInterceptor";
+				
+				tempPanel.addEventListener("initComplete",function(event:BillCardPanelEvent):void{
+					tempPanel.cardPanel.setDataValueByQuery();
+				});
+				tempPanel.addEventListener("deleteSuccessful",function(event:BillCardPanelEvent):void{
+					deleteClickHandler(null);
+					PopUpManager.removePopUp(tw);
+				});
+				tempPanel.addEventListener("saveSuccessful",function(event:StyleTemplateEvent):void{
+					if(event.saveObject != null ){
+						var tempMtCode:String = event.saveObject["MTCODE"];
+						MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(tempMtCode,endpoint);
+						PopUpManager.removePopUp(tw);
+					}
+				});
+				
+				tw.addChild(tempPanel);
+				
+				PopUpManager.addPopUp(tw,desktop,true);
+				PopUpManager.centerPopUp(tw);
+			}
+			
+			public function getAllPodref(layoutXml:XML,code:String):void{
+				for each(var child:XML in layoutXml.children()){
+					if(child.name() == "podref" && child.@code == code)
+						CEPUtils.xmlDeleteNode(child);
+					else
+						getAllPodref(child,code);
+				}
+			}
+			
+			protected function deleteGuideClickHandler(event:MouseEvent):void{
+				//				var rowIndex:int = guideGrid.selectedIndex;
+				var guideArr:Array = guideGrid.selectedItems;
+				if(guideArr.length == 0)
+					return;
+				for each(var guideXML:XML in guideArr){
+					CEPUtils.xmlDeleteNode(guideXML);
+				}
+				guideGrid.invalidateList();
+			}
+			
+			
+			protected function addGuideClickHandler(event:MouseEvent):void{
+				var dialog:RefDialog = new RefDialog();
+				dialog.init2(formService,queryDbSql,null);
+				dialog.title = "选择仪表盘";
+				dialog.allowMultipleSelection = true;
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						
+						if(contentXml.guides.length()<=0){
+							contentXml.appendChild(new XML("<guides />"));
+						}
+						for each(var item:Object in dialog.seletedItemsArray){
+							var newGuide:XML = new XML("<guide/>");
+							newGuide.@name = item[RefDialog.itemName];
+							newGuide.@code = item[RefDialog.itemCode];
+							contentXml.guides.appendChild(newGuide);
+						}
+						
+						guideGrid.invalidateList();
+					}
+				});
+				PopUpManager.addPopUp(dialog,desktop);
+				PopUpManager.centerPopUp(dialog);
+			}
+			
+			//获取下一个pod code
+			public function getNextPodCode():String{
+				var i:int=1;
+				var prefix:String = "POD";
+				while(i < Infinity){
+					var newCode:String = (prefix+i);
+					var exists:Boolean = false;
+					for each(var t:XML in contentXml.pods.pod){
+						if(t.@code == newCode){
+							exists = true;
+							break;
+						}
+					}
+					if(exists){
+						i++;
+						continue;
+					}	
+					else
+						return newCode;
+				}
+				return null;//不可能走到这里
+			}
+			
+			
+			protected function mtcodeText_showHandler(event:FlexEvent):void{
+				filterRelPods();
+				contentXml.layout.@height = dsheightTxt.text;
+				setVarXml();
+				mtcodeText.text = contentXml.toXMLString();
+			}
+			
+			protected function resetButton_clickHandler(event:MouseEvent):void{
+				mtcodeText.text = contentXml.toXMLString();
+			}
+			
+			
+			protected function applyButton_clickHandler(event:MouseEvent):void{
+				contentXml = XML(mtcodeText.text);
+				callLater(function():void{
+					for each(var obj:Object in layoutTypes){
+						if(contentXml.layout.@type == obj.name){
+							layoutTypeBox.selectedItem = obj;
+							break;
+						}
+					}
+					layoutTypeBox_changeHandler(null);
+					getVarXml();
+				});
+			}
+			
+			protected function layoutTypeBox_changeHandler(event:ListEvent):void{
+				if(layoutTypeBox.selectedItem == null)
+					return;
+				contentXml.layout.@type = layoutTypeBox.selectedItem.name;
+				if(contentXml.layout.@type == BAMConst.LAYOUTTYPE_MDIWINDOW){
+					layoutViewStack.selectedChild = mdiWidnowLayoutEditor;
+					if(contentXml.layout.mdiWindowLayout.length() == 0){
+						delete contentXml.layout.*;
+						selectedLayoutXml = <mdiWindowLayout>
+												<sequence/>
+											</mdiWindowLayout>;
+						for each(var pod:XML in contentXml.pods.pod){
+							var newPodRef:XML = <podref/>
+							newPodRef.@code = pod.@code;
+							selectedLayoutXml.sequence.appendChild(newPodRef);
+						}
+						contentXml.layout.appendChild(selectedLayoutXml);
+					}else
+						selectedLayoutXml = contentXml.layout.mdiWindowLayout[0];
+					sequenceDataGrid.invalidateList();
+				}else if(contentXml.layout.@type == BAMConst.LAYOUTTYPE_BOX){
+					layoutViewStack.selectedChild = boxLayoutEditor;
+					if(contentXml.layout.boxLayout.length() == 0){
+						delete contentXml.layout.*;
+						selectedLayoutXml = <boxLayout />;
+						contentXml.layout.appendChild(selectedLayoutXml);
+					}else
+						selectedLayoutXml = contentXml.layout.boxLayout[0];
+				}
+			}
+			
+			
+			private function sequenceTitleFunction(item:Object, column:DataGridColumn):String{
+				if(item != null && item is XML){
+					return contentXml.pods.pod.(@code==item.@code).title;
+				}
+				return null;
+			}
+			private function sequenceDbonameFunction(item:Object, column:DataGridColumn):String{
+				if(item != null && item is XML){
+					return contentXml.pods.pod.(@code==item.@code).@dboname;
+				}
+				return null;
+			}
+			
+			private function makeUp():void{
+				var item:* = sequenceDataGrid.selectedItem;
+				if(item != null && item is XML){
+					var itemXML:XML = item as XML;
+					var i:int = 0;
+					for each( var xml:XML in selectedLayoutXml.sequence.podref){
+						if(xml == itemXML)
+							break;
+						i++;
+					}
+					if(i>0){
+						CEPUtils.xmlDeleteNode(itemXML);
+						var newPodRef:XML = <podref/>;
+						newPodRef.@code = itemXML.@code;
+						selectedLayoutXml.sequence.insertChildBefore(
+							selectedLayoutXml.sequence.podref[i-1],
+							newPodRef
+						);
+						sequenceDataGrid.invalidateList();
+						sequenceDataGrid.selectedItem = newPodRef;
+					}
+				}
+			}
+			
+			private function makeDown():void{
+				var item:* = sequenceDataGrid.selectedItem;
+				if(item != null && item is XML){
+					var itemXML:XML = item as XML;
+					var i:int = 0;
+					for each( var xml:XML in selectedLayoutXml.sequence.podref){
+						if(xml == itemXML)
+							break;
+						i++;
+					}
+					if(i<selectedLayoutXml.sequence.podref.length()-1){
+						var newPodRef:XML = <podref/>;
+						newPodRef.@code = itemXML.@code;
+						selectedLayoutXml.sequence.insertChildAfter(
+							selectedLayoutXml.sequence.podref[i+1],
+							newPodRef
+						);
+						CEPUtils.xmlDeleteNode(itemXML);
+						sequenceDataGrid.invalidateList();
+						sequenceDataGrid.selectedItem = newPodRef;
+					}
+				}
+			}
+			
+			protected function layoutBox_showHandler(event:FlexEvent):void{
+				expandAll();
+				sequenceDataGrid.invalidateList();
+				relPodsBox_showHandler(null);
+			}
+			
+			private function addRelClickHandler(event:MouseEvent):void{
+				if(contentXml.pods.pod.length() == 0 || contentXml.pods.pod.length() == 1){
+					SmartXMessage.show("没有可联动的仪表盘对象！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				var relXml:XML = <relation src="" dest="" />;
+				contentXml.relations.appendChild(relXml);	
+			}
+			
+			private function deleteRelClickHandler(event:MouseEvent):void{
+				var rowIndex:int = relatedDataGrid.selectedIndex;
+				if(rowIndex < 0)
+					return;
+				
+				var relPodXML:XML = contentXml.relations.relation[rowIndex];
+				CEPUtils.xmlDeleteNode(relPodXML);
+				relatedDataGrid.invalidateList();
+			}
+			
+			
+			protected function relPodsBox_showHandler(event:FlexEvent):void{
+				relatedPodsCboData.removeAll();
+				for each(var pod:XML in contentXml.pods.pod){
+					var name:String = pod.@dboname;
+					var code:String = pod.@code;
+					var data:Object = {label:name,data:code};
+					relatedPodsCboData.addItem(data);
+				}
+				var classFactory:ClassFactory = new ClassFactory(ComboBox);
+				classFactory.properties = {dataProvider:relatedPodsCboData};
+				for each(var column:DataGridColumn in relatedDataGrid.columns){
+					column.itemEditor = classFactory;
+					column.editorDataField = "value";
+				}
+			}
+			
+			private function relPodsCboLabelFun(item:Object, column:DataGridColumn):String{
+				var relPodsXml:XML = XML(item);
+				var result:String = "";
+				if(column.dataField == "@src")
+					result = relPodsXml.@src=="null"?"":relPodsXml.@src;
+				else if(column.dataField == "@dest")
+					result = relPodsXml.@dest=="null"?"":relPodsXml.@dest;
+				
+				for each(var value:Object in relatedPodsCboData){
+					var data:String = value.data;
+					var label:String = value.label;
+					if(data == result)
+						return label;
+				}
+				
+				return result;
+			}
+			
+			public function getContentXml():String{
+				mtcodeText_showHandler(null);
+				return contentXml.toXMLString();
+			}
+			//过滤关联错误的POD
+			private function filterRelPods():void{
+				var tempArr:ArrayCollection = new ArrayCollection();
+				for each(var relPodXml:XML in contentXml.relations.relation){
+					var src:String = relPodXml.@src;
+					var dest:String = relPodXml.@dest;
+					if(src == dest || src == 'null' || dest == 'null' || src == '' || dest == ''){
+						CEPUtils.xmlDeleteNode(relPodXml);
+						continue;
+					}
+					if(tempArr.length == 0){
+						tempArr.addItem({src:src,dest:dest});
+					}else{
+						var flag:int = 0;
+						for each(var temp:Object in tempArr){
+							var tempSrc:String = temp.src;
+							var tempDest:String = temp.dest;
+							if(tempSrc == src && tempDest == dest){
+								CEPUtils.xmlDeleteNode(relPodXml);
+								flag++;
+								break;
+							}
+						}
+						if(flag == 0)
+							tempArr.addItem({src:src,dest:dest});
+					}
+				}
+			}
+			
+			private function createBoxlayout():void{
+				var boxlayoutType:Object = boxlayoutCbo.selectedItem;
+				selectedBoxItem = boxlayoutTree.selectedItem as XML;
+				if(selectedBoxItem){
+					if(selectedBoxItem.name() != "podref" 
+					&& selectedBoxItem.name() != "image"
+					&& selectedBoxItem.name() != "html"
+					&& selectedBoxItem.name() != "swf"){//如果有父节点，判断该节点是否为仪表盘对象
+						if(boxlayoutType.data == "podref" && relatedPodsCboData.length == 0)
+							SmartXMessage.show("当前仪表盘还未加入任何仪表盘对象！",SmartXMessage.MESSAGE_WARN);
+						else 
+						    selectedBoxItem.appendChild(createBoxlayoutNode(boxlayoutType.data,true));
+					}
+					else
+						SmartXMessage.show("当前对象下面不允许创建子节点！",SmartXMessage.MESSAGE_WARN);
+				}else{
+					var node:XML = createBoxlayoutNode(boxlayoutType.data,false);
+					if(node)
+						selectedLayoutXml.appendChild(node);
+					else
+						SmartXMessage.show("当前对象必须作为容器对象的子节点！",SmartXMessage.MESSAGE_WARN);
+					boxlayoutTree.dataProvider = selectedLayoutXml.children();
+				}
+				
+				boxlayoutTree.invalidateList();
+				expandAll();
+			}
+			
+			private function createBoxlayoutNode(boxlayoutType:String,hasParent:Boolean):XML{
+				var node:XML;
+				if(boxlayoutType == "podref" && hasParent)//仪表盘对象必须有父节点
+					node = <{boxlayoutType} label="仪表盘对象" code={relatedPodsCboData.getItemAt(0).data} />;
+				else if(boxlayoutType == "hbox" || boxlayoutType == "vbox" || boxlayoutType == "tab"){
+					node = <{boxlayoutType} label={boxlayoutType} percentwidth="100" percentheight="100" />;
+					if(boxlayoutType == "tab"){
+						node.@isLinkBtn = "false";
+					}
+				}
+				else if(boxlayoutType == "swf" && hasParent)
+					node = <{boxlayoutType} label="SWF模块"/>
+				else if(boxlayoutType == "html" && hasParent)
+					node = <{boxlayoutType} label="网页"/>
+				else if(boxlayoutType == "image" && hasParent)
+					node = <{boxlayoutType} label="图片"/>
+				return node;
+			}
+			
+			private function deleteBoxlayout():void{
+				SmartXMessage.show("是否删除该节点以及所有子节点?",SmartXMessage.MESSAGE_CONFIRM,"",this,delBoxlayoutconfirmHandler);
+			}
+			
+			private function delBoxlayoutconfirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES)
+					CEPUtils.xmlDeleteNode(selectedBoxItem);
+			}
+			
+			private function initBoxData():void{
+				if(widthSld)
+					widthSld.value = 0;
+				if(heightSld)
+					heightSld.value = 0;
+				if(dboCbo)
+					dboCbo.selectedIndex = 0;
+				if(boxNameTxt)
+					boxNameTxt.text = "";
+			}
+			
+			private function boxlayoutTree_itemClickHandle():void{
+				initBoxData();
+				selectedBoxItem = boxlayoutTree.selectedItem as XML;
+				if(selectedBoxItem.name() == "vbox" || selectedBoxItem.name() == "hbox" || selectedBoxItem.name() == "tab"){
+					if(selectedBoxItem.name() == "tab")
+						currentState = "tab";
+					else{
+						currentState = "box";
+						if(selectedBoxItem.@title)
+							boxNameTxt.text = selectedBoxItem.@title;
+					}
+					if(selectedBoxItem.@percentwidth)
+						widthSld.value = Number(selectedBoxItem.@percentwidth);
+					if(selectedBoxItem.@percentheight)
+						heightSld.value = Number(selectedBoxItem.@percentheight);
+				}else if(selectedBoxItem.name() == "podref"){
+					currentState = "dbo";
+					for each(var obj:Object in relatedPodsCboData){
+						if(obj.data == selectedBoxItem.@code){
+							dboCbo.selectedItem = obj;
+							break;
+						}
+					}
+				}else if(selectedBoxItem.name() == "swf"){
+					currentState = "swf";
+					swfUrlInput.text = selectedBoxItem.@url;
+				}else if(selectedBoxItem.name() == "html"){
+					currentState = "html";
+					htmlUrlInput.text = selectedBoxItem.@url;
+				}else if(selectedBoxItem.name() == "image"){
+					currentState = "image";
+					imageUrlInput.text = selectedBoxItem.@url;
+				}
+				else
+					currentState = "normal";
+			}
+			
+			private function heightSld_changeHandler(event:SliderEvent):void{
+				selectedBoxItem.@percentheight = heightSld.value;
+			}
+			
+			private function widthSld_changeHandler(event:SliderEvent):void{
+				selectedBoxItem.@percentwidth = widthSld.value;
+			}
+			
+			private function dboCbo_changeHandler(event:ListEvent):void{
+				selectedBoxItem.@code = dboCbo.selectedItem.data;
+			}
+			
+			private function setBoxLayoutXml(boxLayoutXml:XMLList):void{
+				for each(var node:XML in boxLayoutXml){
+					if(node.name() == "podref")
+						node.@label = "仪表盘对象";
+					else if(node.name() == "swf")
+						node.@label = "SWF模块";
+					else if(node.name() == "html")
+						node.@label = "网页";
+					else if(node.name() == "image")
+						node.@label = "图片";
+					else
+						node.@label = node.name();
+					if(node.children().length() > 0)
+						setBoxLayoutXml(node.children());
+				}
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in boxlayoutTree.dataProvider){
+					boxlayoutTree.expandChildrenOf(item,true);
+				}
+			}
+			
+			private function setVarXml():void{
+				dataProvider = setVar.dataProvider;
+				delete contentXml.variables;
+				var variables:XML = <variables />;
+				for each(var data:VariableVo in dataProvider){
+					var variable:XML = <variable name={data.name} type={data.type} defaultValueLabel={data.defaultValueLabel}
+										defaultValue={data.defaultValue} alias={data.label} isUseSynonyms={data.isUseSynonyms?"Y":"N"} 
+										defineCbo={data.defineCbo} defineRefPanel={data.defineRefPanel}/>
+					variables.appendChild(variable);
+				}
+				
+				var dbPrior:String = isDBPriorCheckBox.selected ? "Y":"N";
+				variables.appendChild(<isDBPrior>{dbPrior}</isDBPrior>);
+				
+				contentXml.appendChild(variables);
+			}
+			
+			private function getVarXml():void{
+				dataProvider.removeAll();
+				if(contentXml.variables.length() > 0){
+					for each(var vari:XML in contentXml.variables.variable){
+						var data:VariableVo = new VariableVo(String(vari.@name),String(vari.@type),String(vari.@alias),String(vari.@defaultValue)
+												,String(vari.@defaultValueLabel),String(vari.@defineRefPanel),String(vari.@isUseSynonyms)=='Y'?true:false
+												,String(vari.@defineCbo));
+						dataProvider.addItem(data);
+					}
+					setVar.refreshData(dataProvider);
+				}
+			}
+			
+			public function removePodsBox():void{
+				try{
+					tabNG.removeChild(podsBox);
+				} catch(error:Error) {
+				}
+			}
+			
+			private function tabNameTxt_changeHandler(event:Event):void{
+				selectedBoxItem.@title = boxNameTxt.text;				
+			}
+			
+			private function boxTreeMakeUp():void{
+				if(selectedBoxItem==null || selectedBoxItem.parent() == undefined)
+					return;
+				var index:int = selectedBoxItem.childIndex();
+				if(index == 0)
+					return;
+				var newXml:XML = selectedBoxItem.copy();
+				var parentXml:XML = selectedBoxItem.parent();
+				CEPUtils.xmlDeleteNode(selectedBoxItem)
+				parentXml.insertChildBefore(parentXml.children()[index-1],newXml);
+				callLater(function():void{
+					boxlayoutTree.selectedItem =newXml;
+					boxlayoutTree_itemClickHandle();
+				});
+			}
+			
+			private function boxTreeMakeDown():void{
+				if(selectedBoxItem==null || selectedBoxItem.parent() ==undefined)
+					return;
+				var index:int = selectedBoxItem.childIndex();
+				var parentXml:XML = selectedBoxItem.parent();
+				if(index == parentXml.children().length() - 1)
+					return;
+				var newXml:XML = selectedBoxItem.copy();
+				CEPUtils.xmlDeleteNode(selectedBoxItem)
+				parentXml.insertChildAfter(parentXml.children()[index],newXml);
+				callLater(function():void{
+					boxlayoutTree.selectedItem =newXml;
+					boxlayoutTree_itemClickHandle();
+				});
+			}
+			
+			protected function swfUrlInput_changeHandler(event:Event):void
+			{
+				selectedBoxItem.@url = swfUrlInput.text;
+			}
+			
+			protected function htmlUrlInput_changeHandler(event:Event):void
+			{
+				selectedBoxItem.@url = htmlUrlInput.text;
+			}
+			
+			protected function imageUrlInput_changeHandler(event:Event):void
+			{
+				selectedBoxItem.@url = imageUrlInput.text;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:states>
+		<mx:State name="normal" />
+		<mx:State name="box" />
+		<mx:State name="dbo" />
+		<mx:State name="tab" />
+		<mx:State name="swf" />
+		<mx:State name="html" />
+		<mx:State name="image" />
+	</mx:states>
+	<mx:VBox width="100%" height="100%">
+		<mx:TabNavigator id="tabNG" width="100%" height="100%" creationPolicy="all">
+			<mx:VBox id="podsBox" visible="false" width="100%" height="100%" label="显示对象" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox id="podsBtnBox" width="100%">
+					<mx:LinkButton width="22" height="22" click="addClickHandler(event)"
+								   icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+					<mx:LinkButton width="22" height="22" click="deleteClickHandler(event)"
+								   icon="{AssetsFileLib.minuseIcon}"
+								   toolTip="删除"/>
+					<mx:LinkButton width="22" height="22" click="createDOBtnClickHandler(event)"
+								   icon="{AssetsFileLib.addaddIcon}"
+								   toolTip="新增仪表盘对像"/>
+					<mx:LinkButton width="22" height="22" click="editDOBtnClickHandler(event)"
+								   icon="{AssetsFileLib.editIcon}"
+								   toolTip="编辑仪表盘对像"/>
+				</mx:HBox>
+				<mx:DataGrid id="dataGrid" width="100%" height="100%" allowMultipleSelection="true"
+							 dataProvider="{contentXml.pods.pod}" editable="true"
+							 sortableColumns="true">
+					<mx:columns>
+						<mx:DataGridColumn dataField="@code" editable="false" headerText="显示对象编码"/>
+						<mx:DataGridColumn dataField="@dboname" editable="false"
+										   headerText="关联的仪表盘对象名称"/>
+						<mx:DataGridColumn dataField="@dbocode" editable="false"
+										   headerText="关联的仪表盘对象编码"/>
+						<mx:DataGridColumn dataField="title" editable="true" headerText="标题名称"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+			
+			<mx:VBox id="guidesBox" width="100%" height="100%" label="导航设置" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%">
+					<mx:LinkButton width="22" height="22" click="addGuideClickHandler(event)"
+								   icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+					<mx:LinkButton width="22" height="22" click="deleteGuideClickHandler(event)"
+								   icon="{AssetsFileLib.minuseIcon}"
+								   toolTip="删除"/>
+				</mx:HBox>
+				<mx:DataGrid id="guideGrid" width="100%" height="100%" allowMultipleSelection="true"
+							 dataProvider="{contentXml.guides.guide}" editable="true"
+							 sortableColumns="true">
+					<mx:columns>
+						<mx:DataGridColumn dataField="@name" editable="false" headerText="仪表盘名称"/>
+						<mx:DataGridColumn dataField="@code" editable="false" headerText="仪表盘编码"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+			
+			<mx:VBox id="relPodsBox" width="100%" height="100%" label="仪表盘对象联动管理" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5"
+					 show="relPodsBox_showHandler(event)">
+				<mx:HBox width="100%">
+					<mx:LinkButton width="22" height="22" click="addRelClickHandler(event)"
+								   icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+					<mx:LinkButton width="22" height="22" click="deleteRelClickHandler(event)"
+								   icon="{AssetsFileLib.minuseIcon}"
+								   toolTip="删除"/>
+				</mx:HBox>
+				<mx:DataGrid id="relatedDataGrid" width="100%" height="100%"
+							 dataProvider="{contentXml.relations.relation}" editable="true"
+							 sortableColumns="true">
+					<mx:columns>
+						<mx:DataGridColumn dataField="@src" editable="true" headerText="仪表盘对象"
+										   labelFunction="relPodsCboLabelFun"/>
+						<mx:DataGridColumn dataField="@dest" editable="true" headerText="联动仪表盘对象"
+										   labelFunction="relPodsCboLabelFun"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+			<mx:VBox id="layoutBox" width="100%" height="100%" label="布局" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5"
+					 show="layoutBox_showHandler(event)">
+				<mx:VBox width="100%" height="100%">
+					<mx:HBox width="100%">
+						<mx:CheckBox id="isShowAlertBox" label="是否显示告警栏"
+									 click="{contentXml.layout.@isShowAlert = isShowAlertBox.selected?'true':'false'}"
+									 selected="{contentXml.layout.@isShowAlert == 'true'}"/>
+					</mx:HBox>
+					<mx:HBox width="100%">
+						<mx:Label text="仪表盘高度"/>
+						<mx:TextInput id="dsheightTxt" width="200" restrict="0-9"
+									  text="{contentXml.layout.@height}" toolTip="不设或设为0,则默认为100%"/>
+					</mx:HBox>
+					<mx:HBox width="100%">
+						<mx:Label text="布局类型"/>
+						<mx:ComboBox id="layoutTypeBox" change="layoutTypeBox_changeHandler(event)"
+									 dataProvider="{layoutTypes}" labelField="label"/>
+						
+					</mx:HBox>
+					<mx:ViewStack id="layoutViewStack" width="100%" height="100%">
+						<mx:VBox id="mdiWidnowLayoutEditor" width="100%" height="100%">
+							<mx:HBox width="100%">
+								<mx:Button width="22" height="22" click="makeUp()"
+											   icon="{AssetsFileLib.upIcon}" toolTip="上移"/>
+								<mx:Button width="22" height="22" click="makeDown()"
+											   icon="{AssetsFileLib.downIcon}" toolTip="下移"/>
+							</mx:HBox>
+							<mx:DataGrid id="sequenceDataGrid" width="100%" height="100%"
+										 dataProvider="{selectedLayoutXml.sequence.podref}"
+										 editable="false"> 
+								<mx:columns>
+									<mx:DataGridColumn dataField="@code" editable="false"
+													   headerText="显示对象编码"/>
+									<mx:DataGridColumn editable="false" headerText="关联的仪表盘对象名称"
+													   labelFunction="sequenceDbonameFunction"/>
+									<mx:DataGridColumn editable="false" headerText="标题名称"
+													   labelFunction="sequenceTitleFunction"/>
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:VBox>
+						<mx:VBox id="boxLayoutEditor" width="100%" height="100%">
+							<mx:HBox width="100%">
+								<mx:CheckBox id="isHideDBTitle" label="隐藏仪表盘对象标题栏"
+											 click="{selectedLayoutXml.@isHideDBTitle = isHideDBTitle.selected?'true':'false'}"
+											 selected="{selectedLayoutXml.@isHideDBTitle == 'true'}"/>
+								<mx:CheckBox id="isHideDBTool" label="隐藏仪表盘工具栏"
+											 click="{selectedLayoutXml.@isHideDBTool = isHideDBTool.selected?'true':'false'}"
+											 selected="{selectedLayoutXml.@isHideDBTool == 'true'}"/>
+							</mx:HBox>
+							<mx:HDividedBox width="100%" height="100%" borderStyle="solid">
+								<mx:VBox width="40%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+									<mx:HBox id="treeButtonBox" width="100%" borderStyle="solid">
+										<mx:ComboBox id="boxlayoutCbo" dataProvider="{boxlayoutType}"/>
+										<mx:LinkButton width="22" height="22" click="createBoxlayout()"
+													   icon="{AssetsFileLib.addIcon}"
+													   toolTip="新增(按ESC可以取消当前选中的节点)"/>
+										<mx:LinkButton width="22" height="22" click="deleteBoxlayout()"
+													   icon="{AssetsFileLib.minuseIcon}"
+													   toolTip="删除"/>
+										<mx:LinkButton width="22" height="22" click="boxTreeMakeUp()"
+													   icon="{AssetsFileLib.upIcon}"
+													   toolTip="上移(只允许同级节点)"/>
+										<mx:LinkButton width="22" height="22" click="boxTreeMakeDown()"
+													   icon="{AssetsFileLib.downIcon}"
+													   toolTip="下移(只允许同级节点)"/>
+									</mx:HBox>
+									<mx:Tree id="boxlayoutTree" width="100%" height="100%" dataProvider="{selectedLayoutXml.children()}" 
+											 labelField="@label" itemClick="boxlayoutTree_itemClickHandle()"/>
+								</mx:VBox>
+								<mx:VBox width="60%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+									<mx:HBox width="100%" includeIn="box" horizontalAlign="center">
+										<mx:Label text="名称" width="20%"/>
+										<mx:TextInput id="boxNameTxt" change="tabNameTxt_changeHandler(event)" />
+									</mx:HBox>
+									<mx:HBox width="100%" includeIn="box,tab" horizontalAlign="center">
+										<mx:Label text="高度(%)" width="20%" />
+										<mx:HSlider id="heightSld" minimum="0" maximum="100" snapInterval="1" change="heightSld_changeHandler(event)"/>
+									</mx:HBox>
+									<mx:HBox width="100%" includeIn="box,tab" horizontalAlign="center">
+										<mx:Label text="宽度(%)" width="20%" />
+										<mx:HSlider id="widthSld" minimum="0" maximum="100" snapInterval="1" change="widthSld_changeHandler(event)"/>
+									</mx:HBox>
+									<mx:HBox width="100%" includeIn="tab" horizontalAlign="center">
+										<mx:Label text="是否链接样式" width="20%" toolTip="Tab头部是否链接样式" />
+										<mx:CheckBox id="linkCkb" click="{selectedBoxItem.@isLinkBtn = linkCkb.selected?'true':'false'}"
+													 selected="{selectedBoxItem.@isLinkBtn == 'true'}"/>
+									</mx:HBox>
+									<mx:HBox width="100%" includeIn="dbo" horizontalAlign="center">
+										<mx:Label text="仪表盘对象" width="20%" />
+										<mx:ComboBox id="dboCbo" dataProvider="{relatedPodsCboData}" change="dboCbo_changeHandler(event)" />
+									</mx:HBox>
+									<mx:HBox width="100%" includeIn="swf" horizontalAlign="center">
+										<mx:Label text="SWF模块路径" width="20%" />
+										<mx:TextInput id="swfUrlInput"  change="swfUrlInput_changeHandler(event)" maxWidth="200"/>
+									</mx:HBox>
+									<mx:HBox width="100%" includeIn="html" horizontalAlign="center">
+										<mx:Label text="网页路径" width="20%" />
+										<mx:TextInput id="htmlUrlInput"  change="htmlUrlInput_changeHandler(event)" maxWidth="200"
+													  toolTip="填写绝对路径或相对路径，如http://www.baidu.com/ 或 ireport/aboutblank.html"/>
+									</mx:HBox>
+									<mx:HBox width="100%" includeIn="image" horizontalAlign="center">
+										<mx:Label text="图片路径" width="20%" />
+										<mx:TextInput id="imageUrlInput" change="imageUrlInput_changeHandler(event)" maxWidth="200"/>
+									</mx:HBox>
+								</mx:VBox>
+							</mx:HDividedBox>
+						</mx:VBox>
+					</mx:ViewStack>
+				</mx:VBox>
+			</mx:VBox>
+			<common:SetVariablePanel id="setVar" width="100%" height="100%" isShowConfirmBtn="false" label="仪表盘变量设置" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5" />
+			<mx:VBox id="mtData" width="100%" height="100%" label="元数据" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5"
+					 show="mtcodeText_showHandler(event)">
+				<mx:ApplicationControlBar width="100%">
+					<mx:Button id="applyButton" label="应用" click="applyButton_clickHandler(event)"/>
+					<mx:Button id="resetButton" label="重置" click="resetButton_clickHandler(event)"/>
+				</mx:ApplicationControlBar>
+				<mx:TextArea id="mtcodeText" width="100%" height="100%" editable="true"/>
+			</mx:VBox>
+			
+		</mx:TabNavigator>
+		
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button label="确定" click="confirmFunc()"/>
+			<mx:Button label="取消" click="PopUpManager.removePopUp(this)"/>
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

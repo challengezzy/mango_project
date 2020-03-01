@@ -1,0 +1,53 @@
+<mx:VBox xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="25" 
+		   xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+		   xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+		   xmlns:core="smartx.flex.components.core.*"
+		   xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:s="library://ns.adobe.com/flex/spark"
+		   >
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.Canvas;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			
+			[Bindable]
+			public var dataObj:Object;
+			
+			[Bindable]
+			private var datafield:String;
+			
+			[Bindable]
+			private var datatype:String;
+			
+			private function init():void{
+				
+				if(dataObj != null){
+					labelid.text = dataObj["titlevalue"]+":";
+					textInput.text = dataObj["datavalue"];
+					datafield = dataObj["datafield"];
+					datatype = dataObj["datatype"]
+				}
+			}
+			
+			public function getDataObject():Object{
+				
+				var obj:Object = new Object();
+				
+				obj["titlevalue"] = labelid.text;
+				obj["datavalue"] = textInput.text;
+				obj["datafield"] = datafield;
+				obj["datatype"] = datatype;
+				
+				
+				return obj;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox id="cti" width="100%" height="100%" horizontalAlign="left">
+		<mx:Label id="labelid" width="20%" horizontalCenter="left"/>
+		<mx:TextInput id="textInput" width="60%" horizontalCenter="left" toolTip="输入参数值" />
+	</mx:HBox>
+</mx:VBox>

@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtdesigner:MTDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:mtdesigner="smartx.flex.components.mtdesigner.*" layout="vertical"
+					   creationComplete="init()" width="670" height="550" >
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:VBox horizontalAlign="center" width="100%" height="100%" id="normalConfigVox" 
+				 label="通用配置" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				
+				<mx:HBox width="100%" height="45" horizontalAlign="left" >
+					<mx:Label text="模板类型:" width="15%" />
+					<mx:ComboBox id="styleTypeCob" labelField="styleName" change="styleTypeCob_changeHandler(event)"  dataProvider="{styleTypeCol}" />
+				</mx:HBox>
+				
+				<mx:HBox width="100%" height="45" horizontalAlign="left" >
+					<mx:Label text="元原模板:" width="15%" />
+					<mx:TextInput id="templeteCodeInput"
+								  change="templeteCodeInput_changeHandler(event)" />
+					<mx:LinkButton id="addBtn" icon="{AssetsFileLib.refsearchIcon}" width="22" height="22" toolTip="选择元原模板" click="addBtn_clickHandler(event)"/>
+					<mx:LinkButton id="musBtn" icon="{AssetsFileLib.clearIcon}" width="22" height="22" toolTip="清除元原模板" click="musBtn_clickHandler(event)"/>
+				</mx:HBox>
+			
+				<mx:HBox width="100%" height="60" horizontalAlign="left" >
+					<mx:Label text="初始化过滤条件:" width="15%" />
+					<mx:TextArea id="initConditionInput" editable="{isEditable}" width="320"
+								  change="initConditionInput_changeHandler(event)" />
+				</mx:HBox>
+			
+				<mx:HBox width="100%" height="60" horizontalAlign="left" >
+					<mx:Label text="双击事件处理类:" width="15%" />
+					<mx:TextInput id="doubleClickHandlerInput"  width="320"
+								 change="doubleClickHandlerInput_changeHandler(event)" />
+				</mx:HBox>
+			
+				<mx:HRule width="100%" />
+				
+				<mx:VBox width="100%" height="100%" verticalAlign="top" paddingLeft="10">
+					<mx:HBox width="100%" height="35" horizontalAlign="left" >
+						<mx:Label text="宽度:" width="45" />
+						<mx:ComboBox id="widthTypeCob" labelField="typeName" change="widthTypeCob_changeHandler(event)" dataProvider="{coordTypeCol}" />
+						<mx:TextInput id="widthInput" restrict="0-9" toolTip="填写数字" width="60"
+									  change="widthInput_changeHandler(event)" />
+						<mx:Label width="25"/>
+						<mx:Label text="高度:" width="45" />
+						<mx:ComboBox id="heightTypeCob" labelField="typeName" change="heightTypeCob_changeHandler(event)" dataProvider="{coordTypeCol}" />
+						<mx:TextInput id="heightInput" restrict="0-9" toolTip="填写数字" width="60"
+									  change="heightInput_changeHandler(event)" />
+					</mx:HBox>
+					<mx:HBox width="100%" horizontalAlign="left" height="35">
+						<mx:Label text="卡片组件布局: "/>
+						<mx:ComboBox id="cardLayoutTypeCob" labelField="layoutName" change="cardLayoutTypeCob_changeHandler(event)"  dataProvider="{cardLayoutTypeCol}" />
+						<mx:Label width="25"/>
+						<mx:Label text="数据项标签宽度:"/>
+						<mx:TextInput id="itemLabelWidth" restrict="0-9" toolTip="填写60~400内数字" width="60"
+									  change="itemLabelWidth_changeHandler(event)" />
+						
+						<mx:Label width="25"/>
+						<mx:Label text="列表每页行数:"/>
+						<mx:TextInput id="perPageSizeText" restrict="0-9" toolTip="填写10~400内数字" width="60"
+									  change="perPageSizeText_changeHandler(event)" />
+					</mx:HBox>
+				</mx:VBox>
+			
+				<mx:HRule width="100%" />
+				
+				<mx:VBox width="100%" height="100%" verticalAlign="top" paddingLeft="20">
+					<mx:HBox width="100%" height="100%" horizontalAlign="left">
+						<mx:CheckBox width="120" id="isEditableCB" change="isEditableCB_changeHandler(event)" label="是否可编辑" 
+									 selected="{sourceXML.editable=='true'}" toolTip="是否可以编辑界面中显示的数据" />
+						<mx:CheckBox width="120" id="isShowInsertBtnChk" label="隐藏新增按钮" selected="{sourceXML.isShowInsertBtn == 'false'}" enabled="{isEditableCB.selected}" 
+								 change="{sourceXML.isShowInsertBtn=isShowInsertBtnChk.selected?'false':'true'}" toolTip="是否在风格模板操作按钮中移除新建按钮" />
+						
+						<mx:CheckBox width="120" id="isShowDelBtnChk" label="隐藏删除按钮" selected="{sourceXML.isShowDelBtn == 'false'}" enabled="{isEditableCB.selected}" 
+									 change="{sourceXML.isShowDelBtn=isShowDelBtnChk.selected?'false':'true'}" toolTip="是否在风格模板操作按钮中移除删除按钮" />
+						
+						<mx:CheckBox width="120" id="isChildEditableChk" label="子模板是否可编辑" enabled="{isEditableCB.selected}"
+									 change="{sourceXML.childEditable = isChildEditableChk.selected?'true':'false'}"
+									 selected="{sourceXML.childEditable =='true'}" toolTip="子模板是否可编辑" />
+					</mx:HBox>
+					<mx:HBox width="100%" height="100%" horizontalAlign="left">
+						<mx:CheckBox width="120" id="IsShowDataAfterInitCB" change="IsShowDataAfterInitCB_changeHandler(event)" label="是否查询数据" 
+									 selected="{sourceXML.firstAutoQuery=='true'}"  toolTip="是否在打开界面后立即查询数据" />
+						<mx:CheckBox  width="120" id="isShowAlertCB" change="isShowAlertCB_changeHandler(event)" label="是否弹出提示" 
+									 selected="{sourceXML.isShowAlert=='true'}" toolTip="是否在对界面中的数据进行操作后弹出信息提示" />
+						<mx:CheckBox width="120" id="isDebugModeCB" change="isDebugModeCB_changeHandler(event)" label="是否调试模式" 
+									 selected="{sourceXML.debugMode=='true'}" toolTip="是否进入调式模式" />
+						<mx:CheckBox width="120" id="disableEffectCB" change="disableEffectCB_changeHandler(event)" label="是否禁用效果" 
+									 selected="{sourceXML.disableEffect=='true'}" toolTip="是否禁用切换效果" />
+					</mx:HBox>
+					
+				</mx:VBox>
+			
+		</mx:VBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.workflow.Utils;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Bindable]
+			private var styleTypeCol:ArrayCollection = new ArrayCollection(
+				[
+					{styleName:"风格模板01",styleType:"style01"},
+					{styleName:"风格模板02",styleType:"style02"},
+					{styleName:"风格模板03",styleType:"style03"},
+					{styleName:"风格模板04",styleType:"style04"},
+					{styleName:"风格模板09",styleType:"style09"}
+				]
+			);
+			
+			[Bindable]
+			private var cardLayoutTypeCol:ArrayCollection = new ArrayCollection(
+				[
+					{layoutName:"垂直布局",layout:GlobalConst.LAYOUTTYPE_BILLCARDPANEL_VBOX},
+					{layoutName:"网格布局",layout:GlobalConst.LAYOUTTYPE_BILLCARDPANEL_TILE}
+				]
+			);
+			
+			[Bindable]
+			private var isEditable:Boolean = true;
+			
+			[Bindable]
+			private var coordTypeCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var rltObj:Object = new Object();
+			
+			[Bindable]
+			private var altObj:Object = new Object();
+			
+			private var endpointStr:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			protected var formService:RemoteObject;
+			
+			private function init():void{
+				this.sourceTextArea.editable = false;
+				tabNavigator.removeAllChildren();
+				tabNavigator.addChildAt(normalConfigVox,0);
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpointStr;
+				
+				if( sourceXML == null || StringUtil.trim(sourceXML.toString()) == "" ){
+					sourceXML = <root>
+						          <templetCode />
+						          <editable />
+								  <percentHeight />
+								  <percentWidth />
+								  <initQueryCondition />
+								  <height />
+								  <width />
+								</root>;
+				}
+				
+				templeteCodeInput.text = sourceXML.templetCode;
+				
+				rltObj["typeName"] = "相对布局";
+				rltObj["typeCode"] = "relative";
+				
+				altObj["typeName"] = "绝对布局";
+				altObj["typeCode"] = "absolute";
+				
+				coordTypeCol.addItem(rltObj);
+				coordTypeCol.addItem(altObj);
+				
+				if(sourceXML.percentWidth.length()>0){
+					var temppercentWidth:String = sourceXML.percentWidth;
+					if(temppercentWidth != null && temppercentWidth !="" ){
+						widthInput.text = temppercentWidth;
+						widthTypeCob.selectedItem = rltObj;
+					}
+				}
+				
+				if(sourceXML.percentHeight.length()>0){
+					var temppercentHeight:String = sourceXML.percentHeight;
+					if(temppercentHeight != null && temppercentHeight !="" ){
+						heightInput.text = temppercentHeight;
+						heightTypeCob.selectedItem = rltObj;
+					}
+				}
+				
+				if(sourceXML.height.length()>0){
+					var tempheight:String = sourceXML.height;
+					if(tempheight != null && tempheight !="" ){
+						heightInput.text = tempheight;
+						heightTypeCob.selectedItem = altObj;
+					}
+				}
+				
+				if(sourceXML.width.length()>0){
+					var tempwidth:String = sourceXML.width;
+					if(tempwidth != null && tempwidth !="" ){
+						widthInput.text = tempwidth;
+						widthTypeCob.selectedItem = altObj;
+					}
+				}
+				
+				if(sourceXML.initQueryCondition.length()>0){
+					var initQueryCondition:String = sourceXML.initQueryCondition;
+					if(initQueryCondition != null && initQueryCondition !="" ){
+						initConditionInput.text = initQueryCondition;
+					}
+				}
+				
+				if(sourceXML.styleType.length() >0 ){
+					var styleType:String = sourceXML.styleType;
+					var objStyleType:Object = getStyleObjectByTypeCode(styleType);
+					if(objStyleType != null ){
+						styleTypeCob.selectedItem = objStyleType;
+						styleTypeCob_changeHandler(null);
+					}
+				}
+				styleTypeCob_changeHandler(null);
+				
+				if(sourceXML.cardLayoutType.length() >0 ){
+					var cardLayoutType:String = sourceXML.cardLayoutType;
+					
+					for each(var obj:Object in cardLayoutTypeCol){
+						var layout:String = obj["layout"] as String;
+						if(cardLayoutType == layout){
+							cardLayoutTypeCob.selectedItem = obj;
+							break;
+						}
+					}
+				}
+				
+				itemLabelWidth.text = sourceXML.itemLabelWidth;
+				perPageSizeText.text = sourceXML.perPageSize;
+				
+				doubleClickHandlerInput.text = sourceXML.doubleClickHandler;
+				
+			}
+			
+			private function getStyleObjectByTypeCode(type:String):Object{
+				var item:Object = null;
+				for each(var obj:Object  in styleTypeCol ){
+					var tempType:String = obj["styleType"] as String;
+					if(tempType != null && tempType != "" && type != null && type != "" && type == tempType ){
+						item = obj;
+						break;
+					}
+				}
+				return item;
+			}
+			
+			protected function cardLayoutTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = cardLayoutTypeCob.selectedItem;				
+				if(item != null ){
+					var layout:String = item["layout"] as String;					
+					sourceXML.cardLayoutType = layout;
+				}
+			}
+			
+			protected function styleTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = styleTypeCob.selectedItem;
+				
+				if(item != null ){
+					isEditable  = true;
+					var styleType:String = item["styleType"] as String;
+					var styleName:String = item["styleName"] as String;
+					
+					sourceXML.styleType = styleType;
+					
+					try{
+						var dis:DisplayObject = tabNavigator.getChildAt(1);
+						if(dis != null ){
+							tabNavigator.removeChildAt(1);
+						}
+					}catch(e:Error){
+						trace(e);
+					}
+					
+					if(styleType != null && styleType == "style01"){
+						var style01:Styletemplate01AttributePanel = new Styletemplate01AttributePanel();
+						style01.sourceXML = sourceXML;
+						style01.titleName = styleName+"属性配置";
+						tabNavigator.addChildAt(style01,1);
+					}else if(styleType != null && styleType == "style02"){
+						var style02:Styletemplate02AttributePanel = new Styletemplate02AttributePanel();
+						style02.sourceXML = sourceXML;
+						style02.titleName = styleName+"属性配置";
+						tabNavigator.addChildAt(style02,1);
+					}else if(styleType != null && styleType == "style03"){
+						delete sourceXML.initQueryCondition;
+						initConditionInput.text = "";
+						//isEditable = false;
+						var style03:Styletemplate03AttributePanel = new Styletemplate03AttributePanel();
+						style03.sourceXML = sourceXML;
+						style03.titleName = styleName+"属性配置";
+						tabNavigator.addChildAt(style03,1);
+					}else if(styleType != null && styleType == "style04"){
+						var style04:Styletemplate04AttributePanel = new Styletemplate04AttributePanel();
+						style04.sourceXML = sourceXML;
+						style04.titleName = styleName+"属性配置";
+						tabNavigator.addChildAt(style04,1);
+					}else if(styleType != null && styleType == "style09"){
+						var style09:Styletemplate09AttributePanel = new Styletemplate09AttributePanel();
+						style09.sourceXML = sourceXML;
+						style09.titleName = styleName+"属性配置";
+						tabNavigator.addChildAt(style09,1);
+					}
+				}
+				
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void
+			{
+				var dialog:RefDialog = new RefDialog();
+				dialog.init2(formService,"select t.templetcode as id#,t.templetcode as 编码,t.templetname as 名称 from pub_templet_1 t",null);
+				dialog.title = "选择参数";
+				dialog.allowMultipleSelection = false;
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						
+						templeteCodeInput.text  = dialog.refCode;
+						templeteCodeInput_changeHandler(null);
+						
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+				
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				templeteCodeInput.text = "";
+				templeteCodeInput_changeHandler(null);
+				
+			}
+			
+			protected function templeteCodeInput_changeHandler(event:Event):void
+			{
+				var code:String = templeteCodeInput.text;
+				if(code != null && code != "" ){
+					sourceXML.templetCode = code;
+				}
+			}
+			
+			protected function isEditableCB_changeHandler(event:Event):void
+			{
+				sourceXML.editable = isEditableCB.selected?"true":"false";
+				if(isEditableCB.selected){
+					isChildEditableChk.selected = true;
+				}else{
+					isChildEditableChk.selected = false;
+				}
+				
+			}
+			
+			protected function IsShowDataAfterInitCB_changeHandler(event:Event):void
+			{
+				sourceXML.firstAutoQuery = IsShowDataAfterInitCB.selected?"true":"false";
+				
+			}
+			
+			protected function isShowAlertCB_changeHandler(event:Event):void
+			{
+				sourceXML.isShowAlert = isShowAlertCB.selected?"true":"false";
+				
+			}
+			
+			protected function isDebugModeCB_changeHandler(event:Event):void
+			{
+				sourceXML.debugMode = isDebugModeCB.selected?"true":"false";
+				
+			}
+			
+			protected function disableEffectCB_changeHandler(event:Event):void
+			{
+				sourceXML.disableEffect = disableEffectCB.selected?"true":"false";
+				
+			}
+			
+			protected function heightInput_changeHandler(event:Event):void
+			{
+				var item:Object = heightTypeCob.selectedItem;
+				if(item != null){
+					var type:String = item["typeCode"] as String;
+					var str:String = heightInput.text;
+					if(type =="relative"){
+						var temp:int = parseInt(str);
+						if(temp >100){
+							SmartXMessage.show("相对布局的范围必须在0-100之间");
+						}else{
+							delete sourceXML.height;
+							sourceXML.percentHeight = heightInput.text;
+						}
+
+					}else{
+						delete sourceXML.percentHeight;
+						sourceXML.height = heightInput.text;
+					}
+				}
+				
+			}
+			
+			protected function itemLabelWidth_changeHandler(event:Event):void
+			{
+				var str:String = itemLabelWidth.text;
+				sourceXML.itemLabelWidth = str;
+			}
+			
+			protected function widthInput_changeHandler(event:Event):void
+			{
+				var item:Object = widthTypeCob.selectedItem;
+				if(item != null){
+					var type:String = item["typeCode"] as String;
+					var str:String = widthInput.text;
+					if(type =="relative"){
+						var temp:int = parseInt(str);
+						if(temp >100){
+							SmartXMessage.show("相对布局的范围必须在0-100之间");
+						}else{
+							delete sourceXML.width;
+							sourceXML.percentWidth = widthInput.text;
+						}
+						
+					}else{
+						delete sourceXML.percentWidth;
+						sourceXML.width = widthInput.text;
+					}
+				}
+			}
+			
+			protected function widthTypeCob_changeHandler(event:ListEvent):void
+			{
+				widthInput_changeHandler(null);
+				
+			}
+			
+			protected function heightTypeCob_changeHandler(event:ListEvent):void
+			{
+				heightInput_changeHandler(null);
+			}
+			
+			protected function initConditionInput_changeHandler(event:Event):void
+			{
+				var styleObj:Object = styleTypeCob.selectedItem;
+				if(styleObj != null ){
+//					var type:String = styleObj["styleType"] as String;
+//					if(type != "style03"){
+						sourceXML.initQueryCondition = initConditionInput.text;
+					//}
+				}
+			}
+			
+			protected function doubleClickHandlerInput_changeHandler(event:Event):void
+			{
+				sourceXML.doubleClickHandler = doubleClickHandlerInput.text;
+				
+			}
+			
+			protected function perPageSizeText_changeHandler(event:Event):void
+			{
+				sourceXML.perPageSize = perPageSizeText.text;
+				
+			}
+			
+		]]>
+	</fx:Script>
+</mtdesigner:MTDesigner>

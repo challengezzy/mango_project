@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 creationComplete="init()" width="100%" height="100%" label="{titleName}">
+	
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Bindable]
+			public var titleName:String;
+			
+			[Bindable]
+			public var sourceXML:XML;
+			
+			[Bindable]
+			protected var showOperationButtonTypeDp:ArrayCollection = new ArrayCollection([
+				{name:"菜单",data:GlobalConst.STYLETEMPLATE_OPERATION_MENU},
+				{name:"按钮",data:GlobalConst.STYLETEMPLATE_OPERATION_BUTTON}
+			]);
+
+			private function init():void{
+				
+			}
+			
+			protected function getXMLString():String{
+				return null;
+			};
+			
+		]]>
+	</fx:Script>
+</mx:VBox>

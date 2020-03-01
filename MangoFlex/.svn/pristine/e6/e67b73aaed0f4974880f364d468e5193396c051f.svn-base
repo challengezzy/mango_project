@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Image xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="60" height="60" scaleContent="false" horizontalAlign="center" verticalAlign="middle" buttonMode="true" 
+	source="{AssetsFileLib.workflow14Icon}" toolTip="流程环节"
+	creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			public var templateXML:XML =
+			  <activity>
+				  <code></code> 
+				  <wfname>新建环节</wfname> 
+				  <uiname>新建环节</uiname> 
+				  <x>0</x> 
+				  <y>0</y> 
+				  <afterInterceptorClassName /> 
+				  <beforeInterceptorClassName /> 
+				  <performMode>Manual</performMode> 
+				  <splitType>AND</splitType> 
+				  <joinType>AND</joinType> 
+				  <joinCondition />
+				  <taskAssignRules/>  
+				  <description /> 
+			  </activity>
+			;
+			private function init():void{
+				
+			}
+		]]>
+	</mx:Script>
+</mx:Image>

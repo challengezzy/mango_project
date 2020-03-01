@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="468" height="162"
+	title="请选择">
+	<mx:Script>
+		<![CDATA[
+			import smartx.flex.components.assets.AssetsFileLib;
+			public var viewModeHandler:Function;
+			public var handleModeHandler:Function;
+			public var monitorModeHandler:Function;
+			public var cancelHandler:Function;
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" verticalAlign="middle">
+		<mx:Image source="{AssetsFileLib.questionIcon}" width="50" height="50"/>
+		<mx:Label text="您想如何操作本工作项？" fontSize="14" fontWeight="bold" fontFamily="Verdana"/>
+		
+	</mx:HBox>
+	<mx:ControlBar horizontalAlign="center">
+		<mx:Button label="查看" icon="{AssetsFileLib.viewIcon}" click="viewModeHandler()"/>
+		<mx:Button label="处理" icon="{AssetsFileLib.handleIcon}" click="handleModeHandler()"/>
+		<mx:Button label="流程" icon="{AssetsFileLib.eyeIcon}" click="monitorModeHandler()"/>
+		<mx:Button label="取消" icon="{AssetsFileLib.closeIcon}" click="cancelHandler()"/>
+	</mx:ControlBar>
+	
+	
+</mx:TitleWindow>

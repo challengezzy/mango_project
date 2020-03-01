@@ -1,0 +1,66 @@
+/************************************************************************
+ * $RCSfile: SysdateServer.java,v $  $Revision: 1.3 $  $Date: 2007/10/18 12:08:35 $
+ * $Log: SysdateServer.java,v $
+ * Revision 1.3  2007/10/18 12:08:35  john_liu
+ * 2007.10.18 by john_liu
+ * MR#: BIZM10-166
+ * 获取时间方法出错
+ *
+ * Revision 1.2  2007/10/15 07:54:44  john_liu
+ * 2007.10.15 by john_liu
+ * MR#: NOVA20-0000
+ * 获取数据库当前时间API
+ *
+ * Revision 1.1.2.1  2007/10/15 07:12:29  john_liu
+ * 2007.10.15 by john_liu
+ * MR#: NOVA20-0000
+ * 平台提供一个获取数据库系统时间的统一API
+ *
+ * Revision
+ *
+ * created by john_liu, 2007.10.15    for MR#: 平台提供一个获取数据库系统时间的统一API
+ *
+ ************************************************************************/
+
+package smartx.system.util.sysdate;
+
+import java.util.Date;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.vo.HashVO;
+
+/**
+ * <p>Title: 获取数据库当前系统时间</p>
+ *
+ * <p>Description: 获取数据源的数据库当前时间 </p>
+ *
+ * <p>Copyright: Copyright (c) 2007</p>
+ *
+ * <p>Company: </p>
+ *
+ * @author not attributable
+ * @version 1.0
+ */
+public class SysdateServer
+{
+    CommDMO dmo = new CommDMO();
+
+    public SysdateServer()
+    {
+    }
+
+    public Date getSysDate( String _datasource )
+        throws Exception
+    {
+        Date sysdate = new Date();
+
+        String sql_sysdate = "SELECT SYSDATE FROM DUAL";
+        HashVO[] hvArr_sysdate = this.dmo.getHashVoArrayByDS( _datasource, sql_sysdate );
+        if ( hvArr_sysdate != null && hvArr_sysdate.length > 0 )
+        {
+            sysdate = hvArr_sysdate[0].getDateValue( "SYSDATE" );
+        }
+
+        return sysdate;
+    }
+}

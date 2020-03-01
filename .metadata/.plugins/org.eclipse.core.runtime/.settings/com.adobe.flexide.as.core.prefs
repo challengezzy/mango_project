@@ -1,0 +1,12 @@
+#Thu Sep 18 14:19:57 CST 2014
+PATTERN_FILTER.flexProperties=false
+PATTERN_FILTER.settings=false
+asCycling=[cycle.templates,true,2][cycle.variables,true,3][cycle.functions,true,4][cycle.class,true,5][cycle.package,true,6][cycle.namespaces,true,7]
+PATTERN_FILTER.DS_Store=false
+PATTERN_FILTER.actionScriptProperties=false
+PATTERN_FILTER.flexLibProperties=false
+PATTERN_FILTER.model=false
+eclipse.preferences.version=1
+PATTERN_FILTER.fxpProperties=false
+PATTERN_FILTER.*\ resources=false
+PATTERN_FILTER.project=false

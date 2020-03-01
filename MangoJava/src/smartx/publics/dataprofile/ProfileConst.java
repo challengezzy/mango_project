@@ -1,0 +1,22 @@
+package smartx.publics.dataprofile;
+
+/**
+ *@author zzy
+ *@date Feb 10, 2012
+ *@description 数据剖析常量
+ **/
+public class ProfileConst {
+	
+	//列指标查询SQL中使用的参数,在字符串<%=__ param __%> 中
+	public static String SQL_PARAM_COLUMNNAMES = "COLUMN_NAMES";//分析列
+	public static String SQL_PARAM_TABLENAME = "TABLE_NAME";//分析列所在表
+	public static String SQL_PARAM_WHERECLAUSE = "WHERE_CLAUSE";//Where + 过滤条件表达式
+	public static String SQL_PARAM_ANDWHERECLAUSE = "AND_WHERE_CLAUSE";// And + 过滤条件表达式
+	public static String SQL_PARAM_GROUPBYALIAS = "GROUP_BY_ALIAS";//分析列
+	public static String SQL_PARAM_PATTERNEXPR = "PATTERN_EXPR";//匹配字符串
+	
+	public static String INDICATOR_TYPE_SIMPLE = "0";//简单统计指标
+	public static String INDICATOR_TYPE_PATTERN = "1";//模式匹配指标
+	public static String INDICATOR_TYPE_FREQUENCY = "2";//频率分析指标
+	
+}

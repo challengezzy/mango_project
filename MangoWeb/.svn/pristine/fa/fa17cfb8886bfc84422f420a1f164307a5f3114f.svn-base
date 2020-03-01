@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<service id="remoting-service" 
+    class="flex.messaging.services.RemotingService">
+
+    <adapters>
+        <adapter-definition id="java-object" class="flex.messaging.services.remoting.adapters.JavaAdapter" default="true"/>
+    </adapters>
+
+    <default-channels>
+        <channel ref="my-amf"/>
+    </default-channels>
+	<destination id="smartXFormService"> 
+     <properties> 
+         <source>smartx.publics.form.bs.service.SmartXFormService</source> 
+       </properties> 
+ 	</destination>
+ 	<destination id="smartXJobService"> 
+     <properties> 
+         <source>smartx.framework.common.job.bs.IJobServiceImpl</source> 
+       </properties> 
+ 	</destination>
+ 	
+ 	<destination id="smartXCEPService"> 
+     <properties> 
+         <source>smartx.publics.cep.bs.service.SmartXCEPService</source> 
+       </properties> 
+ 	</destination>
+ 	<destination id="smartXMetadataTempletService"> 
+     <properties> 
+         <source>smartx.publics.metadata.bs.service.SmartXMetadataTempletService</source> 
+       </properties> 
+ 	</destination>
+ 	<destination id="smartXBAMService"> 
+     <properties> 
+         <source>smartx.bam.bs.BamService</source> 
+       </properties> 
+ 	</destination>
+</service>

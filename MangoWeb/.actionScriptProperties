@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<actionScriptProperties analytics="false" mainApplicationPath="MangoWeb.mxml" projectUUID="dba719ee-8676-4e34-b680-9203efae25b1" version="10">
+  <compiler additionalCompilerArguments="-services &quot;D:/workspace/workspace_mango/MangoWeb/WebRoot/WEB-INF/flex/services-config.xml&quot; -locale en_US" autoRSLOrdering="true" copyDependentFiles="true" fteInMXComponents="false" generateAccessible="true" htmlExpressInstall="true" htmlGenerate="true" htmlHistoryManagement="true" htmlPlayerVersionCheck="true" includeNetmonSwc="false" outputFolderPath="WebRoot" removeUnusedRSL="false" rootURL="http://localhost:8080/MangoWeb" sourceFolderPath="flex_src" strict="true" targetPlayerVersion="0.0.0" useApolloConfig="false" useDebugRSLSwfs="true" verifyDigests="true" warn="true">
+    <compilerSourcePath/>
+    <libraryPath defaultLinkType="0">
+      <libraryPathEntry kind="4" path="">
+        <excludedEntries>
+          <libraryPathEntry kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/flex.swc" useDefaultLinkType="false"/>
+          <libraryPathEntry kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/core.swc" useDefaultLinkType="false"/>
+        </excludedEntries>
+      </libraryPathEntry>
+      <libraryPathEntry kind="1" linkType="1" path="flex_libs"/>
+      <libraryPathEntry kind="3" linkType="1" path="/MangoFlex/bin/MangoFlex.swc" useDefaultLinkType="false"/>
+    </libraryPath>
+    <sourceAttachmentPath/>
+  </compiler>
+  <theme themeIsDefault="false" themeIsSDK="true" themeLocation="${SDK_THEMES_DIR}/frameworks/themes/Halo"/>
+  <applications>
+    <application path="DashboardObjectViewer.mxml"/>
+    <application path="MangoWeb.mxml"/>
+  </applications>
+  <modules>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate01Frame.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate01Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate02Frame.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate02Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate03Frame.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate03Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate04Frame.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate04Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate09Frame.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate09Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplateGroupListFrame.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplateGroupListFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/MTDesignerFrame.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/mt/MTDesignerFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/templetmgmt2.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/system/templetmgmt2.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/mtmgmt.swf" optimize="false" sourcePath="flex_src/smartx/flex/modules/basic/system/mtmgmt.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/dashboard/Dashboard.swf" optimize="false" sourcePath="flex_src/smartx/bam/flex/modules/dashboard/Dashboard.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/report/MTReportFrame.swf" optimize="false" sourcePath="flex_src/smartx/bam/flex/modules/report/MTReportFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/CustomLibrary.swf" optimize="false" sourcePath="flex_src/smartx/bam/flex/modules/CustomLibrary.as"/>
+  </modules>
+  <buildCSSFiles/>
+  <flashCatalyst validateFlashCatalystCompatibility="false"/>
+</actionScriptProperties>

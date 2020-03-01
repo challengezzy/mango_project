@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:containers="flexlib.containers.*"
+		   verticalAlign="middle"
+		   creationComplete="init()" >
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Metadata>		       
+		[Event(name='itemClick',type='mx.events.MenuEvent')]
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Menu;
+			import mx.controls.VRule;
+			import mx.core.UIComponent;
+			import mx.events.MenuEvent;
+			
+			[Bindable]
+			public var labelField:String;
+			
+			[Bindable]
+			public var imageLabelColor:String;
+			
+			[Bindable]
+			private var dataProvider:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var menusCol:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				
+			}
+			
+			public function loadMenu(_dataProvider:ArrayCollection,_sysMenuDataProvider:ArrayCollection):void{
+				if(_dataProvider != null ){
+					menusCol.removeAll();
+					if(leftBox.getChildren().length>0){
+						leftBox.removeAllChildren();
+					}
+					for each(var item:Object in _dataProvider){
+						var parentid:String = item["parentid"] as String;
+						var imgUrl:String = (item["imgurl"]==null|| item["imgurl"]=="")?'images/Options.png':item["imgurl"];
+						if(parentid == null || parentid == "" || parentid.toLowerCase() == 'null'){
+							
+							var imgMenu:ImageMenu = new ImageMenu();
+							imgMenu.imageUrl = imgUrl;
+							imgMenu.imageLabelColor = imageLabelColor;
+							imgMenu.labelName = item[labelField];
+							imgMenu.menuLabelField = labelField;
+							imgMenu.dataMenuCol = item["children"];
+							imgMenu.menuItem = item;
+							imgMenu.addEventListener(MenuEvent.ITEM_CLICK,menuItemClickHandler);
+							
+							menusCol.addItem(imgMenu);
+							
+							leftBox.addChild(imgMenu);
+						}
+					}
+				}
+				
+				if(_sysMenuDataProvider != null ){
+					if(rightBox.getChildren().length>0){
+						rightBox.removeAllChildren();
+					}
+					for each(var itemSys:Object in _sysMenuDataProvider){
+						var sysParentid:String = itemSys["parentid"] as String;
+						if(sysParentid == null || sysParentid == "" || sysParentid.toLowerCase() == 'null'){
+							
+							var imgSysMenu:ImageMenu = new ImageMenu();
+							imgSysMenu.imageUrl = itemSys["imgurl"];
+							imgSysMenu.imageLabelColor = imageLabelColor;
+							imgSysMenu.labelName = itemSys[labelField];
+							imgSysMenu.menuLabelField = labelField;
+							imgSysMenu.dataMenuCol = itemSys["children"];
+							imgSysMenu.menuItem = itemSys;
+							imgSysMenu.addEventListener(MenuEvent.ITEM_CLICK,menuItemClickHandler);
+							
+							menusCol.addItem(imgSysMenu);
+							if(rightBox.getChildren().length>0){
+								var vrule:VRule = new VRule();
+								vrule.height = 18;
+								rightBox.addChild(vrule);
+							}
+							rightBox.addChild(imgSysMenu);
+						}
+					}
+				}
+			}
+			
+			private function menuItemClickHandler(event:MenuEvent):void{
+				dispatchEvent(event);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox id="menuBox" width="100%" height="100%" verticalAlign="middle" >
+		<mx:HBox id="leftBox" width="100%" height="100%" verticalAlign="middle" horizontalAlign="left" />
+		<mx:HBox id="rightBox" width="125" height="100%" verticalAlign="bottom" horizontalAlign="left" />
+	</mx:HBox>
+</mx:HBox>

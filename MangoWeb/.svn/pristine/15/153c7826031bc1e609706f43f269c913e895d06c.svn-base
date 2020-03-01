@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="320" height="165"
+		   title="元原模板复制"
+		   close="close()" showCloseButton="true" creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.BillListPanel;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Bindable]
+			public var templeteName:String;
+			
+			[Bindable]
+			public var templeteCode:String;
+			
+			[Bindable]
+			public var listPanel:BillListPanel;
+			
+			[Bindable]
+			public var endpoint:String;
+			
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			
+			protected var formService:RemoteObject;
+			
+			public var showCancelButton:Boolean = true;
+			
+			private function init():void{
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.copyTempleteByCode.addEventListener(ResultEvent.RESULT,copyTempleteByCodeHandler);
+				formService.copyTempleteByCode.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				templeteNameTxt.text = templeteName+"_复制";
+				templeteCodeTxt.text = templeteCode+"_COPY";
+			}
+			
+
+			protected function submitBtn_clickHandler(event:MouseEvent):void
+			{
+				var newName:String  = templeteNameTxt.text;
+				var newCode:String  = templeteCodeTxt.text;
+				formService.copyTempleteByCode(templeteCode,newName,newCode);
+			}
+			
+			private function copyTempleteByCodeHandler(event:ResultEvent):void{
+				SmartXMessage.show("复制成功!");
+				if(listPanel != null ){
+					listPanel.query();
+				}
+				close();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				SmartXMessage.show(event.fault.faultString,SmartXMessage.MESSAGE_ERROR);
+			}
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox height="100%" width="100%" paddingBottom="5"
+			 paddingLeft="5" paddingRight="5" paddingTop="5" >
+		<mx:HBox width="100%" height="100%" horizontalAlign="left">
+			<mx:Label text="模板名称:" />
+			<mx:TextInput id="templeteNameTxt" width="100%" />
+		</mx:HBox>
+		<mx:HBox width="100%" height="100%" horizontalAlign="left" >
+			<mx:Label text="模板编码:" />
+			<mx:TextInput id="templeteCodeTxt" width="100%" />
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom" >
+			<mx:Button id="submitBtn" label="确定" icon="{AssetsFileLib.okIcon}" click="submitBtn_clickHandler(event)" />
+			<mx:Button id="cancelBtn" label="取消" icon="{AssetsFileLib.closeIcon}" click="close()" />
+		</mx:HBox>
+	</mx:VBox>
+	
+</mx:TitleWindow>

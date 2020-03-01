@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" 
+		   width="400" height="300" creationComplete="Init()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import hlib.MovableExtension;			
+			import hlib.DisposeUtil;
+			
+			import myreport.res.Asset;
+			import myreport.util.AboutForm;
+			import myreport.util.PageView;
+			
+			private var _Pages:Array;//item => Sprite
+			private var _PageViews:Array = new Array();//item => PageView
+			private var _Ext:MovableExtension;
+			private var _SelectedIndex:int = -1;
+			private function Init():void
+			{
+				if(!_Ext)
+				{
+					_Ext = new MovableExtension(_Content, MouseDown, MouseMove, MouseUp);
+					_Ext.SuspendHorizontal = true;
+					_Ext.SuspendVertical = true;
+				}
+			}
+			
+			public function get PageCount():int
+			{
+				return _PageViews.length;
+			}
+			
+			public function get SelectedIndex():int
+			{
+				return _SelectedIndex;
+			}
+			/**
+			 * @param source: 支持XML对象、ReportSettings对象
+			 */ 
+			public function Load(source:Object, table:ArrayCollection, parameters:Object):void
+			{			
+				Pages = ReportEngine.GeneratePages(source, table, parameters);
+			}
+			/**
+			 * 子项是Sprite
+			 */ 
+			public function set Pages(value:Array):void
+			{
+				if(_Pages == value)
+					return;
+				Clear();
+				_Pages = value;
+				for each (var page:Sprite in _Pages)
+				{
+					_PageViews.push(new PageView(page));
+				}
+			}
+			public function Clear():void
+			{
+				_SelectedIndex = -1;
+				DisposeUtil.Dispose(_Pages);
+				DisposeUtil.Dispose(_Content);
+				DisposeUtil.Dispose(_PageViews);
+			}
+			/**
+			 * 打印
+			 * @param source: 支持XML对象、ReportSettings对象
+			 * @param pageRange: 页码范围，null时打印全部页码，格式：1-3
+			 */ 
+			public function Print(source:Object, table:ArrayCollection, parameters:Object, pageRange:String):void
+			{
+				ReportEngine.Print(source, table, parameters, pageRange);
+			}
+ 
+			public function GotoPage(pageNumber:int):void
+			{
+				if(_PageViews.length == 0)
+				{
+					_SelectedIndex = -1;
+					return;
+				}
+				_SelectedIndex = pageNumber - 1;
+				_SelectedIndex = Math.max(_SelectedIndex, 0);
+				_SelectedIndex = Math.min(_SelectedIndex, _PageViews.length - 1);
+				
+				var page:PageView = _PageViews[_SelectedIndex] as PageView;
+				_Content.removeAllChildren();
+//				_Content.height = page.height + 24 * 2;	
+//				
+//				if(page.height + 24 * 2 > height)
+//					_Content.width = Math.max(width - 18, page.width + 24 * 2);
+//				else
+//					_Content.width = Math.max(width, page.width + 24 * 2);
+//	 
+//				page.y = 24;
+//				page.x = (_Content.width - page.width)/2;
+				_Content.addChild(page);
+
+			}
+			
+			public function Zoom(scale:Number):void
+			{
+				_Content.scaleX = scale;
+				_Content.scaleY = scale;
+				_Content.validateNow();
+			}
+			
+			public function ShowAbout():void
+			{
+				AboutForm.Instance.Show();
+			}
+		]]>
+	</mx:Script>
+	<mx:Script>
+		<![CDATA[
+			private var _ScrollH:Number = 0;
+			private var _ScrollV:Number = 0;
+			
+			private function MouseDown(event:MouseEvent):void
+			{
+				if((verticalScrollBar && verticalScrollBar.visible)||
+					(horizontalScrollBar && horizontalScrollBar.visible))
+				{
+					_Ext.SuspendStageEvent = false;
+				}
+				else
+					_Ext.SuspendStageEvent = true;
+				
+				if(!_Ext.SuspendStageEvent)
+				{
+					cursorManager.setCursor(Asset.ICON_SIZE_ALL, 1, -10, -10);
+					_ScrollH = horizontalScrollPosition;
+					_ScrollV = verticalScrollPosition;
+				}
+			}
+			
+			private function MouseMove(event:MouseEvent):void
+			{
+				if (verticalScrollBar && _Ext.ChangeY != 0)
+				{
+					verticalScrollPosition = _ScrollV - _Ext.ChangeY;
+				}
+				if (horizontalScrollBar && _Ext.ChangeX != 0)
+				{
+					horizontalScrollPosition = _ScrollH - _Ext.ChangeX;
+				}
+			}
+			
+			private function MouseUp(event:MouseEvent):void
+			{
+				cursorManager.removeAllCursors();
+			}
+		]]>
+	</mx:Script>
+	<!--
+	<mx:Canvas id="_Content" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+		
+	</mx:Canvas>
+	-->
+
+	<mx:VBox id="_Content" width="100%" height="100%" 
+			 verticalAlign="top" horizontalAlign="center" paddingLeft="24" paddingBottom="24" paddingRight="24" paddingTop="24">
+	</mx:VBox>
+
+</mx:Canvas>

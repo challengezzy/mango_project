@@ -1,0 +1,796 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   xmlns:s="library://ns.adobe.com/flex/spark"
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   width="100%" height="100%" creationComplete="init()" layout="vertical" 
+		   xmlns:ext="smartx.flex.components.core.ext.*" xmlns:styletemplate="smartx.flex.components.styletemplate.*">
+	<fx:Declarations>
+		<mx:Button id="designBtn" icon="{AssetsFileLib.designIcon}" label="设计" click="designBtn_clickHandler()" />
+		<mx:Button id="qvQueryResultBtn" icon="{AssetsFileLib.queryResultIcon}" label="查询结果集" click="qvQueryResultBtn_clickHandler()" />
+		<mx:Button id="dbLayoutBtn" icon="{AssetsFileLib.layoutIcon}" label="布局管理" click="dbLayoutBtn_clickHandler()" />
+		<mx:Button id="doAdvBtn" icon="{AssetsFileLib.designIcon}" label="高级属性" click="doAdvBtn_clickHandler()" />
+		<mx:Button id="bvRedeployBtn" icon="{AssetsFileLib.startIcon}" label="重新部署" click="bvRedeployBtn_clickHandler()" />
+		<mx:Button id="bvStartBtn" icon="{AssetsFileLib.startIcon}" label="启动" click="bvStartBtn_clickHandler()" />
+		<mx:Button id="bvStopBtn" icon="{AssetsFileLib.stopIcon}" label="停止" click="bvStopBtn_clickHandler()" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.hurlant.eval.ast.Void;
+			import com.siloon.plugin.rightClick.RightClickManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.bam.flex.modules.businessview.listener.BvRedeplyTreeButtonListerner;
+			import smartx.bam.flex.modules.businessview.listener.BvStartTreeButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.BvStopTreeButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.DesignCardButtonListener;
+			import smartx.bam.flex.modules.message.MessageBox;
+			import smartx.bam.flex.modules.queryview.QueryButtonListener;
+			import smartx.bam.flex.utils.DBLayoutManagerUtil;
+			import smartx.bam.flex.utils.DODesignerUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.bam.flex.vo.dashboard.DashBoardConst;
+			import smartx.bam.flex.vo.dashboard.DashboardObjConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			[Bindable]
+			private var metadata:XML;
+			
+			private var buildModulerWindow:BuildModulerWindow;
+			
+			public var bamService:RemoteObject;
+			[Bindable]
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			[Bindable]
+			private var operationList:ArrayCollection = new ArrayCollection();
+			
+			private var metadataCache:Hashtable = new Hashtable();//所有工作集元数据缓存
+			
+			private var rightClickMenu:Menu;//右键菜单
+			[Bindable]
+			private var bvTempletCode:String = "T_BAM_BUSINESSVIEW";
+			[Bindable]
+			private var qvTempletCode:String = "T_V_BAM_QUERYVIEW";
+			[Bindable]
+			private var doTempletCode:String = "T_BAM_DASHBOARDOBJECT";
+			[Bindable]
+			private var dbTempletCode:String = "T_BAM_DASHBOARD";
+			[Bindable]
+			private var bvInsertBfInterceptor:String = "smartx.bam.bs.bvmanager.BvInsertBfFormInterceptor";
+			[Bindable]
+			private var bvUpdateBfInterceptor:String = "smartx.bam.bs.bvmanager.BvUpdateBfFormInterceptor";
+			[Bindable]
+			private var bvDeleteAfInterceptor:String = "smartx.bam.bs.bvmanager.BvDeleteAfFormInterceptor";
+			[Bindable]
+			private var qvInsertBfInterceptor:String = "smartx.bam.bs.qvmanager.QvInsertBfFormInterceptor";
+			[Bindable]
+			private var dbInsertBfInterceptor:String = "smartx.bam.bs.dashboard.DbInsertBfFormInterceptor";
+			[Bindable]
+			private var dbUpdateBfInterceptor:String = "smartx.bam.bs.dashboard.DbUpdateBfFormInterceptor";
+			[Bindable]
+			private var dbDeleteAfInterceptor:String = "smartx.bam.bs.dashboard.DbDeleteAfFormInterceptor";
+			[Bindable]
+			private var dbDeleteBfInterceptor:String = "smartx.bam.bs.dashboard.DbDeleteBfFormInterceptor";
+			[Bindable]
+			private var doInsertBfInterceptor:String = "smartx.bam.bs.dashboardobj.DboInsertBfFormInterceptor";
+			[Bindable]
+			private var doUpdateBfInterceptor:String = "smartx.bam.bs.dashboardobj.DboUpdateBfFormInterceptor";
+			[Bindable]
+			private var doDeleteAfInterceptor:String = "smartx.bam.bs.dashboardobj.DboDeleteAfFormInterceptor";
+			[Bindable]
+			private var doDeleteBfInterceptor:String = "smartx.bam.bs.dashboardobj.DboDeleteBfFormInterceptor";
+			
+			private var designCardButtonListener:DesignCardButtonListener;
+			
+			private var bvRedeplyTreeButtonListerner:BvRedeplyTreeButtonListerner;
+			
+			private var bvStartTreeButtonListener:BvStartTreeButtonListener;
+			
+			private var bvStopTreeButtonListener:BvStopTreeButtonListener;
+			
+			private var qvQueryResultListener:QueryButtonListener;
+			
+			private var selectItem:Object;
+			
+			private var loginUserName:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME) as String;
+			//是否为更新
+			private var isUpdate:Boolean = false;
+			
+			private var openWsMenuObj:Object = {id:"openWs",name:"打开工作集",enabled:false};
+			
+			private var closeWsMeunObj:Object = {id:"closeWs",name:"关闭工作集",enabled:false};
+			
+			private var delMenuObj:Object = {id:"delete",name:"删除",enabeld:false};
+			
+			private var createBvMenuObj:Object = {id:"createBv",name:"业务视图",enabled:false};
+			
+			private var createQvMenuObj:Object = {id:"createQv",name:"查询视图",enabled:false};
+			
+			private var createDoMenuObj:Object = {id:"createDo",name:"仪表盘对象",enabled:false};
+			
+			private var createDbMenuObj:Object = {id:"createDb",name:"仪表盘",enabled:false};
+			
+			private var expandTreeMenuObj:Object = {id:"expandAll",name:"全部展开",enabled:true};
+			
+			private var shrinkTreeMenuObj:Object = {id:"shrinkAll",name:"全部收起",enabled:true};
+			
+			private var loadingWindow:LoadingWindow = new LoadingWindow();
+			//当前编辑的工作集
+			private var editingWorkspace:String;
+			//是否为编辑模式
+			private var isCardEdit:Boolean = false;
+			[Bindable]
+			private var infoTxt:String;
+			
+			private function init():void{
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint)
+					bamService.endpoint = endpoint;
+				metadata = <workspace />;
+				bamService.getAllWorkspaceMetadata.addEventListener(ResultEvent.RESULT,getAllWorkspaceMetadataHandler);
+				bamService.getAllWorkspaceMetadata.addEventListener(FaultEvent.FAULT,getAllWorkspaceMetadataFaultHandler);
+				bamService.getAllWorkspaceMetadata(loginUserName);
+				
+				bamService.updateWorkspace.addEventListener(ResultEvent.RESULT,updateWorkspaceHandler);
+				bamService.updateWorkspace.addEventListener(FaultEvent.FAULT,updateWorkspaceFaultHandler);
+				
+				bamService.delWorkspace.addEventListener(ResultEvent.RESULT,delWorkspaceHandler);
+				bamService.delWorkspace.addEventListener(FaultEvent.FAULT,delWorkspaceFaultHandler);
+				
+				bamService.delRalateTableByType.addEventListener(ResultEvent.RESULT,delRalateTableByTypeHandler);
+				bamService.delRalateTableByType.addEventListener(FaultEvent.FAULT,delRalateTableByTypeFaultHandler);
+				
+				initOperationList();
+				RightClickManager.regist();
+				wsTree.addEventListener(RightClickManager.RIGHT_CLICK,onRightMouseClick);
+				
+				rightClickMenu = Menu.createMenu(wsTree,operationList,true);
+				rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+				rightClickMenu.setStyle("fontSize",12);
+				
+				designCardButtonListener = new DesignCardButtonListener();
+				qvQueryResultListener = new QueryButtonListener();
+				bvRedeplyTreeButtonListerner = new BvRedeplyTreeButtonListerner();
+				bvStartTreeButtonListener = new BvStartTreeButtonListener();
+				bvStopTreeButtonListener = new BvStopTreeButtonListener();
+			}
+			
+			private function initOperationList():void{
+				var create:Object = {id:"create",name:"新建"};
+				var createOperationList:ArrayCollection = new ArrayCollection([
+					{id:"createWorkspace",name:"工作集"},
+					createBvMenuObj,
+					createQvMenuObj,
+					createDoMenuObj,
+					createDbMenuObj
+				]);
+				create["children"] = createOperationList;
+				operationList.addItem(create);
+				operationList.addItem(delMenuObj);
+				operationList.addItem({id:"refresh",name:"刷新"});
+				operationList.addItem({type:"separator"});
+				operationList.addItem(expandTreeMenuObj);
+				operationList.addItem(shrinkTreeMenuObj);
+				operationList.addItem({type:"separator"});
+				operationList.addItem(openWsMenuObj);
+				operationList.addItem(closeWsMeunObj);
+			}
+			
+			private function onRightMouseClick(event:MouseEvent):void{
+				wsTree.selectItemByMouseEvent(event);
+				wsTree_itemClickHandler(null);
+					
+				if(rightClickMenu != null){
+					rightClickMenu.hide();
+					rightClickMenu.labelField = "name";
+					rightClickMenu.dataProvider = operationList;
+					var point:Point = new Point(mouseX,mouseY);
+					point = localToGlobal(point);  
+					var xx:Number = point.x;
+					var yy:Number = point.y;
+					if(xx + rightClickMenu.width > this.stage.width)
+						xx = this.stage.width - rightClickMenu.width - 1;
+					if(yy + rightClickMenu.height > this.stage.height)
+						yy = this.stage.height - rightClickMenu.height-1;
+					rightClickMenu.show(xx,yy); 
+				}
+			}
+			
+			private function switchBtnEnabled():void{
+				if(selectItem && selectItem.@type == "ws" && selectItem.@isOpened =="true"){
+					openWsMenuObj.enabled = false;
+					closeWsMeunObj.enabled = true;
+				}else if(selectItem && selectItem.@type == "ws" && selectItem.@isOpened =="false"){
+					openWsMenuObj.enabled = true;
+					closeWsMeunObj.enabled = false;
+				}else{
+					openWsMenuObj.enabled = false;
+					closeWsMeunObj.enabled = false;
+				}
+				operationList.removeItemAt(operationList.getItemIndex(openWsMenuObj));
+				operationList.addItem(openWsMenuObj);
+				operationList.removeItemAt(operationList.getItemIndex(closeWsMeunObj));
+				operationList.addItem(closeWsMeunObj);
+				
+				if(selectItem){
+					delMenuObj.enabled = true;
+					if(selectItem.@type == "ws" && selectItem.@isOpened =="false")
+						switchCreateMenu(false);
+					else
+						switchCreateMenu(true);
+				}else{
+					delMenuObj.enabled = false;
+					switchCreateMenu(false);
+				}
+			}
+			
+			private function switchCreateMenu(isOpened:Boolean):void{
+				if(isOpened){
+					createBvMenuObj.enabled = true;
+					createQvMenuObj.enabled = true;
+					createDoMenuObj.enabled = true;
+					createDbMenuObj.enabled = true;
+				}else{
+					createBvMenuObj.enabled = false;
+					createQvMenuObj.enabled = false;
+					createDoMenuObj.enabled = false;
+					createDbMenuObj.enabled = false;
+				}
+			}
+			
+			private function getAllWorkspaceMetadataHandler(event:ResultEvent):void{
+				loadingWindow.stopOper();
+				metadataCache.clear();
+				delete metadata.*;
+				var result:Object = event.result;
+				for(var code:String in result){
+					var localMetadata:XML = new XML(result[code]);
+					metadataCache.add(code,localMetadata.copy());
+					if(localMetadata.@isOpened == "false")
+						delete localMetadata.*;
+					metadata.appendChild(localMetadata);
+				}
+				callLater(function():void{
+					expandOrShrinkAll();	
+				});
+			}
+			
+			private function getAllWorkspaceMetadataFaultHandler(event:FaultEvent):void{
+				loadingWindow.stopOper();
+				SmartXMessage.show("初始化工作集失败！",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private function updateWorkspaceHandler(event:ResultEvent):void{
+				loadingWindow.stopOper();
+				if(!isUpdate){
+					SmartXMessage.show("新增工作集成功！");
+					metadata.appendChild(buildModulerWindow.metadata);
+					metadataCache.add(String(buildModulerWindow.metadata[0].@code),buildModulerWindow.metadata[0].copy());
+				}
+			}
+			
+			private function updateWorkspaceFaultHandler(event:FaultEvent):void{
+				loadingWindow.stopOper();
+				SmartXMessage.show("更新工作集失败！",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private function delWorkspaceHandler(event:ResultEvent):void{
+				loadingWindow.stopOper();
+				SmartXMessage.show("删除工作集成功!");
+				refresh();
+			}
+			
+			private function delWorkspaceFaultHandler(event:FaultEvent):void{
+				loadingWindow.stopOper();
+				SmartXMessage.show("删除工作集失败!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private var deletedNum:int = 0;//已删除的数量
+			
+			private function delRalateTableByTypeHandler(event:ResultEvent):void{
+				deletedNum++;
+				if((String(selectItem.@type).indexOf("folder") >= 0 && deletedNum == selectItem.node.length()) 
+					|| String(selectItem.@type).indexOf("folder") < 0){
+					loadingWindow.stopOper();
+					if(String(selectItem.@type).indexOf("folder") >= 0)
+						delete selectItem.*;
+					else
+						CEPUtils.xmlDeleteNode(XML(selectItem));
+					flushMetadataCache(editingWorkspace,metadata.node.(@code==editingWorkspace)[0].copy());
+					SmartXMessage.show("删除成功!");
+					refresh();
+				}
+			}
+			
+			private function delRalateTableByTypeFaultHandler(event:FaultEvent):void{
+				loadingWindow.stopOper();
+				SmartXMessage.show("删除失败!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private function addWorkspace():void{
+				buildModulerWindow = new BuildModulerWindow();
+				buildModulerWindow.confirmFun = confirmFun;
+				buildModulerWindow.endpoint = endpoint;
+				buildModulerWindow.debugMode = debugMode;
+				PopUpManager.addPopUp(buildModulerWindow,this,true);
+				PopUpManager.centerPopUp(buildModulerWindow);
+			}
+			
+			private function del():void{
+				if(selectItem){
+					if(selectItem.@type == "ws")
+						SmartXMessage.show("是否删除工作集["+selectItem.@name+"]?",SmartXMessage.MESSAGE_CONFIRM,"",this,deleteHandler);
+					else if(String(selectItem.@type).indexOf("folder") >= 0)
+						delByType("folder",String(selectItem.@name));
+					else
+						delByType("table",String(selectItem.parent().@name)+"["+selectItem.@name+"]");
+				}
+			}
+			
+			private function delByType(type:String,msg:String):void{
+				if(type == "folder"){
+					if(selectItem.node.length() > 0)
+						SmartXMessage.show("是否删除所有的"+msg+"?",SmartXMessage.MESSAGE_CONFIRM,"",this,deleteHandler);
+					else
+						SmartXMessage.show("没有可删除的"+msg+"!");
+				}else
+					SmartXMessage.show("是否删除"+msg+"?",SmartXMessage.MESSAGE_CONFIRM,"",this,deleteHandler);
+					
+			}
+			
+			private function deleteHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					deletedNum = 0;
+					loadingWindow.startOper("删除中...",this);
+					var node:XML;
+					if(selectItem.@type == "ws")
+						bamService.delWorkspace(String(selectItem.@code),String(metadataCache.find(String(selectItem.@code))));
+					else if(String(selectItem.@type).indexOf("folder") >= 0){
+						for each(node in selectItem.node){
+							bamService.delRalateTableByType(String(node.@type),String(node.@code),String(node.@refcode));
+						}
+					}else
+						bamService.delRalateTableByType(String(selectItem.@type),String(selectItem.@code),String(selectItem.@refcode));
+				}
+			}
+			
+			private function confirmFun():void{
+				var saveObj:Object = {};
+				saveObj["NAME"] = String(buildModulerWindow.metadata[0].@name);
+				saveObj["CODE"] = String(buildModulerWindow.metadata[0].@code);
+				if(metadataCache.containsKey(saveObj["CODE"])){
+					SmartXMessage.show("该工作集已存在!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				saveObj["METADATA"] = buildModulerWindow.metadata.toXMLString();
+				saveObj["OWNER"] = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME);
+				loadingWindow.startOper("新增中...",this);
+				updateWorkspace(saveObj);
+				PopUpManager.removePopUp(buildModulerWindow);
+			}
+			
+			private function updateWorkspace(saveObj:Object,isUpdate:Boolean=false):void{
+				this.isUpdate = isUpdate;
+				bamService.updateWorkspace(saveObj);
+			}
+			
+			private function operationButton_itemClickHandler(event:MenuEvent):void{
+				var menuid:String = event.item["id"]
+				if(menuid == "createWorkspace")
+					addWorkspace();
+				else if(menuid == "refresh")
+					refresh();
+				else if(menuid == "delete")
+					del();
+				else if(menuid == "closeWs")
+					closeWorkspace();
+				else if(menuid == "openWs")
+					openWorkspace();
+				else if(menuid == "createBv" || menuid == "createQv" || menuid == "createDo" || menuid == "createDb")
+					createItem(menuid);
+				else if(menuid == "expandAll")
+					expandOrShrinkAll();
+				else if(menuid == "shrinkAll")
+					expandOrShrinkAll(false);
+			}
+			
+			private function refresh():void{
+				loadingWindow.startOper("读取中...",this);
+				bamService.getAllWorkspaceMetadata(loginUserName);
+			}
+			
+			private function closeWorkspace():void{
+				if(selectItem && selectItem.@type == "ws" && selectItem.@isOpened == "true"){
+					for each(var xml:XML in metadata.node){
+						if(xml.@code == selectItem.@code)
+							delete xml.*;
+					}
+					selectItem.@isOpened = "false";
+					setWorkspaceStatus(false,String(selectItem.@code));
+					if(editingWorkspace == String(selectItem.@code))
+						transformState("normal");
+					openWsMenuObj.enabled = true;
+					closeWsMeunObj.enabled = false;
+				}
+			}
+			
+			private function openWorkspace():void{
+				if(selectItem && selectItem.@type == "ws" && selectItem.@isOpened == "false"){
+					for each(var xml:XML in metadata.node){
+						if(xml.@code == selectItem.@code){
+							var mtCache:XML = metadataCache.find(String(selectItem.@code)) as XML;
+							xml.appendChild(mtCache.node);
+						}
+					}
+					selectItem.@isOpened = "true";
+					setWorkspaceStatus(true,String(selectItem.@code));
+					openWsMenuObj.enabled = false;
+					closeWsMeunObj.enabled = true
+				}
+			}
+			
+			//设置工作集状态
+			private function setWorkspaceStatus(status:Boolean,code:String):void{
+				var mtCache:XML = metadataCache.find(String(selectItem.@code)) as XML;
+				if(status){
+					mtCache.@isOpened = "true";
+					loadingWindow.startOper("打开工作集...",this);
+				}else{
+					mtCache.@isOpened = "false";
+					loadingWindow.startOper("关闭工作集...",this);
+				}
+				metadataCache.add(String(selectItem.@code),mtCache);
+				var saveObj:Object = {CODE:code,METADATA:mtCache.toXMLString()};
+				updateWorkspace(saveObj,true);
+			}
+			
+			private function wsTree_itemClickHandler(event:ListEvent):void{
+				selectItem = wsTree.selectedItem;
+				if(selectItem){
+					switchBtnEnabled();
+					if(selectItem.@type == "ws" || String(selectItem.@type).indexOf("folder") >= 0)
+						transformState("normal");
+					else{
+						isCardEdit = true;
+						editingWorkspace = selectItem.@refws.length()==0?String(selectItem.@name):String(selectItem.@refws);
+						if(selectItem.@type == "bv"){
+							transformState("bv");
+							infoTxt = "编辑业务视图";
+							enterEditMode(bvStEleven.cardPanel);
+						}else if(selectItem.@type == "qv"){
+							transformState("qv");
+							infoTxt = "编辑查询视图";
+							enterEditMode(qvStEleven.cardPanel);
+						}else if(selectItem.@type == "do"){
+							transformState("do");
+							infoTxt = "编辑仪表盘对象";
+							enterEditMode(doStEleven.cardPanel);
+						}else if(selectItem.@type == "db"){
+							transformState("db");
+							infoTxt = "编辑仪表盘";
+							enterEditMode(dbStEleven.cardPanel);
+						}
+					}
+				}
+			}
+			
+			private function cardPanelSaveSuccessful(event:StyleTemplateEvent):void{
+				var dataValue:Object = event.saveObject;
+				var node:XML;
+				var mtcode:String;
+				if(currentState == "do")
+					mtcode = (dataValue["MTCODE"]==null || dataValue["MTCODE"]=="")
+						?DashboardObjConst.METADATA_PREFIX.concat(dataValue["CODE"]):dataValue["MTCODE"];
+				else if(currentState == "db")
+					mtcode = (dataValue["LAYOUT_MTCODE"]==null || dataValue["LAYOUT_MTCODE"]=="")
+						?DashBoardConst.METADATA_PREFIX.concat(dataValue["CODE"]):dataValue["LAYOUT_MTCODE"];
+				if(isCardEdit){
+					selectItem.@name = dataValue["NAME"];
+					selectItem.@code = dataValue["CODE"];
+					if(currentState == "bv")
+						isRedeployConfirm();
+				}else{
+					if(currentState == "bv"){
+						bvStEleven.cardPanel.addEventListener(BillCardPanelEvent.SETDATAVALUE_COMPLETE,cardSetDataValueCompleteHandler);
+						bvStEleven.cardPanel.initQueryCondition = "code='"+dataValue["CODE"]+"'";
+						bvStEleven.cardPanel.setDataValueByQuery();
+						infoTxt = "编辑业务视图";
+					}else if(currentState == "qv"){
+						node = <node name={dataValue["NAME"]} code={dataValue["CODE"]} type="qv" refws={editingWorkspace} />;
+						metadata.node.(@code==editingWorkspace)[0].node.(@type=="qvfolder")[0].appendChild(node);
+						infoTxt = "编辑查询视图";
+					}else if(currentState == "do"){
+						node = <node name={dataValue["NAME"]} code={dataValue["CODE"]} refcode={mtcode} type="do" refws={editingWorkspace} />;
+						metadata.node.(@code==editingWorkspace)[0].node.(@type=="dofolder")[0].appendChild(node);
+						infoTxt = "编辑仪表盘对象";
+					}else if(currentState == "db"){
+						node = <node name={dataValue["NAME"]} code={dataValue["CODE"]} refcode={mtcode} type="db" refws={editingWorkspace} />;
+						metadata.node.(@code==editingWorkspace)[0].node.(@type=="dbfolder")[0].appendChild(node);
+						infoTxt = "编辑仪表盘";
+					}
+					callLater(function():void{
+						selectTreeItem(node);
+					});
+				}
+				if(mtcode != null && mtcode != "")
+					MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(mtcode,endpoint);
+				if(currentState != "bv")
+					flushMetadataCache(editingWorkspace,metadata.node.(@code==editingWorkspace)[0].copy());
+			}
+			
+			private function cardSetDataValueCompleteHandler(event:BillCardPanelEvent):void{
+				var blp:BillCardPanel = event.currentTarget as BillCardPanel;
+				var dataValue:Object = blp.getDataValue();
+				var node:XML = <node name={dataValue["NAME"]} code={dataValue["CODE"]} refcode={dataValue["STREAMMODULENAME"]} 
+				type="bv" refws={editingWorkspace} />;
+				metadata.node.(@code==editingWorkspace)[0].node.(@type=="bvfolder")[0].appendChild(node);
+				flushMetadataCache(editingWorkspace,metadata.node.(@code==editingWorkspace)[0].copy());
+				blp.removeEventListener(BillCardPanelEvent.SETDATAVALUE_COMPLETE,cardSetDataValueCompleteHandler);
+				isRedeployConfirm();
+				callLater(function():void{
+					selectTreeItem(node);
+				});
+			}
+			
+			private function flushMetadataCache(code:String,metadata:XML):void{
+				metadataCache.add(code,metadata);
+				var saveObj:Object = {CODE:code,METADATA:metadata.toXMLString()};
+				updateWorkspace(saveObj,true);
+			}
+			
+			private function designBtn_clickHandler():void{
+				designCardButtonListener.buttonClick(bvStEleven.cardPanel);
+			}
+			
+			private function qvQueryResultBtn_clickHandler():void{
+				qvQueryResultListener.buttonClick(qvStEleven.cardPanel);
+			}
+			
+			private function dbLayoutBtn_clickHandler():void{
+				var dbLayoutManagerUtil:DBLayoutManagerUtil = new DBLayoutManagerUtil(this,dbStEleven.cardPanel);
+				dbLayoutManagerUtil.doCodes = getAllDoCodes();
+				dbLayoutManagerUtil.advClick(null);
+			}
+			
+			private function doAdvBtn_clickHandler():void{
+				var dashboardObjectMTUtil:DODesignerUtil = new DODesignerUtil(this,doStEleven.cardPanel);
+				dashboardObjectMTUtil.bvCodes = getAllBvCodes();
+				dashboardObjectMTUtil.qvCodes = getAllQvCodes();
+				dashboardObjectMTUtil.advClick(null);
+			}
+			
+			private function transformState(state:String):void{
+				switch (state){
+					case "normal":
+						currentState = "normal";
+						break;
+					case "bv":
+						currentState = "bv";
+						if(!bvStEleven.cardButtonBox.contains(designBtn))
+							bvStEleven.cardButtonBox.addChild(designBtn);
+						if(!bvStEleven.cardButtonBox.contains(bvRedeployBtn))
+							bvStEleven.cardButtonBox.addChild(bvRedeployBtn);
+						if(!bvStEleven.cardButtonBox.contains(bvStartBtn))
+							bvStEleven.cardButtonBox.addChild(bvStartBtn);
+						if(!bvStEleven.cardButtonBox.contains(bvStopBtn))
+							bvStEleven.cardButtonBox.addChild(bvStopBtn);
+						break;
+					case "qv":
+						currentState = "qv";
+						if(!qvStEleven.cardButtonBox.contains(qvQueryResultBtn))
+							qvStEleven.cardButtonBox.addChild(qvQueryResultBtn);
+						break;
+					case "do":
+						currentState = "do";
+						if(!doStEleven.cardButtonBox.contains(doAdvBtn))
+							doStEleven.cardButtonBox.addChild(doAdvBtn);
+						break;
+					case "db":
+						currentState = "db";
+						if(!dbStEleven.cardButtonBox.contains(dbLayoutBtn))
+							dbStEleven.cardButtonBox.addChild(dbLayoutBtn);
+						break;
+					default:
+						Alert.show("状态错误！");
+				}
+			}
+			
+			//新建
+			private function createItem(menuid:String):void{
+				editingWorkspace = selectItem.@refws.length()==0?String(selectItem.@name):String(selectItem.@refws);
+				isCardEdit = false;
+				if(menuid == "createBv"){
+					transformState("bv");
+					infoTxt = "新建业务视图";
+					enterInsertMode(bvStEleven.cardPanel);
+				}else if(menuid == "createQv"){
+					transformState("qv");
+					infoTxt = "新建查询视图";
+					enterInsertMode(qvStEleven.cardPanel);
+				}else if(menuid == "createDo"){
+					if(getAllBvCodes().length == 0 && getAllQvCodes().length == 0){
+						SmartXMessage.show("请先创建查询视图或业务视图!",SmartXMessage.MESSAGE_ERROR);
+						return;
+					}
+					transformState("do");
+					infoTxt = "新建仪表盘对象";
+					enterInsertMode(doStEleven.cardPanel);
+				}else if(menuid == "createDb"){
+					if(getAllDoCodes().length == 0){
+						SmartXMessage.show("请先创建仪表盘对象!",SmartXMessage.MESSAGE_ERROR);
+						return;
+					}
+					transformState("db");
+					infoTxt = "新建仪表盘";
+					enterInsertMode(dbStEleven.cardPanel);
+				}
+			}
+			
+			private function enterInsertMode(blp:BillCardPanel):void{
+				if(!blp.isInitCompleted)
+					blp.addEventListener(BillCardPanelEvent.INITCOMPLETE,cardPanelInited);
+				else
+					blp.enterInsertMode();
+			}
+			
+			private function enterEditMode(blp:BillCardPanel):void{
+				if(!blp.isInitCompleted)
+					blp.addEventListener(BillCardPanelEvent.INITCOMPLETE,cardPanelInited);
+				else{
+					blp.initQueryCondition = "code='"+String(selectItem.@code)+"'";
+					blp.insertMode = false;
+					blp.setDataValueByQuery();
+				}
+			}
+			
+			private function cardPanelInited(event:BillCardPanelEvent):void{
+				var blp:BillCardPanel = event.currentTarget as BillCardPanel;
+				if(!isCardEdit)
+					blp.enterInsertMode();
+				else{
+					blp.initQueryCondition = "code='"+String(selectItem.@code)+"'";
+					blp.insertMode = false;
+					blp.setDataValueByQuery();
+				}
+				blp.removeEventListener(BillCardPanelEvent.INITCOMPLETE,cardPanelInited);
+			}
+			
+			private function expandOrShrinkAll(isExpand:Boolean=true):void{
+				for each(var item:XML in wsTree.dataProvider){
+					wsTree.expandChildrenOf(item,isExpand);
+				}
+			}
+			
+			private function getAllBvCodes():Array{
+				var result:Array = [];
+				var localMt:XML = metadata.node.(@code == editingWorkspace)[0];
+				for each(var node:XML in localMt.node.(@type=="bvfolder")[0].node){
+					result.push(String(node.@code));
+				}
+				return result;
+			}
+			
+			private function getAllQvCodes():Array{
+				var result:Array = [];
+				var localMt:XML = metadata.node.(@code == editingWorkspace)[0];
+				for each(var node:XML in localMt.node.(@type=="qvfolder")[0].node){
+					result.push(String(node.@code));
+				}
+				return result;
+			}
+			
+			private function getAllDoCodes():Array{
+				var result:Array = [];
+				var localMt:XML = metadata.node.(@code == editingWorkspace)[0];
+				for each(var node:XML in localMt.node.(@type=="dofolder")[0].node){
+					result.push(String(node.@code));
+				}
+				return result;
+			}
+			
+			private function bvRedeployBtn_clickHandler():void{
+				var dataValue:Object = bvStEleven.cardPanel.getDataValue();
+				bvRedeplyTreeButtonListerner.redeplyBv(dataValue,null);
+			}
+			
+			private function isRedeployConfirm():void{
+				SmartXMessage.show("保存成功,是否重新发布业务视图?",SmartXMessage.MESSAGE_CONFIRM,"",this,isRedeployConfirmHandler);
+			}
+			
+			private function isRedeployConfirmHandler(event:CloseEvent):void{
+				var dataValue:Object = bvStEleven.cardPanel.getDataValue();
+				if(event.detail == Alert.YES)
+					bvRedeplyTreeButtonListerner.redeplyBv(dataValue,null);
+			}
+			
+			private function bvStartBtn_clickHandler():void{
+				var dataValue:Object = bvStEleven.cardPanel.getDataValue();
+				bvStartTreeButtonListener.startBv(dataValue);
+			}
+			
+			private function bvStopBtn_clickHandler():void{
+				var dataValue:Object = bvStEleven.cardPanel.getDataValue();
+				bvStopTreeButtonListener.stopBv(dataValue);
+			}
+			//选中树节点
+			private function selectTreeItem(item:Object):void{
+				if(item){
+					focusManager.setFocus(wsTree);//将树控件设置为当前焦点
+					var event:ListEvent = new ListEvent(ListEvent.ITEM_CLICK);
+					openFatherItem(XML(item).parent());
+					wsTree.selectedItem = item;
+					var index:int = wsTree.selectedIndex;
+					wsTree.scrollToIndex(index);
+					wsTree.dispatchEvent(event);
+				}
+			}
+			
+			private function openFatherItem(parent:Object):void{
+				if(parent != null ){
+					if(!wsTree.isItemOpen(parent)){
+						wsTree.expandItem(parent,true);
+					}
+					openFatherItem(XML(parent).parent());
+				}else
+					return;
+			}
+				
+			
+		]]>
+	</fx:Script>
+	<mx:states>
+		<s:State name="normal" />
+		<s:State name="bv" />
+		<s:State name="qv" />
+		<s:State name="do" />
+		<s:State name="db" />
+	</mx:states>
+	<mx:HDividedBox id="main" width="100%" height="100%">
+		<mx:VBox width="30%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+				 paddingTop="5">
+			<mx:HBox id="treeButtonBox" width="100%">
+				<mx:PopUpMenuButton id="operationButton" label="操作" dataProvider="{operationList}"
+									itemClick="operationButton_itemClickHandler(event)"
+									labelField="name" openAlways="true"/>
+			</mx:HBox>
+			<ext:TreeWrapper allowMultipleSelection="false" width="100%" height="100%"
+							id="wsTree" labelField="@name" dataProvider="{metadata.node}" itemClick="wsTree_itemClickHandler(event)" />
+		</mx:VBox>
+		<mx:VBox width="70%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" id="cardBox">
+			<styletemplate:StyleTemplate11 id="bvStEleven" width="100%" height="100%" endpoint="{endpoint}" commitLabel="保存"
+										   templetCode="{bvTempletCode}" saveSuccessful="cardPanelSaveSuccessful(event)" isShowAlert="false" 
+										   infoText="{infoTxt}" insertbfIncCard="{bvInsertBfInterceptor}" updatebfIncCard="{bvUpdateBfInterceptor}" 
+										   deleteafIncCard="{bvDeleteAfInterceptor}" debugMode="{debugMode}" includeIn="bv" />
+			<styletemplate:StyleTemplate11 id="qvStEleven" width="100%" height="100%" endpoint="{endpoint}" commitLabel="保存"
+										   templetCode="{qvTempletCode}" saveSuccessful="cardPanelSaveSuccessful(event)" infoText="{infoTxt}"
+										   insertbfIncCard="{qvInsertBfInterceptor}" debugMode="{debugMode}" includeIn="qv" />
+			<styletemplate:StyleTemplate11 id="doStEleven" width="100%" height="100%" endpoint="{endpoint}" commitLabel="保存"
+										   templetCode="{doTempletCode}" saveSuccessful="cardPanelSaveSuccessful(event)" infoText="{infoTxt}"
+										   insertbfIncCard="{doInsertBfInterceptor}" updatebfIncCard="{doUpdateBfInterceptor}" 
+										   deleteafIncCard="{doDeleteAfInterceptor}" deletebfIncCard="{doDeleteBfInterceptor}" debugMode="{debugMode}" includeIn="do" />
+			<styletemplate:StyleTemplate11 id="dbStEleven" width="100%" height="100%" endpoint="{endpoint}" commitLabel="保存"
+										   templetCode="{dbTempletCode}" saveSuccessful="cardPanelSaveSuccessful(event)" infoText="{infoTxt}"
+										   insertbfIncCard="{dbInsertBfInterceptor}" updatebfIncCard="{dbUpdateBfInterceptor}" 
+										   deleteafIncCard="{dbDeleteAfInterceptor}" deletebfIncCard="{dbDeleteBfInterceptor}" debugMode="{debugMode}" includeIn="db" />
+		</mx:VBox>
+	</mx:HDividedBox>
+</mx:Module>

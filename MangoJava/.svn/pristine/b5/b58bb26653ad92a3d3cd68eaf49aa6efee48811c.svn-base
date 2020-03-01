@@ -1,0 +1,74 @@
+/**************************************************************************
+ * $RCSfile: NovaEvent.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:15 $
+ **************************************************************************/
+package smartx.framework.metadata.ui;
+
+import java.util.*;
+
+public class NovaEvent extends EventObject {
+
+    private static final long serialVersionUID = 2069205636506276127L;
+
+    public static int CardChanged = 0;
+
+    public static int ListChanged = 1;
+
+    private int changedType = -1; //变化面板的类型,0是卡片,1是列表
+
+    private Object newObject = null; //变化后的值..
+
+    private int listrow = -1;
+
+    private String itemKey = null;
+
+    public NovaEvent(Object source) {
+        super(source);
+    }
+
+    public NovaEvent(int _type, String _itemKey, Object _obj, Object source) {
+        super(source);
+        this.changedType = _type;
+        this.itemKey = _itemKey;
+        this.newObject = _obj;
+    }
+
+    public NovaEvent(int _type, String _itemKey, Object _obj, int _row, Object source) {
+        super(source);
+        this.changedType = _type;
+        this.itemKey = _itemKey;
+        this.newObject = _obj;
+        this.listrow = _row;
+    }
+
+    public String getItemKey() {
+        return itemKey;
+    }
+
+    public int getChangedType() {
+        return changedType;
+    }
+
+    public int getListrow() {
+        return listrow;
+    }
+
+    public Object getNewObject() {
+        return newObject;
+    }
+
+}
+/**************************************************************************
+ * $RCSfile: NovaEvent.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:15 $
+ *
+ * $Log: NovaEvent.java,v $
+ * Revision 1.2  2007/05/31 07:38:15  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:01:37  qilin
+ * no message
+ *
+ * Revision 1.2  2007/01/30 04:56:13  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

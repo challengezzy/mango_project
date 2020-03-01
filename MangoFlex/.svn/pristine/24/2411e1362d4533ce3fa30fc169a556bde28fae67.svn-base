@@ -1,0 +1,1035 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:util = "smartx.flex.components.util.*"
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" fontSize="12" xmlns:ns1="flexlib.containers.*" creationComplete="init()" xmlns:ns2="com.esri.solutions.flexviewer.components.*" xmlns:portal="smartx.flex.components.basic.portal.*" xmlns:controls="flexlib.controls.*"
+		  currentState="normalState">
+	<fx:Declarations>
+		<!--mx:ArrayList id="styleArray">
+			<fx:Object name="默认" value=""/>
+			<fx:Object name="花岗岩" value="style/granite.swf"/>
+			<fx:Object name="黑白灰" value="style/blackwhite.swf"/>
+			<fx:Object name="Kingnare" value="style/kingnare.swf"/>
+		</mx:ArrayList-->
+		<mx:TitleWindow id="exportInitMetadataWindow" width="400" height="300" title="导出" layout="vertical">
+			<mx:VBox width="100%" height="100%" verticalAlign="middle" horizontalAlign="center"> 
+				<mx:ComboBox id="exportObjectsNameInput" dataProvider="{initMetadataXML.exportobjects}" labelField="@name"/>
+			</mx:VBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="{startExport()}"/> <mx:Button label="取消" click="{PopUpManager.removePopUp(exportInitMetadataWindow)}"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Metadata>		       
+	    [Event(name='relogin',type='smartx.flex.components.event.BasicEvent')]
+		[Event(name='close',type='smartx.flex.components.event.BasicEvent')]
+		[Event(name='loadMenuSuccessful',type='smartx.flex.components.event.BasicEvent')]
+	</fx:Metadata>
+	<fx:Style>
+		@namespace util "smartx.flex.components.util.*";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace ns1 "flexlib.containers.*";
+		@namespace ns2 "com.esri.solutions.flexviewer.components.*";
+		@namespace portal "smartx.flex.components.basic.portal.*";
+		@namespace controls "flexlib.controls.*";
+		.gradient
+		{
+			backgroundColor:#666666;
+		}
+	</fx:Style>
+	<fx:Script>
+	<![CDATA[
+		import com.adobe.net.URI;
+		
+		import flexlib.controls.tabBarClasses.SuperTab;
+		import flexlib.events.SuperTabEvent;
+		
+		import mx.collections.ArrayCollection;
+		import mx.collections.ArrayList;
+		import mx.collections.Sort;
+		import mx.collections.SortField;
+		import mx.controls.Alert;
+		import mx.controls.LinkButton;
+		import mx.controls.dataGridClasses.DataGridColumn;
+		import mx.core.Container;
+		import mx.core.FlexGlobals;
+		import mx.core.IFlexDisplayObject;
+		import mx.core.ScrollPolicy;
+		import mx.events.CloseEvent;
+		import mx.events.FlexEvent;
+		import mx.events.ListEvent;
+		import mx.events.MenuEvent;
+		import mx.graphics.codec.PNGEncoder;
+		import mx.managers.PopUpManager;
+		import mx.modules.ModuleLoader;
+		import mx.rpc.events.FaultEvent;
+		import mx.rpc.events.ResultEvent;
+		import mx.rpc.remoting.mxml.RemoteObject;
+		
+		import net.brandonmeyer.containers.SuperPanel;
+		
+		import smartx.flex.components.assets.AssetsFileLib;
+		import smartx.flex.components.basic.portal.WelcomeFrame;
+		import smartx.flex.components.event.BasicEvent;
+		import smartx.flex.components.util.ComboBoxWindow;
+		import smartx.flex.components.util.DataGridWindow;
+		import smartx.flex.components.util.Hashtable;
+		import smartx.flex.components.util.HelpUtil;
+		import smartx.flex.components.util.IconUtility;
+		import smartx.flex.components.util.LoadingWindow;
+		import smartx.flex.components.util.MemoryUtil;
+		import smartx.flex.components.util.MetadataTempletUtil;
+		import smartx.flex.components.util.PageDataGrid;
+		import smartx.flex.components.util.SmartXMessage;
+		import smartx.flex.components.vo.GlobalConst;
+		import smartx.flex.components.vo.MetadataTemplet;
+		import smartx.flex.components.vo.SimpleHashVO;
+		
+		private var formService:RemoteObject;
+		public var destination:String = GlobalConst.SERVICE_FORM;
+		public var endpoint:String;
+		[Bindable]
+		public var debugMode:Boolean = false;
+		[Bindable]
+		private var menuTreeData:ArrayCollection = new ArrayCollection();
+		private var indexMap:Object = new Object();//树的hash索引，键是菜单id，值是菜单对象
+		[Bindable]
+		private var welcomeText:String;
+		public var verticalMenu:Boolean = false;
+		
+		[Bindable]
+		public var menuType:String = GlobalConst.MENU_TYPE_HORIZONTAL;
+		
+		[Bindable]
+		private var sysMenuCol:ArrayCollection = new ArrayCollection();
+		
+		[Bindable]
+		public static var welcomeImage:Class = AssetsFileLib.mainIcon;
+
+		[Bindable]
+		public static var titleBackgroundImage:Class = AssetsFileLib.titleBgIcon;
+		[Bindable]
+		public var titleImageUrl:String;
+		[Bindable]
+		public var titleLogoImageUrl:String;
+		
+		[Bindable]
+		public var leftImageUrl:String;
+		
+		[Bindable]
+		public var welcomeFrameHeight:int;
+		
+		[Bindable]
+		public var imageMenuHeight:int;
+		
+		[Bindable]
+		public var imageBackgroundColor:String;
+		
+		[Bindable]
+		public var imageLabelColor:String;
+		
+		private var operatingWindow:IFlexDisplayObject;
+		
+		[Bindable]
+		private static var reloginIcon:Class = AssetsFileLib.reloginIcon;
+
+		[Bindable]
+		private static var exitIcon:Class = AssetsFileLib.exitIcon;
+
+		[Bindable]
+		private static var clientenvIcon:Class = AssetsFileLib.clientenvIcon;
+		
+		[Bindable]
+		private static var serverenvIcon:Class = AssetsFileLib.serverenvIcon;
+		
+		[Bindable]
+		private static var homepageIcon:Class = AssetsFileLib.homepageIcon;
+		
+		[Bindable]
+		private static var modifyPwdIcon:Class = AssetsFileLib.modifyPwdIcon;
+		
+		[Bindable]
+		private static var defaultToolBoxIcon:Class = AssetsFileLib.redpointIcon;
+		
+		[Bindable]
+		private static var chatIcon:Class = AssetsFileLib.hideOrShowIcon;
+		
+		[Bindable]
+		private static var exportIcon:Class = AssetsFileLib.exportIcon;
+		
+		[Bindable]
+		private static var styleIcon:Class = AssetsFileLib.styleIcon;
+		
+		private static const ID_SYSTEMMENU_HOMEPAGE:int = 0;
+		private static const ID_SYSTEMMENU_RELOGIN:int = -1;
+		private static const ID_SYSTEMMENU_EXIT:int = -2;
+		private static const ID_SYSTEMMENU_CLIENTENV:int = -3;
+		private static const ID_SYSTEMMENU_SERVERENV:int = -4;
+		private static const ID_SYSTEMMENU_MODIFYPWD:int = -5;
+		private static const ID_SYSTEMMENU_CHAT:int = -6;
+		private static const ID_SYSTEMMENU_EXPORT:int = -7;
+		private static const ID_SYSTEMMENU_CHANGESTYLE:int = -8;
+		private static const ID_SYSTEMMENU_HELP:int = -9;
+		
+		private var menuMap:Object = new Object();//已打开的菜单项，键是菜单id，值是打开的界面frame
+		
+		//private var moduleLoaderCache:Object = new Object();//曾经加载过的moduleyilv放置在此cache中，键是菜单id。flashplayer的module内存释放始终有问题，还不如不释放了
+		
+		[Bindable]
+		public var showToolBox:Boolean = true;
+		[Bindable]
+		public var enableChatPanel:Boolean = true;
+		//private var chatPanel:BillChatPanel;
+		
+		public var enableVisitHistoryRecord:Boolean = true;
+		
+		public var isShowTitle:Boolean;
+		
+		private var localUserInfo:SharedObject = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_USERINFO);
+		//菜单hashtable key为菜单CODE value为菜单的id
+		public var menuCodeMap:Hashtable = new Hashtable();
+		
+		private var userStyle:SharedObject = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_USERSTYLE);
+		private var styleFilePath:String = userStyle.data.styleFilePath as String;
+		public var styleArray:ArrayList = new ArrayList([{name:"默认",value:""}]);
+		[Bindable]
+		private var initMetadataXML:XML;
+		
+		[Bindable]
+		public var menuColorArr:Array = [0xb0b0b0,0x808080];
+		
+		private function init():void{
+			
+			//imageMenuBox.setStyle("fillColors",menuColorArr);
+			
+			formService = new RemoteObject(destination);
+		    if(endpoint!=null)
+		        formService.endpoint = endpoint;
+		   	formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getMenuHandler);
+		    formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+		    //formService.logout.addEventListener(ResultEvent.RESULT,logoutHandler);
+		    formService.dologout.addEventListener(FaultEvent.FAULT,faultHandler); 
+			
+			formService.exportInitMetaData.addEventListener(ResultEvent.RESULT,exportHandler);
+			formService.exportInitMetaData.addEventListener(FaultEvent.FAULT,faultHandler);
+			
+			formService.loadUserParameters.addEventListener(ResultEvent.RESULT,loadUserParametersHandler);
+			formService.loadUserParameters.addEventListener(FaultEvent.FAULT,faultHandler);
+		    
+		    if(!showToolBox)
+		    	northBox.removeChild(toolBox);
+		    
+		    //显示水平菜单或竖菜单
+//			if(verticalMenu)
+//				mainBox.removeChild(menuBar);
+//			else
+//				centerBox.removeChild(verticalMenuBox);
+//			contentNavigator.percentWidth = 100;
+			if(menuType != null && menuType.toLowerCase() == GlobalConst.MENU_TYPE_HORIZONTAL.toLowerCase()){
+				centerBox.removeChild(verticalMenuBox);
+				centerBox.removeChild(welComeFrameBox);
+				mainBox.removeChild(imageMenuBox);
+			}else if(menuType != null && menuType.toLowerCase()== GlobalConst.MENU_TYPE_VERTICAL.toLowerCase()){
+				mainBox.removeChild(menuBar);
+				mainBox.removeChild(imageMenuBox);
+				centerBox.removeChild(welComeFrameBox);
+			}else if(menuType != null && menuType.toLowerCase()== GlobalConst.MENU_TYPE_BIGIMAGE.toLowerCase()){
+				mainBox.removeChild(northBox);
+				mainBox.removeChild(menuBar);
+				centerBox.removeChild(verticalMenuBox);
+				
+				imageMenuBar.addEventListener(MenuEvent.ITEM_CLICK,menuClickHandler);
+				
+//				var imgMenu:ImageMenu = new ImageMenu();
+//				imgMenu.imageUrl = "images/Home.png";
+//				imgMenu.labelName = "查看服务器变";
+//				
+//				var imgMenu2:ImageMenu = new ImageMenu();
+//				imgMenu2.imageUrl = "images/Database.png";
+//				imgMenu2.labelName = "查看服务器变量";
+//				
+//				var imgMenu3:ImageMenu = new ImageMenu();
+//				imgMenu3.imageUrl = "images/Refresh.png";
+//				imgMenu3.labelName = "查看服务器";
+//				
+//				var imgMenu4:ImageMenu = new ImageMenu();
+//				imgMenu4.imageUrl = "images/Tag.png";
+//				imgMenu4.labelName = "查看服务";
+//				
+//				if(imageMenuHbox.getChildren().length>0){
+//					imageMenuHbox.removeAllChildren();
+//				}
+//				imageMenuHbox.addChild(imgMenu);
+//				imageMenuHbox.addChild(imgMenu2);
+//				imageMenuHbox.addChild(imgMenu3);
+//				imageMenuHbox.addChild(imgMenu4);
+				
+				
+			}
+			
+			if(!isShowTitle){
+				mainBox.removeChild(titleHBox);
+//				isShowTitle = true;
+//				localUserInfo.data.isShowTitle ="true";
+			}
+			
+			var initMetadata:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(GlobalConst.MTCODE_INITMETADATA);
+			if(initMetadata != null)
+				initMetadataXML = initMetadata.contentXML;
+				
+		}
+		
+		public function initAfterLogin():void{
+			//是否debug模式的客户端全局变量赋值
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE,debugMode);
+			if(debugMode)
+				currentState = "debugState";
+			//清空菜单
+			menuTreeData = new ArrayCollection();
+			indexMap = new Object();
+			//清空工具栏
+			for each(var child:Object in customToolBar.getChildren()){
+				if(child is LinkButton)
+					customToolBar.removeChild(LinkButton(child));
+			}
+			//关闭所有窗口
+			contentNavigator.removeAllChildren();
+			menuMap = new Object();
+			openWelcomeFrame();
+			//构建默认系统菜单
+			var systemMenu:Object = new Object();
+			systemMenu["name"] = "系统";
+			systemMenu["seq"] = -1;
+			systemMenu["icon"] = homepageIcon;
+			
+			systemMenu["parentid"] = null;
+			
+			var systemMenuList:ArrayCollection = new ArrayCollection(
+				[
+					{name:"欢迎页面",icon:homepageIcon,id:ID_SYSTEMMENU_HOMEPAGE},
+					//{name:"显示/隐藏标题栏",icon:chatIcon,id:ID_SYSTEMMENU_CHAT},
+					{name:"重新登录",icon:reloginIcon,id:ID_SYSTEMMENU_RELOGIN},
+					{name:"修改密码",icon:modifyPwdIcon,id:ID_SYSTEMMENU_MODIFYPWD},
+					{name:"界面风格",icon:styleIcon,id:ID_SYSTEMMENU_CHANGESTYLE},
+//					{name:"聊天",icon:chatIcon,id:ID_SYSTEMMENU_CHAT}
+					{name:"帮助",icon:AssetsFileLib.wjxIcon,id:ID_SYSTEMMENU_HELP},
+					{name:"退出",icon:exitIcon,id:ID_SYSTEMMENU_EXIT}
+				]
+			);
+			if(debugMode){
+				systemMenuList.addItem({type:"separator"});
+				systemMenuList.addItem({name:"查看客户端变量",icon:clientenvIcon,id:ID_SYSTEMMENU_CLIENTENV});
+				systemMenuList.addItem({name:"查看服务端变量",icon:serverenvIcon,id:ID_SYSTEMMENU_SERVERENV});
+				systemMenuList.addItem({name:"导出平台数据",icon:exportIcon,id:ID_SYSTEMMENU_EXPORT});
+			}
+			systemMenu["children"] = systemMenuList;
+			if(this.menuType.toLowerCase() != GlobalConst.MENU_TYPE_BIGIMAGE.toLowerCase()){
+				menuTreeData.addItem(systemMenu);
+			}else{
+				
+				sysMenuCol.removeAll();
+				
+				var exitObj:Object = new Object();
+				exitObj["name"] = "退出";
+				exitObj["seq"] = -2;
+				exitObj["icon"] = null;
+				exitObj["id"] = -2;
+				
+				exitObj["parentid"] = null;
+				
+//				var aboutObj:Object = new Object();
+//				aboutObj["name"] = "关于";
+//				aboutObj["seq"] = -2;
+//				aboutObj["icon"] = null;
+//				aboutObj["id"] = -100;
+//				
+//				aboutObj["parentid"] = null;
+				
+				sysMenuCol.addItem(systemMenu);
+				//sysMenuCol.addItem(aboutObj);
+				sysMenuCol.addItem(exitObj);
+				
+			}
+			
+			//构建欢迎语句
+		    var loginUserName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME));  
+		    var projectName:String = ClientEnviorment.getInstance().getNova2ConfigParam("PROJECT_NAME");
+		    welcomeText = loginUserName+"，欢迎您使用【"+projectName+"】";
+			//读取用户客户端参数
+			var loginUserId:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+			formService.loadUserParameters(loginUserId);
+		    //构建菜单
+		    var defaultUserName:String = ClientEnviorment.getInstance().getDefaultUserInfo().name;
+		    if(defaultUserName == loginUserName)//是SA用户
+		    	 formService.getSimpleHashVoArrayByDS(null,
+		    		"select m.* from V_FLEX_MENU m");
+		    else{
+				formService.getSimpleHashVoArrayByDS(null,
+					"select m.* from v_flex_menu m,pub_user_menu u where m.id=u.menuid and u.userid='"+loginUserId
+					+"' union select m.* from v_flex_menu m,pub_role_menu prm,pub_user_role pur where pur.roleid = prm.roleid and m.id = prm.menuid and pur.userid='"+loginUserId
+					+"' union select m.* from v_flex_menu m,pub_user_workposition puw,pub_workposition_menu pwm where pwm.menuid = m.id and puw.workpositionid = pwm.workpositionid and puw.userid='"+loginUserId+"'");
+			}
+		}
+		
+		private function loadUserParametersHandler(event:ResultEvent):void{   
+			var paraMap:* = event.result;
+			for (var name:String in paraMap){
+				ClientEnviorment.getInstance().putVar(name,paraMap[name]);
+			}
+		}
+		
+		private function getMenuHandler(event:ResultEvent):void{   
+			var menuVOs:Array = event.result as Array;
+			var hasNotAllLoaded:Boolean = true;
+			var loadedCount:int = 1;
+			menuCodeMap.clear();
+			while(hasNotAllLoaded && loadedCount > 0){
+				hasNotAllLoaded = false;
+				loadedCount = 0;
+				for each(var menuVO:SimpleHashVO in menuVOs){
+					var vo:Object = menuVO.dataMap;
+					var menuObj:Object  = new Object();
+					
+					menuObj["id"] = vo["id"];
+					
+					var id:String = vo["id"] as String;
+					var parentid:String = vo["parentmenuid"] as String;
+					if(indexMap[id] == null){
+						hasNotAllLoaded = true;
+						//目前的树里面没有
+						//先找到它的父节点
+						if(parentid != null && indexMap[parentid] == null){
+							//父节点也没加载，下轮再说
+							continue;
+						}else{
+							menuObj["code"] = vo["name"];
+							menuObj["name"] = vo["localname"];
+							menuObj["seq"] = vo["seq"];
+							
+							menuObj["parentid"] = parentid;
+							menuObj["imgurl"] = vo["icon"];
+							
+							if(parentid == null){//是根节点
+								menuTreeData.addItem(menuObj);
+								sortBySeqField(menuTreeData);
+							}
+							else{
+								var father:Object = indexMap[parentid];
+								if(!father.hasOwnProperty("children"))
+									father.children = new ArrayCollection();
+								father.children.addItem(menuObj);
+								sortBySeqField(father.children);
+							}
+							
+							//从menuconfig读取菜单信息
+							//var menuConfigItemMap:Object = NovaClientEnviorment.getInstance().getMenuConfigItemMap();
+							//var menuItem:Object = menuConfigItemMap[menuObj["code"]];
+							//if(menuItem != null){
+							menuObj["url"] = vo["command"];
+							if(vo["showintoolbar"] == "Y"){//加载到工具栏
+								var button:ToolBoxButton = new ToolBoxButton();
+								button.toolTip = menuObj["name"];
+								button.width = 20;
+								button.height = 20;
+								button.id = menuObj["id"];
+								button.toolBoxSeq = vo["toolbarseq"];
+								if(vo["icon"] != null && vo["icon"] != ""){
+									var iconClass:Class = IconUtility.getClass(button,vo["icon"],16,16);	
+									button.setStyle("icon",iconClass);
+								}
+								else
+									button.setStyle("icon",defaultToolBoxIcon);
+								button.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+									var eventButton:LinkButton = event.target as LinkButton;
+									openMenuFrame(parseInt(eventButton.id));
+								});
+								var i:int=0;
+								for(;i<customToolBar.getChildren().length;i++){
+									//寻找插入位置
+									var tempObj:Object = customToolBar.getChildAt(i);
+									if(tempObj is ToolBoxButton){
+										var tempButton:ToolBoxButton = tempObj as ToolBoxButton;
+										if(button.toolBoxSeq < tempButton.toolBoxSeq)
+											break;
+									}
+								}
+								customToolBar.addChildAt(button,i);
+							}
+							//}
+							indexMap[id] = menuObj;
+							menuCodeMap.add(menuObj["code"],id);
+							loadedCount++;
+						}
+					}
+				}
+			}
+			verticalMenuBar.dataProvider = menuTreeData;
+			menuBar.dataProvider = menuTreeData;
+			
+			imageMenuBar.loadMenu(menuTreeData,sysMenuCol);
+			
+			dispatchEvent(new BasicEvent(BasicEvent.LOADMENU_SUCCESSFUL));
+		}
+		
+		private function sortBySeqField(array:ArrayCollection):void{
+			var sort:Sort = new Sort();
+			sort.fields = [new SortField("seq",false,false,true)];
+			array.sort = sort;
+			array.refresh();
+		}
+			
+		private function menuClickHandler(event:MenuEvent):void{
+			var item:Object = event.item;
+			var menuId:int = item["id"];
+			if(menuId <= 0){
+				//是系统默认菜单
+				switch(menuId){
+					case ID_SYSTEMMENU_HOMEPAGE:
+						openWelcomeFrame();
+						break;
+					case ID_SYSTEMMENU_RELOGIN:
+						relogin();
+						break;
+					case ID_SYSTEMMENU_EXIT:
+						logout();
+						break;
+					case ID_SYSTEMMENU_CLIENTENV:
+						showClientVar();
+						break;
+					case ID_SYSTEMMENU_SERVERENV:
+						showServerVar();
+						break;	
+					case ID_SYSTEMMENU_MODIFYPWD:
+						modifyPwd();
+						break;
+					case ID_SYSTEMMENU_CHAT:
+//						openChatPanel();
+						this.isShowTitleHandler();
+						break;
+					case ID_SYSTEMMENU_EXPORT:
+						export();
+						break;
+					case ID_SYSTEMMENU_CHANGESTYLE:
+						changeStyle();
+						break;
+					case ID_SYSTEMMENU_HELP:
+						help();
+						break;
+				}
+			}
+			else{
+				
+				var menuCode:String = item["code"];
+				HelpUtil.getInstance().dispatchHelpEvent(HelpUtil.SYS_MENU_HEAD+menuCode);
+				
+				openMenuFrame(menuId);
+			}
+				
+		}
+		
+		public function openMenuFrame(menuId:int,dataValue:Object=null):void{
+			var menuObj:Object = indexMap[menuId];
+			if(menuObj == null){
+				Alert.show("试图打开的菜单项不存在！","错误");
+				return;
+			}
+			if(menuObj["url"] == null){
+				Alert.show("试图打开的菜单项没有设定内容","错误");
+				return;
+			}
+			//记录用户访问记录
+			if(enableVisitHistoryRecord){
+				var userId:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID) as String;
+				//不存在于数据库中的用户不保存历史记录，例:sa用户
+				if(Number(userId) > 0)
+					formService.saveHistoryRecord(null,userId,menuId);
+			}
+			var isWindowMode:Boolean = false;
+			var isWeburl:Boolean = false;
+			var url:String = menuObj["url"] as String;
+			//对菜单进行变量解析
+			url = ClientEnviorment.getInstance().parseClientVariable(url);
+			if(url.substr(0,8) == "[window]"){
+				//弹出窗口显示
+				url = url.substring(8,url.length);
+				isWindowMode = true;
+			}else if(url.substr(0,8) == "[weburl]"){
+				url = url.substring(8,url.length);
+				isWeburl = true;
+			}
+			//var loader:ModuleLoader = moduleLoaderCache[menuId] as ModuleLoader;
+			//if(loader == null){
+			var loader:ModuleLoader = new ModuleLoader();
+			loader.url = url;
+			loader.label = menuObj["name"];
+				//moduleLoaderCache[menuId] = loader;
+			//}
+			if(isWindowMode){
+				var window:SuperPanel = new SuperPanel();
+				window.title =  menuObj["name"];
+				window.allowClose = true;
+				window.allowDrag = true;
+				window.allowMaximize = true;
+				window.allowMinimize = true;
+				window.allowResize = true;
+				window.width = 500;
+				window.height = 400;
+				loader.percentHeight = 100;
+				loader.percentWidth = 100;
+				loader.name = "loader";
+				window.addChild(loader);
+				window.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					closeWindow(IFlexDisplayObject(event.target));
+				});
+				PopUpManager.addPopUp(window,this,true);
+				PopUpManager.centerPopUp(window);
+			}else if(isWeburl){
+				var urlReq:URLRequest = new URLRequest();
+				if(url.toLowerCase().indexOf("http") < 0){//相对路径
+					var uri:URI = new URI(FlexGlobals.topLevelApplication.url);
+					url = "http://".concat(uri.authority).concat(":")
+						.concat(uri.port).concat("/").concat(url);
+				}
+				urlReq.url = encodeURI(url);
+				navigateToURL(urlReq, "_blank");
+			}else{
+				registerMenuFrame(menuId,loader);
+				dispatchEvent(new BasicEvent(BasicEvent.OPENMENU_SUCCESSFUL,false,false,menuObj["code"],dataValue));
+			}
+		}
+		
+		private function closeWindow(window:IFlexDisplayObject):void{
+			var loader:ModuleLoader = SuperPanel(window).getChildByName("loader") as ModuleLoader;
+			if(loader != null){
+				loader.unloadModule();
+				MemoryUtil.forceGC();
+			}
+			SuperPanel(window).removeAllChildren();
+			PopUpManager.removePopUp(window);
+		}
+		
+		private function openWelcomeFrame():void{
+			//初始化欢迎界面
+			var welcomeFrame:WelcomeFrame = new WelcomeFrame();
+			welcomeFrame.desktopFrame = this;
+			welcomeFrame.menuType = this.menuType;
+			if(menuType != null && menuType.toLowerCase() == GlobalConst.MENU_TYPE_BIGIMAGE.toLowerCase()){
+				if(welComeFrameBox.getChildren().length >0){
+					welComeFrameBox.removeAllChildren();
+				}
+				if(welcomeFrameHeight >0 ){
+					welcomeFrame.height = welcomeFrameHeight;
+				}else{
+					welcomeFrame.percentHeight = 100;
+				}
+				
+				welComeFrameBox.addChild(welcomeFrame);
+			}else{
+				registerMenuFrame(ID_SYSTEMMENU_HOMEPAGE,welcomeFrame);
+			}
+			
+		}
+		
+		private function tabDoubleClicked(event:MouseEvent):void{
+			//大图标模式下，隐藏左边的欢迎栏
+			if(menuType.toLowerCase() != GlobalConst.MENU_TYPE_BIGIMAGE.toLowerCase()){
+				return;
+			}
+			
+			if(event.target is SuperTab){
+				if(centerBox.contains(welComeFrameBox)){
+					centerBox.removeChild(welComeFrameBox);
+				}else{
+					centerBox.addChildAt(welComeFrameBox,0);
+				}
+			}
+		}
+		
+		private function tabCloseHandler(event:SuperTabEvent):void{
+			var index:Number = event.tabIndex;
+			var frame:Container = Container(contentNavigator.getChildAt(index));
+			var menuid:String = getMenuIdByFrame(frame);
+			//关闭时截图留档
+			if(enableVisitHistoryRecord){
+				//var userId:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID) as String;
+				//modified by xuzhilin 20121229 禁用截图功能，与百度地图冲突，实用价值不大
+//				var bitmapData:BitmapData = new BitmapData(frame.width,frame.height);
+//				bitmapData.draw(frame);
+//				var bitmap:Bitmap = new Bitmap(bitmapData);
+//				var byteData:ByteArray = new PNGEncoder().encode(bitmapData);
+//				//formService.saveHistoryRecord(byteData,userId,getMenuIdByFrame(frame));
+//				//localUserInfo.data["vhr_"+menuid+"_width"] = bitmapData.width;
+//				//localUserInfo.data["vhr_"+menuid+"_height"] = bitmapData.height;
+//				localUserInfo.data["vhr_"+menuid+"_pixels"] = byteData;
+//				localUserInfo.flush();
+			}
+			unregisterMenuFrame(frame);
+			var menuCode:String;
+			for each(var key:String in menuCodeMap.getKeySet()){
+				if(menuid == String(menuCodeMap.find(key))){
+					menuCode = key;
+					break;
+				}
+			}
+			dispatchEvent(new BasicEvent(BasicEvent.CLOSE,false,false,menuCode));
+		}
+		
+		private function registerMenuFrame(menuId:int,frame:Container,showIt:Boolean=true):void{
+			if(menuMap[menuId] == null){
+				contentNavigator.addChild(frame);
+				menuMap[menuId] = frame;
+			}
+			if(showIt)
+				contentNavigator.selectedChild = menuMap[menuId] as Container;
+		}
+		
+		private function unregisterMenuFrameByMenuId(menuId:int,closeIt:Boolean=false):void{
+			var frame:Container = menuMap[menuId];
+			if(frame == null)//没有打开过
+				return;
+			menuMap[menuId] = null;
+			if(frame is ModuleLoader){
+				ModuleLoader(frame).unloadModule();
+				MemoryUtil.forceGC();
+			}
+			if(closeIt)
+				contentNavigator.removeChild(frame);
+		}
+		
+		private function unregisterMenuFrame(frame:Container):void{
+			var menuId:String = getMenuIdByFrame(frame);
+			if(menuId != null)
+				unregisterMenuFrameByMenuId(parseInt(menuId));
+		}
+		
+		private function getMenuIdByFrame(frame:Container):String{
+			for(var menuId:String in menuMap){
+				if(menuMap[menuId] == frame){
+					return menuId;
+				}
+			}
+			return null;
+		}
+		
+		
+		
+		private function faultHandler(event:FaultEvent):void{
+			endOperat();
+			Alert.show(event.fault.faultString, 'Error');
+		}
+		
+		private function showServerVar():void{
+			var paramArray:ArrayCollection = ClientEnviorment.getInstance().geNova2ConfigParamArray();
+			var window:DataGridWindow = new DataGridWindow();
+			window.title = "查看服务器变量";
+			window.initialize();
+			var dataGrid:PageDataGrid = window.dataGrid;
+			dataGrid.mygridcolumns = new Array();
+			var column:DataGridColumn = new DataGridColumn("变量名");
+			column.dataField = "key";
+			dataGrid.mygridcolumns = dataGrid.mygridcolumns.concat(column);
+			column = new DataGridColumn("变量值");
+			column.dataField = "value";
+			dataGrid.mygridcolumns = dataGrid.mygridcolumns.concat(column);
+			column = new DataGridColumn("描述");
+			column.dataField = "descr";
+			dataGrid.mygridcolumns = dataGrid.mygridcolumns.concat(column);
+			
+			dataGrid.pagecount = 20;
+			dataGrid.initdata(paramArray);
+			
+			window.showCloseButton = true;
+			window.addEventListener(CloseEvent.CLOSE,function():void{
+				PopUpManager.removePopUp(window);
+			});
+			
+			PopUpManager.addPopUp(window,this,true);
+			PopUpManager.centerPopUp(window);
+		}
+		
+		private function showClientVar():void{
+			var varMap:Object = ClientEnviorment.getInstance().getVarMap();
+			var paramArray:ArrayCollection = new ArrayCollection();
+			for(var key:String in varMap){
+				var temp:Object = new Object();
+				temp["key"] = key;
+				temp["value"] = varMap[key];
+				if(temp["value"]!=null){
+					var tempValue:String = temp["value"].toString();
+					if(tempValue.length > 300)//太长了，显示会很难看
+						temp["value"] = tempValue.substr(0,300)+"...";
+				}
+				paramArray.addItem(temp);
+			}
+			var window:DataGridWindow = new DataGridWindow();
+			window.title = "查看客户端变量";
+			window.initialize();
+			var dataGrid:PageDataGrid = window.dataGrid;
+			dataGrid.mygridcolumns = new Array();
+			var column:DataGridColumn = new DataGridColumn("变量名");
+			column.dataField = "key";
+			dataGrid.mygridcolumns = dataGrid.mygridcolumns.concat(column);
+			column = new DataGridColumn("变量值");
+			column.dataField = "value";
+			dataGrid.mygridcolumns = dataGrid.mygridcolumns.concat(column);
+			
+			dataGrid.pagecount = 20;
+			dataGrid.initdata(paramArray);
+			
+			window.showCloseButton = true;
+			window.addEventListener(CloseEvent.CLOSE,function():void{
+				PopUpManager.removePopUp(window);
+			});
+			
+			PopUpManager.addPopUp(window,this,true);
+			PopUpManager.centerPopUp(window);
+		}
+		
+		public function relogin():void{
+			formService.dologout(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+			closeAllWindow();
+			dispatchEvent(new BasicEvent(BasicEvent.RELOGIN));
+		}
+		
+		private function logout():void{
+			HelpUtil.getInstance().dispatchHelpEvent(HelpUtil.SYS_LOGIN_HEAD+"OUT");
+			formService.dologout(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+			closeIE();
+		}
+		
+		private function closeIE():void{
+			var request:URLRequest = new URLRequest("javascript:window.close()");
+			navigateToURL(request,"_self");
+		}
+		//修改密码
+		public function modifyPwd():void{
+			var ump:UserModifyPwd = new UserModifyPwd();
+			ump.endpoint = endpoint;
+			ump.setState(false);
+			PopUpManager.addPopUp(ump,this,true);
+			PopUpManager.centerPopUp(ump);
+		}
+		
+//		private function openChatPanel():void{
+//			if(enableChatPanel){
+//		    	//开启聊天客户端
+//		    	if(chatPanel == null){
+//		    		chatPanel = new BillChatPanel();
+//		    	}
+//		    	else
+//		    		chatPanel.login();
+//		    	PopUpManager.addPopUp(chatPanel,this);
+//		    	PopUpManager.centerPopUp(chatPanel);
+//		    }
+//		}
+		
+		private function isShowTitleHandler():void{
+			
+			if(isShowTitle){
+				mainBox.removeChild(titleHBox);
+				isShowTitle = false;
+				localUserInfo.data.isShowTitle ="false";
+			}else{
+				mainBox.addChildAt(titleHBox,0);
+				isShowTitle = true;
+				localUserInfo.data.isShowTitle ="true";
+			}
+			
+		}
+		
+		private function export():void{
+			PopUpManager.addPopUp(exportInitMetadataWindow,this,true);
+			PopUpManager.centerPopUp(exportInitMetadataWindow);
+			
+		}
+		
+		private function startExport():void{
+			if(exportObjectsNameInput.selectedIndex<0){
+				Alert.show("请选择到导出的对象");
+				return;
+			}
+			PopUpManager.removePopUp(exportInitMetadataWindow);
+			startOperat();
+			formService.exportInitMetaData(exportObjectsNameInput.selectedLabel);
+		}
+		
+		private function exportHandler(event:ResultEvent):void{
+			endOperat();
+			var url:String = event.result as String;
+			navigateToURL(new URLRequest(url), "_blank");
+		}
+		
+		private function startOperat():void{
+			
+			if(operatingWindow == null){
+				var temp:LoadingWindow = new LoadingWindow();
+				temp.text = "正在执行……";
+				operatingWindow = temp;
+			}
+			PopUpManager.addPopUp(operatingWindow,this,true);
+			PopUpManager.centerPopUp(operatingWindow);
+		}
+		
+		private function endOperat():void{
+			if(operatingWindow!=null)
+				PopUpManager.removePopUp(operatingWindow);
+		}
+		
+		private function closeAllWindow():void{
+//			if(chatPanel != null)
+//				chatPanel.close();
+			if(HelpUtil.getInstance().getHelpPanel().isPopUp){
+				PopUpManager.removePopUp(HelpUtil.getInstance().getHelpPanel());
+			}
+			
+		}
+		
+		public function getMenuIndexMap():Object{
+			return indexMap;
+		}
+		
+		private function changeStyle():void{
+			var styles:ArrayCollection = new ArrayCollection();
+			styles.addAll(styleArray);
+			var styleWindow:ComboBoxWindow = new ComboBoxWindow();
+			styleWindow.title = "更换界面风格";
+			styleWindow.dataProvider = styles;
+			styleWindow.width = 300;
+			styleWindow.height = 180;
+			styleWindow.addEventListener(FlexEvent.CREATION_COMPLETE,function(event:FlexEvent):void{
+				var window:ComboBoxWindow = event.currentTarget as ComboBoxWindow;
+				window.buttonBar.removeChild(window.cancelButton);
+				if(styleFilePath == null || styleFilePath == ""){
+					window.mainComboBox.selectedIndex = 0;
+				}
+				else{
+					for each(var obj:* in window.dataProvider){
+						if(obj.value == styleFilePath){
+							window.mainComboBox.selectedItem = obj;
+							break;
+						}
+					}
+				}
+				window.mainComboBox.addEventListener(ListEvent.CHANGE,function(changeEvent:ListEvent):void{
+					if(window.mainComboBox.selectedItem != null){
+						FlexGlobals.topLevelApplication.styleManager.unloadStyleDeclarations(styleFilePath);
+						if(window.mainComboBox.selectedItem.value != ""){
+							styleFilePath = window.mainComboBox.selectedItem.value as String;
+							
+//							var str:String = window.mainComboBox.selectedItem.menubgcolor as String;
+//							if(str != null && str != ""){
+//								var arr:Array = str.split(",");
+//								if(arr != null && arr.length == 2){
+//									menuColorArr = arr;
+//									imageMenuBox.setStyle("fillColors",menuColorArr);
+//									userStyle.data.menubgcolor = str;
+//								}
+//							}
+							
+//							var labelcolor:String  = window.mainComboBox.selectedItem.menulabelcolor as String;
+//							if(labelcolor != null && labelcolor != ""){
+//								imageLabelColor = labelcolor;
+//								userStyle.data.menulabelcolor = labelcolor;
+//							}
+							
+							userStyle.data.styleFilePath = styleFilePath;
+							FlexGlobals.topLevelApplication.styleManager.loadStyleDeclarations2(styleFilePath);
+						}
+						else{
+							styleFilePath = "";
+//							userStyle.data.menulabelcolor = "0x000033";
+//							userStyle.data.menubgcolor = "0xb0b0b0,0x808080";
+							userStyle.data.styleFilePath = styleFilePath;
+						}
+					}
+				});
+			});
+			PopUpManager.addPopUp(styleWindow,this,true);
+			PopUpManager.centerPopUp(styleWindow);
+		}
+		
+		private function help():void{
+			var helpPanel:HelpPanel = HelpUtil.getInstance().getHelpPanel();
+			if(!helpPanel.isPopUp){
+				var pt:Point = new Point((this.width-helpPanel.width),(this.height-helpPanel.height));
+				pt = this.localToGlobal(pt);
+				helpPanel.x = pt.x;
+				helpPanel.y = pt.y;
+				PopUpManager.addPopUp(helpPanel,this,false);
+			}
+			helpPanel.goToHelpSubjectById(null);
+		}
+		
+		override public function validateSize(recursive:Boolean = false):void {
+			super.validateSize(recursive);
+			if (!initialized) return;
+			if (height < measuredHeight) verticalScrollPolicy = ScrollPolicy.ON;
+			else verticalScrollPolicy = ScrollPolicy.OFF;
+		}
+		
+	]]>
+	</fx:Script>
+	<mx:states>
+		<mx:State name="normalState"/>
+		<mx:State name="debugState"/>
+	</mx:states>
+	<mx:VBox width="100%" height="100%" id="mainBox" borderStyle="solid" borderColor="gray" horizontalGap="0" verticalGap="0">
+		<mx:HBox id="titleHBox" height="70" width="100%" horizontalGap="0">
+			<mx:HBox width="70%" horizontalAlign="left" verticalAlign="middle">
+				<mx:Image source="{titleImageUrl}"/>
+			</mx:HBox>
+			<mx:HBox width="30%" horizontalAlign="right" verticalAlign="middle">
+				<mx:Image source="{titleLogoImageUrl}"/>
+			</mx:HBox>
+		</mx:HBox>
+		
+		<mx:MenuBar width="100%" height="20" dataProvider="{menuTreeData}" labelField="name" id="menuBar" itemClick="menuClickHandler(event)"></mx:MenuBar>
+		
+		<mx:HBox id="imageMenuBox" height="{imageMenuHeight}" styleName="gradient"  width="100%" verticalAlign="middle">
+			<mx:VBox id="logoBox" >
+				<mx:Image height="100%" source="{leftImageUrl}" />
+			</mx:VBox>
+			<util:ImageMenuBar id="imageMenuBar" labelField="name" imageLabelColor="{imageLabelColor}" height="100%" width="100%" />
+		</mx:HBox>
+		
+		<mx:HBox width="100%" height="25" verticalAlign="middle" id="northBox" >
+			<mx:HBox id="toolBox" width="50%">
+				<ns1:Docker minWidth="500" height="20">
+					<ns1:DockableToolBar>
+						<mx:LinkButton toolTip="欢迎页面" click="openWelcomeFrame()" width="20" height="20" icon="{homepageIcon}"/>
+						<!--mx:LinkButton toolTip="显示/隐藏标题栏" click="isShowTitleHandler()" width="20" height="20" icon="{chatIcon}"/-->
+						<mx:LinkButton toolTip="重新登录" click="relogin()" width="20" height="20" icon="{reloginIcon}"/>
+						<mx:LinkButton toolTip="界面风格" click="changeStyle()" width="20" height="20" icon="{styleIcon}"/>
+						<mx:LinkButton toolTip="修改密码" click="modifyPwd()" width="20" height="20" icon="{modifyPwdIcon}" />
+						<mx:LinkButton toolTip="退出" click="logout()" width="20" height="20" icon="{exitIcon}"/>	
+						<mx:LinkButton toolTip="查看客户端变量" click="showClientVar()" width="20" height="20" icon="{clientenvIcon}" includeIn="debugState"/>
+						<mx:LinkButton toolTip="查看服务端变量" click="showServerVar()" width="20" height="20" icon="{serverenvIcon}" includeIn="debugState"/>
+						<mx:LinkButton toolTip="导出平台数据" click="export()" width="20" height="20" icon="{exportIcon}" includeIn="debugState"/>
+					</ns1:DockableToolBar>
+					<ns1:DockableToolBar id="customToolBar">
+						
+					</ns1:DockableToolBar>
+				</ns1:Docker>
+			</mx:HBox>
+			<mx:HBox width="50%" id="welcomeBox" horizontalGap="0" horizontalAlign="left">
+				<mx:Label text="{welcomeText}"/>				
+			</mx:HBox>
+		</mx:HBox>
+		
+		<mx:HRule  width="100%"  />
+		<mx:Spacer height="2" width="100%"/>
+		<mx:HBox width="100%" height="100%" horizontalGap="3" id="centerBox">
+			<mx:VBox width="20%" height="100%" id="verticalMenuBox" verticalGap="0">
+				<mx:Panel title="菜单导航" width="100%" height="100%" layout="vertical">
+					<controls:VerticalMenuBar width="100%" height="100%" dataProvider="{menuTreeData}" labelField="name" id="verticalMenuBar" itemClick="menuClickHandler(event)"/>
+				</mx:Panel>
+			</mx:VBox>
+			
+			<mx:VBox id="welComeFrameBox" width="28%" height="100%" />
+			
+			<ns1:SuperTabNavigator height="100%" width="100%" styleName="superTabNavigatorStyle" id="contentNavigator" tabClose="tabCloseHandler(event)" 
+								   doubleClick="tabDoubleClicked(event)"
+								   paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			</ns1:SuperTabNavigator>
+		</mx:HBox>
+	</mx:VBox>
+</mx:Canvas>

@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:containers="net.brandonmeyer.containers.*" 
+				layout="vertical" width="300" height="200" title="新建工作集"
+				allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true" horizontalScrollPolicy="off"
+				close="PopUpManager.removePopUp(this)" creationComplete="init()" xmlns:styletemplate="smartx.flex.components.styletemplate.*">
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.effects.Effect;
+			import mx.events.FlexEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.bam.flex.modules.businessview.listener.DesignCardButtonListener;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			private var _metadata:XML;
+			[Bindable]
+			public var debugMode:Boolean;
+			[Bindable]
+			public var endpoint:String;
+			
+			private var bvTypeMenu:Menu;
+			[Bindable]
+			private var bvTempletCode:String = "T_BAM_BUSINESSVIEW";
+			[Bindable]
+			private var qvTempletCode:String = "T_V_BAM_QUERYVIEW";
+			
+			private var designCardButtonListener:DesignCardButtonListener;
+			[Bindable]
+			private var insertBfInterceptor:String = "smartx.bam.bs.bvmanager.BvInsertBfFormInterceptor";
+			[Bindable]
+			public var confirmFun:Function;
+			
+			private function init():void{
+				designCardButtonListener = new DesignCardButtonListener();
+				if(!bvStEleven.cardButtonBox.contains(designBtn))
+					bvStEleven.cardButtonBox.addChildAt(designBtn,1);
+			}
+			
+			private function wsNextBtn_clickHandler():void{
+				if(wsNameTxt.text == ""){
+					SmartXMessage.show("工作集名称不能为空！",SmartXMessage.MESSAGE_ERROR);
+					return
+				}
+				if(wsCodeTxt.text == ""){
+					SmartXMessage.show("工作集编码不能为空！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				_metadata = <root><node name={wsNameTxt.text} code={wsCodeTxt.text} isOpened="true" type="ws">
+									<node name="业务视图" type="bvfolder" refws={wsCodeTxt.text} />
+									<node name="查询视图" type="qvfolder" refws={wsCodeTxt.text} />
+									<node name="仪表盘对象" type="dofolder" refws={wsCodeTxt.text} />
+									<node name="仪表盘" type="dbfolder" refws={wsCodeTxt.text} />
+								 </node></root>
+				//main.selectedChild = bvBox;
+				confirmFun();
+			}
+			
+			private function bvLastBtn_clickHandler():void{
+				main.selectedChild = workspaceBox;
+			}
+			
+			private function bvBox_showHandler():void{
+				title = "业务视图建模";
+				width = 600;
+				height = 550;
+				centerToWindow();
+			}
+			
+			private function centerToWindow():void{
+				x = (screen.width - width) / 2;
+				y = (screen.height - height) / 2;
+			}
+			
+			private function workspaceBox_showHandler():void{
+				title = "新建工作集";
+				width = 300;
+				height = 200;
+				centerToWindow();
+			}
+			
+			private function bvPopupBtn_creationCompleteHandler():void{
+				bvTypeMenu = new Menu();
+				bvTypeMenu.dataProvider = [{label:"业务视图"},{label:"查询视图"}];
+				bvTypeMenu.selectedIndex = 0;
+				bvTypeMenu.addEventListener(MenuEvent.ITEM_CLICK,bvTypeMenuItemClickHandler);
+				bvPopupBtn.popUp = bvTypeMenu;
+			}
+			
+			private function bvTypeMenuItemClickHandler(event:MenuEvent):void{
+				var label:Object = event.item.label;
+				if(label == "查询视图"){
+					currentState = "qv";
+					if(bvStEleven.cardButtonBox.contains(designBtn))
+						bvStEleven.cardButtonBox.removeChild(designBtn);
+				}else{
+					currentState = "bv";
+					if(!bvStEleven.cardButtonBox.contains(designBtn))
+						bvStEleven.cardButtonBox.addChildAt(designBtn,1);
+				}
+			}
+			
+			private function cardPanelSaveSuccessful(event:StyleTemplateEvent):void{
+				var dataValue:Object = event.saveObject;
+				var node:XML;
+				if(currentState == "qv"){
+					node = <node name={dataValue["NAME"]} code={dataValue["CODE"]} type="qv" refws={wsCodeTxt.text} />;
+					_metadata.node.node[1].appendChild(node);
+				}else if(currentState == "bv"){
+					node = <node name={dataValue["NAME"]} code={dataValue["CODE"]} refcode={dataValue["STREAMMODULENAME"]} 
+										type="bv" refws={wsCodeTxt.text} />;
+					_metadata.node.node[0].appendChild(node);
+				}
+			}
+			
+			private function designBtn_clickHandler():void{
+				designCardButtonListener.buttonClick(bvStEleven.cardPanel);
+			}
+			
+			public function get metadata():XMLList{
+				return _metadata.node;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Button id="designBtn" icon="{AssetsFileLib.designIcon}" label="设计" click="designBtn_clickHandler()" />
+	</fx:Declarations>
+	<containers:states>
+		<s:State name="bv" />
+		<s:State name="qv" />
+	</containers:states>
+	<mx:ViewStack id="main" width="100%" height="100%" creationPolicy="all">
+		<mx:VBox id="workspaceBox" width="100%" height="100%" show="workspaceBox_showHandler()"
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:VBox width="100%" height="100%" verticalAlign="middle">
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="名称" />
+					<mx:TextInput id="wsNameTxt" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="编码" />
+					<mx:TextInput id="wsCodeTxt" />
+				</mx:HBox>
+			</mx:VBox>
+			<mx:HBox horizontalAlign="right" width="100%">
+				<mx:Button id="wsNextBtn" label="完成" 
+						   icon="{AssetsFileLib.okIcon}" click="wsNextBtn_clickHandler()" />
+			</mx:HBox>
+		</mx:VBox>
+		<mx:VBox id="bvBox" width="100%" height="100%" 
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5"
+				 show="bvBox_showHandler()">
+			<mx:HBox width="100%">
+				<mx:PopUpButton id="bvPopupBtn" label="新建视图" creationComplete="bvPopupBtn_creationCompleteHandler()" openAlways="true"/>
+			</mx:HBox>
+			<styletemplate:StyleTemplate11 id="bvStEleven" width="100%" height="100%" endpoint="{endpoint}" isCommitButton="false"
+										   templetCode="{bvTempletCode}" saveSuccessful="cardPanelSaveSuccessful(event)" insertbfIncCard="{insertBfInterceptor}"
+										   debugMode="{debugMode}" excludeFrom="qv" />
+			<styletemplate:StyleTemplate11 id="qvStEleven" width="100%" height="100%" endpoint="{endpoint}" isCommitButton="false"
+										   templetCode="{qvTempletCode}" saveSuccessful="cardPanelSaveSuccessful(event)"
+										   debugMode="{debugMode}" includeIn="qv" />
+			<mx:HBox width="100%" horizontalAlign="right">
+				<mx:Button id="bvLastBtn" label="上一步" 
+						   icon="{AssetsFileLib.laststepIcon}" click="bvLastBtn_clickHandler()" />
+				<mx:Button id="bvCompleteBtn" label="完成" 
+						   icon="{AssetsFileLib.okIcon}" click="confirmFun()" />
+			</mx:HBox>
+		</mx:VBox>
+	</mx:ViewStack>
+</containers:SuperPanel>

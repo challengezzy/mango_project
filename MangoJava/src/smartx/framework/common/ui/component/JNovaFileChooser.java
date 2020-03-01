@@ -1,0 +1,104 @@
+/***********************************************************************
+ * $RCSfile: JNovaFileChooser.java,v $  $Revision: 1.1 $  $Date: 2007/06/11 03:31:18 $
+ * $Log: JNovaFileChooser.java,v $
+ * Revision 1.1  2007/06/11 03:31:18  qilin
+ * no message
+ *
+*************************************************************************/
+
+package smartx.framework.common.ui.component;
+
+import java.io.File;
+import java.util.Vector;
+import javax.swing.*;
+
+/**
+ * 此类是对JFileChooser类的扩展，可以为其设置多个文件过滤器，
+ * 使在该文件选择器中可过滤出一定文件类型的文件，便于选取。
+ *
+ *
+ * @version 1.9 04/23/99
+ * @author Enigma
+ */
+
+public class JNovaFileChooser extends JFileChooser
+{
+    /**
+     * 构造一个文件选择器，若不添加文件过滤器，则功能
+     * 等同于JFileChooser。
+     *
+     * @see javax.swing.JFileChooser
+     */
+	public JNovaFileChooser()
+	{
+		super();
+	}
+
+    /**
+     * 增加文件过滤的类型和文件类型的描述。
+     *
+     * @param sFileType - 可进行过滤的文件类型。
+     * @param sShowInformation - 该过滤文件类型的简短描述。
+     * @param isDescription - 对该描述是否在选择器中显示。
+     * @see JGxluFileFilter
+     */
+	public void addChoosableStringFilter(String sFileType, String sShowInformation, boolean isDescription)
+	{
+		if(this != null && sFileType != null && sShowInformation != null)
+		{
+			JNovaFileFilter fileFilter = new JNovaFileFilter(sFileType, sShowInformation);
+			fileFilter.setExtensionListInDescription(isDescription);
+			this.addChoosableFileFilter(fileFilter);
+		}
+	}
+
+    /**
+     * 在选择一个文件后，取得该文件的物理路径。
+     *
+     * @return 所选择文件的物理路径
+     *
+     * @see #getMultipleSelectedFilePath
+     */
+	public String getSingleSelectedFilePath()
+	{
+		if(this != null && this.getSelectedFile() != null)
+		{
+			return this.getSelectedFile().getPath();
+		}
+		else
+		{
+			System.out.println("Guoxin Lucent Technologies Common Class Exception : Get Selected File Null !");
+			return "";
+		}
+	}
+
+    /**
+     * 在选择多个文件后，取得这些文件的物理路径。
+     *
+     * @return 所选择文件的物理路径
+     *
+     * @see #getSingleSelectedFilePath
+     */
+	public Vector getMultipleSelectedFilePath()
+	{
+		if(this != null && this.getSelectedFiles() != null)
+		{
+			Vector filePath = new Vector();
+			File[] files = this.getSelectedFiles();
+			for(int i = 0; i < files.length; i++)
+			{
+				File file = files[i];
+				if(file != null)
+				{
+					filePath.addElement(file.getPath());
+				}
+			}
+			return filePath;
+		}
+		else
+		{
+			System.out.println("Guoxin Lucent Technologies Common Class Exception : Get Selected File Null !");
+			return null;
+		}
+	}
+}

@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" fontSize="12" xmlns:ns1="smartx.flex.components.*" creationComplete="init()" xmlns:ns2="smartx.flex.components.styletemplate.*" xmlns:code="http://code.google.com/p/flexlib/"
+		   preinitialize="preinit()">
+	<fx:Declarations>
+		<mx:HBox width="100%" id="listButtonBox">
+			<mx:PopUpMenuButton label="操作" id="operationButton" icon="{AssetsFileLib.operationIcon}" dataProvider="{operationList}" openAlways="true"
+								/>
+		</mx:HBox>
+		<fx:Object id="viewButton" label="查看" handler="{mainTemplate.onEdit}" icon="{AssetsFileLib.viewIcon}" rightClick="true"/>
+		<fx:Object id="editButton" label="编辑" handler="{mainTemplate.onEdit}" icon="{AssetsFileLib.editingIcon}" rightClick="true"/>
+		<fx:Object id="insertButton" label="新增" handler="{mainTemplate.onInsert}" icon="{AssetsFileLib.insertIcon}" rightClick="true"/>
+		<fx:Object id="deleteButton" label="删除" handler="{onDelete}" icon="{AssetsFileLib.delete2Icon}" rightClick="true"/>
+		
+		<mx:Button id="viewBtn" label="查看" icon="{AssetsFileLib.viewIcon}" />
+		<mx:Button id="editBtn" label="编辑" icon="{AssetsFileLib.editingIcon}" />
+		<mx:Button id="insertBtn" label="新增" icon="{AssetsFileLib.insertIcon}" />
+		<mx:Button id="deleteBtn" label="删除" icon="{AssetsFileLib.delete2Icon}" />
+		
+		<mx:HBox id="cardButtonBox" width="100%">
+			<mx:Button label="返回" click="mainTemplate.onReturn()" icon="{AssetsFileLib.returnIcon}"/>
+			<mx:Button id="saveAndReturnButton" label="保存并返回" click="onSaveAndReturn()" icon="{AssetsFileLib.savereturnIcon}"/>
+			<mx:Button id="cardSaveButton" label="保存" click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+		</mx:HBox>
+	</fx:Declarations>
+	<fx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+		import mx.containers.BoxDirection;
+		import mx.controls.Alert;
+		import mx.controls.Menu;
+		import mx.events.CloseEvent;
+		import mx.events.CollectionEvent;
+		import mx.events.CollectionEventKind;
+		import mx.events.ListEvent;
+		import mx.events.MenuEvent;
+		import mx.rpc.events.FaultEvent;
+		import mx.rpc.events.ResultEvent;
+		import mx.rpc.remoting.mxml.RemoteObject;
+		
+		import smartx.flex.components.assets.AssetsFileLib;
+		import smartx.flex.components.core.BillListPanel;
+		import smartx.flex.components.core.ext.DataValidator;
+		import smartx.flex.components.event.BillCardPanelEvent;
+		import smartx.flex.components.util.Hashtable;
+		import smartx.flex.components.util.SmartXMessage;
+		import smartx.flex.components.util.TempletDataUtil;
+		import smartx.flex.components.vo.GlobalConst;
+		[Bindable]
+		public var templetCode:String;
+		[Bindable]
+		public var editable:Boolean = true;
+		
+		public var childEditable:Boolean = true;
+		
+		[Bindable]
+		public var debugMode:Boolean = false;
+		public var childTemplates:Array;
+		[Bindable]
+		public var destination:String = GlobalConst.SERVICE_FORM;
+		[Bindable]
+		public var endpoint:String;
+		private var formService:RemoteObject;
+		private var returnAfterSave:Boolean = false;
+		[Bindable]
+		public var direction:String = BoxDirection.VERTICAL;//主子容器布局方向
+		
+		[Bindable]
+		public var initQueryCondition:String;
+		
+		[Bindable]
+		private var conditionMap:Hashtable = new Hashtable();
+		
+		//add by caohenghui 2011/07/05 --start
+		[Bindable]
+		public var insertbfIncCard:String;
+		[Bindable]
+		public var insertafIncCard:String;
+		[Bindable]
+		public var updatebfIncCard:String;
+		[Bindable]
+		public var updateafIncCard:String;
+		[Bindable]
+		public var deletebfIncCard:String;
+		[Bindable]
+		public var deleteafIncCard:String;
+		[Bindable]
+		public var bfIncList:String;
+		[Bindable]
+		public var afIncList:String;
+		[Bindable]
+		public var bfIncBatch:String;
+		[Bindable]
+		public var afIncBatch:String;
+		[Bindable]
+		public var deletebfIncBatch:String;
+		[Bindable]
+		public var deleteafIncBatch:String;
+		//add by caohenghui 2011/07/05 --end
+		[Bindable]
+		public var operationList:ArrayCollection = new ArrayCollection();
+		[Bindable]
+		private var interval:Number = 0;
+		
+		[Bindable]
+		public var showDataAfterInit:Boolean = false;
+		
+		public var mainTempletPercent:Number = 0;//主表尺寸比
+		
+		public var childrenTempletPercent:Number = 0;//子表尺寸比
+		
+		[Bindable]
+		public var pageSize:Number = 40;
+		
+		//显示操作按钮的方式（默认为MENU）
+		[Bindable]
+		public var showOperationButtonType:String;
+		
+		//add by zhangzy 20130106 对布局、界面按钮开放控制
+		[Bindable]
+		public var disableEffect:Boolean = false;
+		[Bindable]
+		public var isShowInsertBtn:Boolean = true;//显示新建按钮
+		[Bindable]
+		public var isShowDelBtn:Boolean = true;// 是否显示删除按钮
+		[Bindable]
+		public var cardLayoutType:String = GlobalConst.LAYOUTTYPE_BILLCARDPANEL_VBOX;//卡片布局方式
+		[Bindable]
+		public var itemLabelWidth:int = 160;
+		
+		public var beforeInitFun:Function;
+		
+		private function preinit():void{
+			if(showOperationButtonType == null ||showOperationButtonType == "")
+				showOperationButtonType = GlobalConst.STYLETEMPLATE_OPERATION_MENU;
+			//初始化操作按钮
+			if(!editable){
+				operationList.addItem(viewButton);
+				
+				viewBtn.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+					mainTemplate.onEdit();
+				});
+				operationList.addItem(viewBtn);
+			}else{
+				
+				if(isShowInsertBtn){
+					operationList.addItem(insertButton);
+					insertBtn.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+						mainTemplate.onInsert();
+					});
+					operationList.addItem(insertBtn);
+					
+				}
+				if(isShowDelBtn){
+					operationList.addItem(deleteButton);
+						
+					deleteBtn.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+						onDelete();
+					});
+					operationList.addItem(deleteBtn);
+				}
+				
+				
+				operationList.addItem(editButton);
+				editBtn.addEventListener(MouseEvent.CLICK,function (event:MouseEvent):void{
+					mainTemplate.onEdit();
+				});
+				operationList.addItem(editBtn);
+			}
+		}
+		
+		override protected function createChildren():void{
+			super.createChildren();
+			if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_MENU){
+				operationList.filterFunction = function (item:*):Boolean{
+					if(item is Button)
+						return false;
+					else
+						return true;
+				}
+				operationList.refresh();
+			}
+			mainTemplate.listPanel.topArea.addChild(listButtonBox);
+			mainTemplate.cardBox.addChildAt(cardButtonBox,0);
+			if(!editable){
+				cardButtonBox.removeChild(saveAndReturnButton);
+				cardButtonBox.removeChild(cardSaveButton);
+			}
+		}
+		
+	    private function init():void{
+			if(beforeInitFun != null)
+				beforeInitFun();
+			if(templetCode == null)
+        		throw Error("元原模板编号不能为null");
+        	formService = new RemoteObject(destination);
+		    if(endpoint!=null)
+		        formService.endpoint = endpoint;
+		    formService.updateBatchData.addEventListener(ResultEvent.RESULT,updateHandler);
+		    formService.updateBatchData.addEventListener(FaultEvent.FAULT,faultHandler);
+			formService.executeBatchByDS.addEventListener(ResultEvent.RESULT,updateHandler);
+			formService.executeBatchByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+
+			if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_BUTTON){
+				if(operationButton && listButtonBox.contains(operationButton) )
+					listButtonBox.removeChild(operationButton);
+				for each(var operation:* in operationList){
+					if(operation is Button)
+						listButtonBox.addChild(operation);
+				}
+			}else if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_MENU){
+				var operationMenu:Menu = operationButton.popUp as Menu;
+				operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+			}
+			
+			//添加右键菜单
+			if(mainTemplate.listPanel.rightClickMenu != null){
+				mainTemplate.listPanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler,false,0,true);
+				for each(var obj:* in operationList){
+					if(obj is Button)
+						continue;
+					if(obj.rightClick){
+						//需要添加到右键菜单
+						mainTemplate.listPanel.rightClickMenuItems.push(obj);
+					}
+				}
+			}
+			
+			//设置布局大小
+			if(direction == BoxDirection.VERTICAL){
+				mainTemplate.percentHeight = mainTempletPercent;
+				childrenBox.percentHeight = childrenTempletPercent;
+			}else if(direction == BoxDirection.HORIZONTAL){
+				mainTemplate.percentWidth = mainTempletPercent;
+				childrenBox.percentWidth = childrenTempletPercent;
+			}
+			
+        	if(childTemplates != null){
+				conditionMap.clear();
+        		for each(var childObject:Object in childTemplates){
+        			var label:String = childObject["label"];
+        			var childTempletCode:String = childObject["templetCode"];
+					var buttonBox:HBox  =childObject["buttonBox"];
+					var initQueryConditionStr:String = childObject["initQueryCondition"];
+					conditionMap.add(label+childTempletCode,initQueryConditionStr);
+        			var childPanel:BillListPanel = new BillListPanel();
+//					var childPanel:StyleTemplate01 = new StyleTemplate01();
+        			if(childTempletCode == null)
+        				throw new Error("没有设置子表的模板编码");
+        			childPanel.destination = destination;
+        			childPanel.endpoint = endpoint;
+        			childPanel.templetCode = childTempletCode;
+        			childPanel.editable = false;
+        			childPanel.showQuickQueryPanel = false;
+        			childPanel.showEditBox = false;
+        			childPanel.debugMode = debugMode;
+        			childPanel.label = label;
+        			childPanel.showInitingWindow = false;
+        			childPanel.showLoadingWindow = false;
+					childPanel.rowCountPerPage = pageSize;
+        			
+					childPanel.showSaveButton = false;
+					
+        			childrenNavigator.addChild(childPanel);
+					callLater(function():void{
+						childPanel.pageBox.addChildAt(buttonBox,childPanel.pageBox.getChildIndex(childPanel.editBox)+1);
+					});
+        		}
+				//双击也要刷新子列表 modified by xuzhilin 20130122
+        		mainTemplate.listPanel.dataGrid.addEventListener(ListEvent.CHANGE,listPanelItemClickHander);
+				mainTemplate.listPanel.dataGrid.addEventListener(CollectionEvent.COLLECTION_CHANGE,listPanelCollectionChangeHandler);
+				
+				mainTemplate.listPanel.dataGrid.addEventListener(ListEvent.ITEM_DOUBLE_CLICK,listPanelDoubleClickHander);
+				mainTemplate.cardPanel.addEventListener(BillCardPanelEvent.REFRESHCHILDLIST,cardPanelRefreshChild);
+//					function(event:ListEvent):void{
+//        			var mainObject:Object = mainTemplate.listPanel.getSelectedRowValue();
+//        			var pkname:String = mainTemplate.listPanel.primaryKey;
+//        			var pkValue:Object = mainObject[pkname];
+//        			for(var i:int=0;i<childrenNavigator.getChildren().length;i++){
+//        				var childPanel:BillListPanel = BillListPanel(childrenNavigator.getChildAt(i));
+//						//当前显示的弹出loading窗口
+//						if(childPanel == childrenNavigator.selectedChild)
+//							childPanel.showLoadingWindow = true;
+//						else
+//							childPanel.showLoadingWindow = false;
+//        				var childObject:Object = childTemplates[i];
+//        				var forienKey:String = childObject["forienKey"];
+//        				if(forienKey == null)
+//        					throw new Error("子表["+childPanel.templetCode+"]没有指定外键");
+//        				var condition:String = forienKey+"='"+pkValue+"'";
+//        				childPanel.initQueryCondition = condition;
+//        				childPanel.query();
+//        			}
+//        		});
+        	}
+			
+				mainTemplate.insertbfIncCard=insertbfIncCard;
+				mainTemplate.insertafIncCard=insertafIncCard;
+				mainTemplate.updatebfIncCard=updatebfIncCard;
+				mainTemplate.updateafIncCard=updateafIncCard;
+				mainTemplate.deletebfIncCard=deletebfIncCard;
+				mainTemplate.deleteafIncCard=deleteafIncCard;
+				mainTemplate.bfIncList=bfIncList;
+				mainTemplate.afIncList=afIncList;
+			
+		}
+		
+		private function listPanelItemClickHander(event:ListEvent):void{
+			clearInterval(interval);
+			interval = setInterval(deferredClickHandler,240);
+		}
+		
+		private function listPanelCollectionChangeHandler(event:CollectionEvent):void{
+			clearInterval(interval);
+			if(event.kind ==  CollectionEventKind.RESET){
+				interval = setInterval(deferredClickHandler,240);
+			}
+		}
+		
+		private function listPanelDoubleClickHander(event:ListEvent):void{
+			clearInterval(interval);
+//			listPanelItemClickHander(null);
+			mainTemplate.onEdit();
+			this.onEdit();
+			//双击也要刷新子列表 modified by xuzhilin 20130122
+			interval = setInterval(deferredClickHandler,240);
+			
+		}
+		//cardpanel中要求子模板列表数据刷新
+		private function cardPanelRefreshChild(event:BillCardPanelEvent):void{
+			var mainObject:Object = mainTemplate.cardPanel.getDataValue();
+			refreshChildListPanel(mainObject);
+		}
+		
+		private function deferredClickHandler():void{
+			
+			clearInterval(interval);			
+			var mainObject:Object = mainTemplate.listPanel.getSelectedRowValue();
+			if(mainObject == null)
+				mainObject = new Object();
+			refreshChildListPanel(mainObject);
+		}
+		//刷新子列表
+		private function refreshChildListPanel(mainObject:Object):void{
+			var pkname:String = mainTemplate.listPanel.primaryKey;
+			
+			for(var i:int=0;i<childrenNavigator.getChildren().length;i++){
+				var pkValue:Object = mainObject[pkname];
+				var childPanel:BillListPanel = BillListPanel(childrenNavigator.getChildAt(i));
+				//当前显示的弹出loading窗口
+				if(childPanel == childrenNavigator.selectedChild)
+					childPanel.showLoadingWindow = true;
+				else
+					childPanel.showLoadingWindow = false;
+				var childObject:Object = childTemplates[i];
+				var forienKey:String = childObject["forienKey"];
+				if(forienKey == null)
+					throw new Error("子表["+childPanel.templetCode+"]没有指定外键");
+				
+				var mainTableKey:String = childObject["mainTableKey"];//如果子表指定的主表的 查询字段，则使用指定字段数据。如果没有指定，仍用主表的主键值。
+				if(mainTableKey != null && mainTableKey != ""){
+					pkValue = mainObject[mainTableKey];
+				}
+				
+				var initCdt:String = conditionMap.find(childPanel.label+childPanel.templetCode) as String;
+				var condition:String = forienKey+"='"+pkValue+"'";
+				if(pkValue == null)
+					condition = forienKey+"=null";
+				if( initCdt != null && initCdt != "" ){
+					condition = condition +" AND "+initCdt;
+				}
+				childPanel.initQueryCondition = condition;
+				childPanel.query();
+			}
+		}
+		
+       	private function faultHandler(event:FaultEvent):void{   
+			SmartXMessage.show("Error",SmartXMessage.MESSAGE_ERROR,event.fault.faultString,this);
+       	}
+       	
+       	private function updateHandler(event:ResultEvent):void{
+       		mainTemplate.cardPanel.insertMode = false;
+       		for(var i:int=0;i<childrenNavigator.getChildren().length;i++){
+        		var childPanel:BillListPanel = BillListPanel(childrenNavigator.getChildAt(i));
+        		childPanel.clearEditStatus();		
+        	}
+       		if(returnAfterSave){
+       			mainTemplate.onReturn();
+				returnAfterSave = false;
+       		}
+			mainTemplate.listPanel.query();
+			SmartXMessage.show("操作已成功!");
+       	}	
+       		
+		private function onEdit():void{
+			for each(var childPanel:BillListPanel in childrenNavigator.getChildren()){
+				if(editable && childEditable){//主模板可编辑，子模板才可以编辑
+					childPanel.showEditBox = true;
+					childPanel.editable = true;
+				}
+			}
+		}
+		
+		private function onInsert():void{
+			for each(var childPanel:BillListPanel in childrenNavigator.getChildren()){
+				childPanel.initQueryCondition = "1=2";//清空子表
+        		childPanel.query();
+				childPanel.showEditBox = true;
+				childPanel.editable = true;
+			}
+		}
+		
+		private function onReturn():void{
+			for each(var childPanel:BillListPanel in childrenNavigator.getChildren()){
+				childPanel.showEditBox = false;
+				childPanel.editable = false;
+			}			
+		}
+		
+		private function onSave():void{
+			//保存，两个分别保存card和子表修改
+			var dataValueList:Array = new Array();
+			//先处理card
+			if(!mainTemplate.cardPanel.validateData())
+				return;
+			for each(var dataValidator:DataValidator in mainTemplate.cardPanel.getDataValidators()){
+		        if(!dataValidator.validateData(mainTemplate.cardPanel))
+		        	return;
+		    }
+			var saveDataValue:Object = mainTemplate.cardPanel.getDataValue();
+			if(saveDataValue != null)
+				dataValueList.push(saveDataValue);
+			var pkValue:Object = mainTemplate.cardPanel.primaryKeyValue;
+			for(var i:int=0;i<childrenNavigator.getChildren().length;i++){
+        		var childPanel:BillListPanel = BillListPanel(childrenNavigator.getChildAt(i));
+        		var childObject:Object = childTemplates[i];
+        		var forienKey:String = childObject["forienKey"];
+				if(childPanel.datasourceName != mainTemplate.cardPanel.datasourceName){
+					SmartXMessage.show("子表数据源与主表不同，无法保存");
+					return;
+				}
+				//刷新子表的外键值，指向主键
+				var insertObjects:Array = childPanel.dataObjectsWaitingForInsert;
+				for each(var insertObject:Object in insertObjects){
+					insertObject[forienKey] = pkValue;
+				}
+				
+				if(!childPanel.validateData())
+					return;
+				var saveDataValues:Array = childPanel.getSaveDataValueList();
+				if(saveDataValues != null){
+					for each(var tempDataValue:Object in saveDataValues){
+						dataValueList.push(tempDataValue);
+					}
+				}
+			}
+			if(dataValueList.length>0)
+				formService.updateBatchData(dataValueList,bfIncBatch,afIncBatch);
+			else
+				SmartXMessage.show("无需保存");
+			
+		}
+		
+		private function onSaveAndReturn():void{
+			onSave();
+			returnAfterSave = true;
+		}
+		
+		private function onDelete():void{
+			if(mainTemplate.listPanel.getSelectedRowValues().length == 0){
+				SmartXMessage.show("请选择要删除的记录");
+				return;
+			}
+			SmartXMessage.show("是否确认要删除记录？",SmartXMessage.MESSAGE_CONFIRM,null,this,function(event:CloseEvent):void{
+				switch(event.detail){
+					case Alert.YES:
+						var sqlList:Array = new Array();
+						var values:Array = new Array();
+						for each(var selectListRowValue:Object in mainTemplate.listPanel.getSelectedRowValues()){
+							var pkname:String = mainTemplate.listPanel.primaryKey;
+        					var pkValue:Object = selectListRowValue[pkname];
+							for(var i:int=0;i<childrenNavigator.getChildren().length;i++){
+				        		var childPanel:BillListPanel = BillListPanel(childrenNavigator.getChildAt(i));
+				        		var childObject:Object = childTemplates[i];
+				        		var forienKey:String = childObject["forienKey"];
+				   				var deleteSQL:String = "delete from "+childPanel.saveTableName+" where "+forienKey+"='"+pkValue+"'";
+				   				trace(deleteSQL);
+				   				sqlList.push(deleteSQL);
+				   				childPanel.initQueryCondition = "1=2";//清空子表
+        						childPanel.query();
+				   			}
+							var tempSQL:String = "delete from "+mainTemplate.listPanel.saveTableName+" where "+pkname+"='"+TempletDataUtil.convertSQLValue(pkValue.toString())+"'";
+			   				trace(tempSQL);
+							sqlList.push(tempSQL);
+							
+							var tempObj:Object = new Object();
+							tempObj["flag"] = "delete";
+							tempObj["table"]= mainTemplate.listPanel.saveTableName;
+							tempObj["pkname"] = pkname;
+							tempObj["pkvalue"] = TempletDataUtil.convertSQLValue(pkValue.toString());
+							tempObj["datasource"] = mainTemplate.listPanel.datasourceName;
+							values.push(tempObj);
+							
+						}
+//						mainTemplate.listPanel.deleteRow(false);
+						
+						if(sqlList.length>0){
+							formService.executeBatchByDS(mainTemplate.listPanel.datasourceName, sqlList,values,deletebfIncBatch,deleteafIncBatch);
+						}
+						
+					case Alert.NO:
+						return;
+				}
+			});
+		}
+		
+		protected function operationButton_itemClickHandler(event:MenuEvent):void
+		{
+			var item:* = event.item;
+			if(item.handler != null)
+				item.handler();
+		}
+
+	]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" id="mainBox">
+		<mx:DividedBox width="100%" height="100%" direction="{direction}">
+			<ns2:StyleTemplate02 width="100%" height="100%" id="mainTemplate"
+				destination="{destination}" endpoint="{endpoint}" edit="onEdit()" insert="onInsert()" returnToList="onReturn()"
+				templetCode="{templetCode}" debugMode="{debugMode}" editable="{editable}" showSystemButton="false"
+								 initQueryCondition="{initQueryCondition}"
+								 insertbfIncCard ="{insertbfIncCard}"
+								 insertafIncCard ="{insertafIncCard}"
+								 updatebfIncCard ="{updatebfIncCard}"
+								 updateafIncCard ="{updateafIncCard}"
+								 deletebfIncCard ="{deletebfIncCard}"
+								 deleteafIncCard ="{deleteafIncCard}"
+								 showDataAfterInit="{showDataAfterInit}"
+								 disableEffect="{disableEffect}"
+								 pageSize="{pageSize}"
+								 isShowInsertBtn="{isShowInsertBtn}"
+								 isShowDelBtn="{isShowDelBtn}"
+								 cardLayoutType="{cardLayoutType}"
+								 itemLabelWidth="{itemLabelWidth}"
+								 />
+			<mx:VBox id="childrenBox" width="100%" height="100%">
+				<mx:TabNavigator id="childrenNavigator" width="100%" height="100%"/>
+			</mx:VBox>
+		</mx:DividedBox>
+	</mx:VBox>
+</mx:Canvas>

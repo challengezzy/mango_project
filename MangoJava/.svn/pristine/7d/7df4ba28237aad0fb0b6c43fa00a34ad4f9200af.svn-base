@@ -1,0 +1,124 @@
+/**************************************************************************
+ * $RCSfile: NovaConstants.java,v $  $Revision: 1.2.8.1 $  $Date: 2009/08/14 09:23:47 $
+ **************************************************************************/
+package smartx.framework.common.ui;
+
+public class NovaConstants {
+    // 模板编码,BSUitl工厂实现时引用
+    public static final String STRING_TEMPLET_CODE = "TEMPLETCODE";
+
+    // 客户端环境,BSUitl工厂实现时引用
+    public static final String STRING_CLIENT_ENVIRONMENT = "CLIENTENV";
+
+    //
+    //单据数据编辑状态 ..开始
+    //
+    public static final String BILLDATAEDITSTATE_INIT = "INIT"; //
+
+    public static final String BILLDATAEDITSTATE_INSERT = "INSERT"; //
+
+    public static final String BILLDATAEDITSTATE_UPDATE = "UPDATE"; //
+
+    public static final String BILLDATAEDITSTATE_DELETE = "DELETE"; //
+
+    //
+    //	单据数据编辑状态..结束
+    //
+
+    //卡片/列表下控件编辑状态设置
+    public static final String BILLCOMPENTEDITABLE_ALL = "1"; //全部可编辑
+
+    public static final String BILLCOMPENTEDITABLE_ONLYINSERT = "2"; //只有新增时可编辑
+
+    public static final String BILLCOMPENTEDITABLE_ONLYUPDATE = "3"; //只有修改时可编辑
+
+    public static final String BILLCOMPENTEDITABLE_NONE = "4"; //全部不可编辑!
+
+    // 消息类型
+    public static final int MESSAGE_INFO = 0;
+
+    public static final int MESSAGE_WARN = 1;
+
+    public static final int MESSAGE_ERROR = 2;
+
+    public static final int MESSAGE_CONFIRM = 3;
+
+    // 消息窗口标题
+    public static final String MESSAGE_INFO_TITLE = "提示";
+
+    public static final String MESSAGE_WARN_TITLE = "警告";
+
+    public static final String MESSAGE_ERROR_TITLE = "错误";
+
+    public static final String MESSAGE_CONFIRM_TITLE = "确认";
+
+    // 常用的提示信息
+    public static final String STRING_DEL_CONFIRM = "确定要删除吗?";
+
+    public static final String STRING_DEL_SELECTION_NEED = "请选择一条要删除的记录!";
+
+    public static final String STRING_OPERATION_SUCCESS = "操作成功!";
+
+    public static final String STRING_OPERATION_FAILED = "操作失败!";
+
+    public static final String STRING_CURRENT_USER = "当前用户: ";
+
+    public static final String STRING_LOGIN_TIME = "登录时间: ";
+
+    public static final String STRING_CURRENT_POSITION = "当前位置: ";
+
+    public static final String STRING_CURRENT_POSITION_DIVIDER = " >> ";
+
+    public static final String STRING_REFPANEL_CUSTOMER_TITLE = "自定义面板";
+
+    public static final String STRING_REFPANEL_COMMON_TITLE = "基本信息";
+
+    public static final String STRING_REFPANEL_UIINTERCEPTOR = "UI拦截器";
+
+    public static final String STRING_REFPANEL_BSINTERCEPTOR = "BS拦截器";
+
+    // 时间类型；0表示数据库字段的时间为char型，1表示为date型
+    public static final int DATETYPE = 0;
+
+    //上传文件存放目录
+    public static final String UPLOAD_DIRECTORY = "upload"; //
+
+    public static final String UPLOAD_FILE_NAME = "filename";
+
+    public static final String UPLOAD_RESULT = "result";
+    //参照中不显示列的标记符
+    public static final String STRING_REFPANEL_UNSHOWSIGN = "#";
+
+    //用户工位
+    public static final String USER_WORKPOSITION = "SYS_WORKPOSITION";
+    
+    
+    /**
+     * 登录验证模式
+     */
+    public static final String SYS_LOGIN_LOCAL="LOCAL";//本地认证
+    public static final String SYS_LOGIN_3TH="OTHER";//第三方认证
+    
+}
+
+/**************************************************************************
+ * $RCSfile: NovaConstants.java,v $  $Revision: 1.2.8.1 $  $Date: 2009/08/14 09:23:47 $
+ *
+ * $Log: NovaConstants.java,v $
+ * Revision 1.2.8.1  2009/08/14 09:23:47  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/05/31 07:38:23  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 05:56:36  qilin
+ * no message
+ *
+ * Revision 1.3  2007/03/01 02:28:38  sunxf
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 03:41:28  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%" xmlns:core="smartx.flex.components.core.*"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.hurlant.eval.ast.Void;
+			
+			import mx.controls.Alert;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_CEP;
+			[Bindable]
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			private var cepService:RemoteObject;
+			
+			
+			private function init():void{
+				if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+					debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				cepService = new RemoteObject(destination);
+				if(endpoint!=null)
+					cepService.endpoint = endpoint;
+				
+				cepService.startStreamModule.addEventListener(ResultEvent.RESULT,doSuccessfulHandler);
+				cepService.startStreamModule.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				cepService.stopStreamModule.addEventListener(ResultEvent.RESULT,doSuccessfulHandler);
+				cepService.stopStreamModule.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				cepService.undeployStreamModule.addEventListener(ResultEvent.RESULT,doSuccessfulHandler);
+				cepService.undeployStreamModule.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				cepService.redeployStreamModule.addEventListener(ResultEvent.RESULT,doSuccessfulHandler);
+				cepService.redeployStreamModule.addEventListener(FaultEvent.FAULT,faultHandler);
+			}
+			
+			
+			private function doSuccessfulHandler(event:ResultEvent):void{
+				Alert.show("操作成功");
+				listPanel.query();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			private function start():void{
+				var module:Object = listPanel.getSelectedRowValue();
+				if(module == null){
+					Alert.show("请选择要操作的流模块");
+					return;
+				}
+				var name:String = module["NAME"];
+				var providername:String = module["PROVIDERNAME"];
+				var status:int = module["STATUS"]["id"];
+				if(status == 1){
+					Alert.show("该模块已启动，无法再次启动");
+					return;
+				}
+				cepService.startStreamModule(providername,name);
+			}
+			
+			private function stop():void{
+				var module:Object = listPanel.getSelectedRowValue();
+				if(module == null){
+					Alert.show("请选择要操作的流模块");
+					return;
+				}
+				var name:String = module["NAME"];
+				var providername:String = module["PROVIDERNAME"];
+				var status:int = module["STATUS"]["id"];
+				if(status == 0){
+					Alert.show("该模块已停止，无法再次停止");
+					return;
+				}
+				cepService.stopStreamModule(providername,name);
+			}
+			
+			private function undeploy():void{
+				var module:Object = listPanel.getSelectedRowValue();
+				if(module == null){
+					Alert.show("请选择要操作的流模块");
+					return;
+				}
+				var name:String = module["NAME"];
+				var providername:String = module["PROVIDERNAME"];
+				cepService.undeployStreamModule(providername,name);
+			}
+			
+			private function redeploy():void{
+				var module:Object = listPanel.getSelectedRowValue();
+				if(module == null){
+					Alert.show("请选择要操作的流模块");
+					return;
+				}
+				var name:String = module["NAME"];
+				var providername:String = module["PROVIDERNAME"];
+				cepService.redeployStreamModule(providername,name);
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%">
+		<mx:Button label="启动" click="start()" icon="@Embed(source='../../assets/images/start.png')"/>
+		<mx:Button label="停止" click="stop()" icon="@Embed(source='../../assets/images/stop.png')"/>
+		<mx:Button label="重新发布" click="redeploy()" icon="@Embed(source='../../assets/images/redeploy.png')"/>
+		<mx:Button label="卸载" click="undeploy()" icon="@Embed(source='../../assets/images/delete2.png')"/>
+	</mx:HBox>
+	<core:BillListPanel id="listPanel" templetCode="T_PUB_CEP_STREAMMODULE" width="100%" height="100%" debugMode="{debugMode}" 
+						showEditBox="false" editable="false" endpoint="{endpoint}"/>
+</mx:Module>

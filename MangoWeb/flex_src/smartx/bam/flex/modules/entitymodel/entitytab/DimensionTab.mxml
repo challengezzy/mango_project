@@ -1,0 +1,1208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009"
+						 xmlns:s="library://ns.adobe.com/flex/spark"
+						 xmlns:mx="library://ns.adobe.com/flex/mx" 
+						 xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*"
+						 width="100%" height="100%" label="维度管理"
+						 creationComplete="init()">
+	<fx:Declarations>
+		
+		<mx:HBox width="100%" id="entityDimensionHBox" >
+			<mx:Label text="维度实体" toolTip="" width="25%"/>
+			<mx:ComboBox id="entityCob" width="50%" change="entityCob_changeHandler(event)" labelFunction="entityLabelFunction" dataProvider="{entityCol}" toolTip="选择实体"/>
+		</mx:HBox>
+		
+		<mx:HBox id="timeDimensionTypeHBox" width="100%" >
+			<mx:Label text="时间纬度类型" toolTip="时间维度类型" width="25%"/>
+			<mx:ComboBox id="timeDimensionTypeCob" width="50%" labelField="label" change="timeDimensionTypeCob_changeHandler(event)" dataProvider="{timeDimensionTypeCol}" />
+		</mx:HBox>
+		
+		<mx:HBox id="historyYearHbox" width="100%" >
+			<mx:Label text="起始年份" width="25%"/>
+			<mx:TextInput id="historyYearTxt" toolTip="抽取历史日期的起始年份,取值范围:1900至当前年份,超出范围将视为无效!" width="50%" restrict="0-9" />
+		</mx:HBox>
+		
+		<mx:HBox id="synDimentionHBox" width="100%" >
+			<mx:Label text="同义词组" toolTip="选择一个同义词组" width="25%"/>
+			<mx:ComboBox id="synDimensionTypeCob" width="50%" labelField="label" change="synDimensionTypeCob_changeHandler(event)" dataProvider="{synonymsCol}" />
+		</mx:HBox>
+		
+		<mx:TitleWindow id="entityLevelTw" title="实体维度级别" showCloseButton="true" width="530" height="290" close="PopUpManager.removePopUp(entityLevelTw)">
+			<mx:VBox width="100%" height="100%" horizontalAlign="center" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%" >
+					<mx:Label text="名称" width="25%" color="blue"/>
+					<mx:TextInput id="levelNameTxt" width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="字段类型" toolTip="" width="25%"/>
+					<mx:ComboBox id="columnTypeCob" width="75%" labelField="label" dataProvider="{fildsTypeCol}" toolTip="字段类型"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="是否唯一" toolTip="" width="25%"/>
+					<mx:CheckBox id="isUniqueCheckBox" selected="false" toolTip="是否唯一"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="字段" toolTip="" width="25%"/>
+					<mx:ComboBox id="columnCob" width="75%" labelField="columnLabel" dataProvider="{columnsCol}" toolTip="选择字段"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="父字段" toolTip="" width="25%"/>
+					<mx:ComboBox id="parentColumnCob" width="62%" labelField="columnLabel" dataProvider="{columnsCol}" toolTip="选择父字段"/>
+					<mx:LinkButton id="parentColumnBtn" icon="{AssetsFileLib.clearIcon}" click="parentColumnBtn_clickHandler(event)" toolTip="清除" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="根节点值" toolTip="" width="25%"/>
+					<mx:TextInput id="parentColumnValueTxt" text="null" width="75%" toolTip="树形结构的根节点数值"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" >
+					<mx:Button id="entityDimensionConfirmBtn" label="确定" click="entityDimensionConfirmBtn_clickHandler(event)" />
+					<mx:Button click="PopUpManager.removePopUp(entityLevelTw)" label="取消" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="timeLevelTw" title="时间维度级别" showCloseButton="true" width="530" height="270" close="PopUpManager.removePopUp(timeLevelTw)">
+			<mx:VBox  width="100%" height="100%" horizontalAlign="center" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%" >
+					<mx:Label text="级别类型" toolTip="时间维度级别类型" width="25%"/>
+					<mx:ComboBox id="levelTypeCob" width="75%" labelField="label" dataProvider="{levelTypeCol}" toolTip="选择字段"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="名称" width="25%" color="blue"/>
+					<mx:TextInput id="timeLevelNameTxt" width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="字段类型" toolTip="" width="25%"/>
+					<mx:ComboBox id="timeColumnTypeCob" width="75%" labelField="label" dataProvider="{fildsTypeCol}" toolTip="字段类型"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="是否唯一" toolTip="" width="25%"/>
+					<mx:CheckBox id="timeIsUniqueCheckBox" selected="false" toolTip="是否唯一"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="字段" toolTip="" width="25%"/>
+					<mx:ComboBox id="timeColumnCob" width="75%" labelField="columnLabel" dataProvider="{columnsCol}" toolTip="选择字段"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center" >
+					<mx:Button id="timeDimensionConfirmBtn" label="确定" click="timeDimensionConfirmBtn_clickHandler(event)" />
+					<mx:Button click="PopUpManager.removePopUp(timeLevelTw)" label="取消" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="contentXmlTw" title="元数据" showCloseButton="true" width="800" height="500" close="PopUpManager.removePopUp(contentXmlTw)">
+			<mx:TextArea id="contentXmlText" width="100%" height="100%" editable="false" />
+		</mx:TitleWindow>
+		
+		<mx:DataGrid id="entityLevelDg" width="100%" height="100%" dataProvider="{tempDimensionXml.Hierarchy.Level}" doubleClickEnabled="true" doubleClick="onEditLevel()" >
+			<mx:columns>
+				<mx:DataGridColumn dataField="@name" editable="false" headerText="名称"/>
+				<mx:DataGridColumn labelFunction="getColumnTypeName" editable="false"  headerText="字段类型"/>
+				<mx:DataGridColumn dataField="@column" editable="false" headerText="字段"/>
+				<mx:DataGridColumn dataField="@parentColumn" editable="false" headerText="父字段"/>
+				<mx:DataGridColumn dataField="@nullParentValue" editable="false" headerText="根节点值"/>
+			</mx:columns>
+		</mx:DataGrid>
+		
+		<mx:DataGrid id="timeLevelDg" width="100%" height="100%" dataProvider="{tempDimensionXml.Hierarchy.Level}" doubleClick="onEditLevel()" doubleClickEnabled="true" >
+			<mx:columns>
+				<mx:DataGridColumn dataField="@name" editable="false" headerText="名称"/>
+				<mx:DataGridColumn labelFunction="getColumnTypeName" editable="false"  headerText="字段类型"/>
+				<mx:DataGridColumn dataField="@column" editable="false" headerText="字段"/>
+				<mx:DataGridColumn labelFunction="getLevelTypeName" editable="false" headerText="级别类型"/>
+			</mx:columns>
+		</mx:DataGrid>
+		
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.effects.Effect;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.Pixelate;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.EntityTaskViewWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			public static const ENTITY_DIMENSION:String = "EntityDimension";//实体维度
+			public static const TIME_DIMENSION:String = "TimeDimension";//时间维度
+			public static const INNER_DIMENSION:String = "InnerDimension";//内部维度
+			public static const SYNONYMS_DIMENSION:String = "SynonymsDimension";//同义词维度
+			
+			private var MT_SYNONYMS:String = "MT_SYNONYMS";
+			
+			private var loginName:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME) as String;
+			
+			[Bindable]
+			public var isEdit:Boolean = true;
+			
+			[Bindable]
+			private var switchEffect:Effect;
+			
+			[Bindable]
+			public var saveFun:Function;
+			
+			[Bindable]
+			public var saveNoAlertFun:Function;
+			
+			[Bindable]
+			public var refresh:Function;
+			
+			[Bindable]
+			public var entityCol:ArrayCollection;
+			
+			[Bindable]
+			private var columnsCol:ArrayCollection = new ArrayCollection();
+			
+			private var content:String;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			[Bindable]
+			public var seletedDimensionXml:XML;
+			
+			[Bindable]
+			private var tempDimensionXml:XML;
+			
+			private var saveInfo:Object;
+			
+			private var isSaveSuccessful:Boolean = false;
+			
+			private var hasSaved:Boolean = false;
+			
+			private var dimensionType:String;
+			
+			[Bindable]
+			public var dwDsName:String;
+			
+			[Bindable]
+			private var fildsTypeCol:ArrayCollection = new ArrayCollection([
+				{label:"字符",value:"String"},
+				{label:"数字",value:"Numeric"},
+				{label:"时间",value:"Date"}
+			]);
+			
+			[Bindable]
+			private var levelTypeCol:ArrayCollection = new ArrayCollection([
+				{label:"Years",value:"TimeYears"},
+				{label:"Months",value:"TimeMonths"},
+				{label:"Days",value:"TimeDays"}
+			]);
+			
+			[Bindable]
+			private var timeDimensionTypeCol:ArrayCollection = new ArrayCollection([
+				{label:"年",value:"year",table:"DW_DIMENSION_YEAR"},
+				{label:"年月",value:"yearmonth",table:"DW_DIMENAION_YEARMONTH"},
+				{label:"年月日",value:"yearmonthday",table:"DW_DIMENSION_YEARMONTHDAY"}
+//				{label:"年月日时",value:"yearmonthday",table:"DW_DIMENSION_YEARMONTHDAYHOUR"}
+			]);
+			
+			[Bindable]
+			private var synonymsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var allInheritAtts:ArrayCollection = new ArrayCollection();
+			
+			private var entityXml:XML;
+			
+			private var dimensionXml:XML;
+			
+			private var levelEdit:Boolean = true;
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new Pixelate();
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取表结构时出错",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.dealDimension.addEventListener(ResultEvent.RESULT,dealDimensionHanlder);
+				bamService.dealDimension.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.createEntityDimensionTable.addEventListener(ResultEvent.RESULT,createEntityDimensionTableHandler);
+				bamService.createEntityDimensionTable.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.createSynonymsDimensionTable.addEventListener(ResultEvent.RESULT,createSynonymsDimensionTableHandler);
+				bamService.createSynonymsDimensionTable.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				
+				isCreationComplete = true;
+				showHandler();
+			}
+			
+			public function showHandler():void{
+				mainTab.selectedChild = baseInfoVbox;
+				this.dimensionType = String(seletedDimensionXml.@type);
+				this.tempDimensionXml = seletedDimensionXml.copy();
+				initLevelPanelItems();
+				if(isEdit){
+					
+					dimensionNameTxt.text = String(seletedDimensionXml.@name);
+					dimensionCodeTxt.text = String(seletedDimensionXml.@code);
+					isIncludeAllItemCheckBox.selected = (seletedDimensionXml.Hierarchy.@hasAll =="true" ?true:false);
+					allItemsNameTxt.text = String(seletedDimensionXml.Hierarchy.@allMemberName);
+					
+					if(dimensionType == DimensionTab.TIME_DIMENSION){
+						timeDimensionTypeCob.selectedItem = getItemFromArrayCollection(timeDimensionTypeCol,String(seletedDimensionXml.Hierarchy.@type),"value");
+						timeDimensionTypeCob_changeHandler(null);
+						historyYearTxt.text = String(seletedDimensionXml.@startyear);
+					}else if(dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+						synDimensionTypeCob.selectedItem = getItemFromArrayCollection(synonymsCol,String(seletedDimensionXml.@synonymsCode),"code");
+						synDimensionTypeCob_changeHandler(null);
+					}else if(dimensionType == DimensionTab.ENTITY_DIMENSION){
+						var entityCode:String = String(seletedDimensionXml.@entityCode);
+						for each(var obj:Object in entityCol){
+							var xml:XML = obj as XML;
+							if(!BAMUtil.isEmpty(entityCode)&& entityCode == String(xml.@code)){
+								entityCob.selectedItem = obj;
+							}
+						}
+						entityCob_changeHandler(null);
+					}
+					
+				}else{
+					
+					dimensionNameTxt.text = "";
+					dimensionCodeTxt.text = "";
+					isIncludeAllItemCheckBox.selected = false;
+					allItemsNameTxt.text = "";
+					
+					if(dimensionType == DimensionTab.TIME_DIMENSION){
+						timeDimensionTypeCob.selectedIndex = 0;
+						timeDimensionTypeCob_changeHandler(null);
+						historyYearTxt.text = "";
+					}else if(dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+						synDimensionTypeCob_changeHandler(null);
+					}else if(dimensionType == DimensionTab.ENTITY_DIMENSION){
+						entityCob_changeHandler(null);
+					}
+				}
+			}
+			
+			private function getItemFromArrayCollection(columnCol:ArrayCollection,itemName:String,keyName:String):Object{
+				var columnItem:Object = null;
+				for each(var tempItem:Object in columnCol){
+					var tempItemName:String = tempItem[keyName] as String;
+					if(!BAMUtil.isEmpty(tempItemName) && !BAMUtil.isEmpty(itemName) && tempItemName == itemName ){
+						columnItem = tempItem;
+						break;
+					}
+				}
+				return columnItem;
+			}
+			
+			private function getColumnTypeName(item:Object,column:DataGridColumn):String{
+				var typeName:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					var typeValue:String = String(xml.@type);
+					for each(var typeItem:Object in fildsTypeCol){
+						var tempTypeValue:String = typeItem["value"] as String;
+						if(!BAMUtil.isEmpty(typeValue) && typeValue == tempTypeValue){
+							typeName = typeItem["label"] as String;
+						}
+					}
+				}
+				return typeName;
+			}
+			
+			private function getLevelTypeName(item:Object,column:DataGridColumn):String{
+				var levelName:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					var typeValue:String = String(xml.@levelType);
+					for each(var typeItem:Object in levelTypeCol){
+						var tempTypeValue:String = typeItem["value"] as String;
+						if(!BAMUtil.isEmpty(typeValue) && typeValue == tempTypeValue){
+							levelName = typeItem["label"] as String;
+						}
+					}
+				}
+
+				return levelName;
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				var tds:TableDataStruct = event.result as TableDataStruct;
+				columnsCol.removeAll();
+				var index:int = 0;
+				for each(var name:String in tds.table_header){
+					var type:String = tds.table_body_type[index] as String;
+					var columnItem:Object = new Object();
+					columnItem["columnName"] = name.toUpperCase();
+					columnItem["columnAlias"] = name.toUpperCase();
+					columnItem["columnType"] = type;
+					columnItem["columnLabel"] = name.toUpperCase();
+					columnItem["columnRef"] = "";
+					columnsCol.addItem(columnItem);
+				}
+				
+//				foreignKeyCob.selectedItem = getItemFromArrayCollection(columnsCol,String(seletedDimensionXml.@foreignKey),"columnAlias");
+			}
+			
+			private function dealDimensionHanlder(event:ResultEvent):void{
+				var tableName:String = event.result as String;
+				if(!BAMUtil.isEmpty(tableName)){
+					tempDimensionXml.Hierarchy.Table.@name = tableName.toUpperCase();
+					seletedDimensionXml.Hierarchy.Table.@name = tableName.toUpperCase();
+				}
+				showHandler();
+				saveNoAlertFun();
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("抽取结束!");
+			}
+			
+			private function createEntityDimensionTableHandler(event:ResultEvent):void{
+				var dimentionTable:String = event.result as String;
+				tempDimensionXml.Hierarchy.Table.@name = dimentionTable.toUpperCase();
+				if(isEdit){
+					CEPUtils.xmlDeleteNode(seletedDimensionXml);
+					contentXml.dimensions.appendChild(tempDimensionXml);
+					seletedDimensionXml = tempDimensionXml;
+					refresh();
+				}else{
+					
+					if(contentXml.dimensions.length()<=0 ){
+						contentXml.appendChild(new XML("<dimensions />"));
+					}
+					contentXml.dimensions.appendChild(tempDimensionXml);
+					seletedDimensionXml = tempDimensionXml;
+					isEdit = true;
+					refresh();
+				}
+				saveFun();
+				showHandler();
+				
+			}
+			
+			private function createSynonymsDimensionTableHandler(event:ResultEvent):void{
+				var dimentionTable:String = event.result as String;
+				tempDimensionXml.Hierarchy.Table.@name = dimentionTable.toUpperCase();
+				if(isEdit){
+					CEPUtils.xmlDeleteNode(seletedDimensionXml);
+					contentXml.dimensions.appendChild(tempDimensionXml);
+					seletedDimensionXml = tempDimensionXml;
+					refresh();
+				}else{
+					
+					if(contentXml.dimensions.length()<=0 ){
+						contentXml.appendChild(new XML("<dimensions />"));
+					}
+					contentXml.dimensions.appendChild(tempDimensionXml);
+					seletedDimensionXml = tempDimensionXml;
+					isEdit = true;
+					refresh();
+				}
+				saveFun();
+				showHandler();
+				
+			}
+			
+			private function refreshColumns():void{
+				columnsCol.removeAll();
+				var currEntityXml:XML = entityXml;
+				for each( var attributeItem:XML in currEntityXml.attributes.attribute){
+					var name:String = String(attributeItem.@name);
+					var type:String = String(attributeItem.@type);
+					var label:String = String(attributeItem.@label);
+					var refDesc:String = String(attributeItem.@dictionaryRef);
+					var columnItem:Object;
+					if(String(currEntityXml.@type) == "virtual"){//如果是虚拟实体
+						columnItem = new Object();
+						columnItem["columnName"] = String(attributeItem.@expression);
+						columnItem["columnAlias"] = name.toUpperCase();
+						columnItem["columnType"] = type;
+						columnItem["columnLabel"] = label;
+						columnItem["columnRef"] = refDesc;
+						columnsCol.addItem(columnItem);
+					}else{
+						var mappingItems:XMLList = currEntityXml.mappingInfo.attributeMapping.map.(@attributeName == attributeItem.@name);
+						if(mappingItems.length() > 0){
+							columnItem = new Object();
+							columnItem["columnName"] = String(mappingItems[0].@columnName);
+							columnItem["columnAlias"] = name.toUpperCase();
+							columnItem["columnType"] = type;
+							columnItem["columnLabel"] = label;
+							columnItem["columnRef"] = refDesc;
+							columnsCol.addItem(columnItem);
+						}
+					}
+				}
+				
+				for each(var parentAttXml:XML in allInheritAtts){
+					var parentAttName:String = String(parentAttXml.@name);
+					var parentAttType:String = String(parentAttXml.@type);
+					var parentAttLabel:String = String(parentAttXml.@label);
+					var parentAttRefDesc:String = String(parentAttXml.@dictionaryRef);
+					var parenColumnItem:Object = new Object();
+					parenColumnItem["columnName"] = parentAttName.toUpperCase();
+					parenColumnItem["columnAlias"] = parentAttName.toUpperCase();
+					parenColumnItem["columnType"] = parentAttType;
+					parenColumnItem["columnLabel"] = parentAttLabel;
+					parenColumnItem["columnRef"] = parentAttRefDesc;
+					columnsCol.addItem(parenColumnItem);
+				}
+			}
+			
+			private function refreshTimeDimensionColumn():void{
+				columnsCol.removeAll();
+				
+			}
+			
+			private function initLevelPanelItems():void{
+				
+				var index:int = baseInfoCard.getChildIndex(allItemNameHBox);
+				if(!BAMUtil.isEmpty(dimensionType) && dimensionType == DimensionTab.ENTITY_DIMENSION ){
+					
+					if(baseInfoCard.contains(timeDimensionTypeHBox)){
+						baseInfoCard.removeChild(timeDimensionTypeHBox);
+					}
+					if(baseInfoCard.contains(historyYearHbox)){
+						baseInfoCard.removeChild(historyYearHbox);
+					}
+					if(listVBox.contains(timeLevelDg)){
+						listVBox.removeChild(timeLevelDg);
+					}
+					if(baseInfoCard.contains(synDimentionHBox)){
+						baseInfoCard.removeChild(synDimentionHBox);
+					}
+					
+					if(!baseInfoCard.contains(entityDimensionHBox)){
+						baseInfoCard.addChildAt(entityDimensionHBox,index+1);
+					}
+					
+					if(!listVBox.contains(entityLevelDg)){
+						listVBox.addChild(entityLevelDg);
+					}
+					
+				}else if(!BAMUtil.isEmpty(dimensionType) && dimensionType == DimensionTab.TIME_DIMENSION){
+					
+					if(listVBox.contains(entityLevelDg)){
+						listVBox.removeChild(entityLevelDg);
+					}
+					if(baseInfoCard.contains(entityDimensionHBox)){
+						baseInfoCard.removeChild(entityDimensionHBox);
+					}
+					if(baseInfoCard.contains(synDimentionHBox)){
+						baseInfoCard.removeChild(synDimentionHBox);
+					}
+					
+					if(!baseInfoCard.contains(timeDimensionTypeHBox)){
+						baseInfoCard.addChildAt(timeDimensionTypeHBox,index+1);
+					}
+					if(!baseInfoCard.contains(historyYearHbox)){
+						baseInfoCard.addChildAt(historyYearHbox,index+2);
+					}
+					
+					if(!listVBox.contains(timeLevelDg)){
+						listVBox.addChild(timeLevelDg);
+					}
+				}else if(!BAMUtil.isEmpty(dimensionType) && dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+					
+					if(baseInfoCard.contains(timeDimensionTypeHBox)){
+						baseInfoCard.removeChild(timeDimensionTypeHBox);
+					}
+					if(baseInfoCard.contains(historyYearHbox)){
+						baseInfoCard.removeChild(historyYearHbox);
+					}
+					if(listVBox.contains(timeLevelDg)){
+						listVBox.removeChild(timeLevelDg);
+					}
+					if(baseInfoCard.contains(entityDimensionHBox)){
+						baseInfoCard.removeChild(entityDimensionHBox);
+					}
+					
+					if(!baseInfoCard.contains(synDimentionHBox)){
+						baseInfoCard.addChildAt(synDimentionHBox,index+1);
+					}
+					
+					if(!listVBox.contains(entityLevelDg)){
+						listVBox.addChild(entityLevelDg);
+					}
+					
+					var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(this.MT_SYNONYMS);
+					if(metadataTemplet != null){
+						for each(var synXml:XML in metadataTemplet.contentXML.synonyms){
+							var name:String = String(synXml.@name);
+							var code:String = String(synXml.@code);
+							var item:Object = new Object();
+							item["label"] = name;
+							item["code"] = code;
+							synonymsCol.addItem(item);
+						}
+					}
+					
+					if(synonymsCol.length >0){
+						synDimensionTypeCob.selectedIndex = 0;
+					}
+				}
+			}
+			
+			private function onSave():void{
+				
+				var dimensionName:String = dimensionNameTxt.text;
+				var dimensionCode:String = dimensionCodeTxt.text;
+				
+				if(BAMUtil.isEmpty(dimensionCode)){
+					SmartXMessage.show("编码不能为空!");
+					return
+				}
+				
+				if(isEdit){
+					if(getDimensionCount(dimensionCode)>1){
+						SmartXMessage.show("编码重复!");
+						return;
+					}
+				}else{
+					if(getDimensionCount(dimensionCode)>=1){
+						SmartXMessage.show("编码重复!");
+						return;
+					}
+				}
+				
+				var isIncludeAllItem:Boolean = isIncludeAllItemCheckBox.selected;
+				var allItemsName:String = allItemsNameTxt.text;
+				
+				tempDimensionXml.@name = dimensionName;
+				tempDimensionXml.@code = dimensionCode;
+				
+				tempDimensionXml.Hierarchy.@hasAll = isIncludeAllItem;
+				tempDimensionXml.Hierarchy.@allMemberName = allItemsName;
+				
+				if(dimensionType == DimensionTab.ENTITY_DIMENSION){
+//					var primaryKey:String = String(entityXml.@idAttributeName);
+//					if(!BAMUtil.isEmpty(primaryKey)){
+//						tempDimensionXml.Hierarchy.@primaryKey = primaryKey;
+//					}else{
+//						
+//					}
+					tempDimensionXml.Hierarchy.@primaryKey = "ID";
+					
+					var entityCode:String = String(entityXml.@code);
+					tempDimensionXml.@entityCode = entityCode;
+					if(isEdit){
+						CEPUtils.xmlDeleteNode(seletedDimensionXml);
+						contentXml.dimensions.appendChild(tempDimensionXml);
+						seletedDimensionXml = tempDimensionXml;
+						refresh();
+					}else{
+						
+						if(contentXml.dimensions.length()<=0 ){
+							contentXml.appendChild(new XML("<dimensions />"));
+						}
+						contentXml.dimensions.appendChild(tempDimensionXml);
+						seletedDimensionXml = tempDimensionXml;
+						isEdit = true;
+						refresh();
+					}
+					saveFun();
+					showHandler();
+					
+				}else if(dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+					var tempSynObj:Object = synDimensionTypeCob.selectedItem;
+					tempDimensionXml.Hierarchy.@primaryKey = "ID";
+					tempDimensionXml.@synonymsCode = String(tempSynObj["code"]);
+					if(isEdit){
+						CEPUtils.xmlDeleteNode(seletedDimensionXml);
+						contentXml.dimensions.appendChild(tempDimensionXml);
+						seletedDimensionXml = tempDimensionXml;
+						refresh();
+					}else{
+						
+						if(contentXml.dimensions.length()<=0 ){
+							contentXml.appendChild(new XML("<dimensions />"));
+						}
+						contentXml.dimensions.appendChild(tempDimensionXml);
+						seletedDimensionXml = tempDimensionXml;
+						isEdit = true;
+						refresh();
+					}
+					saveFun();
+					showHandler();
+					
+				}else if(dimensionType == DimensionTab.TIME_DIMENSION){
+					tempDimensionXml.Hierarchy.@primaryKey = "ID";
+					var typeObj:Object = timeDimensionTypeCob.selectedItem;
+					tempDimensionXml.Hierarchy.@type = typeObj["value"] as String;
+					tempDimensionXml.Hierarchy.Table.@name = typeObj["table"] as String;
+					
+					tempDimensionXml.@startyear = historyYearTxt.text;
+					
+					if(isEdit){
+						CEPUtils.xmlDeleteNode(seletedDimensionXml);
+						contentXml.dimensions.appendChild(tempDimensionXml);
+						seletedDimensionXml = tempDimensionXml;
+						refresh();
+					}else{
+						
+						if(contentXml.dimensions.length()<=0 ){
+							contentXml.appendChild(new XML("<dimensions />"));
+						}
+						contentXml.dimensions.appendChild(tempDimensionXml);
+						seletedDimensionXml = tempDimensionXml;
+						isEdit = true;
+						refresh();
+					}
+					saveFun();
+					showHandler();
+				}
+			}
+			
+			private function getDimensionCount(code:String):int{
+				var acount:int = 0;
+				for each(var dimensionXml:XML in contentXml.dimensions.Dimension){
+					var tempCode:String = String(dimensionXml.@code);
+					if(!BAMUtil.isEmpty(tempCode) && !BAMUtil.isEmpty(code) && tempCode == code){
+						acount = acount+1;
+					}
+				}
+				return acount;
+			}
+			
+			protected function entityCob_changeHandler(event:ListEvent):void{
+				var selectEntityItem:Object = entityCob.selectedItem;
+				if(selectEntityItem != null ){
+					entityXml = selectEntityItem as XML;
+						allInheritAtts = EntityUtil.getInheritAttributes(entityXml,contentXml);
+						refreshColumns();
+				}
+			}
+			
+			private function entityLabelFunction(item:Object):String{
+				var entityName:String = "";
+				if(item != null ){
+					var xml:XML = item as XML;
+					entityName = xml.@name;
+				}
+				return entityName;
+			}
+			
+			protected function parentColumnBtn_clickHandler(event:MouseEvent):void
+			{
+				parentColumnCob.selectedItem = null;
+			}
+			
+			private function showXml():void{
+				if(desktop != null){
+					PopUpManager.addPopUp(contentXmlTw,desktop,true);
+				}else{
+					PopUpManager.addPopUp(contentXmlTw,this,true);
+				}
+				PopUpManager.centerPopUp(contentXmlTw);
+				contentXmlText.text = tempDimensionXml.toXMLString();
+			}
+			
+			private function onAddLevel():void{
+				
+				if(dimensionType == DimensionTab.ENTITY_DIMENSION || dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+					
+					if(desktop != null){
+						PopUpManager.addPopUp(entityLevelTw,desktop,true);
+					}else{
+						PopUpManager.addPopUp(entityLevelTw,this,true);
+					}
+					PopUpManager.centerPopUp(entityLevelTw);
+					
+					levelNameTxt.text = "";
+					columnTypeCob.selectedIndex = 0;
+					if(columnsCol.length >0){
+						columnCob.selectedIndex = 0;
+						parentColumnCob.selectedItem = null;
+					}
+					parentColumnValueTxt.text = "null";
+					levelEdit = false;
+					
+				}else if(dimensionType == DimensionTab.TIME_DIMENSION){
+					if(desktop != null){
+						PopUpManager.addPopUp(timeLevelTw,desktop,true);
+					}else{
+						PopUpManager.addPopUp(timeLevelTw,this,true);
+					}
+					PopUpManager.centerPopUp(timeLevelTw);
+					
+					timeLevelNameTxt.text = "";
+					if(columnsCol.length >0){
+						timeColumnCob.selectedIndex = 0;
+					}
+					levelEdit = false;
+					
+				}
+				
+			}
+			
+			private function onDeleteLevel():void{
+				if(dimensionType == DimensionTab.ENTITY_DIMENSION || dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+					var entityDimensionLevelItem:Object = entityLevelDg.selectedItem;
+					if(entityDimensionLevelItem != null){
+						var tempEntityLevelXml:XML = entityDimensionLevelItem as XML;
+						CEPUtils.xmlDeleteNode(tempEntityLevelXml);
+					}else{
+						SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+					}
+				}else if(dimensionType == DimensionTab.TIME_DIMENSION){
+					var timeDimensionLevelItem:Object = timeLevelDg.selectedItem;
+					if(timeDimensionLevelItem != null){
+						var tempTimeLevelXml:XML = timeDimensionLevelItem as XML;
+						CEPUtils.xmlDeleteNode(tempTimeLevelXml);
+					}else{
+						SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+					}
+				}
+			}
+			
+			private function onEditLevel():void{
+				if(dimensionType == DimensionTab.ENTITY_DIMENSION || dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+					var entityDimensionLevelItem:Object = entityLevelDg.selectedItem;
+					if(entityDimensionLevelItem != null){
+						if(desktop != null){
+							PopUpManager.addPopUp(entityLevelTw,desktop,true);
+						}else{
+							PopUpManager.addPopUp(entityLevelTw,this,true);
+						}
+						PopUpManager.centerPopUp(entityLevelTw);
+						
+						var tempEntityLevelXml:XML = entityDimensionLevelItem as XML;
+						
+						levelNameTxt.text = String(tempEntityLevelXml.@name);
+						columnTypeCob.selectedItem = getItemFromArrayCollection(fildsTypeCol,String(tempEntityLevelXml.@type),"value");
+						isUniqueCheckBox.selected = (String(tempEntityLevelXml.@uniqueMembers)=="true"?true:false);
+						columnCob.selectedItem = getItemFromArrayCollection(columnsCol,String(tempEntityLevelXml.@column),"columnAlias");
+						parentColumnCob.selectedItem = getItemFromArrayCollection(columnsCol,String(tempEntityLevelXml.@parentColumn),"value");
+						parentColumnValueTxt.text = String(tempEntityLevelXml.@nullParentValue);
+						levelEdit = true;
+						
+					}else{
+						SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+					}
+				}else if(dimensionType == DimensionTab.TIME_DIMENSION){
+					var timeDimensionLevelItem:Object = timeLevelDg.selectedItem;
+					if(timeDimensionLevelItem != null){
+						if(desktop != null){
+							PopUpManager.addPopUp(timeLevelTw,desktop,true);
+						}else{
+							PopUpManager.addPopUp(timeLevelTw,this,true);
+						}
+						PopUpManager.centerPopUp(timeLevelTw);
+						
+						var tempTimeLevelXml:XML = timeDimensionLevelItem as XML;
+						
+						timeLevelNameTxt.text = String(tempTimeLevelXml.@name);
+						timeColumnTypeCob.selectedItem = getItemFromArrayCollection(fildsTypeCol,String(tempTimeLevelXml.@type),"value");
+						timeIsUniqueCheckBox.selected = (String(tempTimeLevelXml.@uniqueMembers)=="true"?true:false);
+						timeColumnCob.selectedItem = getItemFromArrayCollection(columnsCol,String(tempTimeLevelXml.@column),"columnAlias");
+						levelTypeCob.selectedItem = getItemFromArrayCollection(levelTypeCol,String(tempTimeLevelXml.@levelType),"value");
+						levelEdit = true;
+
+					}else{
+						SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+					}
+				}
+			}
+			
+			protected function timeDimensionConfirmBtn_clickHandler(event:MouseEvent):void
+			{
+				if(levelEdit){
+					
+					var timeDimensionLevelItem:Object = timeLevelDg.selectedItem;
+					if(timeDimensionLevelItem != null){
+						
+						var tempTimeLevelXml:XML = timeDimensionLevelItem as XML;
+						
+						tempTimeLevelXml.@levelType = getValueFromObject(levelTypeCob.selectedItem,"value");
+						tempTimeLevelXml.@name = timeLevelNameTxt.text;
+						tempTimeLevelXml.@type = getValueFromObject(timeColumnTypeCob.selectedItem,"value");
+						tempTimeLevelXml.@uniqueMembers = timeIsUniqueCheckBox.selected;
+						tempTimeLevelXml.@column = getValueFromObject(timeColumnCob.selectedItem,"columnAlias");
+						tempTimeLevelXml.@nameColumn = getValueFromObject(timeColumnCob.selectedItem,"columnAlias");
+						
+					}
+					
+				}else{
+					
+					var newTimeLevelXml:XML = <Level />;
+					
+					newTimeLevelXml.@levelType = getValueFromObject(levelTypeCob.selectedItem,"value");
+					newTimeLevelXml.@name = timeLevelNameTxt.text;
+					newTimeLevelXml.@type = getValueFromObject(timeColumnTypeCob.selectedItem,"value");
+					newTimeLevelXml.@uniqueMembers = timeIsUniqueCheckBox.selected;
+					newTimeLevelXml.@column = getValueFromObject(timeColumnCob.selectedItem,"columnAlias");
+					newTimeLevelXml.@nameColumn = getValueFromObject(timeColumnCob.selectedItem,"columnAlias");
+					
+					
+					if(tempDimensionXml.Hierarchy.length() <= 0){
+						tempDimensionXml.appendChild(new XML("<Hierarchy />"));
+					}
+					tempDimensionXml.Hierarchy.appendChild(newTimeLevelXml);
+					
+				}
+				
+				PopUpManager.removePopUp(timeLevelTw);
+				
+			}
+			
+			protected function entityDimensionConfirmBtn_clickHandler(event:MouseEvent):void
+			{
+				if(levelEdit){
+					
+					var entityDimensionLevelItem:Object = entityLevelDg.selectedItem;
+					if(entityDimensionLevelItem != null){
+
+						var tempEntityLevelXml:XML = entityDimensionLevelItem as XML;
+						
+						tempEntityLevelXml.@name = levelNameTxt.text;
+						tempEntityLevelXml.@type = getValueFromObject(columnTypeCob.selectedItem,"value");
+						tempEntityLevelXml.@uniqueMembers = isUniqueCheckBox.selected;
+						tempEntityLevelXml.@column = getValueFromObject(columnCob.selectedItem,"columnAlias");
+						tempEntityLevelXml.@nameColumn = getValueFromObject(columnCob.selectedItem,"columnAlias");
+						tempEntityLevelXml.@parentColumn = getValueFromObject(parentColumnCob.selectedItem,"columnAlias");
+						tempEntityLevelXml.@nullParentValue = parentColumnValueTxt.text;
+						
+					}
+					
+				}else{
+					
+					var newEntityLevelXml:XML = <Level />;
+					
+					newEntityLevelXml.@name = levelNameTxt.text;
+					newEntityLevelXml.@type = getValueFromObject(columnTypeCob.selectedItem,"value");
+					newEntityLevelXml.@uniqueMembers = isUniqueCheckBox.selected;
+					newEntityLevelXml.@column = getValueFromObject(columnCob.selectedItem,"columnAlias");
+					newEntityLevelXml.@nameColumn = getValueFromObject(columnCob.selectedItem,"columnAlias");
+					newEntityLevelXml.@parentColumn = getValueFromObject(parentColumnCob.selectedItem,"columnAlias");
+					newEntityLevelXml.@nullParentValue = parentColumnValueTxt.text;
+					
+					if(tempDimensionXml.Hierarchy.length() <= 0){
+						tempDimensionXml.appendChild(new XML("<Hierarchy />"));
+					}
+					tempDimensionXml.Hierarchy.appendChild(newEntityLevelXml);
+					
+				}
+				
+				PopUpManager.removePopUp(entityLevelTw);
+			}
+			
+			private function getValueFromObject(obj:Object,key:String):String{
+				var tempValue:String = "";
+				if(obj != null ){
+					tempValue = obj[key] as String;
+				}
+				return tempValue;
+			}
+			
+			protected function timeDimensionTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = timeDimensionTypeCob.selectedItem;
+				if(item != null ){
+					var table:String = item["table"] as String;
+//					formService.getTableDataStructByDS(dwDsName,"select * from "+table+" where 1=2 ");
+					
+					var columnItem:Object = new Object();
+					columnItem["columnName"] = "YEARNAME";
+					columnItem["columnAlias"] = "YEARNAME";
+					columnItem["columnType"] = "varchar2";
+					columnItem["columnLabel"] = "YEARNAME";
+					columnItem["columnRef"] = "";
+					columnsCol.addItem(columnItem);
+					
+					var columnItem2:Object = new Object();
+					columnItem2["columnName"] = "MONTHNAME";
+					columnItem2["columnAlias"] = "MONTHNAME";
+					columnItem2["columnType"] = "varchar2";
+					columnItem2["columnLabel"] = "MONTHNAME";
+					columnItem2["columnRef"] = "";
+					columnsCol.addItem(columnItem2);
+					
+					var columnItem3:Object = new Object();
+					columnItem3["columnName"] = "DAYNAME";
+					columnItem3["columnAlias"] = "DAYNAME";
+					columnItem3["columnType"] = "varchar2";
+					columnItem3["columnLabel"] = "DAYNAME";
+					columnItem3["columnRef"] = "";
+					columnsCol.addItem(columnItem3);
+					
+					if(tempDimensionXml.Hierarchy.length() <= 0){
+						tempDimensionXml.appendChild(new XML("<Hierarchy />"));
+					}
+					
+					if(tempDimensionXml.Hierarchy.Table.length() <= 0){
+						tempDimensionXml.appendChild(new XML("<Table />"));
+					}
+					
+					tempDimensionXml.Hierarchy.Table.@name=table;
+					
+					for each(var tempLevelXml:XML in tempDimensionXml.Hierarchy.Level){
+						if(String(tempLevelXml.name())=="Level"){
+							delete tempDimensionXml.Hierarchy.Level;
+						}
+					}
+					
+						
+					if(table.toUpperCase()=="DW_DIMENSION_YEAR"){
+						
+						columnsCol.removeAll();
+						columnsCol.addItem(columnItem);
+							
+						var newTimeLevelXmlYear:XML = <Level />;
+						
+						newTimeLevelXmlYear.@levelType = "TimeYears";
+						newTimeLevelXmlYear.@name = "年";
+						newTimeLevelXmlYear.@type = "String";
+						newTimeLevelXmlYear.@uniqueMembers = "true";
+						newTimeLevelXmlYear.@column = "YEARNAME";
+						newTimeLevelXmlYear.@nameColumn = "YEARNAME";
+						tempDimensionXml.Hierarchy.appendChild(newTimeLevelXmlYear);
+						
+					}else if(table.toUpperCase()=="DW_DIMENAION_YEARMONTH"){
+						
+						columnsCol.removeAll();
+						columnsCol.addItem(columnItem);
+						columnsCol.addItem(columnItem2);
+						
+						var newTimeLevelXmlYear2:XML = <Level />;
+						
+						newTimeLevelXmlYear2.@levelType = "TimeYears";
+						newTimeLevelXmlYear2.@name = "年";
+						newTimeLevelXmlYear2.@type = "String";
+						newTimeLevelXmlYear2.@uniqueMembers = "true";
+						newTimeLevelXmlYear2.@column = "YEARNAME";
+						newTimeLevelXmlYear2.@nameColumn = "YEARNAME";
+						tempDimensionXml.Hierarchy.appendChild(newTimeLevelXmlYear2);
+						
+						var newTimeLevelXmlMonth:XML = <Level />;
+						
+						newTimeLevelXmlMonth.@levelType = "TimeMonths";
+						newTimeLevelXmlMonth.@name = "月";
+						newTimeLevelXmlMonth.@type = "String";
+						newTimeLevelXmlMonth.@uniqueMembers = "true";
+						newTimeLevelXmlMonth.@column = "MONTHNAME";
+						newTimeLevelXmlMonth.@nameColumn = "MONTHNAME";
+						tempDimensionXml.Hierarchy.appendChild(newTimeLevelXmlMonth);
+						
+					}else if(table.toUpperCase()=="DW_DIMENSION_YEARMONTHDAY"){
+						
+						columnsCol.removeAll();
+						columnsCol.addItem(columnItem);
+						columnsCol.addItem(columnItem2);
+						columnsCol.addItem(columnItem3);
+						
+						var newTimeLevelXmlYear3:XML = <Level />;
+						
+						newTimeLevelXmlYear3.@levelType = "TimeYears";
+						newTimeLevelXmlYear3.@name = "年";
+						newTimeLevelXmlYear3.@type = "String";
+						newTimeLevelXmlYear3.@uniqueMembers = "true";
+						newTimeLevelXmlYear3.@column = "YEARNAME";
+						newTimeLevelXmlYear3.@nameColumn = "YEARNAME";
+						tempDimensionXml.Hierarchy.appendChild(newTimeLevelXmlYear3);
+						
+						var newTimeLevelXmlMonth2:XML = <Level />;
+						
+						newTimeLevelXmlMonth2.@levelType = "TimeMonths";
+						newTimeLevelXmlMonth2.@name = "月";
+						newTimeLevelXmlMonth2.@type = "String";
+						newTimeLevelXmlMonth2.@uniqueMembers = "true";
+						newTimeLevelXmlMonth2.@column = "MONTHNAME";
+						newTimeLevelXmlMonth2.@nameColumn = "MONTHNAME";
+						tempDimensionXml.Hierarchy.appendChild(newTimeLevelXmlMonth2);
+						
+						var newTimeLevelXmlDay:XML = <Level />;
+						newTimeLevelXmlDay.@levelType = "TimeDays";
+						newTimeLevelXmlDay.@name = "日";
+						newTimeLevelXmlDay.@type = "String";
+						newTimeLevelXmlDay.@uniqueMembers = "true";
+						newTimeLevelXmlDay.@column = "DAYNAME";
+						newTimeLevelXmlDay.@nameColumn = "DAYNAME";
+						tempDimensionXml.Hierarchy.appendChild(newTimeLevelXmlDay);
+						
+					}
+				}
+				
+			}
+			
+			private function onDimensionTask():void{
+				if(!insertMode){
+					var dimensionXml:XML = selectedItem.content as XML;
+					if(dimensionXml != null ){
+						var dimensionCode:String = dimensionXml.@code;
+						var dimensionName:String = dimensionXml.@name;
+						var taskCode:String = dimensionXml.@taskCode;
+						
+						var rtw:EntityTaskViewWindow = new EntityTaskViewWindow();
+						rtw.entityModelCode = contentXml.entityModelCode;
+						rtw.code = dimensionCode;
+						rtw.taskCode = taskCode;
+						rtw.dataTaskDesc = dimensionName;
+						rtw.content = dimensionXml;
+						rtw.tempContent = tempDimensionXml;
+						rtw.saveNoAlertFun = saveNoAlertFun;
+						rtw.entityTaskType = BAMConst.ENTITY_DATATASK_DIMENSION;
+						
+						if(desktop != null){
+							PopUpManager.addPopUp(rtw,desktop,true);
+						}else{
+							PopUpManager.addPopUp(rtw,this,true);
+						}
+						
+						PopUpManager.centerPopUp(rtw);
+						
+					}else{
+						SmartXMessage.show("请先选一条规则",SmartXMessage.MESSAGE_WARN);
+					}
+					
+				}else{
+					SmartXMessage.show("模型尚未保存,不能发布任务",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			private function onDealDimension():void{
+				if(!insertMode){
+						var dimensionCode:String = String(seletedDimensionXml.@code);
+						OperatingTipUtil.startOperat("正在抽取....",this);
+						bamService.dealDimension(contentXml.toXMLString(),String(contentXml.entityModelCode),dimensionCode);
+				}else{
+					SmartXMessage.show("模型尚未保存,不能抽取",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			protected function synDimensionTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = synDimensionTypeCob.selectedItem;
+				if(item != null ){
+					
+					columnsCol.removeAll();
+					var columnItem1:Object = new Object();
+					columnItem1["columnName"] = "NAME";
+					columnItem1["columnAlias"] = "NAME";
+					columnItem1["columnType"] = "varchar2";
+					columnItem1["columnLabel"] = "名称";
+					columnItem1["columnRef"] = "";
+					
+					columnsCol.addItem(columnItem1);
+					
+					var columnItem2:Object = new Object();
+					columnItem2["columnName"] = "VALUE";
+					columnItem2["columnAlias"] = "VALUE";
+					columnItem2["columnType"] = "varchar2";
+					columnItem2["columnLabel"] = "数值";
+					columnItem2["columnRef"] = "";
+					
+					columnsCol.addItem(columnItem2);
+					
+					if(tempDimensionXml.Hierarchy.length() <= 0){
+						tempDimensionXml.appendChild(new XML("<Hierarchy />"));
+					}
+					
+					for each(var tempLevelXml:XML in tempDimensionXml.Hierarchy.Level){
+						if(String(tempLevelXml.name())=="Level"){
+							delete tempDimensionXml.Hierarchy.Level;
+						}
+					}
+					
+					var newEntityLevelXml:XML = <Level />;
+					newEntityLevelXml.@name = "名称";
+					newEntityLevelXml.@type = "String";
+					newEntityLevelXml.@uniqueMembers = "false";
+					newEntityLevelXml.@column = "NAME";
+					newEntityLevelXml.@nameColumn = "NAME";
+					newEntityLevelXml.@parentColumn = "";
+					newEntityLevelXml.@nullParentValue = "";
+					tempDimensionXml.Hierarchy.appendChild(newEntityLevelXml);
+					
+					var newEntityLevelXml2:XML = <Level />;
+					newEntityLevelXml2.@name = "数值";
+					newEntityLevelXml2.@type = "String";
+					newEntityLevelXml2.@uniqueMembers = "false";
+					newEntityLevelXml2.@column = "VALUE";
+					newEntityLevelXml2.@nameColumn = "VALUE";
+					newEntityLevelXml2.@parentColumn = "";
+					newEntityLevelXml2.@nullParentValue = "";
+					tempDimensionXml.Hierarchy.appendChild(newEntityLevelXml2);
+					
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:TabNavigator id="mainTab" width="100%" height="100%" paddingTop="3" creationPolicy="all">
+		<mx:VBox id="baseInfoVbox" label="基本信息" width="100%" height="100%" paddingBottom="5"
+				 paddingLeft="5" paddingRight="5" paddingTop="5" >
+			<mx:HBox width="100%">
+				<mx:Button label="保存" toolTip="保存当前信息" click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+				<mx:Button label="查看XML" toolTip="查看XML" visible="{debugMode}" click="showXml()" icon="{AssetsFileLib.viewIcon}" />
+			</mx:HBox>
+			<mx:VBox id="baseInfoCard"  width="100%" height="100%" paddingLeft="35" >
+				<mx:HBox width="100%" >
+					<mx:Label text="名称" width="25%" color="blue"/>
+					<mx:TextInput id="dimensionNameTxt" width="50%" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="编码" width="25%" color="blue"/>
+					<mx:TextInput id="dimensionCodeTxt" editable="{!isEdit}" width="50%" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="是否包含'所有成员'" toolTip="" width="25%"/>
+					<mx:CheckBox id="isIncludeAllItemCheckBox" selected="false" toolTip="是否包含所有成员"/>
+				</mx:HBox>
+				<mx:HBox id="allItemNameHBox" width="100%" >
+					<mx:Label text="'所有成员'显示名称" width="25%" color="blue"/>
+					<mx:TextInput id="allItemsNameTxt" width="50%" />
+				</mx:HBox>
+			</mx:VBox>
+			<mx:HRule width="100%" />
+			<mx:HBox width="100%">
+				<mx:Button label="任务调度" toolTip="对当前维度进行任务调度" click="onDimensionTask()" />
+				<mx:Button label="立即抽取" toolTip="立即抽取当前维度数据" click="onDealDimension()" visible="{debugMode}" />
+			</mx:HBox>
+		</mx:VBox>
+		
+		<mx:VBox id="levelVbox" label="级别信息" width="100%" height="100%" paddingBottom="5"
+				 paddingLeft="5" paddingRight="5" paddingTop="5" >
+			<mx:HBox width="100%">
+				<mx:Button label="保存" toolTip="保存当前信息" click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+				<mx:Button label="查看XML" toolTip="查看XML" visible="{debugMode}" click="showXml()" icon="{AssetsFileLib.viewIcon}" />
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:LinkButton width="22" height="22" click="onAddLevel()" icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+				<mx:LinkButton width="22" height="22" click="onDeleteLevel()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除"/>
+				<mx:LinkButton width="22" height="22" click="onEditLevel()" icon="{AssetsFileLib.editIcon}" toolTip="编辑"/>
+			</mx:HBox>
+			<mx:VBox id="listVBox" width="100%" height="100%" />
+		</mx:VBox>
+	</mx:TabNavigator>
+</entitymodel:AbstractTab>

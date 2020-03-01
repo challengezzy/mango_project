@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				layout="vertical" width="500" height="420"
+				close="close()" showCloseButton="true" title="剖析任务调度"
+				horizontalAlign="center"
+				creationComplete="init()" xmlns:containers="flexlib.containers.*">
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var bamService:RemoteObject;			
+			private var formService:RemoteObject;			
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));;
+			
+			[Bindable]
+			public var taskCode:String;//任务编码
+			[Bindable]
+			public var taskCronExp:String//循环任务表达式
+			public var analyzerSetId:String;//外部传入
+			public var analyzerCode:String;//分析集编码
+			public var datasourceName:String;//数据源名称
+			
+			private var taskTempletXml:XML;
+			public var dataTaskDesc:String;
+			
+			public var taskSql:String;
+			public var taskId:String;
+			
+			public var saveNoAlertFun:Function;
+			
+			private function init():void{
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				bamService.endpoint = endpoint;
+				formService.endpoint = endpoint;
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据任务错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.addDataTask.addEventListener(ResultEvent.RESULT,addDataTaskOkHandler);
+				bamService.addDataTask.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("添加或更新数据任务错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				taskCode = "AnalyzerSet_" + analyzerCode;
+				var taskSql:String = "select id,name,code,type,cronexpression from pub_datatask_templet t where t.code = '" + taskCode +"'";
+				formService.getSimpleHashVoArrayByDS(null,taskSql);
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var taskArr:Array = event.result as Array;
+				
+				if( taskArr.length > 0){
+					var taskObj:SimpleHashVO = taskArr[0];
+					taskId = taskObj.dataMap["id"];
+					taskCronExp = taskObj.dataMap["cronexpression"];
+				}
+			}
+			
+			private function addDataTaskOkHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("剖析数据任务生成成功",SmartXMessage.MESSAGE_INFO);
+				close();
+			}
+			
+			private function addTaskBtn_clickHandler(event:MouseEvent):void{
+				var taskContent:String = getCustomTaskXml().toXMLString(); 
+				OperatingTipUtil.startOperat("正在生成数据任务!",this);
+				bamService.addDataTask(taskCode,taskCode,taskExpTxt.text,taskContent,isExecChk.selected);
+				
+			}
+			
+			//生成数据任务XML
+			private function getCustomTaskXml():XML{
+				var xml:XML = <root><datatask desc="分析集剖析任务"/></root>;
+				var customXml:XML = <custom_task desc="" isNeedRun="true" hasChildren="false" name="" implclass="" rate="35"/>;
+				customXml.@name = taskCode;
+				customXml.@desc = taskCode;
+				customXml.@implclass = "smartx.bam.bs.datatask.custom.AnalyzerProfileTask";
+				customXml.analyzerSetId = analyzerSetId;
+				customXml.datasource = datasourceName;
+				customXml.profileDate = "{getCurrDate()}";
+				
+				xml.datatask.appendChild(customXml);				
+				return xml;
+			}
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" horizontalAlign="center" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<containers:AdvancedForm  id="generalForm" width="100%" height="100%" >
+			<mx:FormItem label="任务类型">
+				<mx:ComboBox id="taskTypeCmb" enabled="false">
+					<mx:dataProvider>
+						<fx:Array>
+							<fx:String>循环任务</fx:String>
+						</fx:Array>
+					</mx:dataProvider>
+				</mx:ComboBox>
+			</mx:FormItem>
+			<mx:FormItem label="任务编码" required="true" enabled="false" >
+				<mx:TextInput text="{taskCode}" id="taskCodeInput" width="200"/>
+			</mx:FormItem>
+			<mx:FormItem label="任务调度表达式" >
+				<mx:TextInput text="{taskCronExp}" id="taskExpTxt" width="200" 
+							  toolTip="默认每天23点30分执行;注:从左到右,空格间的字符依次表示:秒(0-59),分(0-59),时(0-23),日(1-31),月(1-12),日(星期周期1-7)" />
+			</mx:FormItem>
+			<mx:FormItem label="是否立即执行" >
+				<mx:CheckBox id="isExecChk"/>
+			</mx:FormItem>
+		</containers:AdvancedForm>
+		
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+			<mx:Button id="addTaskBtn" label="确定"  click="addTaskBtn_clickHandler(event)" />
+			<mx:Button id="delTaskBtn" label="取消"  click="close()" />
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

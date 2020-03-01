@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="500" height="500" fontSize="12" > 
+	<mx:Script>
+        <![CDATA[
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+        	import mx.events.ListEvent;
+        	import mx.events.TreeEvent;
+        	import mx.controls.dataGridClasses.DataGridColumn;
+        	import mx.controls.Alert;
+        	import mx.rpc.events.FaultEvent;
+        	import mx.rpc.events.ResultEvent;
+        	import mx.collections.ArrayCollection;
+        	import mx.events.CloseEvent;
+        	import mx.managers.PopUpManager;     
+        	
+        	[Bindable]
+        	private var dataTree:ArrayCollection = new ArrayCollection();//树的dataprovider
+        	private var indexMap:Object = new Object();//树的hash索引
+        	[Bindable]
+        	private var headerItems:ArrayCollection = new ArrayCollection();
+        	private var parentRefPanel:ItemRefPanel;
+        	public var closeByConfirm:Boolean = false;
+        	private var tableDataStruct:TableDataStruct;
+        	public var refPK:String;
+        	public var refCode:String;
+        	public var refName:String;
+        	public var refPKHeader:String;
+        	public var refCodeHeader:String;
+        	public var refNameHeader:String;
+        	private var headers:Array;
+        	private var dataList:ArrayCollection;
+        	
+        	public function init(parentRefPanel:ItemRefPanel):void{
+        		this.parentRefPanel = parentRefPanel;
+        		parentRefPanel.formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				parentRefPanel.formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+				var sql:String;
+				//parentRefPanel.loadall = "false";//测试用 
+				if(parentRefPanel.loadall == "true")
+					sql = "select * from ("+parentRefPanel.str_realsql+") where rownum <= 2000";//限制1000条
+				else //分级加载
+					sql = "select t.*," + 
+							"(select count(1) from ("+parentRefPanel.str_realsql+") t2 where t2."+parentRefPanel.str_parentfieldname+"=t."+parentRefPanel.str_pkfieldname+") childCount# " + 
+							"from ("+parentRefPanel.str_realsql+") t where t."+parentRefPanel.str_parentfieldname+" is null";
+				parentRefPanel.formService.getTableDataStructByDS(parentRefPanel.str_datasourcename,sql);
+        	}  
+        	
+        	private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+		
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				tableDataStruct = event.result as TableDataStruct;
+				//初始化搜索框和表头
+				if(headers == null){
+					headers = tableDataStruct.table_header;
+					if(headers.length < 3)
+						throw new Error("参照语句错误，至少返回3列");
+					tree.labelField = headers[2];
+					refPKHeader = headers[0];
+					refCodeHeader = headers[1];
+					refNameHeader = headers[2];
+					for each(var header:String in headers){
+						if(header.charAt(header.length-1)!="#"){
+							headerItems.addItem({label:header,data:header});
+							var column:DataGridColumn = new DataGridColumn(header);
+							dataGrid.columns = dataGrid.columns.concat(column);
+						}	
+					}
+				}
+				
+				//构建树
+				var tableBody:Array = tableDataStruct.table_body;
+				//add by zhangzy2012/3/2 对树数据进行预处理，把找不到父节点的节点，强制改成根节点
+				var pkIdx:int =0;
+				var parentPkIdx:int =0;
+				for(var m:int=0;m<headers.length;m++){//找到主键和父节点所有列位置
+					if(parentRefPanel.str_parentfieldname == headers[m] )
+						parentPkIdx = m;
+					if(parentRefPanel.str_pkfieldname == headers[m] )
+						pkIdx = m;
+				}
+				var parentindexMap:Object = new Object()				
+				for each(var t:Array in tableBody){
+					var ppStr:String = t[pkIdx];
+					parentindexMap[ppStr] = t;
+				}
+				for each(var row:Array in tableBody){
+					var tparentPk:String = row[parentPkIdx];
+					if(tparentPk!=null && tparentPk != ""){
+						var parentObj:Object = parentindexMap[tparentPk];
+						if( parentObj == null)
+							row[parentPkIdx] = "";
+					}
+				}
+				
+				var hasNotLoaded:Boolean = true;
+				while(hasNotLoaded){
+					hasNotLoaded = false;
+					for each(var strRow:Array in tableBody){
+						var temp:Object = new Object();
+						for(var i:int=0;i<strRow.length;i++){
+							temp[headers[i]] = strRow[i];
+						}
+						
+						var pk:String = temp[parentRefPanel.str_pkfieldname];
+						var parentPk:String = temp[parentRefPanel.str_parentfieldname];
+						if(indexMap[pk] == null){
+							//目前的树里面没有
+							//先找到它的父节点
+							if(parentPk != "" && indexMap[parentPk] == null){
+								//父节点也没加载，不正常了额，忽略
+								continue;
+							}
+							else{
+								if(parentPk == ""){//是根节点
+									dataTree.addItem(temp);
+								}
+								else{
+									var father:Object = indexMap[parentPk];
+									if(!father.hasOwnProperty("children"))
+										father.children = new ArrayCollection();
+									father.children.addItem(temp);
+								}
+								if(parentRefPanel.loadall != "true"){
+									//如果是分级延迟加载，需要判断该节点是否是叶子节点
+									var childCount:int = parseInt(temp["CHILDCOUNT#"]);
+									if(childCount > 0)
+										temp.children = new ArrayCollection();
+								}
+								indexMap[pk] = temp;
+								hasNotLoaded = true;
+							}
+						}
+					}
+				}
+				tree.invalidateList();
+				this.validateNow();
+//				//设置过滤函数
+//				dataTree.filterFunction = searchFilter;
+			} 
+			
+//			public function search():void{
+//				dataTree.refresh();
+//				tree.invalidateList();
+//			}	
+//					
+//			private function searchFilter(item:Object):Boolean{
+//				var key:String = keyInput.text;
+//				if(key!=""){
+//					var itemData:String = item[tree.labelField] as String;
+//					var i:int = itemData.indexOf(key,0);
+//					if(i<0)
+//						return false;
+//				}
+//				return true;
+//			}
+			private function treeItemOpening(event:TreeEvent):void{
+				var item:Object = event.item;
+				if(parentRefPanel.loadall == "true" || !item.children is ArrayCollection)
+					return;
+				var children:ArrayCollection = item.children as ArrayCollection;
+				if(children.length == item["CHILDCOUNT#"])//全加载过了
+					return;
+				var pk:String = item[parentRefPanel.str_pkfieldname];
+				var sql:String = "select t.*," + 
+							"(select count(1) from ("+parentRefPanel.str_realsql+") t2 where t2."+parentRefPanel.str_parentfieldname+"=t."+parentRefPanel.str_pkfieldname+") childCount# " + 
+							"from ("+parentRefPanel.str_realsql+") t where t."+parentRefPanel.str_parentfieldname+"='"+pk+"'";
+				parentRefPanel.formService.getTableDataStructByDS(parentRefPanel.str_datasourcename,sql);
+			}
+        	
+        	private function treeItemClick(event:ListEvent):void{
+        		var item:Object = tree.selectedItem;
+				var children:ArrayCollection = item.children;
+				dataGrid.dataProvider = children;
+				dataList = children;
+        	}	
+        	public function close(isConfirm:Boolean):void{
+        		if(isConfirm){
+        			if(dataGrid.selectedIndex < 0 && tree.selectedItem == null){
+        				Alert.show("请选择一行数据！","错误");
+        				return;
+        			}
+        			var selectedObject:Object;
+        			if(dataGrid.selectedIndex >= 0){
+        				selectedObject = dataList[dataGrid.selectedIndex];
+        			}
+        			else{
+        				selectedObject = tree.selectedItem;
+        			}
+        			refPK = String(selectedObject[refPKHeader]);
+	        		refCode = String(selectedObject[refCodeHeader]);
+	        		refName = String(selectedObject[refNameHeader]);
+        		}
+        		closeByConfirm = isConfirm;
+        		PopUpManager.removePopUp(this);
+        		dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+        	}
+         ]]>
+    </mx:Script>
+	<mx:HDividedBox width="100%" height="100%" liveDragging="true">
+		<mx:VBox width="30%" height="100%">
+		<!--
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:TextInput width="50" id="keyInput" text="" keyUp="search()"/>
+				<mx:Button width="36" icon="@Embed(source='assets/images/quicQuery.png')"/>
+			</mx:HBox>
+			-->
+			<mx:Tree width="100%" height="100%" doubleClick="close(true)" doubleClickEnabled="true" id="tree" dataProvider="{dataTree}" itemOpening="treeItemOpening(event)" itemClick="treeItemClick(event)"></mx:Tree>
+		</mx:VBox>
+		<mx:VBox width="70%" height="100%">
+			<mx:DataGrid width="100%" height="100%" id="dataGrid" doubleClick="close(true)" doubleClickEnabled="true"/>
+		</mx:VBox>
+	</mx:HDividedBox>
+	<mx:HBox width="100%" horizontalAlign="center">
+		<mx:Button label="确定" click="close(true)"/>
+		<mx:Button label="取消" click="close(false)"/>
+	</mx:HBox>
+	
+</mx:TitleWindow>

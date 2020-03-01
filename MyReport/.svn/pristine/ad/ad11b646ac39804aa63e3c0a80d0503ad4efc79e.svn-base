@@ -1,0 +1,872 @@
+<Groups>
+  <Group name="运算符">
+    <Item>
+      <Name>()</Name>
+      <Value>()</Value>
+      <Memo><![CDATA[左、右括号]]></Memo>
+    </Item>
+    <Item>
+      <Name>+</Name>
+      <Value>+</Value>
+      <Memo>
+        <![CDATA[加：exp1 + exp2 或 正号 +exp]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>-</Name>
+      <Value>-</Value>
+      <Memo>
+        <![CDATA[减：exp1 – exp2 或 负号 –exp]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>*</Name>
+      <Value>*</Value>
+      <Memo>
+        <![CDATA[乘：exp1 * exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>/</Name>
+      <Value>/</Value>
+      <Memo>
+        <![CDATA[除：exp1 / exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>%</Name>
+      <Value>%</Value>
+      <Memo>
+        <![CDATA[取余：exp1 % exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>^</Name>
+      <Value>^</Value>
+      <Memo>
+        <![CDATA[幂运算：exp1 ^ exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>==</Name>
+      <Value>==</Value>
+      <Memo>
+        <![CDATA[等于：exp1 == exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>!=</Name>
+      <Value>!=</Value>
+      <Memo>
+        <![CDATA[不等于：exp1 != exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[>]]></Name>
+      <Value><![CDATA[>]]></Value>
+      <Memo>
+        <![CDATA[大于：exp1 > exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[>=]]></Name>
+      <Value><![CDATA[>=]]></Value>
+      <Memo>
+        <![CDATA[大于等于：exp1 >= exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[<]]></Name>
+      <Value><![CDATA[<]]></Value>
+      <Memo>
+        <![CDATA[小于：exp1 < exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[<=]]></Name>
+      <Value><![CDATA[<=]]></Value>
+      <Memo>
+        <![CDATA[小于等于：exp1 <= exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[&&]]></Name>
+      <Value><![CDATA[&&]]></Value>
+      <Memo>
+        <![CDATA[逻辑与：exp1 && exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[||]]></Name>
+      <Value><![CDATA[||]]></Value>
+      <Memo>
+        <![CDATA[逻辑或：exp1 || exp2]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[!]]></Name>
+      <Value><![CDATA[!]]></Value>
+      <Memo>
+        <![CDATA[取非：!exp]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA[""]]></Name>
+      <Value><![CDATA[""]]></Value>
+      <Memo>
+        <![CDATA[字符串定义]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name><![CDATA['']]></Name>
+      <Value><![CDATA['']]></Value>
+      <Memo>
+        <![CDATA[字符串定义]]>
+      </Memo>
+    </Item>
+  </Group>
+  <Group name="统计函数">
+    <Item>
+      <Name>Sum</Name>
+      <Value>Sum(field, start, end)</Value>
+      <Memo>
+        <![CDATA[求和：Sum(field, start, end)
+说明：求和。start，end是可选参数，当没有start，end参数时默认累加所有行。
+例子：
+Sum(Fields!金额.Value)
+Sum(Fields!金额.Value,GroupStartIndex(),GroupEndIndex())
+Sum(Fields!金额.Value,0,RowIndex())
+Sum(Fields!金额.Value,GroupStartIndex(),GroupStartIndex()+GroupRowIndex())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>SumIf</Name>
+      <Value>SumIf(field, cond, start, end)</Value>
+      <Memo>
+        <![CDATA[条件求和：SumIf(field, cond, start, end)
+说明：统计满足条件的和。start，end是可选参数，当没有start，end参数时默认累加所有符合条件的行。
+例子：
+SumIf(Fields!金额.Value, Fields!金额.Value>10)
+SumIf(Fields!金额.Value, Fields!金额.Value>10,GroupStartIndex(),GroupEndIndex())
+SumIf(Fields!金额.Value, Fields!金额.Value>10,0,RowIndex())
+SumIf(Fields!金额.Value, Fields!金额.Value>10,GroupStartIndex(),GroupStartIndex()+GroupRowIndex())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Get</Name>
+      <Value>Get(field, cond, start, end)</Value>
+      <Memo>
+        <![CDATA[查询数据：Get(field, cond, start, end)
+说明：查询符合条件cond的第一条数据，并返回field的值。start，end是可选参数，当没有start，end参数时默认累加所有符合条件的行。
+例子：
+Get(Fields!金额.Value, Fields!金额.Value>10)
+Get(Fields!金额.Value, Fields!金额.Value>10,GroupStartIndex(),GroupEndIndex())
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Avg</Name>
+      <Value>Avg(field, start, end)</Value>
+      <Memo>
+        <![CDATA[求平均：Avg(field, start, end)
+说明：求平均。start，end是可选参数，当没有start，end参数时默认求所有行的平均值。
+例子：
+Avg(Fields!金额.Value)
+Avg(Fields!金额.Value,GroupStartIndex(),GroupEndIndex())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>AvgIf</Name>
+      <Value>AvgIf(field, cond, start, end)</Value>
+      <Memo>
+        <![CDATA[条件求平均：AvgIf(field, cond, start, end)
+说明：求满足条件的行的平均值。start，end是可选参数，当没有start，end参数时默认求所有符合条件的行的平均值。
+例子：
+AvgIf(Fields!金额.Value, Fields!金额.Value>10)
+AvgIf(Fields!金额.Value, Fields!金额.Value>10,GroupStartIndex(),GroupEndIndex())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>CountIf</Name>
+      <Value>CountIf(cond, start, end)</Value>
+      <Memo>
+        <![CDATA[条件计数：CountIf(cond, start, end)
+说明：统计满足条件的行的数量。start，end是可选参数，当没有start，end参数时默认统计所有符合条件的行的数量。
+例子：
+CountIf(Fields!金额.Value>10)
+CountIf(Fields!金额.Value>10,GroupStartIndex(),GroupEndIndex())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Max</Name>
+      <Value>Max(field, start, end)</Value>
+      <Memo>
+        <![CDATA[最大值：Max(field, start, end)
+说明：统计最大值。start，end是可选参数，当没有start，end参数时默认统计所有行的最大值。
+例子：
+Max(Fields!金额.Value)
+Max(Fields!金额.Value,,GroupStartIndex(),GroupEndIndex())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Min</Name>
+      <Value>Min(field, start, end)</Value>
+      <Memo>
+        <![CDATA[最小值：Min(field, start, end)
+说明：统计最小值。start，end是可选参数，当没有start，end参数时默认统计所有行的最小值。
+例子：
+Min(Fields!金额.Value)
+Min(Fields!金额.Value,GroupStartIndex(),GroupEndIndex())
+]]>
+      </Memo>
+    </Item>
+  </Group>
+  <Group name="流程控制函数">
+    <Item>
+      <Name>If</Name>
+      <Value>If(cond, proc_true, proc_false)</Value>
+      <Memo>
+        <![CDATA[单条件执行：If(cond, proc_true, proc_false)
+说明：当cond为true时，执行proc_true，否则执行proc_false。
+例子：
+If(Fields!金额.Value>100, Fields!金额.Value*0.9, Fields!金额.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Choose</Name>
+      <Value>Choose(index, proc1, proc2, proc3, …)</Value>
+      <Memo>
+        <![CDATA[分支执行：Choose(index, proc1, proc2, proc3, …)
+说明：根据index的值，执行相应的procN。index以0开始，procN参数的数量应该与index的取值数量相同。
+例子：
+Choose(Fields!类型.Value, 客户,供货商,其他)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Switch</Name>
+      <Value>Switch(cond1, proc1, cond2, proc2, cond3, proc3, …)</Value>
+      <Memo>
+        <![CDATA[多条件执行：Switch(cond1, proc1, cond2, proc2, cond3, proc3, …)
+说明：如果condN为true，则执行相对于的procN。condN，procN参数成对出现。
+例子：
+=Switch(Fields!数值.Value<=0,Str(),Fields!数值.Value<=1,Fields!数值.Value*80,Fields!数值.Value<=2,Fields!数值.Value*90)
+]]>
+      </Memo>
+    </Item>
+  </Group>
+  <Group name="文本处理函数">
+    <Item>
+      <Name>Str</Name>
+      <Value>Str(exp)</Value>
+      <Memo>
+        <![CDATA[输出字符串：Str(exp)
+说明：输出字符串。一些关键字符可以通过该函数输出。
+例子：
+Str()
+Str(Fields!类型.Value)
+Str(    )
+Str( ‘ “，“<> )
+Str(+-*/,())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>CurrencyCN</Name>
+      <Value>CurrencyCN(exp)</Value>
+      <Memo>
+        <![CDATA[转成中文大写金额：CurrencyCN(exp)
+说明：转成中文大写金额。
+例子：CurrencyCN(Fields!金额.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Fixed</Name>
+      <Value>Fixed(num, digits)</Value>
+      <Memo>
+        <![CDATA[数字定点输出：Fixed(num, digits)
+说明：输出数字字符串。digits大于 0（零），则将数字四舍五入到指定的小数位；digits等于 0，则将数字四舍五入到最接近的整数。digits小于 0，则在小数点左侧进行四舍五入。digits是可选参数，默认值是0，digits应该在0~20(含)范围内。
+例子：
+Fixed(Fields!金额.Value,2)
+Fixed(Fields!金额.Value,Opp(2))
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Prefixed</Name>
+      <Value>Prefixed(num, len)</Value>
+      <Memo>
+        <![CDATA[数字前置补零：Prefixed(num, len)
+说明：输出数字字符串，当数字字符串长度小于参数len时前面补零。len是可选参数。
+例子：Prefixed(Fields!月份.Value,2)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>FormatNum</Name>
+      <Value>FormatNum(exp, format)</Value>
+      <Memo>
+        <![CDATA[格式化数字输出：FormatNum(exp, format)
+说明：输出格式化字符串。
+format的取值：
+保留n位小数：fn，例如：f0，f2
+金额保留n位小数：cn，例如：c2
+最多保留n位小数： 0.####，任意个#
+百分比保留n位小数：pn，例如： p0，p1
+例子：
+FormatNum(Fields!金额.Value,c2)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>FormatDate</Name>
+      <Value>FormatDate(exp, format)</Value>
+      <Memo>
+        <![CDATA[格式化日期输出：FormatDate(exp, format)
+说明：输出格式化字符串。
+format的取值：
+日期(yyyy年MM月dd日)：Str(d)
+日期(yyyy-MM-dd)：Str(yyyy-MM-dd)
+日期(yyyy-MM-dd HH:mm:ss)：Str(yyyy-MM-dd HH:mm:ss)
+日期(yyyyMMdd)：Str(yyyyMMdd)
+日期(yyyyMMddHHmmss)：Str(yyyyMMddHHmmss)
+例子：
+FormatDate(Fields!日期.Value,Str(d))
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Concat</Name>
+      <Value>Concat(text1, text2, …)</Value>
+      <Memo>
+        <![CDATA[连接字符串：Concat(text1, text2, …)
+说明：连接多个字符串。
+例子：Concat(Fields!商品.Value,Str(    ),Fields!规格.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Len</Name>
+      <Value>Len(exp)</Value>
+      <Memo>
+        <![CDATA[获取字符串长度：Len(exp)
+说明：获取字符串长度。
+例子：Len(Fields!类型.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Find</Name>
+      <Value>Find(text, within, start)</Value>
+      <Memo>
+        <![CDATA[查找字符串：Find(text, within, start)
+说明：查找字符串。start是可选参数，没有start时默认从0索引出开始查找。
+例子：Find(Fields!备注.Value,货款)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Replace</Name>
+      <Value>Replace(text, within, replace)</Value>
+      <Memo>
+        <![CDATA[替换字符串：Replace(text, within, replace)
+说明：替换字符串。
+例子：Replace(Fields!备注.Value,货款,Str())
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Substr</Name>
+      <Value>Substr(text, start, len)</Value>
+      <Memo>
+        <![CDATA[截断字符串：Substr(text, start, len)
+说明：截断字符串。len是可选参数，没有len时默认截断到字符串最后。
+例子：Substr(Fields!备注.Value,0,2)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Substr2</Name>
+      <Value>Substr2(text, start, end)</Value>
+      <Memo>
+        <![CDATA[截断字符串2：Substr2(text, start, end)
+说明：截断字符串。end是可选参数，没有end时默认截断到字符串最后。
+例子：Substr2(Fields!备注.Value,0,2)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Split</Name>
+      <Value>Split(text, delim)</Value>
+      <Memo>
+        <![CDATA[分割字符串：Split(text, delim)
+说明：分割字符串。
+例子：
+Split(Fields!备注.Value, '/')
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>SplitAtLen</Name>
+      <Value>SplitAtLen(text, len)</Value>
+      <Memo>
+        <![CDATA[根据长度分割字符串：SplitAtLen(text, len)
+说明：根据长度len分割字符串。
+例子：
+SplitAtLen(Fields!备注.Value, 4)
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Join</Name>
+      <Value>Join(tokens, sep)</Value>
+      <Memo>
+        <![CDATA[合并成字符串：Join(tokens, sep)
+说明：合并成字符串。split是可选参数，默认是空字符串。
+例子：
+Join(Split(Fields!备注.Value, '/'))
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+			<Name>BracketL</Name>
+			<Value>BracketL()</Value>
+			<Memo>
+        <![CDATA[小括号(左)：BracketL()
+说明：输出左小括号。小括号是表达式关键字，不能直接使用，要使用该函数输出。
+例子：
+BracketL()
+
+]]>
+			</Memo>
+		</Item>
+		<Item>
+			<Name>BracketR</Name>
+			<Value>BracketR()</Value>
+			<Memo>
+        <![CDATA[小括号(右)：BracketR()
+说明：输出右小括号。小括号是表达式关键字，不能直接使用，要使用该函数输出。
+例子：
+BracketR()
+
+]]>
+			</Memo>
+		</Item>
+  </Group>
+  <Group name="数学函数">
+    <Item>
+      <Name>Num</Name>
+      <Value>Num(exp)</Value>
+      <Memo>
+        <![CDATA[转成数字：Num(exp)
+说明：转成数字。
+例子：Num(Fields!类型.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Abs</Name>
+      <Value>Abs(exp)</Value>
+      <Memo>
+        <![CDATA[绝对值：Abs(exp)
+说明：获取数字绝对值。
+例子：Abs(Fields!金额.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Opp</Name>
+      <Value>Opp(exp)</Value>
+      <Memo>
+        <![CDATA[相反数：Opp(exp)
+说明：获取数字的相反数。
+例子：Opp(Fields!金额.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Rand</Name>
+      <Value>Rand(min, max)</Value>
+      <Memo>
+        <![CDATA[随机数：Rand(min, max)
+说明：返回大于等于min，小于max的随机数。min，max是可选参数，没有时默认返回大于等于0，小于1的随机数。
+例子：
+Rand()
+Rand(0,10)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>RandInt</Name>
+      <Value>RandInt(min, max)</Value>
+      <Memo>
+        <![CDATA[随机整数：RandInt(min, max)
+说明：返回大于等于min，小于max的随机整数。min，max是可选参数，没有时默认返回大于等于0，小于1的随机整数。
+例子：
+RandInt()
+RandInt(0,10)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>LenInt</Name>
+      <Value>LenInt(exp)</Value>
+      <Memo>
+        <![CDATA[获取整数部分位数：LenInt(exp)
+说明：获取数字的整数部分位数。
+例子：LenInt(Fields!金额.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Ceil</Name>
+      <Value>Ceil(exp, digits)</Value>
+      <Memo>
+        <![CDATA[上限值：Ceil(exp, digits)
+说明：获取数字的上限值。数字的上限值是大于等于该数字的最接近的整数。digits大于 0（零），则将数字取上限值到指定的小数位；digits等于 0，则将数字取上限值到最接近的整数。digits小于 0，则在小数点左侧进行取上限值。digits是可选参数，默认值是0，digits应该在0~20(含)范围内。
+例子：
+Ceil(Fields!金额.Value)
+Ceil(Fields!金额.Value, 2)
+Ceil(Fields!金额.Value, Opp(2))
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Floor</Name>
+      <Value>Floor(exp, digits)</Value>
+      <Memo>
+        <![CDATA[下限值：Floor(exp, digits)
+说明：获取数字的下限值。数字的下限值是小于等于指定数字最接近的整数。digits大于 0（零），则将数字取下限值到指定的小数位；digits等于 0，则将数字取下限值到最接近的整数。digits小于 0，则在小数点左侧进行取下限值。digits是可选参数，默认值是0，digits应该在0~20(含)范围内。
+例子：
+Floor(Fields!金额.Value)
+Floor(Fields!金额.Value, 2)
+Floor(Fields!金额.Value, Opp(2))
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Round</Name>
+      <Value>Round(exp, digits)</Value>
+      <Memo>
+        <![CDATA[四舍五入：Round(exp, digits)
+说明：获取数字的四舍五入数值。digits大于 0（零），则将数字四舍五入到指定的小数位；digits等于 0，则将数字四舍五入到最接近的整数。digits小于 0，则在小数点左侧进行四舍五入。digits是可选参数，默认值是0，digits应该在0~20(含)范围内。
+例子：
+Round(Fields!金额.Value)
+Round(Fields!金额.Value, 2)
+Round(Fields!金额.Value, Opp(2))
+]]>
+      </Memo>
+    </Item>
+  </Group>
+  <Group name="期日函数">
+    <Item>
+      <Name>Date</Name>
+      <Value>Date(year, month, day)</Value>
+      <Memo>
+        <![CDATA[创建日期：Date(year, month, day, hour, minute, second)
+说明：创建日期。year，month，day，hour，minute，second是可选参数，没有上述参数时返回当前系统日期时间。
+例子：
+Date()
+Date(2011,1,1)
+Date(2011,1,1,23,59,59)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Year</Name>
+      <Value>Year()</Value>
+      <Memo>
+        <![CDATA[获取年份：Year(date)
+说明：获取年份。date是可选参数，默认返回当前系统日期年份。
+例子：
+Year()
+Year(“2011-1-1”)
+Year(Fields!日期.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Month</Name>
+      <Value>Month()</Value>
+      <Memo>
+        <![CDATA[获取月份：Month(date)
+说明：创建日期。date是可选参数，默认返回当前系统日期月份。
+例子：
+Month()
+Month(“2011-1-1”)
+Month(Fields!日期.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Day</Name>
+      <Value>Day()</Value>
+      <Memo>
+        <![CDATA[获取天数：Day(date)
+说明：创建日期。date是可选参数，默认返回当前系统日期天数。
+例子：
+Day()
+Day(“2011-1-1”)
+Day(Fields!日期.Value)
+]]>
+      </Memo>
+    </Item>
+  </Group>
+  <Group name="控件显示函数">
+    <Item>
+      <Name>ToImage</Name>
+      <Value>ToImage(exp)</Value>
+      <Memo>
+        <![CDATA[显示图形：ToImage(exp)
+说明：显示图形。
+例子：ToImage(Fields!图形.Value)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>ToReport</Name>
+      <Value>ToReport(style, table)</Value>
+      <Memo>
+        <![CDATA[显示子报表：ToReport(style, table, parameters)
+说明：显示子报表。parameters是可选参数，默认为空。
+例子：ToReport(Parameters!报表样式.Value, Fields!子表格.Value)
+]]>
+      </Memo>
+    </Item>
+  </Group>
+  <Group name="数据源函数">
+    <Item>
+      <Name>Series</Name>
+      <Value>Series(field)</Value>
+      <Memo>
+        <![CDATA[创建序列：Series(field)
+说明：根据表格字段field创建并返回序列。一般用于图表数据源。
+例子：
+Series(Field!Name.Value)
+
+]]>
+      </Memo>
+    </Item>
+     <Item>
+      <Name>Len</Name>
+      <Value>Len(exp)</Value>
+      <Memo>
+        <![CDATA[获取数组长度：Len(exp)
+说明：获取数组长度。
+例子：Len(Parameters!数组.Value)
+
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>GetValue</Name>
+      <Value>GetValue(field, row)</Value>
+      <Memo>
+        <![CDATA[获取数据值：GetValue(field, row)
+说明：获取指定行row和指定字段field的数据值。row是可选参数，默认是当前行。
+例子：GetValue(DynamicField())
+
+]]>
+      </Memo>
+    </Item>
+  </Group>
+  <Group name="杂项函数">
+    <Item>
+      <Name>Null</Name>
+      <Value>Null()</Value>
+      <Memo>
+        <![CDATA[空值：Null()
+说明：返回空值。
+例子：
+Null()
+]]>
+      </Memo>
+    </Item>  
+    <Item>
+      <Name>True</Name>
+      <Value>True()</Value>
+      <Memo>
+        <![CDATA[布尔值真：True()
+说明：返回布尔值true。
+例子：
+True()
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>False</Name>
+      <Value>False()</Value>
+      <Memo>
+        <![CDATA[布尔值非：False()
+说明：返回布尔值false。
+例子：
+False()
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Not</Name>
+      <Value>Not(exp)</Value>
+      <Memo>
+        <![CDATA[取非：Not(exp)
+说明：取非。
+例子：
+Not(12)
+Not(Fields!数量.Value<=0)
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>RowCount</Name>
+      <Value>RowCount()</Value>
+      <Memo>
+        <![CDATA[总行数：RowCount()
+说明：获取当前表格总行数。
+例子：RowCount()
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>RowIndex</Name>
+      <Value>RowIndex()</Value>
+      <Memo>
+        <![CDATA[行索引：RowIndex()
+说明：获取当前行索引。
+例子：RowIndex()
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>RowNumber</Name>
+      <Value>RowNumber()</Value>
+      <Memo>
+        <![CDATA[行号：RowNumber()
+说明：获取当前行号。
+例子：RowNumber()
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>GroupIndex</Name>
+      <Value>GroupIndex()</Value>
+      <Memo>
+        <![CDATA[分组索引：GroupIndex()
+说明：获取当前分组索引。
+例子：GroupIndex()
+
+]]>
+      </Memo>
+    </Item>
+     <Item>
+      <Name>GroupNumber</Name>
+      <Value>GroupNumber()</Value>
+      <Memo>
+        <![CDATA[分组号：GroupNumber()
+说明：获取当前分组号。
+例子：GroupNumber()
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>GroupRowIndex</Name>
+      <Value>GroupRowIndex()</Value>
+      <Memo>
+        <![CDATA[分组行索引：GroupRowIndex()
+说明：获取当前分组行索引。
+例子：GroupRowIndex()
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>GroupRowNumber</Name>
+      <Value>GroupRowNumber()</Value>
+      <Memo>
+        <![CDATA[分组行号：GroupRowNumber()
+说明：获取当前分组行号。
+例子：GroupRowNumber()
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>GroupStartIndex</Name>
+      <Value>GroupStartIndex()</Value>
+      <Memo>
+        <![CDATA[分组开始索引：GroupStartIndex()
+说明：获取当前分组开始索引。
+例子：GroupStartIndex()
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>GroupEndIndex</Name>
+      <Value>GroupEndIndex()</Value>
+      <Memo>
+        <![CDATA[分组结束索引：GroupEndIndex()
+说明：获取当前分组结束索引。
+例子：GroupEndIndex()
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>DynamicField</Name>
+      <Value>DynamicField()</Value>
+      <Memo>
+        <![CDATA[动态列字段：DynamicField()
+说明：访问当前动态列的字段名称。
+例子：DynamicField ()
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>DynamicText</Name>
+      <Value>DynamicText()</Value>
+      <Memo>
+        <![CDATA[动态列文本：DynamicText()
+说明：访问当前动态列的显示文本，用于列头文本显示。
+例子：DynamicField ()
+
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>DynamicValue</Name>
+      <Value>DynamicValue()</Value>
+      <Memo>
+        <![CDATA[动态列数据值：DynamicValue()
+说明：访问当前行当前动态列的数据值，用于表主体获取数据。
+例子：DynamicValue ()
+
+
+]]>
+      </Memo>
+    </Item>
+    <Item>
+      <Name>Val</Name>
+      <Value>Val()</Value>
+      <Memo>
+        <![CDATA[当前值：Val()
+说明：获取当前值。
+例子：Val()
+]]>
+      </Memo>
+    </Item>
+  </Group>
+</Groups>

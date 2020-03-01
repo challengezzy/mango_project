@@ -1,0 +1,27 @@
+<Graph>
+  <Node id="StartNode" name="0" desc="root Node" nodeColor="0xFFFFFF" nodeSize="25"       nodeIcon="url::smartx/bam/flex/assets/image/processchart/start.png" x="10" y="10" />
+  <Node id="2" name="A" desc="node A" nodeColor="0x8F8FFF" nodeSize="12" nodeClass="tree" nodeIcon="url::smartx/bam/flex/assets/image/processchart/2.png" x="10" y="15" />
+  <Node id="3" name="B" desc="node B" nodeColor="0xF00000" nodeSize="36" nodeClass="tree" nodeIcon="url::smartx/bam/flex/assets/image/processchart/3.png" x="10" y="20" />
+
+  <Node id="8" name="A.1" desc="leaf a1" nodeColor="0x8F8FFF" nodeSize="21" nodeClass="leaf" nodeIcon="url::smartx/bam/flex/assets/image/processchart/4.png" x="20" y="20" />
+  <Node id="9" name="A.2" desc="leaf a1" nodeColor="0x8F8FFF" nodeSize="15" nodeClass="leaf" nodeIcon="url::smartx/bam/flex/assets/image/processchart/5.png" x="20" y="25" />
+  <Node id="10" name="A.3" desc="leaf a1" nodeColor="0x8F8FFF" nodeSize="32" nodeClass="leaf" nodeIcon="url::smartx/bam/flex/assets/image/processchart/5.png" x="20" y="30" />
+  <Node id="11" name="A.4" desc="leaf a1" nodeColor="0x8F8FFF" nodeSize="16" nodeClass="leaf" nodeIcon="url::smartx/bam/flex/assets/image/processchart/9.png" x="20" y="35" />
+  
+  <Node id="14" name="B.1" desc="leaf b1" nodeColor="0xF00000" nodeSize="27" nodeClass="leaf" nodeIcon="url::smartx/bam/flex/assets/image/processchart/6.png" x="30" y="30" />
+  <Node id="15" name="B.2" desc="leaf b2" nodeColor="0xF00000" nodeSize="10" nodeClass="leaf" nodeIcon="url::smartx/bam/flex/assets/image/processchart/7.png" x="30" y="35" />
+  <Node id="16" name="B.3" desc="leaf b3" nodeColor="0xF00000" nodeSize="13" nodeClass="leaf" nodeIcon="url::smartx/bam/flex/assets/image/processchart/8.png" x="30" y="40" />
+    
+  <Edge fromID="StartNode" toID="2" edgeLabel="No Change" flow="50" color="0x556b2f" edgeClass="sun" edgeIcon="url::smartx/bam/flex/assets/image/processchart/NoChange.png" />
+  <Edge fromID="StartNode" toID="3" edgeLabel="Bad" flow="400" color="0xcd5c5c" edgeClass="sun" edgeIcon="url::smartx/bam/flex/assets/image/processchart/Rain.png" />
+  
+  <Edge fromID="2" toID="8" edgeLabel="Good" flow="100" edgeClass="rain" edgeIcon="url::smartx/bam/flex/assets/image/processchart/Sun.png" />
+  <Edge fromID="2" toID="9" edgeLabel="Bad" flow="400" edgeClass="rain" edgeIcon="url::smartx/bam/flex/assets/image/processchart/Rain.png" />
+  <Edge fromID="2" toID="10" edgeLabel="No Change" flow="800" edgeClass="rain" edgeIcon="url::smartx/bam/flex/assets/image/processchart/NoChange.png" />
+  <Edge fromID="2" toID="11" edgeLabel="Good" flow="100" edgeClass="rain" edgeIcon="url::smartx/bam/flex/assets/image/processchart/Good.png" />
+
+  <Edge fromID="3" toID="14" edgeLabel="Good" flow="1" edgeClass="rain" edgeIcon="url::smartx/bam/flex/assets/image/processchart/Sun.png" />
+  <Edge fromID="3" toID="15" edgeLabel="No Change" flow="40" edgeClass="rain" edgeIcon="url::smartx/bam/flex/assets/image/processchart/NoChange.png" />
+  <Edge fromID="3" toID="16" edgeLabel="Bad" flow="80" edgeClass="rain" edgeIcon="url::smartx/bam/flex/assets/image/processchart/Rain.png" />
+  
+</Graph>

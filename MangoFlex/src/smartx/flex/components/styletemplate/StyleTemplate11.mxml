@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" 
+		   fontSize="12" xmlns:ns1="smartx.flex.components.*" 
+		   creationComplete="init()" 
+		   xmlns:ns2="smartx.flex.components.styletemplate.*" 
+		   xmlns:code="http://code.google.com/p/flexlib/" xmlns:core="smartx.flex.components.core.*">
+	<mx:Metadata>
+		[Event(name='beforeSave',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='save',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='saveSuccessful',type='smartx.flex.components.event.StyleTemplateEvent')]
+	</mx:Metadata>
+	<mx:Script>
+	<![CDATA[
+		import mx.controls.Alert;
+		import mx.events.CloseEvent;
+		import mx.events.ListEvent;
+		import mx.managers.PopUpManager;
+		import mx.rpc.events.FaultEvent;
+		import mx.rpc.events.ResultEvent;
+		import mx.rpc.remoting.mxml.RemoteObject;
+		
+		import smartx.flex.components.assets.AssetsFileLib;
+		import smartx.flex.components.core.BillListPanel;
+		import smartx.flex.components.core.ext.DataValidator;
+		import smartx.flex.components.event.BillCardPanelEvent;
+		import smartx.flex.components.event.StyleTemplateEvent;
+		import smartx.flex.components.util.TempletDataUtil;
+		import smartx.flex.components.vo.GlobalConst;
+		[Bindable]
+		public var templetCode:String;
+		[Bindable]
+		public var debugMode:Boolean;
+		[Bindable]
+		public var destination:String = GlobalConst.SERVICE_FORM;
+		[Bindable]
+		public var endpoint:String;
+		[Bindable]
+		public var isShowAlert:Boolean = true;
+		[Bindable]
+		public var commitLabel:String = "提交";
+		
+		private var formService:RemoteObject;
+		
+		public var isCommitButton:Boolean = true;
+		
+		private var _isSaveAndCreate:Boolean = false;
+		
+		public var isButtonsBottom:Boolean = false;
+		
+		public var isButtonRight:Boolean = false;
+		
+		public var isShowAllButton:Boolean = false;
+		[Bindable]
+		public var insertbfIncCard:String;
+		[Bindable]
+		public var insertafIncCard:String;
+		[Bindable]
+		public var updatebfIncCard:String;
+		[Bindable]
+		public var updateafIncCard:String;
+		[Bindable]
+		public var deletebfIncCard:String;
+		[Bindable]
+		public var deleteafIncCard:String;
+		[Bindable]
+		public var clientInsertBfIncCard:String;
+		[Bindable]
+		public var clientInsertAfIncCard:String;
+		[Bindable]
+		public var clientUpdateBfIncCard:String;
+		[Bindable]
+		public var clientUpdateAfIncCard:String;
+		[Bindable]
+		public var clientDeleteBfIncCard:String;
+		[Bindable]
+		public var clientDeleteAfIncCard:String;
+		[Bindable]
+		public var infoText:String;
+		
+	    private function init():void{
+			if(templetCode == null)
+        		throw Error("元原模板编号不能为null");
+        	formService = new RemoteObject(destination);
+		    if(endpoint!=null)
+		        formService.endpoint = endpoint;
+			if(!isShowAllButton){
+				if(isCommitButton)
+					cardButtonBox.removeChild(cardSaveButton);
+				else
+					cardButtonBox.removeChild(cardCommitButton);
+			}
+			
+			if(isButtonsBottom){
+				mainBox.removeChild(cardButtonBox);
+				mainBox.addChildAt(cardButtonBox,1);
+			}
+			if(isButtonRight)
+				cardButtonBox.setStyle("horizontalAlign","right");
+			
+		}
+		
+		private function onInitComplete():void{
+			cardPanel.enterInsertMode();
+		}
+		
+		private function onSave():void{
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.BEFORE_SAVE,cardPanel.getDataValue()));
+			cardPanel.save();
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.SAVE,cardPanel.getDataValue()));
+			_isSaveAndCreate = true;
+		}
+		
+		private function onCommit():void{
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.BEFORE_SAVE,cardPanel.getDataValue()));
+			cardPanel.save();
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.SAVE,cardPanel.getDataValue()));
+		}
+		
+		private function onSaveSuccessful():void{
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.SAVESUCCESSFUL,cardPanel.getDataValue()));
+			cardPanel.insertMode = false;
+			if(_isSaveAndCreate){
+				cardPanel.enterInsertMode();
+			}
+			_isSaveAndCreate = false;
+		}
+		
+		public function get isSaveAndCreate():Boolean{
+			return _isSaveAndCreate;
+		}
+
+	]]>
+	</mx:Script>
+	<mx:VBox width="100%" height="100%" id="mainBox">
+		<mx:HBox width="100%" id="cardButtonBox">
+			<mx:Button id="cardSaveButton" label="保存并新建"  click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+			<mx:Button id="cardCommitButton" label="{commitLabel}"  click="onCommit()" icon="{AssetsFileLib.saveIcon}"/>
+		</mx:HBox>
+		<mx:Label id="info" text="{infoText}"/>
+		<core:BillCardPanel 
+			destination="{destination}" 
+			endpoint="{endpoint}" templetCode="{templetCode}" isShowAlert="{isShowAlert}"
+			id="cardPanel" width="100%" height="100%" 
+			title="详细信息" debugMode="{debugMode}" 
+			saveSuccessful="onSaveSuccessful()" 
+			initComplete="onInitComplete()" 
+			showInitingWindow="false"
+			insertBfInterceptor="{insertbfIncCard}" insertAfInterceptor="{insertafIncCard}"
+			updateBfInterceptor="{updatebfIncCard}" updateAfInterceptor="{updateafIncCard}"
+			deleteBfInterceptor="{deletebfIncCard}" deleteAfInterceptor="{deleteafIncCard}"
+			clientInsertBfIncCard="{clientInsertBfIncCard}" clientInsertAfIncCard="{clientInsertAfIncCard}"
+			clientUpdateBfIncCard="{clientUpdateBfIncCard}" clientUpdateAfIncCard="{clientUpdateAfIncCard}"
+			clientDeleteBfIncCard="{clientDeleteBfIncCard}" clientDeleteAfIncCard="{clientDeleteAfIncCard}">
+		</core:BillCardPanel>
+	</mx:VBox>
+</mx:Canvas>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+	<taskRuleList>
+		<taskRule>
+			<taskFilterList>
+				<taskFilter implClass="gxlu.flex.components.workflow.task.DefaultTaskFilter">
+					<property name="ActivityCode" value="WFA0"/>
+					<property name="ProcessCode" value="WFP2010-2-23.2363"/>
+				</taskFilter>
+				<taskFilter>
+					<property name="abc" value="aaaa"/>
+				</taskFilter>
+			</taskFilterList>
+			<taskHandler implClass="gxlu.flex.components.workflow.task.DefaultTaskHandler"/>
+		</taskRule>
+	</taskRuleList>
+</root>

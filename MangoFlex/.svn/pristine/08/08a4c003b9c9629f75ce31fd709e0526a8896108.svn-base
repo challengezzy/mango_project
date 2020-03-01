@@ -1,0 +1,128 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project name="MangoFlex" basedir="." default="buildSwc">
+	<property environment="env" />
+	<property name="src_dir" value="../src" />
+	<!-- 配置MangoFlex工程绝对路径,需要根据需要修改 D:/hudson/jobs/Mango/workspace/MangoFlex D:/workspace_mango/MangoFlex -->
+	<property name="project_root" value="D:/hudson/jobs/Mango/workspace/MangoFlex" />
+	<property name="libs_dir" value="../lib" />
+	<property name="deploy_dir" value="../swc" />
+	<property name="swc_file" value="MangoFlex.swc" />
+	<property name="application.locale" value="zh_CN" />
+	<property name="FLEX_HOME" value="${env.FLEX_HOME}" />
+	<property name="ANT_HOME" value="${env.ANT_HOME}" />
+	<property name="SmartXRef-FlexLib.root"
+	          value="${basedir}/../../SmartXRef-FlexLib" />
+	<property name="SmartXRef-DateTimeLibrary.root"
+	          value="${basedir}/../../SmartXRef-DateTimeLibrary" />
+	<property name="SmartXRef-QsCalendar.root"
+	          value="${basedir}/../../SmartXRef-QsCalendar" />
+	<property name="SmartXRef-Birdeye.root"
+	          value="${basedir}/../../SmartXRef-Birdeye" />
+	<property name="MangoAsset.root"
+		          value="${basedir}/../../MangoAsset" />
+	<property name="SmartXVideoPlayer.root"
+			          value="${basedir}/../../SmartXVideoPlayer" />
+	<taskdef resource="flexTasks.tasks"
+	         classpath="${FLEX_HOME}/ant/lib/flexTasks.jar" />
+	<taskdef resource="net/sf/antcontrib/antlib.xml">
+		<classpath>
+			<pathelement location="${ANT_HOME}/lib/ant-contrib-1.0b3.jar" />
+		</classpath>
+	</taskdef>
+	<target name="init">
+		<delete dir="${deploy_dir}" />
+		<mkdir dir="${deploy_dir}" />
+		<delete file="../lib/assets.swc" />
+		<delete file="antLog.log" />
+	</target>
+	<target name="buildSwc" depends="init">
+		<fileset dir="${src_dir}" id="src.files">
+			<include name="**/**" />
+		</fileset>
+		<pathconvert property="evaFramework_classes"
+		             pathsep="${line.separator}"
+		             dirsep="."
+		             refid="src.files">
+			<!--<map from="/" to="/" />-->
+			<map from="${project_root}/src/" to="" />
+			<mapper>
+				<chainedmapper>
+					<globmapper from="*.as" to="*" />
+				</chainedmapper>
+				<chainedmapper>
+					<globmapper from="*.mxml" to="*" />
+				</chainedmapper>
+			</mapper>
+		</pathconvert>
+		<echo message="${evaFramework_classes}" />
+		<compc output="${deploy_dir}/${swc_file}"
+		       optimize="true"
+		       incremental="true"
+		       benchmark="true"
+		       fork="true"
+		       include-classes="${evaFramework_classes}"
+		       strict="true"
+		       debug="false"
+		       as3="true"
+		       actionscript-file-encoding="utf-8"
+		       allow-source-path-overlap="true"
+		       use-resource-bundle-metadata="true"
+		       keep-all-type-selectors="true"
+		       maxmemory="256m">
+			<source-path path-element="${src_dir}" />
+			<!-- The Flex 4 default theme is Spark. -->
+			<theme dir="${FLEX_HOME}/frameworks/themes/Halo" append="true">
+				<include name="halo.swc" />
+			</theme>
+			<external-library-path dir="${FLEX_HOME}/frameworks/libs"
+			                       append="true">
+				<include name="*.swc" />
+				<include name="/air/*.swc" />
+				<include name="/locale/${application.locale}/*.swc" />
+			</external-library-path>
+			<library-path dir="${libs_dir}" append="true">
+				<include name="DegrafaFlex4.swc" />
+				<include name="as3ds.swc" />
+				<include name="Efflex_v0[1].03_fx3_fp9.swc" />
+				<include name="EvalES4.swc" />
+				<include name="flexiframe.swc" />
+				<!--include name="IconUtility.swc" /-->
+				<include name="jrvc.swc" />
+				<!--include name="overview_map.swc" /-->
+				<include name="qsDragTile.swc" />
+				<include name="qsFishEye.swc" />
+				<include name="RightClickLib.swc" />
+				<include name="searchcoders_text.swc" />
+				<!--nclude name="SparkWebCommonComponents.swc" /-->
+				<include name="superPanel.swc" />
+				<include name="tweener.swc" />
+				<include name="FusionCharts.swc" />
+				<include name="FlexPivotComponent.swc" />
+				<include name="as3corelib.swc" />
+				<include name="amChartsFB4.swc" />
+				<include name="amMapFB4.swc" />
+				<include name="AutoComplete.swc" />
+				<include name="SmartXRef-Birdeye.swc" />
+				<include name="SmartXRef-DateTimeLibrary.swc" />
+				<include name="SmartXRef-FlexLib.swc" />
+				<include name="SmartXRef-QsCalendar.swc" />
+				<include name="SmartXVideoPlayer.swc" />
+			</library-path>
+			<!--
+			<library-path dir="${libs_dir}" append="true">
+			</library-path>
+			-->
+			<source-path path-element="${src_dir}" />
+			
+			<include-libraries dir="${MangoAsset.root}/swc" append="true">
+							<include name="*.swc" />
+						</include-libraries>
+		</compc>
+		<echo message="-- Deletes cache file --" />
+		<delete>
+			<fileset dir="${deploy_dir}"
+			         includes="${swc_file}.cache"
+			         defaultexcludes="false" />
+		</delete>
+	</target>
+</project>

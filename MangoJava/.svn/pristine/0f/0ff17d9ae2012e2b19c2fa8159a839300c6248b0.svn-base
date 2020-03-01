@@ -1,0 +1,257 @@
+package smartx.publics.form.bs.service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.ui.NovaClientEnvironment;
+import smartx.framework.common.vo.FrameWorkTBUtil;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.metadata.bs.FrameWorkMetaDataServiceImpl;
+import smartx.framework.metadata.vo.Pub_Templet_1VO;
+import smartx.framework.metadata.vo.Pub_Templet_1_ItemVO;
+import smartx.framework.metadata.vo.jepfunctions.JepFormulaParse;
+import smartx.publics.form.vo.BillListPanelVO;
+
+/**
+ *@author zzy
+ *@date Aug 16, 2011
+ **/
+public class BillListPanelService {
+	
+	private Logger logger = NovaLogger.getLogger(this.getClass());
+	
+	/**
+	 * 获取BillListPanelVO指定页数据
+	 * @param templetCode
+	 * @param condition
+	 * @param pageNum
+	 * @param rowCountPerPage
+	 * @param clientEnviorment
+	 * @return
+	 * @throws Exception
+	 */
+	public BillListPanelVO getBillListPanelVOByPage(String templetCode,
+			String condition, int pageNum, int rowCountPerPage,Map<String,Object> clientEnviorment)throws Exception {
+		
+
+		CommDMO dmo = new CommDMO();
+		try {
+			NovaClientEnvironment nce;
+			if(clientEnviorment != null)
+				nce = FormServiceUtil.getNewNovaClientEnviorment(clientEnviorment);
+			else
+				nce = NovaClientEnvironment.getInstance();
+			
+			BillListPanelVO vo = new BillListPanelVO();
+			FrameWorkMetaDataServiceImpl service = new FrameWorkMetaDataServiceImpl();
+			Pub_Templet_1VO templetVO = service.getPub_Templet_1VO(templetCode,nce);
+			vo.setTempletVO(templetVO);
+			// 取表头
+			Pub_Templet_1_ItemVO[] templetItemVOs = templetVO.getItemVos();
+			vo.setTempletItemVOs(templetItemVOs);
+
+			// 取记录数
+			String datasource = templetVO.getDatasourcename();
+			String sql = FormServiceUtil.getSQL(templetVO, condition,nce);
+			vo.setRealSQL(sql);
+			int count = service.getBillListRowCountByDS(datasource, sql,
+					templetVO, nce);
+			vo.setTableDataRowCount(count);
+			// 取页总数
+			int pageCount = count % rowCountPerPage == 0 ? count
+					/ rowCountPerPage : count / rowCountPerPage + 1;
+			vo.setTableDataPageCount(pageCount);
+			vo.setRowCountPerPage(rowCountPerPage);
+			if (pageNum <= 0 || pageNum > pageCount)
+				pageNum = 1;
+			vo.setCurrentPage(pageNum);
+			// 起始行号
+			int li_begin_pos = rowCountPerPage * (pageNum - 1);
+			if (li_begin_pos > count - 1) {
+				return vo;
+			}
+			// 截止行号
+			int li_end_pos = li_begin_pos + rowCountPerPage - 1;
+			if (li_end_pos >= count - 1) {
+				li_end_pos = count - 1;
+			}
+			// 取数据
+			Object[][] values = service.getBillListSubDataByDS(templetVO
+					.getDatasourcename(), sql, li_begin_pos, li_end_pos,
+					templetVO, nce);
+			List valuesList = new ArrayList();
+			for (int i = 0; i < values.length; i++) {
+				Object[] row = values[i];
+				HashMap rowMap = new HashMap();
+				rowMap.put("rownum", Integer.valueOf(li_begin_pos + i + 1));
+				for (int j = 0; j < row.length - 1; j++) {
+					rowMap.put(templetItemVOs[j].getItemkey(), row[j + 1]);
+				}
+				
+				//处理伪列
+				for(int k = 0; k < templetItemVOs.length; k++){
+					Pub_Templet_1_ItemVO templetItemVO = templetItemVOs[k];
+					if(templetItemVO.getExtattr02() != null && templetItemVO.getExtattr02().equalsIgnoreCase("Y")){
+						String itemType = templetItemVO.getExtattr03();
+						String itemValue = templetItemVO.getExtattr04();
+						
+						try{
+							// 0--value 数值类型,1--famula 公式类型,2--javaclass java实现类
+							if(itemType != null && itemType.equalsIgnoreCase("1")){
+								JepFormulaParse jepParse = new JepFormulaParse(JepFormulaParse.li_bs);
+					            Object obj = jepParse.execFormula(new FrameWorkTBUtil().convertFormulaMacPars(itemValue,nce, rowMap));
+					            if (obj != null) {
+					            	itemValue = obj.toString();
+					            }
+							}else if(itemType != null && itemType.equalsIgnoreCase("2")){
+								if(itemValue != null && !itemValue.trim().equals("")){
+									Object objImpl = Class.forName(itemValue).newInstance();
+									if( objImpl instanceof VirtualColumnHandlerIFC ){
+										itemValue = ((VirtualColumnHandlerIFC) objImpl).handler(rowMap).toString();
+									}
+								}
+							}
+							
+						}catch(Exception e){
+						}
+						rowMap.put(templetItemVO.getItemkey(), itemValue);
+					}
+				}
+				
+				valuesList.add(rowMap);
+			}
+			vo.setTableDataValues(valuesList);
+			return vo;
+		}
+		catch(Exception e){
+			logger.error("",e);
+			throw e;
+		}
+		finally {
+			dmo.releaseContext();
+		}
+	}
+	
+	/**
+	 * 获取templetCode中查到的所有数据
+	 * @param templetCode
+	 * @param condition
+	 * @param clientEnviorment
+	 * @return
+	 * @throws Exception
+	 */
+	public BillListPanelVO getBillListPanelVO(String templetCode,
+			String condition,Map<String,Object> clientEnviorment) throws Exception {
+	
+		CommDMO dmo = new CommDMO();
+		try {
+			NovaClientEnvironment nce;
+			if(clientEnviorment != null)
+				nce = FormServiceUtil.getNewNovaClientEnviorment(clientEnviorment);
+			else
+				nce = NovaClientEnvironment.getInstance();
+			
+			BillListPanelVO vo = new BillListPanelVO();
+			FrameWorkMetaDataServiceImpl service = new FrameWorkMetaDataServiceImpl();
+			Pub_Templet_1VO templetVO = service.getPub_Templet_1VO(templetCode,nce);
+			vo.setTempletVO(templetVO);
+			// 取表头
+			Pub_Templet_1_ItemVO[] templetItemVOs = templetVO.getItemVos();
+			vo.setTempletItemVOs(templetItemVOs);
+
+			String sql = FormServiceUtil.getSQL(templetVO, condition,nce);
+			vo.setRealSQL(sql);
+			// 取数据
+			Object[][] values = service.getBillListDataByDS(templetVO
+					.getDatasourcename(), sql, templetVO,nce);
+			List valuesList = new ArrayList();
+			for (int i = 0; i < values.length; i++) {
+				Object[] row = values[i];
+				HashMap rowMap = new HashMap();
+				rowMap.put("rownum", Integer.valueOf(i + 1));
+				for (int j = 0; j < row.length - 1; j++) {
+					rowMap.put(templetItemVOs[j].getItemkey(), row[j + 1]);
+				}
+				
+				//处理伪列
+				for(int k = 0; k < templetItemVOs.length; k++){
+					Pub_Templet_1_ItemVO templetItemVO = templetItemVOs[k];
+					if(templetItemVO.getExtattr02() != null && templetItemVO.getExtattr02().equalsIgnoreCase("Y")){
+						String itemType = templetItemVO.getExtattr03();
+						String itemValue = templetItemVO.getExtattr04();
+						try{
+							// 0--value 数值类型,1--famula 公式类型,2--javaclass java实现类
+							if(itemType != null && itemType.equalsIgnoreCase("1")){
+								JepFormulaParse jepParse = new JepFormulaParse(JepFormulaParse.li_bs);
+					            Object obj = jepParse.execFormula(new FrameWorkTBUtil().convertFormulaMacPars(itemValue,nce, rowMap));
+					            if (obj != null) {
+					            	itemValue = obj.toString();
+					            }
+							}else if(itemType != null && itemType.equalsIgnoreCase("2")){
+								if(itemValue != null && !itemValue.trim().equals("")){
+									Object objImpl = Class.forName(itemValue).newInstance();
+									if( objImpl instanceof VirtualColumnHandlerIFC ){
+										itemValue = ((VirtualColumnHandlerIFC) objImpl).handler(rowMap).toString();
+									}
+								}
+							}
+							
+						}catch(Exception e){
+						}
+						rowMap.put(templetItemVO.getItemkey(), itemValue);
+					}
+				}
+				
+				valuesList.add(rowMap);
+			}
+			vo.setTableDataValues(valuesList);
+			vo.setTableDataRowCount(valuesList.size());
+			return vo;
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("getBillListPanelVO",e);
+			throw e;
+		}
+		finally {
+			dmo.releaseContext();
+		}
+	
+	}
+	
+	/**
+	 * 获取BillList记录总数
+	 * @param templetCode
+	 * @param condition
+	 * @param clientEnviorment
+	 * @return
+	 * @throws Exception
+	 */
+	public int getBillListPanelRowCount(String templetCode, String condition,Map<String,Object> clientEnviorment)throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			NovaClientEnvironment nce;
+			if(clientEnviorment != null)
+				nce = FormServiceUtil.getNewNovaClientEnviorment(clientEnviorment);
+			else
+				nce = NovaClientEnvironment.getInstance();
+
+			FrameWorkMetaDataServiceImpl service = new FrameWorkMetaDataServiceImpl();
+			Pub_Templet_1VO templetVO = service.getPub_Templet_1VO(templetCode,nce);
+			String datasource = templetVO.getDatasourcename();
+			String sql = FormServiceUtil.getSQL(templetVO, condition,nce);
+			int count = service.getBillListRowCountByDS(datasource, sql,templetVO, nce);
+			return count;
+		} catch (Exception e) {
+			logger.error("getBillListPanelRowCount 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext();
+		}
+	}
+
+}

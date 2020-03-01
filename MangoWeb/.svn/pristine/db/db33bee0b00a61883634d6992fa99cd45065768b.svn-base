@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   layout="absolute"
+		   creationComplete="creationCompleteHandler()"
+		   width="100%" height="100%"
+		   horizontalScrollPolicy="off" xmlns:dashboard="smartx.bam.flex.modules.dashboard.*"
+		   >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.flex.components.util.StringUtils;
+			
+			[Bindable]
+			private var dbcodeFromUrl:String;
+			
+			private function creationCompleteHandler():void{
+				var url:String = this.loaderInfo.url;
+				
+				//Alert.show("dbcodeFromUrl="+dbcodeFromUrl+"url = "+url);
+				var parameters:Object = smartx.flex.components.util.StringUtils.parseUrlParameters(url);
+				var tempDbcode:String = parameters.dbcode;
+				if(dbcodeFromUrl == null && !BAMUtil.isEmpty(tempDbcode)){
+					dbcodeFromUrl = tempDbcode;
+				}
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<dashboard:DashboardPanel id="dashboardPanel" width="100%" height="100%"
+							  dbcodeFromUrl="{dbcodeFromUrl}"
+							  >
+		
+	</dashboard:DashboardPanel>
+</mx:Module>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 verticalScrollPolicy="off" horizontalScrollPolicy="off" verticalAlign="middle"
+		 xmlns:util="myreport.util.*" implements="myreport.util.IPagingable" creationComplete="Init()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.res.Asset;
+			//function(pageRange:String):void
+			public var OnPrint:Function = null;
+			//function(scale:Number):void
+			public var OnZoom:Function = null;
+			//function(pageNumber:Number):void
+			public var OnGotoPage:Function = null;
+
+			private var _TotalPage:Number = 0;
+			private var _Index:int = -1;
+
+			private function Init():void
+			{
+				_PagingBar.Pagingable = this;
+			}
+			
+			private function Print():void
+			{
+				var pageRange:String = _Begin.text + "-" + _End.text;
+				if (_TotalPage > 0 && OnPrint != null)
+					OnPrint(pageRange);
+			}
+
+			private function Zoom():void
+			{
+				if(!_Zoom.selectedItem)
+					return;
+				var scale:Number = Number(_Zoom.selectedItem.replace("%", "")) / 100;
+				if (scale == 0)
+					return;
+				if (OnZoom != null)
+					OnZoom(scale);
+			}
+			public function set Total(value:int):void
+			{
+				_TotalPage = value;
+				_Index = -1;
+				
+				var enable:Boolean = _TotalPage > 0;
+				_PagingBar.Enabled = enable;
+				_Begin.text = enable ? "1" : "0";
+				_End.text = _TotalPage.toString();
+				_Begin.enabled = enable;
+				_End.enabled = enable;
+				_BtnPrint.enabled = enable;
+				
+				GotoPage(0);
+				Zoom();
+			}
+ 
+			//==========IPagingable=========
+			public function get Total():int
+			{
+				return _TotalPage;
+			}
+			public function get Current():int
+			{
+				return _Index;
+			}
+			public function GotoPage(index:int):void
+			{
+				index = Math.max(0, index);
+				index = Math.min(_TotalPage - 1, index);
+				if(_Index == index)
+					return;
+				_Index = index;
+				
+				if (_TotalPage && OnGotoPage != null)
+					OnGotoPage(_Index + 1);
+				ReportPageChanged();
+			}
+			private function ReportPageChanged():void
+			{
+				var e:PagingEvent = new PagingEvent(PagingEvent.PAGE_CHANGED);
+				dispatchEvent(e);
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox verticalAlign="middle" horizontalGap="3">
+		<mx:Label text="打印"/>
+		<mx:TextInput width="32" text="1" id="_Begin"/>
+		<mx:Label text="至" textAlign="center"/>
+		<mx:TextInput width="32" text="10" id="_End"/>
+		<mx:Label text="页"/>
+	</mx:HBox>
+	<util:ToolButton id="_BtnPrint" icon="{Asset.ICON_PRINT}" toolTip="打印" label="" click="Print()" width="23"/>
+	<mx:VRule height="24"/>
+	<mx:ComboBox width="80" selectedIndex="3" fontWeight="normal" id="_Zoom" change="Zoom()"
+				 fillAlphas="[1.0, 1.0]" fillColors="[#FFFFFF, #FFFFFF]" cornerRadius="4">
+		<mx:dataProvider>
+			<mx:Array>
+				<mx:String>25%</mx:String>
+				<mx:String>50%</mx:String>
+				<mx:String>75%</mx:String>
+				<mx:String>100%</mx:String>
+				<mx:String>125%</mx:String>
+				<mx:String>150%</mx:String>
+				<mx:String>175%</mx:String>
+				<mx:String>200%</mx:String>
+			</mx:Array>
+		</mx:dataProvider>
+	</mx:ComboBox>
+	<util:PagingBar id="_PagingBar">
+	</util:PagingBar>
+</mx:HBox>

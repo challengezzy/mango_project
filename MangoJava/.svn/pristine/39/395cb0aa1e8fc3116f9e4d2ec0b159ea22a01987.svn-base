@@ -1,0 +1,315 @@
+package smartx.framework.common.utils;
+
+
+import java.io.*;
+import java.util.List;
+import java.util.zip.Deflater;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import org.apache.commons.io.FileUtils;
+
+
+public class FileUtil {
+	
+	/**
+	 * 删除指定文件
+	 * @param f
+	 * @return long 被删除的文件数量，文件不存在则返回0
+	 */
+	public static long deleteFile(File f)throws Exception{
+		if(!f.exists()){throw new Exception("需要删除的文件不存在！");}
+		if(f.isDirectory()){
+			//if(Sys.isDebug)	System.out.printf("删除：%s %n",f.getAbsolutePath()+"...");
+			long rt=0;
+			File[] fs=f.listFiles();			
+			for(int i=0;i<fs.length;i++){
+				rt+=deleteFile(fs[i]);
+			}
+			//if(Sys.isDebug)	System.out.printf("删除：%s %n",f.getAbsolutePath());
+			f.delete();
+			rt++;
+			return rt;
+		}else{
+			//if(Sys.isDebug)	System.out.printf("删除：%s %n",f.getAbsolutePath());;
+			if(f.delete()){
+				return 1;
+			}else{
+				return 0;
+			}
+		}
+	}
+	/**
+	 * 删除指定文件
+	 * @param f
+	 * @return long 被删除的文件数量，文件不存在则返回0
+	 */
+	public static long deleteFile(String f)throws Exception{
+		return deleteFile(new File(f));
+	}
+	
+	/**
+	 * 删除指定文件，如果存在的话
+	 * @param fpath
+	 */
+	public static void removeFileIfExists(String fpath) {
+		File f = new File(fpath);
+		if (f.exists()) {
+			f.delete();
+		}
+	}
+	
+	/**
+	 * 创建文件目录，如果不存在的话
+	 * @param dirpath
+	 */
+	public static void createDirIfNotExists(String dirpath){
+		File dir = new File(dirpath);
+		if(!dir.exists())
+			dir.mkdirs();
+	}
+	
+	
+	
+	
+	/**
+	 * 拷贝文件到指定地方
+	 * @param fsource 源文件或者文件夹
+	 * @param ftarget 目标目录
+	 */
+	public static long copyFile(File fsource,File ftarget)throws Exception{
+		if(!fsource.exists()){throw new Exception("需要拷贝的文件不存在！");}
+		if(!ftarget.exists()){
+			if(!ftarget.mkdirs()){
+				throw new Exception("拷贝目的目录不能创建！");
+			}
+		}
+		String tpath=ftarget.getAbsolutePath();
+		//拷贝文件处理
+		if(fsource.isFile()){
+			//if(Sys.isDebug)	System.out.printf("拷贝 %s 到 %s %n",fsource.getAbsolutePath(),tpath+"/"+fsource.getName());
+			return copyFileIO(fsource,tpath+"/"+fsource.getName());
+		}
+		//拷贝目录处理
+		File[] fs=fsource.listFiles();
+		long flen=0;
+		for(int i=0;i<fs.length;i++){
+			if(fs[i].isFile()){
+				//if(Sys.isDebug)	System.out.printf("拷贝 %s 到 %s %n",fs[i].getAbsolutePath(),tpath+"/"+fs[i].getName());
+				flen+=copyFileIO(fs[i],tpath+"/"+fs[i].getName());
+			}else{
+				//if(Sys.isDebug)	System.out.printf("拷贝 %s 到 %s %n",fs[i].getAbsolutePath(),tpath+"/"+fs[i].getName()+"...");
+				flen+=copyFile(fs[i],new File(tpath+"/"+fs[i].getName()));
+			}
+		}
+		return flen;		
+	}
+	public static long copyFileIO(File fsource,String fpath)throws Exception{
+		FileInputStream in=new FileInputStream(fsource);
+		FileOutputStream out=new FileOutputStream(fpath);
+		byte[] buffer =new byte[1024*5];
+		int len,flen=0;		
+		while ((len=in.read(buffer))!=-1){
+			flen+=len;
+		    out.write(buffer,0,len);
+		} 
+		out.flush();
+		out.close();
+		in.close(); 
+		return flen;
+	}
+	
+	/**
+	 * 拷贝文件到指定地方
+	 * @param fsource 源文件
+	 * @param ftarget 目标文件或者目录
+	 */
+	public static long copyFile(String fsource,String ftarget)throws Exception{
+		return copyFile(new File(fsource),new File(ftarget));
+	}
+	
+		
+	
+	/**
+	 * 转移文件到指定地方
+	 * @param fsource 源文件
+	 * @param ftarget 目标文件，不一定存在
+	 */
+	public static boolean moveFile(File fsource,File ftarget)throws Exception{
+		if(Sys.isDebug)	
+			System.out.printf("转移 %s 到 %s %n",fsource.getAbsolutePath(),ftarget.getAbsolutePath()+"...");
+		
+		long flen=copyFile(fsource,ftarget);
+		if(Sys.isDebug)	
+			System.out.printf("转移文件总长度：%d字节 %n",flen);
+		long fcount=deleteFile(fsource);
+		if(Sys.isDebug)	
+			System.out.printf("转移文件总个数：%d个文件 %n",fcount);
+		
+		return true;
+	}
+	/**
+	 * 转移文件到指定地方
+	 * @param fsource 源文件
+	 * @param ftarget 目标文件，不一定存在
+	 */
+	public static boolean moveFile(String fsource,String ftarget)throws Exception{
+		return moveFile(new File(fsource),new File(ftarget));
+	}
+	
+	/**
+	 * 更名
+	 * @param f
+	 * @param sname
+	 */
+	public static boolean renameFile(File f,String sname)throws Exception{
+		if(!f.exists()){throw new Exception("需要更名的文件不存在！");}
+		String path=f.isFile()?f.getParent():f.getAbsolutePath();
+		return f.renameTo(new File(path+"/"+sname));
+	}
+	/**
+	 * 更名
+	 * @param f
+	 * @param sname
+	 */
+	public static boolean renameFile(String f,String sname)throws Exception{
+		return renameFile(new File(f),sname);
+	}
+	
+	/**
+	 * 读取文件中的字符串内容
+	 * @param fileName
+	 * @param encoding
+	 * @return
+	 * @throws IOException
+	 */
+	public static String readFileContent(String fileName,String encoding) throws IOException {
+		//建议直接使用commons-io.jar中的类FileUtils
+		File file = new File(fileName);
+		return FileUtils.readFileToString(file, encoding);
+		
+	}
+	
+	/**
+	 * 读取文件转换为字节数组
+	 * @param File
+	 * @return
+	 * @throws Exception
+	 */
+	public static byte[] getBytesFromFile(File file) throws Exception{
+		if (file == null)
+			return null;
+
+		FileInputStream stream = new FileInputStream(file);
+		ByteArrayOutputStream out = new ByteArrayOutputStream(1000);
+
+		byte[] b = new byte[1000];
+		int n;
+		while ((n = stream.read(b)) != -1) {
+			out.write(b, 0, n);
+		}
+		stream.close();
+		out.close();
+
+		return out.toByteArray();
+	}
+
+	/**
+	 * 把byte[] 转换为文件,返回文件句柄
+	 * @param b 字节数组
+	 * @param outputFile
+	 * @return
+	 * @throws Exception
+	 */
+	public static File getFileFromBytes(byte[] b, String outputFile) throws Exception{
+		BufferedOutputStream stream = null;
+		File file = null;
+		try {
+			file = new File(outputFile);
+			FileOutputStream fstream = new FileOutputStream(file);
+			stream = new BufferedOutputStream(fstream);
+			stream.write(b);
+			stream.flush();
+			fstream.flush();
+			fstream.close();
+		} catch (Exception e) {
+			throw new Exception(e);
+		} finally {
+			if (stream != null)
+					stream.close();
+		}
+		
+		return file;
+	}
+	
+	/**
+	 * 把多个文件打成zip文件并删除原有文件
+	 * @param fileNames
+	 * @param zipFile
+	 * @param zipLevel 压缩级别
+	 * @return 返回文件名
+	 */
+	public static String ZipAndDelFile(List<String> fileNames, String zipFileName,int zipLevel) throws Exception {
+
+		File zipFile = new File(zipFileName);
+		if(!zipFile.exists())//如果不存在，创建一个新的zip file
+			zipFile.createNewFile();
+			
+		FileOutputStream fos = new FileOutputStream(zipFileName);
+		ZipOutputStream zos = new ZipOutputStream(fos);
+		zos.setLevel(zipLevel);
+		
+		for (String filePathName : fileNames) {
+			File file = new File(filePathName);
+			
+			FileInputStream fis = new FileInputStream(file);
+			zos.putNextEntry(new ZipEntry(file.getName()));
+			int i = -1;
+			while ((i = fis.read()) != -1) {
+				zos.write(i);
+			}
+			zos.flush();
+			zos.closeEntry();
+			fis.close();
+			//删除
+			file.delete();
+		}
+		zos.close();
+		fos.close();
+
+		return zipFileName;
+	}
+	
+	/**
+	 * 把多个文件打成zip文件并删除原有文件
+	 * @param fileNames
+	 * @param zipFile
+	 * @return 返回文件名
+	 */
+	public static String ZipAndDelFile(List<String> fileNames, String zipFileName) throws Exception {
+
+		return ZipAndDelFile(fileNames,zipFileName,Deflater.DEFLATED);
+	}
+	
+	public static String createFile(String dirPath,String fileName) throws Exception{
+		File file = new File(dirPath+"/"+fileName);
+		if(file.isDirectory() || !file.exists()){
+			file.createNewFile();
+		}
+		
+		return dirPath+"/"+fileName;
+	}
+	
+	public static void main(String[] args)throws Exception{
+		
+		//System.out.println(FileUtil.copyFile("E:\\☆☆临时资料区☆☆","F:\\☆☆临时资料区☆☆"));
+		//System.out.flush();
+		//System.out.println(FileUtil.renameFile("C:\\DownTemp_1","DownTemp_2"));
+		//System.out.flush();		
+		System.out.println(FileUtil.moveFile("E:\\☆☆临时资料区☆☆","F:\\☆☆临时资料区☆☆"));
+		System.out.flush();
+		//System.out.println(FileUtil.deleteFile("E:\\DownTemp_3"));
+		//System.out.flush();
+	}
+
+}

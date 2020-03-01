@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cep:AbstractStreamControlPropertyEditor xmlns:fx="http://ns.adobe.com/mxml/2009" 
+										 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:cep="smartx.flex.components.core.cep.*"
+										 creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<fx:Component id="actionEditor">  
+			<mx:ComboBox>  
+				<mx:dataProvider>  
+					<fx:String>Add</fx:String>  
+					<!--<fx:String>Replace</fx:String>  -->
+					<fx:String>Remove</fx:String>
+				</mx:dataProvider>  
+			</mx:ComboBox>  
+		</fx:Component>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.cep.StreamEvent;
+			import smartx.flex.components.core.cep.StreamEventField;
+			import smartx.flex.components.core.cep.StreamInstance;
+			[Bindable]
+			private var schemaXML:XMLList;
+			private var settingsXML:XMLList;
+			
+			[Bindable]
+			public var nameEditorProvider:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				refresh();
+			}
+			
+			public override function refresh():void{
+				//先更新可选择的名称
+				nameEditorProvider.removeAll();
+				for each(var inputStream:StreamInstance in streamInstance.inputStreamList){
+					var event:StreamEvent = inputStream.getOutputStreamEvent();
+					for each(var field:StreamEventField in event.fieldList){
+						nameEditorProvider.addItem(field.name);
+					}
+				}
+				//更新settingsXML
+				settingsXML = streamInstance.defineXML.settings;
+				if(settingsXML.additionalExpression.length() == 0){
+					var temp:XML = <additionalExpression/>;
+					settingsXML.appendChild(temp);
+					triggerDataChangeEvent();
+				}
+				schemaXML = settingsXML.additionalExpression.field;
+				dataGrid.invalidateList();
+			}
+			
+			private function addField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				var temp:XML = 
+					<field>
+						<action>Add</action>
+						<name/>
+						<expression/>
+					</field>;
+				settingsXML.additionalExpression.insertChildAfter(null,temp);
+				schemaXML = settingsXML.additionalExpression.field;
+				triggerDataChangeEvent();
+				dataGrid.invalidateList();
+			}
+
+			private function isFieldNameExists(name:String):Boolean{
+				for each(var field:XML in schemaXML){
+					if(field.name == name){
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			private function deleteField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				if(schemaXML!=null){
+					CEPUtils.xmlDeleteNode(schemaXML[selectedIndex]);
+				}
+				schemaXML = settingsXML.additionalExpression.field;
+				triggerDataChangeEvent();
+				dataGrid.invalidateList();
+			}
+			
+			private function triggerDataChangeEvent():void{
+				dispatchEvent(new FlexEvent(FlexEvent.DATA_CHANGE));
+			}
+			
+			protected function dataGrid_itemFocusOutHandler(event:DataGridEvent):void
+			{
+				triggerDataChangeEvent(); 
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:HBox width="100%">
+			<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addField()"/>
+			<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteField()"/>
+		</mx:HBox>
+		<mx:DataGrid id="dataGrid" width="100%" height="100%" editable="true" dataProvider="{schemaXML}" itemFocusOut="dataGrid_itemFocusOutHandler(event)" >
+			<mx:columns>
+				<mx:DataGridColumn headerText="动作" dataField="action" itemEditor="{actionEditor}" editorDataField="value"/>
+				<mx:DataGridColumn headerText="字段名" dataField="name">
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:ComboBox dataProvider="{outerDocument.nameEditorProvider}" editable="true"/>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+				<mx:DataGridColumn headerText="表达式" dataField="expression"/>
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+</cep:AbstractStreamControlPropertyEditor>

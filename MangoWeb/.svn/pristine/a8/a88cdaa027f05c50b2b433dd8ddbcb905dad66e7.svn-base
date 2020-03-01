@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009"
+						 xmlns:s="library://ns.adobe.com/flex/spark"
+						 xmlns:mx="library://ns.adobe.com/flex/mx"
+						 xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*"
+						 width="100%" height="100%" label="数据展示"
+						 creationComplete="init()">
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.effects.Effect;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.Pixelate;
+			
+			import smartx.bam.flex.modules.dashboardobject.designer.BaseDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.CardDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.GeneralFormDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.GeographyChartDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.IndicatorDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.ListChartDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.MultiSeriesChartDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.OlapDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.ProcessChartDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.SingleSeriesChartDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.TreeListChartDesigner;
+			import smartx.bam.flex.modules.dashboardobject.designer.XYPlotChartDesigner;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.mtchart.MTCardChartPanel;
+			import smartx.flex.components.core.mtchart.MTChartPanel;
+			import smartx.flex.components.core.mtchart.MTIndicatorPanel;
+			import smartx.flex.components.core.mtchart.MTListChartPanel;
+			import smartx.flex.components.core.mtchart.MTMultiSeriesChartPanel;
+			import smartx.flex.components.core.mtchart.MTOLAPChartPanel;
+			import smartx.flex.components.core.mtchart.MTProcessChartPanel;
+			import smartx.flex.components.core.mtchart.MTSingleSeriesPanel;
+			import smartx.flex.components.core.mtchart.MTTreeGridChartPanel;
+			import smartx.flex.components.core.mtchart.MTXYPlotChartPanel;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChartType;
+			import smartx.flex.components.util.MemoryUtil;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var searchChartTypeSQL:String = "SELECT TO_CHAR(BS.VALUE) VALUE, BS.VALUEEN CODE, BS.VALUECN NAME FROM BFBIZ_SYSDICTIONARY BS WHERE BS.CLASSID = 'BAM_DASHBOARDOBJECT' AND BS.ATTRIBUTEID = 'TYPE'";
+			
+			private var searchDashboardobjectSQL:String = "select * from v_bam_dashboardobject ";
+			
+			private const CHARTID:String = "dboViewer";
+			
+			private var loginName:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME) as String;
+			
+			private var providerName:String = GlobalConst.DEFAULTPROVIDERNAME_CEP;
+			
+			[Bindable]
+			private var isEdit:Boolean = false;
+			[Bindable]
+			private var switchEffect:Effect;
+			
+			[Bindable]
+			public var datasourceName:String;
+			
+			[Bindable]
+			public var saveFun:Function;
+			
+			private var entityCode:String;
+			
+			private var entityXml:XML;
+			
+			private var content:String;
+			
+			private var sql:String;
+			
+			[Bindable]
+			private var chartTypeCol:ArrayCollection = new ArrayCollection();
+			
+			private var isReturn:Boolean = true;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var seletedDataviewerXml:XML;
+			
+			private var saveInfo:Object;
+			
+			private var isSaveSuccessful:Boolean = false;
+			
+			private var generalFormDesigner:GeneralFormDesigner;
+			
+			private var chart:MTChartPanel;
+			
+			private var hasSaved:Boolean = false;
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new Pixelate();
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取图表类型时出错",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				formService.getSimpleHashVOMap.addEventListener(ResultEvent.RESULT,getSimpleHashVOMapHandler);
+				formService.getSimpleHashVOMap.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据时出错",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.saveEntityViewer.addEventListener(ResultEvent.RESULT,saveEntityViewerHandler);
+				bamService.saveEntityViewer.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("保存时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.updateEntityViewer.addEventListener(ResultEvent.RESULT,updateEntityViewerHandler);
+				bamService.updateEntityViewer.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("更新时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.deleteEntityViewer.addEventListener(ResultEvent.RESULT,deleteEntityViewerHandler);
+				bamService.deleteEntityViewer.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("删除时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.generateEntitySql.addEventListener(ResultEvent.RESULT,generateEntitySqlHandler);
+				bamService.generateEntitySql.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("生成SQL时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.getChartDataByMtContent.addEventListener(ResultEvent.RESULT,getChartDataByMtContentHandler);
+				bamService.getChartDataByMtContent.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("无法加载对象数据",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				formService.getSimpleHashVoArrayByDS(null,searchChartTypeSQL);
+				
+				isCreationComplete = true;
+				
+				entityXml = selectedItem.content as XML;
+				entityCode = String(entityXml.@code);
+				bamService.generateEntitySql(entityXml.toXMLString(),contentXml.toXMLString(),null);
+				
+				
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				chartTypeCol.removeAll();
+				var dataArr:Array = event.result as Array;
+				for each(var sp:SimpleHashVO in dataArr){
+					chartTypeCol.addItem(sp.dataMap);
+				}
+			}
+			
+			private function saveEntityViewerHandler(event:ResultEvent):void{
+				var code:String = event.result as String;
+				var charTypeItem:Object = chartTypeCob.selectedItem;
+				var dataviewerXml:XML = <dataviewer />;
+				if(entityXml.dataviewers.length()<=0 ){
+					entityXml.appendChild(new XML("<dataviewers />"));
+				}
+				
+				dataviewerXml.@name = dataViewerNameTxt.text;
+				dataviewerXml.@code = code;
+				dataviewerXml.@chartType = charTypeItem["value"];
+				dataviewerXml.@chartName = charTypeItem["name"];
+				dataviewerXml.@desc = dataViewerDescTxt.text;
+				entityXml.dataviewers.appendChild(dataviewerXml);
+				
+				hasSaved = true;
+				
+				saveFun();
+				
+				onRefresh();
+				
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(code,endpoint);
+				
+			}
+			
+			private function updateEntityViewerHandler(event:ResultEvent):void{
+				
+				var charTypeItem:Object = chartTypeCob.selectedItem;
+				
+				seletedDataviewerXml.@name = dataViewerNameTxt.text;
+				seletedDataviewerXml.@chartType = charTypeItem["value"];
+				seletedDataviewerXml.@chartName = charTypeItem["name"];
+				seletedDataviewerXml.@desc = dataViewerDescTxt.text;
+
+				saveFun();
+				
+				onRefresh();
+				
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(String(seletedDataviewerXml.@code),endpoint);
+				
+			}
+			
+			private function deleteEntityViewerHandler(event:ResultEvent):void{
+				CEPUtils.xmlDeleteNode(seletedDataviewerXml);
+				dataGrid.dataProvider = selectedItem.content.dataviewers.dataviewer;
+				dataGrid.invalidateList();
+				seletedDataviewerXml = null;
+				saveFun();
+				onRefresh();
+			}
+			
+			private function generateEntitySqlHandler(event:ResultEvent):void{
+				sql = event.result as String;
+			}
+			
+			protected function onView():void{
+				if(chart != null ){
+					chartPanel.removeChild(chart);
+				}
+				mainVbox.selectedChild = chartVbox;
+				var templet:MetadataTemplet = new MetadataTemplet();
+				templet.contentXML = new XML(content);
+				templet.code = CHARTID;
+				var charTypeItem:Object = chartTypeCob.selectedItem;
+				var tempType:String = charTypeItem["value"] as String;
+				var type:int = parseInt(tempType);
+				switch(type){
+					case MTChartType.SINGLESERIESCHART:
+						chart = new MTSingleSeriesPanel();
+						break;
+					case MTChartType.MULTISERIESCHART:
+						chart = new  MTMultiSeriesChartPanel();
+						break;
+					case MTChartType.XYPLOTCHART:
+						chart = new MTXYPlotChartPanel();
+						break;
+//					case MTChartType.PIVOTCOMBINATIONCHART:
+//						break;
+//					case MTChartType.GEOGRAPHYCHART:
+//						chart = new MTGeoMapChartPanel();
+//						break;
+					case MTChartType.INDICATOR:
+						chart = new MTIndicatorPanel();
+						break;
+					case MTChartType.TABLE:
+						chart = new MTListChartPanel();
+						break;
+					case MTChartType.TREELIST:
+						chart = new MTTreeGridChartPanel();
+						break;
+					case MTChartType.CARD:
+						chart = new MTCardChartPanel();
+						break;
+					case MTChartType.OLAP:
+						chart = new MTOLAPChartPanel();
+						break;
+					case MTChartType.PROCESSCHART:
+						chart = new MTProcessChartPanel();
+						break;
+				}
+				if(chart == null){
+					SmartXMessage.show("不支持的对象类型!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				chart.chartId = CHARTID;
+				chart.metadataTemplet = templet;
+				chart.endpoint = endpoint;
+				chart.percentHeight = 100;
+				chart.percentWidth = 100;
+				chart.dashboardCode = CHARTID;
+				chart.intervalTime = 20000;
+				chart.isShowAlert = false;
+				chart.isAutoRefresh = false;
+				chart.addEventListener(MTChartEvent.REFRESH_DATA,refreshChartData);
+				chart.addEventListener(MTChartEvent.INIT_COMPLETE,chartInitHandler);
+				
+				if(chart != null ){
+					chartPanel.addChild(chart);
+				}
+				
+			}
+			
+			private function chartInitHandler(event:MTChartEvent):void{
+				if(chart!=null){
+					chart.start();
+				}
+			}
+			
+			private function refreshChartData(event:MTChartEvent):void{
+				var mtchart:MTChartPanel = event.currentTarget as MTChartPanel;
+				var dboChartId:String = CHARTID.concat("_").concat(event.id);
+				try{
+					var accessFilter:String = MTChartUtil.parseFilterVariable(event.id,mtchart.accessFilter,event.dataValues,dboChartId);
+					var filter:String = MTChartUtil.parseFilter(event.id,event.dataValues,dboChartId,mtchart);
+					bamService.getChartDataByMtContent(content,providerName,event.chartType,event.id,filter,accessFilter);
+				}
+				catch(e:Error){
+					mtchart.isLoading = false;
+				}	
+			}
+			
+			private function getChartDataByMtContentHandler(event:ResultEvent):void{
+				if(chart == null)
+					return;
+				var chartDataMap:Object = event.result;
+				var chartDataArr:Array = chartDataMap[CHARTID] as Array;
+				if(chartDataArr != null){
+					chart.dataProvider=new ArrayCollection(chartDataArr);
+					chart.refreshComplete();
+				}else if(chart is MTListChartPanel){
+					chart.refreshComplete();
+				}
+			}
+			
+			private function onRefresh():void{
+				dataGrid.dataProvider = selectedItem.content.dataviewers.dataviewer;
+				dataGrid.invalidateList();
+			}
+			
+			protected function onAdd():void
+			{
+				hasSaved = false;
+				saveInfo = new Object();
+				var contentStr:String = "<chart><datasource type='entity' modelCode='"+String(contentXml.entityModelCode)+"' entityCode='"+entityCode+"'>"+datasourceName+"</datasource><extend /></chart>";
+				var temXml:XML = new XML(contentStr);
+				temXml.datasource.@sql = sql;
+				content = temXml.toXMLString();
+				saveInfo["content"] = content;
+				isEdit = false;
+				mainVbox.selectedChild = cardVbox;
+				dataViewerNameTxt.text = "";
+				dataViewerDescTxt.text = "";
+				chartTypeCob.selectedIndex = 0;
+			}
+			
+			protected function onEdit():void
+			{
+				hasSaved = false;
+				var item:Object = dataGrid.selectedItem;
+				if(item != null ){
+					
+					seletedDataviewerXml = item as XML;
+					
+					var code:String = String(seletedDataviewerXml.@code);
+					
+					dataViewerNameTxt.text = String(seletedDataviewerXml.@name);
+					dataViewerDescTxt.text = String(seletedDataviewerXml.@desc);
+					
+					var tempChartItem:Object = getChartItemByValue(String(seletedDataviewerXml.@chartType));
+					if(tempChartItem != null){
+						chartTypeCob.selectedItem = tempChartItem;
+					}
+					
+					isEdit = true;
+					
+					formService.getSimpleHashVOMap(null,searchDashboardobjectSQL+" where code='"+code+"'");
+					
+				}else{
+					SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			private function getSimpleHashVOMapHandler(event:ResultEvent):void{
+				var obj:Object = event.result;
+				var doArr:Array = obj["SIMPLEHASHVOARRAY"] as Array;
+				for each(var sp:SimpleHashVO in doArr){
+					saveInfo = sp.dataMap;
+				}
+				content = saveInfo["content"];
+				mainVbox.selectedChild = cardVbox;
+			}
+			
+			protected function onDel():void
+			{
+				var item:Object = dataGrid.selectedItem;
+				if(item != null ){
+					seletedDataviewerXml = item as XML;
+					var code:String = String(seletedDataviewerXml.@code);
+					saveInfo = new Object();
+					saveInfo["code"] = code;
+					bamService.deleteEntityViewer(saveInfo);
+				}else{
+					SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+				}
+				
+			}
+			
+			protected function onDesign():void{
+				var type:Object = chartTypeCob.selectedItem;
+				if(!type){
+					SmartXMessage.show("没有该类型的图表!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				var designer:BaseDesigner = null;
+				if(type.id == MTChartType.SINGLESERIESCHART){
+					designer = new SingleSeriesChartDesigner();
+					generalFormDesigner.title = "单组数据图属性设置";
+				}else if(type.id == MTChartType.MULTISERIESCHART){
+					designer = new MultiSeriesChartDesigner();
+					generalFormDesigner.title = "多组数据图高级属性设置";
+				}else if(type.id == MTChartType.XYPLOTCHART){
+					designer = new XYPlotChartDesigner();
+					generalFormDesigner.title = "坐标数据图高级属性设置";
+				}else if(type.id == MTChartType.GEOGRAPHYCHART){
+					designer = new GeographyChartDesigner();
+					generalFormDesigner.title = "地理图高级属性设置";
+				}else if(type.id == MTChartType.INDICATOR){
+					designer = new IndicatorDesigner();
+					generalFormDesigner.title = "指示器高级属性设置";
+				}else if(type.id == MTChartType.PIVOTCOMBINATIONCHART){
+					SmartXMessage.show("透视混合图高级属性");
+				}else if(type.id == MTChartType.TABLE){
+					designer = new ListChartDesigner();
+					generalFormDesigner.title = "列表图高级属性设置";
+				}else if(type.id == MTChartType.TREELIST){
+					designer = new TreeListChartDesigner();
+					generalFormDesigner.title = "树形列表图高级属性设置";
+				}else if(type.id == MTChartType.CARD){
+					designer = new CardDesigner();
+					generalFormDesigner.title = "卡片图高级属性设置";
+				}else if(type.id == MTChartType.OLAP){
+					designer = new OlapDesigner();
+					generalFormDesigner.title = "OLAP图高级属性设置";
+				}else if(type.id == MTChartType.PROCESSCHART){
+					designer = new ProcessChartDesigner();
+					generalFormDesigner.title = "流程图高级属性设置";
+				}else{
+					SmartXMessage.show("没有该类型图表的高级属性!",SmartXMessage.MESSAGE_ERROR);
+				}
+				
+				if(generalFormDesigner != null){
+					generalFormDesigner.confirmFunc = confirmBtnClick;
+					if(content != null)
+						generalFormDesigner.contentXml = new XML(content);
+					
+					generalFormDesigner.isEditEntityCob = false;
+					
+					if(this.desktop != null){
+						PopUpManager.addPopUp(generalFormDesigner,desktop,true);
+					}else{
+						PopUpManager.addPopUp(generalFormDesigner,this,true);
+					}
+					
+					PopUpManager.centerPopUp(generalFormDesigner);
+				}
+			}
+			
+			private function confirmBtnClick():void{
+				content = generalFormDesigner.getContentXmlStr();
+				PopUpManager.removePopUp(generalFormDesigner);
+				generalFormDesigner.confirmFunc = null;
+				generalFormDesigner = null;
+				MemoryUtil.forceGC();
+			}
+			
+			protected function onReturn():void{
+				mainVbox.selectedChild = listVbox;
+				dataGrid.dataProvider = selectedItem.content.dataviewers.dataviewer;
+				dataGrid.invalidateList();
+			}
+			
+			private function onReturnView():void{
+				mainVbox.selectedChild = cardVbox;
+			}
+			
+			protected function onSave():void{
+				
+				var dataViewerName:String = dataViewerNameTxt.text;
+				var charTypeItem:Object = chartTypeCob.selectedItem;
+				var dataViewerDesc:String = dataViewerDescTxt.text;
+				
+				if( BAMUtil.isEmpty(dataViewerName)){
+					SmartXMessage.show("名称不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				if(charTypeItem == null ){
+					SmartXMessage.show("图表类型不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				saveInfo["name"] = dataViewerName;
+				saveInfo["type"] = charTypeItem["value"];
+				saveInfo["description"] = dataViewerDesc;
+				saveInfo["content"] = content;
+				saveInfo["user"] = loginName;
+				if(!isEdit){
+					saveInfo["entityName"] = String(entityXml.@name);
+					saveInfo["code"] = contentXml.entityModelCode+"_"+entityCode;
+					if(!hasSaved){
+						bamService.saveEntityViewer(saveInfo);
+					}
+				}else{
+					bamService.updateEntityViewer(saveInfo);
+				}
+				
+			}
+			
+			protected function onSaveAndReturn():void{
+				onSave();
+				onReturn();
+			}
+			
+			private function getChartItemByValue(value:String):Object{
+				var item:Object = null;
+				for each(var tempItem:Object in chartTypeCol){
+					var tempValue:String = tempItem["value"] as String;
+					if( !BAMUtil.isEmpty(value) && !BAMUtil.isEmpty(tempValue) && value == tempValue){
+						item = tempItem;
+					}
+				}
+				return item;
+			}
+			
+			private function isExistDataViewer(code:String):Boolean{
+				var isExist:Boolean = false;
+				for each(var dataView:XML in selectedItem.content.dataviewers.dataviewer){
+					var tempCode:String = String(dataView.@code);
+					if(!BAMUtil.isEmpty(tempCode) && !BAMUtil.isEmpty(code) && code == tempCode){
+						isExist = true;
+					}
+				}
+				return isExist;
+			}
+			
+			public function showHandler():void
+			{
+				entityXml = selectedItem.content as XML;
+				entityCode = String(entityXml.@code);
+				bamService.generateEntitySql(entityXml.toXMLString(),contentXml.toXMLString(),null);
+				onReturn();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:ViewStack id="mainVbox" width="100%" height="100%" creationPolicy="all" >
+		<mx:VBox id="listVbox" width="100%" height="100%" paddingBottom="5"
+				 paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+			<mx:HBox width="100%">
+				<mx:Button id="add" width="22" height="22" click="onAdd()" icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+				<mx:Button id="del" width="22" height="22" click="onDel()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除"/>
+				<mx:Button id="edit" width="22" height="22" click="onEdit()" icon="{AssetsFileLib.editIcon}" toolTip="编辑"/>
+				<mx:Button width="22" height="22" click="onRefresh()" icon="{AssetsFileLib.refreshIcon}" toolTip="刷新"/>
+			</mx:HBox>
+			<mx:DataGrid id="dataGrid" width="100%" height="100%" allowMultipleSelection="false"
+						 dataProvider="{selectedItem.content.dataviewers.dataviewer}" doubleClickEnabled="true"
+						 itemDoubleClick="onEdit()">
+				<mx:columns>
+					<mx:DataGridColumn dataField="@name" headerText="名称"/>
+					<mx:DataGridColumn dataField="@code" headerText="编码"/>
+					<mx:DataGridColumn dataField="@chartName" headerText="类型"/>
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		<mx:VBox id="cardVbox" width="100%" height="100%" paddingBottom="5"
+				 paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}" >
+			<mx:HBox width="100%">
+				<mx:Button label="返回" toolTip="返回列表" click="onReturn()" icon="{AssetsFileLib.returnIcon}"/>
+				<mx:Button label="保存并返回" toolTip="保存当前信息并返回列表" click="onSaveAndReturn()" icon="{AssetsFileLib.savereturnIcon}"/>
+				<mx:Button label="保存" toolTip="保存当前信息" click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+				<mx:Button label="高级" click="onDesign()" icon="{AssetsFileLib.designIcon}" toolTip="高级设计"/>
+				<mx:Button label="预览" click="onView()" icon="{AssetsFileLib.viewIcon}" toolTip="预览"/>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Label text="名称" width="25%" color="blue"/>
+				<mx:TextInput id="dataViewerNameTxt" width="50%" />
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Label text="图表类型" width="25%" color="blue"/>
+				<mx:ComboBox id="chartTypeCob" width="50%" labelField="name" dataProvider="{chartTypeCol}" />
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Label text="描述" width="25%" />
+				<mx:TextArea id="dataViewerDescTxt" width="50%" height="100" />
+			</mx:HBox>
+		</mx:VBox>
+		
+		<mx:VBox id="chartVbox" width="100%" height="100%" paddingBottom="5"
+				 paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}" >
+			<mx:HBox width="100%" >
+				<mx:Button label="返回" click="onReturnView()" icon="{AssetsFileLib.returnIcon}"/>
+			</mx:HBox>
+			<mx:VBox id="chartPanel" width="100%" height="100%"  />
+		</mx:VBox>
+		
+	</mx:ViewStack>
+</entitymodel:AbstractTab>

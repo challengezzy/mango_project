@@ -1,0 +1,579 @@
+/************************************************************************
+ * $RCSfile: PrintProvider.java,v $  $Revision: 1.3.2.1 $  $Date: 2009/02/02 16:13:10 $
+ * $Log: PrintProvider.java,v $
+ * Revision 1.3.2.1  2009/02/02 16:13:10  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/10/10 03:27:52  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/09/11 08:04:31  john_liu
+ * no message
+ *
+ * Revision
+ *
+ * created by john_liu, 2007.09.11    for MR#: 0000, 迁移孙雪峰代码
+ *
+ ************************************************************************/
+
+
+package smartx.publics.print.ui;
+
+
+import java.util.HashMap;
+
+import smartx.framework.common.ui.FrameWorkCommService;
+import smartx.framework.common.ui.NovaClientEnvironment;
+import smartx.framework.common.ui.NovaRemoteServiceFactory;
+import smartx.framework.common.vo.FrameWorkTBUtil;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.metadata.vo.jepfunctions.JepFormulaParse;
+import smartx.publics.print.vo.Pub_PrintTempletItemVO;
+import smartx.publics.print.vo.Pub_PrintTempletVO;
+
+public class PrintProvider
+{
+    PrintWork printwork = null;
+    //  DATAMAP中存放对应打印模板名称的key值
+    public static final String  DATA_MAP_KEY_PRINTTEMPLETNAME = "DATA_MAP_KEY_PRINTTEMPLETNAME";
+
+    public PrintProvider()
+    {
+    }
+
+    public void print( String templetcode, int[] id, String pkname )
+    {
+        if ( templetcode == null || templetcode.equals( "" ) || id.length == 0 )
+            return;
+        HashMap result_map = new HashMap();
+        HashVO[] datas = null;
+        for ( int i = 0; i < id.length; i++ )
+        {
+            try
+            {
+//				 每个打印任务都要重新取一次
+                Pub_PrintTempletVO printvo = getPrintService()
+                    .getPub_PrintTempletVO( templetcode,
+                                            NovaClientEnvironment.getInstance() );
+                Pub_PrintTempletItemVO[] itemvo = printvo.getItemvo();
+                if ( printvo == null )
+                {
+                    System.out.println( "打印模板为空..." );
+                    return;
+                }
+                datas = getMetaService().getHashVoArrayByDS(
+                    null,
+                    "select * from " + printvo.getTablename() + " where "
+                    + pkname + "='" + id[i] + "'" );
+                if ( datas == null || datas.length == 0 )
+                    continue;
+                HashMap data_map = convertToHashMap( datas[0] );
+                // 更新数据中的值为模板中显示值公式的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValueformula() != null )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String value = util.convertFormulaMacPars( itemvo[j]
+                            .getValueformula(), NovaClientEnvironment
+                            .getInstance(), data_map );
+                        if ( value != null )
+                        {
+                            value = getJepFormulaValue( value );
+                            itemvo[j].setValue( value );
+                            data_map.put( itemvo[j].getItemkey(), value );
+                        }
+                    }
+                }
+                // 更新数据中的值为模板中定义的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValue() != null )
+                        data_map.put( itemvo[j].getItemkey(), itemvo[j]
+                                      .getValue() );
+                }
+                // 执行用户自定义类
+                if ( printvo.getCustdealclass() != null
+                     && !printvo.getCustdealclass().equals( "" ) )
+                {
+                    AbstractPrintProcess process = ( AbstractPrintProcess ) Class
+                        .forName( printvo.getCustdealclass() ).newInstance();
+                    try
+                    {
+                        process.processData( printvo, data_map );
+                    }
+                    catch ( Exception e )
+                    {
+                        result_map.put( datas[i].getStringValue( pkname ), "false" );
+                        continue;
+                    }
+                }
+                // 执行显示公式
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    // 默认显示空值
+                    if ( itemvo[j].getIsshownull() == null )
+                        itemvo[j].setIsshownull( "Y" );
+                    if ( itemvo[j].getIsshow() == null )
+                    {
+                        itemvo[j].setIsshow( "Y" );
+                        continue;
+                    }
+                    if ( itemvo[j].getIsshow() != null
+                         && !itemvo[j].getIsshow().equals( "" )
+                         && !itemvo[j].getIsshow().equalsIgnoreCase( "N" ) )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String isshow = util.convertFormulaMacPars( itemvo[j]
+                            .getIsshow(), NovaClientEnvironment
+                            .getInstance(), data_map );
+                        if ( isshow.indexOf( "=" ) != -1 )
+                        {
+                            String[] comp_items = isshow.split( "=" );
+                            if ( comp_items.length != 2 )
+                            {
+                                System.out.println( "显示公式有错误,应该为{xxx}=yyy.." );
+                                return;
+                            }
+                            if ( comp_items[0].equalsIgnoreCase( comp_items[1] ) )
+                            {
+                                itemvo[j].setIsshow( "Y" );
+                            }
+                        }
+                    }
+                }
+                if ( printwork == null )
+                    printwork = new PrintWork();
+                printwork.print( printvo, data_map ); // 执行打印
+
+            }
+            catch ( Exception e )
+            {
+                e.printStackTrace();
+                System.out.println( "[" + pkname + "]为[" + datas[i].getStringValue( pkname ) + "]的记录打印失败.." );
+                result_map.put( datas[i].getStringValue( pkname ), "false" );
+            }
+        }
+    }
+
+    /**
+     * 批量打印
+     * @param templetcode  元元模板编码
+     * @param data_map     数据
+     * @param pkname	具有唯一性的字段，用于返回结果
+     * @return			HashMap　其中根据pkname　设定为"true"或"false"
+     */
+    public HashMap print( String templetcode, HashMap[] data_map, String pkname )
+    {
+        if ( templetcode == null || templetcode.equals( "" ) || data_map == null
+             || data_map.length == 0 || pkname == null || pkname.equals( "" ) )
+            return null;
+        HashMap result_map = new HashMap();
+        for ( int i = 0; i < data_map.length; i++ )
+        {
+            try
+            {
+                //  每个打印任务都要重新取一次
+                Pub_PrintTempletVO printvo = getPrintService().getPub_PrintTempletVO( templetcode,
+                    NovaClientEnvironment.getInstance() );
+                Pub_PrintTempletItemVO[] itemvo = printvo.getItemvo();
+                if ( printvo == null )
+                {
+                    System.out.println( "打印模板为空..." );
+                    return null;
+                }
+                // 更新数据中的值为模板中显示值公式的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValueformula() != null )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String value = util.convertFormulaMacPars( itemvo[j]
+                            .getValueformula(), NovaClientEnvironment
+                            .getInstance(), data_map[i] );
+                        if ( value != null )
+                        {
+                            value = getJepFormulaValue( value );
+                            itemvo[j].setValue( value );
+                            data_map[i].put( itemvo[j].getItemkey(), value );
+                        }
+                    }
+                }
+                // 更新数据中的值为模板中定义的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValue() != null )
+                        data_map[i].put( itemvo[j].getItemkey(), itemvo[j]
+                                         .getValue() );
+                }
+                // 执行用户自定义类
+                if ( printvo.getCustdealclass() != null
+                     && !printvo.getCustdealclass().equals( "" ) )
+                {
+                    AbstractPrintProcess process = ( AbstractPrintProcess ) Class
+                        .forName( printvo.getCustdealclass() ).newInstance();
+                    try
+                    {
+                        process.processData( printvo, data_map[i] );
+                    }
+                    catch ( Exception e )
+                    {
+                        result_map.put( data_map[i].get( pkname ), "false" );
+                        continue;
+                    }
+                }
+                // 执行显示公式
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    // 默认显示空值
+                    if ( itemvo[j].getIsshownull() == null )
+                        itemvo[j].setIsshownull( "Y" );
+                    if ( itemvo[j].getIsshow() == null )
+                    {
+                        itemvo[j].setIsshow( "Y" );
+                        continue;
+                    }
+                    if ( itemvo[j].getIsshow() != null
+                         && !itemvo[j].getIsshow().equals( "" )
+                         && !itemvo[j].getIsshow().equalsIgnoreCase( "N" ) )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String isshow = util.convertFormulaMacPars( itemvo[j]
+                            .getIsshow(), NovaClientEnvironment
+                            .getInstance(), data_map[i] );
+                        if ( isshow.indexOf( "=" ) != -1 )
+                        {
+                            String[] comp_items = isshow.split( "=" );
+                            if ( comp_items.length != 2 )
+                            {
+                                System.out.println( "显示公式有错误,应该为{xxx}=yyy.." );
+                                result_map
+                                    .put( data_map[i].get( pkname ), "false" );
+                                return null;
+                            }
+                            if ( comp_items[0].equalsIgnoreCase( comp_items[1] ) )
+                            {
+                                itemvo[j].setIsshow( "Y" );
+                            }
+                        }
+                    }
+                }
+                if ( printwork == null )
+                    printwork = new PrintWork();
+                printwork.print( printvo, data_map[i] ); // 执行打印
+                result_map.put( data_map[i].get( pkname ), "true" );
+            }
+            catch ( Exception e )
+            {
+                e.printStackTrace();
+                System.out.println( "[" + pkname + "]为[" + data_map[i].get( pkname ) + "]的记录打印失败.." );
+                result_map.put( data_map[i].get( pkname ), "false" );
+            }
+        }
+        return result_map;
+
+    }
+
+    /**
+     * 打印拆机单时，直接传入打印模板 add by cuiyi 20070928
+     * @param templetcode  打印模板code
+     * @param data_map     数据
+     * @param pkname	具有唯一性的字段，用于返回结果
+     * @return			HashMap　其中根据pkname　设定为"true"或"false"
+     */
+    public HashMap print( String printTempletcode, HashMap[] data_map, String pkname ,boolean isdelPrint)
+    {
+        if ( printTempletcode == null || printTempletcode.equals( "" ) || data_map == null
+        		|| data_map.length == 0 || pkname == null || pkname.equals( "" ) )
+            return null;
+        HashMap result_map = new HashMap();
+        for ( int i = 0; i < data_map.length; i++ )
+        {
+            try
+            {
+                //  每个打印任务都要重新取一次
+            	//拆机单的打印模板是从外面传入的
+                Pub_PrintTempletVO printvo = getPrintService().getPub_PrintTempletVO( printTempletcode,
+                    NovaClientEnvironment.getInstance(),true );
+                Pub_PrintTempletItemVO[] itemvo = printvo.getItemvo();
+                if ( printvo == null )
+                {
+                    System.out.println( "打印模板为空..." );
+                    return null;
+                }
+                // 更新数据中的值为模板中显示值公式的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValueformula() != null )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String value = util.convertFormulaMacPars( itemvo[j]
+                            .getValueformula(), NovaClientEnvironment
+                            .getInstance(), data_map[i] );
+                        if ( value != null )
+                        {
+                            value = getJepFormulaValue( value );
+                            itemvo[j].setValue( value );
+                            data_map[i].put( itemvo[j].getItemkey(), value );
+                        }
+                    }
+                }
+                // 更新数据中的值为模板中定义的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValue() != null )
+                    	data_map[i].put( itemvo[j].getItemkey(), itemvo[j]
+                                         .getValue() );
+                }
+                // 执行用户自定义类
+                if ( printvo.getCustdealclass() != null
+                     && !printvo.getCustdealclass().equals( "" ) )
+                {
+                    AbstractPrintProcess process = ( AbstractPrintProcess ) Class
+                        .forName( printvo.getCustdealclass() ).newInstance();
+                    try
+                    {
+                        process.processData( printvo, data_map[i] );
+                    }
+                    catch ( Exception e )
+                    {
+                        result_map.put( data_map[i].get( pkname ), "false" );
+                        continue;
+                    }
+                }
+                // 执行显示公式
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    // 默认显示空值
+                    if ( itemvo[j].getIsshownull() == null )
+                        itemvo[j].setIsshownull( "Y" );
+                    if ( itemvo[j].getIsshow() == null )
+                    {
+                        itemvo[j].setIsshow( "Y" );
+                        continue;
+                    }
+                    if ( itemvo[j].getIsshow() != null
+                         && !itemvo[j].getIsshow().equals( "" )
+                         && !itemvo[j].getIsshow().equalsIgnoreCase( "N" ) )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String isshow = util.convertFormulaMacPars( itemvo[j]
+                            .getIsshow(), NovaClientEnvironment
+                            .getInstance(), data_map[i] );
+                        if ( isshow.indexOf( "=" ) != -1 )
+                        {
+                            String[] comp_items = isshow.split( "=" );
+                            if ( comp_items.length != 2 )
+                            {
+                                System.out.println( "显示公式有错误,应该为{xxx}=yyy.." );
+                                result_map
+                                    .put( data_map[i].get( pkname ), "false" );
+                                return null;
+                            }
+                            if ( comp_items[0].equalsIgnoreCase( comp_items[1] ) )
+                            {
+                                itemvo[j].setIsshow( "Y" );
+                            }
+                        }
+                    }
+                }
+                if ( printwork == null )
+                    printwork = new PrintWork();
+                printwork.print( printvo, data_map[i] ); // 执行打印
+                result_map.put( data_map[i].get( pkname ), "true" );
+            }
+            catch ( Exception e )
+            {
+                e.printStackTrace();
+                System.out.println( "[" + pkname + "]为[" + data_map[i].get( pkname ) + "]的记录打印失败.." );
+                result_map.put( data_map[i].get( pkname ), "false" );
+            }
+        }
+        return result_map;
+
+    }
+
+    
+    
+    /**
+     * add by cuiyi 20070925
+     * 批量打印时打印模板跟随每一条数据走，打印模板名称从data_map里面取值
+     * //a)装机工单 -〉装机模板 b)	移机工单-〉移机模板c)	拆机工单-〉拆机模板
+     * @param data_map
+     * @param pkname
+     * @return
+     */
+    public HashMap print( HashMap[] data_map, String pkname )
+    {
+   	 if ( data_map == null || data_map.length == 0 || pkname == null || pkname.equals( "" ) )
+          return null;
+        HashMap result_map = new HashMap();
+        for ( int i = 0; i < data_map.length; i++ )
+        {
+        	String printTempletcode = (String )data_map[i].get( this.DATA_MAP_KEY_PRINTTEMPLETNAME);
+        	 if ( printTempletcode == null || printTempletcode.equals( "" ))
+                 return null;
+            try
+            {
+                //  每个打印任务都要重新取一次
+                Pub_PrintTempletVO printvo = getPrintService().getPub_PrintTempletVO( printTempletcode,
+                    NovaClientEnvironment.getInstance(),true );
+                Pub_PrintTempletItemVO[] itemvo = printvo.getItemvo();
+                if ( printvo == null )
+                {
+                    System.out.println( "打印模板为空..." );
+                    return null;
+                }
+                // 更新数据中的值为模板中显示值公式的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValueformula() != null )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String value = util.convertFormulaMacPars( itemvo[j]
+                            .getValueformula(), NovaClientEnvironment
+                            .getInstance(), data_map[i] );
+                        if ( value != null )
+                        {
+                            value = getJepFormulaValue( value );
+                            itemvo[j].setValue( value );
+                            data_map[i].put( itemvo[j].getItemkey(), value );
+                        }
+                    }
+                }
+                // 更新数据中的值为模板中定义的值
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    if ( itemvo[j].getValue() != null )
+                    	data_map[i].put( itemvo[j].getItemkey(), itemvo[j]
+                                         .getValue() );
+                }
+                // 执行用户自定义类
+                if ( printvo.getCustdealclass() != null
+                     && !printvo.getCustdealclass().equals( "" ) )
+                {
+                    AbstractPrintProcess process = ( AbstractPrintProcess ) Class
+                        .forName( printvo.getCustdealclass() ).newInstance();
+                    try
+                    {
+                        process.processData( printvo, data_map[i] );
+                    }
+                    catch ( Exception e )
+                    {
+                        result_map.put( data_map[i].get( pkname ), "false" );
+                        continue;
+                    }
+                }
+                // 执行显示公式
+                for ( int j = 0; j < itemvo.length; j++ )
+                {
+                    // 默认显示空值
+                    if ( itemvo[j].getIsshownull() == null )
+                        itemvo[j].setIsshownull( "Y" );
+                    if ( itemvo[j].getIsshow() == null )
+                    {
+                        itemvo[j].setIsshow( "Y" );
+                        continue;
+                    }
+                    if ( itemvo[j].getIsshow() != null
+                         && !itemvo[j].getIsshow().equals( "" )
+                         && !itemvo[j].getIsshow().equalsIgnoreCase( "N" ) )
+                    {
+                        FrameWorkTBUtil util = new FrameWorkTBUtil();
+                        String isshow = util.convertFormulaMacPars( itemvo[j]
+                            .getIsshow(), NovaClientEnvironment
+                            .getInstance(), data_map[i] );
+                        if ( isshow.indexOf( "=" ) != -1 )
+                        {
+                            String[] comp_items = isshow.split( "=" );
+                            if ( comp_items.length != 2 )
+                            {
+                                System.out.println( "显示公式有错误,应该为{xxx}=yyy.." );
+                                result_map
+                                    .put( data_map[i].get( pkname ), "false" );
+                                return null;
+                            }
+                            if ( comp_items[0].equalsIgnoreCase( comp_items[1] ) )
+                            {
+                                itemvo[j].setIsshow( "Y" );
+                            }
+                        }
+                    }
+                }
+                if ( printwork == null )
+                    printwork = new PrintWork();
+                printwork.print( printvo, data_map[i] ); // 执行打印
+                result_map.put( data_map[i].get( pkname ), "true" );
+            }
+            catch ( Exception e )
+            {
+                e.printStackTrace();
+                System.out.println( "[" + pkname + "]为[" + data_map[i].get( pkname ) + "]的记录打印失败.." );
+                result_map.put( data_map[i].get( pkname ), "false" );
+            }
+        }
+        return result_map;
+
+    }
+
+    private HashMap convertToHashMap( HashVO vo )
+    {
+        if ( vo == null )
+            return null;
+        HashMap map = new HashMap();
+        String[] keys = vo.getKeys();
+        for ( int i = 0; i < keys.length; i++ )
+        {
+            map.put( keys[i].toUpperCase(), vo.getStringValue( keys[i] ) );
+        }
+        return map;
+    }
+
+    private String getJepFormulaValue( String _exp )
+    {
+        JepFormulaParse jepParse = new JepFormulaParse( JepFormulaParse.li_ui ); //
+        Object obj = jepParse.execFormula( _exp );
+        if ( obj == null )
+        {
+            return "";
+        }
+        String str_return = "";
+
+        if ( obj instanceof Double )
+        {
+            Double d_value = ( Double ) obj;
+            double ld_tmp = d_value.doubleValue();
+            long ll_tmp = d_value.longValue(); //
+            if ( ld_tmp == ll_tmp )
+            {
+                return "" + ll_tmp;
+            }
+            else
+            {
+                return "" + ld_tmp;
+            }
+        }
+        else if ( obj instanceof String )
+        {
+            str_return = "" + obj;
+        }
+
+        return str_return;
+    }
+
+    protected FrameWorkCommService getMetaService()
+        throws Exception
+    {
+        FrameWorkCommService service = ( FrameWorkCommService ) NovaRemoteServiceFactory
+            .getInstance().lookUpService( FrameWorkCommService.class );
+        return service;
+    }
+
+    protected PrintTempletService getPrintService()
+        throws Exception
+    {
+        PrintTempletService service = ( PrintTempletService ) NovaRemoteServiceFactory
+            .getInstance().lookUpService( PrintTempletService.class );
+        return service;
+    }
+}

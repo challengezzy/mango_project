@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   layout="absolute" width="100%" height="100%" 
+		   xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+		   initialize="init()" >
+	<fx:Declarations>
+		<fx:Object id="importButton" label="导入" handler="{importHandler}" rightClick="true"/>
+		<fx:Object id="exportButton" label="导出" handler="{exportHandler}" rightClick="true"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.FileUploadPanel;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.XMLExportObject;
+			[Bindable]
+			private var treeTempletCode:String = "T_BAM_FOLDER_TREE";
+			[Bindable]
+			private var templetCodeMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var typeMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var loadAll:Boolean = true;
+			[Bindable]
+			private var parentFieldName:String = "PARENTID";
+			[Bindable]
+			private var seqFieldName:String ="NAME";
+			[Bindable]
+			private var labelFieldName:String = "NAME";
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var debugmode:Boolean;
+			[Bindable]
+			public var typeFiledName:String = "TYPE";
+			[Bindable]
+			public var fkFiledName:String = "PID";
+			[Bindable]
+			public var templetCodeParentFieldNameMap:Hashtable = new Hashtable();
+			
+			private var mtcode:String;
+			
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			
+			private var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) as Boolean;
+			
+			private var formService:RemoteObject;
+			
+			private var xmlFolder:XMLExportObject;
+			
+			private var flagName:String="scenario";
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			private function init():void{
+				templetCodeMap.add("0","T_BAM_FOLDER_SCENARIO");
+				templetCodeMap.add("1","T_BAM_BUSINESSSCENARIO");
+				typeMap.add("0","业务场景目录");
+				typeMap.add("1","业务场景对象");
+				templetCodeParentFieldNameMap.add("T_BAM_FOLDER_SCENARIO","PARENTID");
+				templetCodeParentFieldNameMap.add("T_BAM_BUSINESSSCENARIO","FOLDERID");
+				endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				debugmode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				
+				formService = new RemoteObject(destination);
+				if(endpoint != null)
+					formService.endpoint = endpoint;
+				
+				formService.exportXmlToMDFile.addEventListener(ResultEvent.RESULT,exportXmlToMDFileHandler);
+				formService.exportXmlToMDFile.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				addButtons();
+			}
+
+			protected function treePanel_itemChangeHandler(event:StyleTemplateEvent):void
+			{
+				// TODO Auto-generated method stub
+				
+				var item:* = treePanel.treePanel.tree.selectedItem;
+					
+				if( item !=null && item["TYPE"]=="1" && treePanel.isEditMode == true){
+					
+					var scenarionId:String = String(item["ID"]).replace("S","");
+					
+					var childPanel:BusinessScenarion = new  BusinessScenarion();
+					childPanel.endpoint = this.endpoint;
+					childPanel.scenarioId = scenarionId;
+					childPanel.debugMode = debugMode;
+					childPanel.percentHeight = 100;
+					childPanel.percentWidth = 100;
+					
+					treePanel.setExtendCanvasContent(childPanel,60);
+					
+				}
+				
+
+			}
+			
+			protected function addButtons():void{
+				treePanel.operationList.addItem({type:"separator"});
+				treePanel.operationList.addItem(importButton);
+				treePanel.operationList.addItem(exportButton);
+				
+			}
+			
+			private function importHandler():void{
+				
+				var fup:FileUploadPanel = new FileUploadPanel();
+				
+				fup.addEventListener(BasicEvent.LOADDATA_SUCCESSFUL,uploadSuccessfulHandler);
+				fup.datasource = treePanel.treePanel.datasource;
+				fup.flagName = flagName;
+				
+				PopUpManager.addPopUp(fup,treePanel,true);
+				PopUpManager.centerPopUp(fup);
+			}
+			
+			private function exportHandler():void{
+				
+				var xmlExportObject:XMLExportObject = new XMLExportObject();
+				xmlExportObject.tableName="BAM_BUSINESSSCENARIO";
+				xmlExportObject.pkName="ID";
+				xmlExportObject.fkName="FOLDERID";
+				xmlExportObject.visiblePkName="code";
+				xmlExportObject.datasource=treePanel.treePanel.datasource;
+				xmlExportObject.fetchSql = "select NAME,CODE,DESCRIPTION,DATASOURCETYPE,DATASOURCECODE from BAM_BUSINESSSCENARIO ";
+				
+				xmlFolder = new XMLExportObject();
+				xmlFolder.tableName="BAM_FOLDER";
+				xmlFolder.pkName="ID";
+				xmlFolder.fkName="PARENTID";
+				xmlFolder.visiblePkName="code,type";
+				xmlFolder.datasource=treePanel.treePanel.datasource;
+				
+				xmlFolder.fetchSql = "select NAME,CODE,DESCRIPTION,TYPE from BAM_FOLDER where TYPE=0";
+				xmlFolder.childObjects = [];
+				xmlFolder.childObjects.push(xmlFolder);
+				xmlFolder.childObjects.push(xmlExportObject);
+				
+				ConfirmUtil.confirm("确定要导出吗?",treePanel.treePanel,confirmHandler);
+				
+			}
+			
+			private function uploadSuccessfulHandler(event:BasicEvent):void{
+				treePanel.treePanel.load();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endOperat();
+				Alert.show(event.fault.faultString, '导出业务场景失败');
+			}
+			
+			private function exportXmlToMDFileHandler(event:ResultEvent):void{
+				var url:String = event.result as String;
+				navigateToURL(new URLRequest(url), "_blank");
+				endOperat();
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					startOperat();
+					formService.exportXmlToMDFile([xmlFolder],"scenariodata.md",flagName);
+				}
+			}
+			
+			private function startOperat():void{
+				
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在导出……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,treePanel,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endOperat():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+
+		]]>
+	</fx:Script>
+	<styletemplate:StyleTemplate03 id="treePanel" templetCode="{treeTempletCode}" debugMode="{debugmode}"
+								   templetCodeParentFieldNameMap="{templetCodeParentFieldNameMap}"
+								   endpoint="{endpoint}"
+								   typeTempletCodeMap="{templetCodeMap}"
+								   loadAll="{loadAll}"
+								   parentFieldName="{parentFieldName}"
+								   seqFieldName="{seqFieldName}"
+								   labelFieldName="{labelFieldName}"
+								   typeFieldName="{typeFiledName}"
+								   fkFieldName="{fkFiledName}"
+								   itemChange="treePanel_itemChangeHandler(event)"
+								   typeLabelMap="{typeMap}"/>
+</mx:Module>

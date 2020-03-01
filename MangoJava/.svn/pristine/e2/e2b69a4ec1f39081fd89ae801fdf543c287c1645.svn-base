@@ -1,0 +1,528 @@
+package smartx.framework.common.utils.ftp;
+
+
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.util.ArrayList;
+
+import org.apache.log4j.Logger;
+
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.vo.NovaLogger;
+
+
+public class FtpUtil {
+	private static Logger logger = NovaLogger.getLogger(FtpUtil.class);
+	
+	private static String encode="GBK";
+	
+	/**
+	 * 获得远端文件列表
+	 * 返回结果类似：
+	 *     drw-rw-rw-   1 ftp      ftp            0 Sep 24 17:13 logs
+	 *     -rw-rw-rw-   1 ftp      ftp      1963812 Sep 02 17:18 nova.jar
+	 * @param svr
+	 * @param port 
+	 * @param u
+	 * @param pwd
+	 * @param rpath
+	 * @param filter 文件名过滤
+	 * @return ArrayList<String> 文件信息
+	 */
+	public static ArrayList<String> listFile(String svr, int port, String u, String pwd, String rpath,String filter)throws Exception{
+		BufferedReader dr=null;
+		FtpClient ftpClient=null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//命令 cd
+			if (rpath.length() != 0) {
+				ftpClient.cd(rpath);
+			}
+			
+			//list
+			ArrayList<String> rt=new ArrayList<String>();
+			String s=null;
+			dr = new BufferedReader(new InputStreamReader(ftpClient.list()));
+			while ((s = dr.readLine()) != null) {
+				//System.out.println(s);
+				//文件名匹配过滤
+				if(filter == null || filter.length() <1 )
+					rt.add(s);
+				else{
+					if(StringUtil.isMatch(s, filter))
+						rt.add(s);
+				}
+			}
+			return rt;
+		}catch(Exception e){
+			logger.error("获取FTP服务器上文件列表发生异常！", e);
+			throw new Exception("获取FTP服务器上文件列表发生异常！", e);
+		}finally{
+			dr.close();
+			dr=null;
+			ftpClient.closeServer();
+		}
+	}
+	
+	/**
+	 * 获得远端文件名列表
+	 * @param svr
+	 * @param port 
+	 * @param u
+	 * @param pwd
+	 * @param rpath
+	 * @param filter 文件名过滤
+	 * @return ArrayList<String> 文件信息
+	 */
+	public static ArrayList<String> listFileName(String svr, int port, String u, String pwd, String rpath,String filter)throws Exception{
+		BufferedReader dr=null;
+		FtpClient ftpClient=null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//list
+			ArrayList<String> rt=new ArrayList<String>();
+			String s=null;
+			dr = new BufferedReader(new InputStreamReader(ftpClient.nameList(rpath)));
+			while ((s = dr.readLine()) != null) {
+				//System.out.println(s);
+				//文件名匹配过滤
+				if(filter == null || filter.length() <1 )
+					rt.add(s);
+				else{
+					if(StringUtil.isMatch(s, filter))
+						rt.add(s);
+				}
+			}
+			return rt;
+		}catch(Exception e){
+			logger.error("获取FTP服务器上文件列表发生异常！", e);
+			throw new Exception("获取FTP服务器上文件列表发生异常！", e);
+		}finally{
+			dr.close();
+			dr=null;
+			ftpClient.closeServer();
+		}
+	}
+	
+	/**
+	 * 获得远端文件列表
+	 * 返回结果类似：
+	 *     drw-rw-rw-   1 ftp      ftp            0 Sep 24 17:13 logs
+	 *     -rw-rw-rw-   1 ftp      ftp      1963812 Sep 02 17:18 nova.jar
+	 * @param svr
+	 * @param port 
+	 * @param u
+	 * @param pwd
+	 * @param rpath
+	 * @return ArrayList<String> 文件信息
+	 */
+	public static ArrayList<String> listFile(String svr, int port, String u, String pwd, String rpath)throws Exception{
+		return listFile(svr, port, u, pwd, rpath, null);
+	}
+	
+	/**
+	 * 上传文件
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param fpath
+	 * @param rpath FTP服务器端路径
+	 * @param rname FTP服务器端文件名称
+	 */
+	public static void uploadFile(String svr, String port, String u, String pwd, String fpath, String rpath, String rname)throws Exception{
+		uploadFile(svr, Integer.parseInt(port), u, pwd, fpath, rpath, rname);
+	}
+	
+	/**
+	 * 上传文件
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param fpath
+	 * @param rpath FTP服务器端路径
+	 * @param rname FTP服务器端文件名称
+	 */
+	public static void uploadFile(String svr, int port, String u, String pwd, String fpath, String rpath, String rname)throws Exception{
+		File f=new File(fpath);
+		if(!f.exists()) throw new Exception("需要上传的文件不存在！");
+		uploadFile(svr, port, u, pwd, f, rpath, rname);
+	}
+	
+	/**
+	 * 上传文件
+	 * @param svr
+	 * @param u
+	 * @param pwd
+	 * @param f
+	 * @param rpath FTP服务器端路径
+	 * @param rname FTP服务器端文件名称
+	 */
+	public static void uploadFile(String svr, int port, String u, String pwd, File f, String rpath, String rname)throws Exception{
+		FileInputStream fis=null;
+		try{
+			fis=new FileInputStream(f);
+			uploadFile(svr, port, u, pwd, fis, rpath, rname);
+		}catch(Exception e){
+			logger.error("上传文件产生异常！", e);
+			throw new Exception("上传文件产生异常！", e);
+		}finally{
+			fis.close();
+		}
+	}
+	
+	/**
+	 * 上传文件
+	 * @param svr
+	 * @param u
+	 * @param pwd
+	 * @param is 本方法内不包含is的关闭，需要具体调用方法处理。
+	 * @param rpath FTP服务器端路径
+	 * @param rname FTP服务器端文件名称
+	 */
+	public static void uploadFile(String svr, int port, String u, String pwd, InputStream is, String rpath, String rname)throws Exception{
+		DataOutputStream outf =null;
+		FtpClient ftpClient = null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//命令 cd
+			if (rpath.length() != 0) {
+				ftpClient.cd(rpath);
+			}
+			
+			//命令 delete
+			ftpClient.sendServer("DELE "+rname+" \r\n");
+			ftpClient.readServerResponse();
+			
+			//upload
+			ftpClient.binary();			
+			byte[] b=new byte[1024];
+			int len=0;
+			outf = new DataOutputStream(ftpClient.put(rname));
+			while((len=is.read(b))>-1){
+				outf.write(b, 0, len);
+			}
+			
+		}catch(Exception e){
+			logger.error("向FTP服务器传送文件发生错误！",e);
+			throw new Exception("向FTP服务器传送文件发生错误！",e);
+		}finally{
+			outf.flush();
+			outf.close();
+			ftpClient.closeServer();
+		}
+	}
+	
+	/**
+	 * 下载文件
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param f
+	 * @param rpath
+	 * @param rname
+	 * @throws Exception
+	 */
+	public static void downloadFile(String svr, String port, String u, String pwd, String fpath, String rpath, String rname)throws Exception{
+		downloadFile(svr, Integer.parseInt(port), u, pwd, fpath, rpath, rname);
+ 	}
+	
+	/**
+	 * 下载文件
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param f
+	 * @param rpath
+	 * @param rname
+	 * @throws Exception
+	 */
+	public static void downloadFile(String svr, int port, String u, String pwd, String fpath, String rpath, String rname)throws Exception{
+		File f=new File(fpath);
+		if(f.exists()) f.delete();		
+		downloadFile(svr, port, u, pwd, f, rpath, rname);
+ 	}
+	
+	/**
+	 * 下载文件
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param f
+	 * @param rpath
+	 * @param rname
+	 * @throws Exception
+	 */
+	public static void downloadFile(String svr, int port, String u, String pwd, File f, String rpath, String rname)throws Exception{
+		FileOutputStream fos=null;
+		try{
+			fos=new FileOutputStream(f);			
+			downloadFile(svr, port, u, pwd, fos, rpath, rname);
+		}catch(Exception e){
+			logger.error("下载文件产生异常！", e);
+			throw new Exception("下载文件产生异常！", e);
+		}finally{
+			fos.flush();
+			fos.close();
+			fos=null;
+		}
+	}
+	
+	
+	/**
+	 * 下载文件
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param os
+	 * @param rpath
+	 * @param rname
+	 * @throws Exception
+	 */
+	public static void downloadFile(String svr, int port, String u, String pwd, OutputStream os, String rpath, String rname)throws Exception{
+		DataInputStream downinf = null;
+		FtpClient ftpClient = null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//命令 cd
+			if (rpath.length() != 0) {
+				ftpClient.cd(rpath);
+			}
+			
+			downinf = new DataInputStream(ftpClient.get(rname));
+			byte[] b=new byte[1024];
+			int len=0;
+			while((len=downinf.read(b))>-1){
+				os.write(b, 0, len);
+			}
+		}catch(Exception e){
+			logger.error("从FTP服务器下载文件发生错误！", e);
+			throw new Exception("从FTP服务器下载文件发生错误！", e);
+		}finally{
+			downinf.close();
+			ftpClient.closeServer();
+		}
+		
+	}
+
+	/**
+	 * 删除文件
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param rpath
+	 * @param rname
+	 * @throws Exception
+	 */
+	public static void delete(String svr, int port, String u, String pwd, String rpath, String rname)throws Exception{
+		FtpClient ftpClient = null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//命令 cd
+			if (rpath.length() != 0) {
+				ftpClient.cd(rpath);
+			}
+			
+			//delete
+			ftpClient.sendServer("DELE "+rname+" \r\n");
+			ftpClient.readServerResponse();
+		}catch(Exception e){
+			logger.error("从FTP服务器下载文件发生错误！", e);
+			throw new Exception("从FTP服务器下载文件发生错误！", e);
+		}finally{
+			
+			ftpClient.closeServer();
+		}
+	}
+	
+	/**
+	 * 文件重命名
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param rpath
+	 * @param rnamefrom
+	 * @param rnameto
+	 * @throws Exception
+	 */
+	public static void rename(String svr, int port, String u, String pwd, String rpath, String rnamefrom, String rnameto)throws Exception{
+		FtpClient ftpClient = null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//命令 cd
+			if (rpath.length() != 0) {
+				ftpClient.cd(rpath);
+			}
+			
+			//命令 rename
+			ftpClient.rename(rnamefrom, rnameto);
+		}catch(Exception e){
+			logger.error("从FTP服务器下载文件发生错误！", e);
+			throw new Exception("从FTP服务器下载文件发生错误！", e);
+		}finally{			
+			ftpClient.closeServer();
+		}
+	}
+	
+	/**
+	 * 创建目录
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param rpath
+	 * @param subpath
+	 * @throws Exception
+	 */
+	public static void mkdir(String svr, int port, String u, String pwd, String rpath, String subpath)throws Exception{
+		FtpClient ftpClient = null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//命令 cd
+			if (rpath.length() != 0) {
+				ftpClient.cd(rpath);
+			}
+			
+			//mkdir
+			ftpClient.sendServer("XMKD "+subpath+" \r\n");
+			ftpClient.readServerResponse();
+		}catch(Exception e){
+			logger.error("在FTP服务器创建目录发生错误！", e);
+			throw new Exception("在FTP服务器创建目录发生错误！", e);
+		}finally{			
+			ftpClient.closeServer();
+		}
+	}
+	
+	/**
+	 * 删除目录
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param rpath
+	 * @param subpath
+	 * @throws Exception
+	 */
+	public static void rmdir(String svr, int port, String u, String pwd, String rpath, String subpath)throws Exception{
+		FtpClient ftpClient = null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//命令 cd
+			if (rpath.length() != 0) {
+				ftpClient.cd(rpath);
+			}
+			
+			//mkdir
+			ftpClient.sendServer("XRMD "+subpath+" \r\n");
+			ftpClient.readServerResponse();
+		}catch(Exception e){
+			logger.error("在FTP服务器删除目录发生错误！", e);
+			throw new Exception("在FTP服务器删除目录发生错误！", e);
+		}finally{			
+			ftpClient.closeServer();
+		}
+	}
+	
+	/**
+	 * 在FTP上执行sql
+	 * @param svr
+	 * @param port
+	 * @param u
+	 * @param pwd
+	 * @param cmd
+	 * @throws Exception
+	 */
+	public static void exec(String svr, int port, String u, String pwd, String cmd)throws Exception{
+		FtpClient ftpClient = null;
+		try{
+			ftpClient = new FtpClient(encode);
+			// 创建FtpClient对象
+			ftpClient.openServer(svr, port);
+			// 连接FTP服务器
+			ftpClient.login(u, pwd);
+			
+			//mkdir
+			ftpClient.sendServer(cmd+" \r\n");
+			ftpClient.readServerResponse();
+		}catch(Exception e){
+			logger.error("在FTP服务器执行命令“"+cmd+"”发生错误！", e);
+			throw new Exception("在FTP服务器执行命令“"+cmd+"”发生错误！", e);
+		}finally{			
+			ftpClient.closeServer();
+		}
+	}
+	
+	
+	
+	public static void main(String[] args)throws Exception{
+		int port = 21;
+		String server = "136.128.9.162";		
+		String uid = "administrator";
+		String pwd = "123456";
+		String path = "/";
+		String uploadf="H:/JavaFtpTemp/飞秋FeiQ.exe";
+		String uploadt="FeiQ2.exe";
+		String downloadf="H:/JavaFtpTemp/飞秋FeiQ2.exe";
+		
+		FtpUtil.uploadFile(server, port, uid, pwd, uploadf, path, uploadt);
+		
+		FtpUtil.downloadFile(server, port, uid, pwd, downloadf, path, uploadt);
+		
+		FtpUtil.delete(server, port, uid, pwd, path, uploadt);
+	}
+}

@@ -1,0 +1,629 @@
+/**************************************************************************
+ * $RCSfile: SelectTableDialog.java,v $  $Revision: 1.6.2.1 $  $Date: 2010/01/20 10:10:07 $
+ **************************************************************************/
+package smartx.framework.metadata.ui;
+
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+import javax.swing.Box;
+import javax.swing.Icon;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JTextField;
+
+import smartx.framework.common.dsmanager.ui.SystemAppDBIFC;
+import smartx.framework.common.ui.NovaRemoteServiceFactory;
+import smartx.framework.common.ui.UIUtil;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaRemoteException;
+import smartx.framework.metadata.ui.componentscard.DefaultRefModel;
+import smartx.framework.metadata.ui.componentscard.UIRefDialog;
+
+
+public class SelectTableDialog extends NovaDialog {
+
+	private static final long serialVersionUID = -3133752516499403815L;
+
+	private JLabel jlb_name = null;
+
+	private JLabel jlb_code = null;
+
+	private JLabel jlb_tem_name = null;
+
+	private JLabel jlb_datasource_name = null;
+
+	private JTextField jtf_tab_name = null;
+
+	private JTextField jtf_code = null;
+
+	private JTextField jtf_tem_name = null;
+
+	private JButton[] jbt_operator = null;
+
+	public JComboBox datasource = null;
+
+	private String str_sql = null;
+
+	private String str_table_name;
+
+	private String str_templete_code;
+
+	private String str_templete_name;
+
+	private int li_closeType = -1;
+
+	private ActionListener listener = null;
+
+	public SelectTableDialog(Container _parent, String _name, String _sql) {
+		super(_parent, _name, 550, 300); //
+		this.str_sql = _sql;
+
+		this.addWindowListener(new WindowAdapter() {
+			public void windowClosed(WindowEvent e) {
+				li_closeType = 2;
+			}
+
+			public void windowClosing(WindowEvent e) {
+				li_closeType = 2;
+			}
+		});
+		listener = new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				dealActionPerform(e);
+			}
+		};
+		initialize(); //
+	}
+
+	public SelectTableDialog() {
+
+		// TODO Auto-generated constructor stub
+
+	}
+
+	private void initialize() {
+		jlb_datasource_name = new JLabel("数据源：");
+		jlb_name = new JLabel("表名：");
+		jlb_code = new JLabel("模板编码：");
+		jlb_tem_name = new JLabel("模板名称：");
+
+		jlb_datasource_name.setHorizontalAlignment(JLabel.RIGHT);
+		jlb_name.setHorizontalAlignment(JLabel.RIGHT);
+		jlb_code.setHorizontalAlignment(JLabel.RIGHT);
+		jlb_tem_name.setHorizontalAlignment(JLabel.RIGHT);
+
+		jlb_datasource_name.setPreferredSize(new Dimension(80, 20));
+		jlb_name.setPreferredSize(new Dimension(80, 20));
+		jlb_code.setPreferredSize(new Dimension(80, 20));
+		jlb_tem_name.setPreferredSize(new Dimension(80, 20));
+
+		jtf_tab_name = new JTextField();
+		jtf_code = new JTextField();
+		jtf_tem_name = new JTextField();
+
+		jtf_tab_name.setPreferredSize(new Dimension(150, 20));
+		jtf_code.setPreferredSize(new Dimension(220, 20));
+		jtf_tem_name.setPreferredSize(new Dimension(320, 20));
+
+		// 远程调用传递的数据源
+		try {
+			SystemAppDBIFC dsmanager = (SystemAppDBIFC) NovaRemoteServiceFactory
+					.getInstance().lookUpService(SystemAppDBIFC.class);
+			String[] s = dsmanager.dbTransmission();
+			datasource = new JComboBox(s);
+			System.out.println("获取的数据源：" + datasource);
+			// System.out.println(datasource.getSelectedItem().toString());
+			datasource.setPreferredSize(new Dimension(320, 20));
+		} catch (NovaRemoteException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		MyItemListener actionListener = new MyItemListener();
+		datasource.addItemListener(actionListener);
+
+		jbt_operator = new JButton[5];
+		jbt_operator[0] = getBtn("选择表", new Dimension(90, 20));
+		jbt_operator[1] = getBtn("查看所有关联模板", new Dimension(150, 20));
+		jbt_operator[2] = getBtn("关联模板", new Dimension(90, 20));
+		jbt_operator[3] = getBtn("确定", new Dimension(90, 20));
+		jbt_operator[4] = getBtn("取消", new Dimension(90, 20));
+
+		Box table_datasource_box = Box.createHorizontalBox();
+		table_datasource_box.add(Box.createHorizontalStrut(20));
+		table_datasource_box.add(jlb_datasource_name);
+		table_datasource_box.add(datasource);
+		table_datasource_box.add(Box.createHorizontalStrut(20));// 增加
+
+		Box table_name_box = Box.createHorizontalBox();
+		table_name_box.add(Box.createHorizontalStrut(20));
+		table_name_box.add(jlb_name);
+		table_name_box.add(jtf_tab_name);
+
+		table_name_box.add(Box.createHorizontalStrut(5));//
+		table_name_box.add(jbt_operator[0]);
+		table_name_box.add(Box.createHorizontalStrut(5));
+		table_name_box.add(jbt_operator[1]);
+		table_name_box.add(Box.createHorizontalStrut(20));
+
+		Box templet_code_box = Box.createHorizontalBox();
+		templet_code_box.add(Box.createHorizontalStrut(20));
+		templet_code_box.add(jlb_code);
+		templet_code_box.add(jtf_code);
+		templet_code_box.add(Box.createHorizontalStrut(10));
+		templet_code_box.add(jbt_operator[2]);
+		templet_code_box.add(Box.createHorizontalStrut(20));
+
+		Box templet_name_box = Box.createHorizontalBox();
+		templet_name_box.add(Box.createHorizontalStrut(20));
+		templet_name_box.add(jlb_tem_name);
+		templet_name_box.add(jtf_tem_name);
+		templet_name_box.add(Box.createHorizontalStrut(20));
+
+		Box btn_box = Box.createHorizontalBox();
+		btn_box.add(Box.createHorizontalGlue());
+		btn_box.add(jbt_operator[3]);
+		btn_box.add(Box.createHorizontalStrut(40));
+		btn_box.add(jbt_operator[4]);
+		btn_box.add(Box.createHorizontalGlue());
+
+		this.getContentPane().setLayout(new GridLayout(7, 1, 10, 20));
+		this.getContentPane().add(new JLabel(""));
+		this.getContentPane().add(table_datasource_box);
+		this.getContentPane().add(table_name_box);
+		this.getContentPane().add(templet_code_box);
+		this.getContentPane().add(templet_name_box);
+		this.getContentPane().add(new JLabel(""));
+		this.getContentPane().add(btn_box);
+	}
+
+	/**
+	 * 定制所有按钮
+	 * 
+	 * @param _obj:StringORIcon
+	 * @param _demension:初始大小
+	 * @return
+	 */
+	private JButton getBtn(Object _obj, Dimension _demension) {
+		JButton jbt_temp = null;
+		if (_obj instanceof String) {
+			jbt_temp = new JButton(_obj.toString());
+		} else if (_obj instanceof Icon) {
+			jbt_temp = new JButton((Icon) _obj);
+		}
+		jbt_temp.setPreferredSize(_demension);
+		jbt_temp.addActionListener(listener);
+		return jbt_temp;
+	}
+
+	private void dealActionPerform(ActionEvent e) {
+		Object obj = e.getSource();
+		if (obj.equals(jbt_operator[0]))// 查看所有表
+		{
+			onReference();
+		} else if (obj.equals(jbt_operator[1])) { // 查看表的所有已存在模板
+			onExistRef();
+		} else if (obj.equals(jbt_operator[2])) { // 查看当前模板的关联模板
+			onExistTemplete();
+		} else if (obj.equals(jbt_operator[3])) { // 处理确定
+			try {
+				onConfirm();
+			} catch (SQLException e1) {
+				e1.printStackTrace();
+			}
+		} else if (obj.equals(jbt_operator[4])) { // 处理取消
+			onCancel();
+		}
+	}
+
+	public class MyItemListener implements ItemListener {
+
+		public void itemStateChanged(ItemEvent evt) {
+			JComboBox cb = (JComboBox) evt.getSource();
+			System.out.println(cb.getSelectedItem().toString());
+
+		}
+	}
+
+	protected void onExistTemplete() {
+		if (this.jtf_code.getText().equals("")) {
+			JOptionPane.showMessageDialog(this, "请先填入模板编码名！");
+			return;
+		}
+		ShowExistTempleteCodeDialog showExistTempleteCodeDialog = new ShowExistTempleteCodeDialog(
+				this, jtf_code.getText() + "模板", "TEMPLETCODE", jtf_code
+						.getText());
+		showExistTempleteCodeDialog.setVisible(true);
+	}
+
+	protected void onExistRef() {
+		if (this.jtf_tab_name.getText().equals("")) {
+			JOptionPane.showMessageDialog(this, "请先填入表名！");
+			return;
+		}
+		ShowExistTempleteCodeDialog showExistTempleteCodeDialog = new ShowExistTempleteCodeDialog(
+				this, "表" + jtf_tab_name.getText() + "的所有模板", "TABLENAME",
+				jtf_tab_name.getText());
+		showExistTempleteCodeDialog.setVisible(true);
+	}
+
+	protected void onReference() {
+		UIRefDialog refDialog = null;
+		try {
+			refDialog = new UIRefDialog(this, "选择: 数据表",
+					jtf_tab_name.getText(), new DefaultRefModel(datasource
+							.getSelectedItem().toString(), str_sql));
+
+			if (refDialog.getCloseType() == 0) {
+				this.str_table_name = refDialog.getRefVO().getName();
+				this.str_templete_code = str_table_name + "_CODE1";
+				this.str_templete_name = str_table_name + "_NAME1";
+
+				this.jtf_tab_name.setText(str_table_name);
+				this.jtf_code.setText(str_templete_code);
+				this.jtf_tem_name.setText(str_templete_name);
+			}
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			JOptionPane.showMessageDialog(this, "通过SQL[" + str_sql
+					+ "]打开窗口失败!!!");
+			return;
+		}
+	}
+
+	private String[] getStringArray() {
+		String[] parmeters = new String[3];
+		parmeters[0] = this.str_templete_code;
+		parmeters[1] = this.str_templete_name;
+		parmeters[2] = this.str_table_name;
+		return parmeters;
+	}
+
+	public String getTableName() {
+		return this.str_table_name;
+	}
+
+	public String getTempleteName() {
+		return this.str_templete_name;
+	}
+
+	public String getTempleteCode() {
+		return this.str_templete_code;
+	}
+
+	public int getCloseType() {
+		return this.li_closeType;
+	}
+
+	private boolean ensureNotEmpty() {
+		if (str_table_name.equals("")) {
+			JOptionPane.showMessageDialog(this, "表名不能为空！");
+			return false;
+		}
+		if (str_templete_code.equals("")) {
+			JOptionPane.showMessageDialog(this, "模板编码名不能为空！");
+			return false;
+		}
+		if (str_templete_name.equals("")) {
+			JOptionPane.showMessageDialog(this, "模板名不能为空！");
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * 确定
+	 * 
+	 * @throws SQLException
+	 * 
+	 */
+	private void onConfirm() throws SQLException {
+
+		this.str_table_name = this.jtf_tab_name.getText();
+		this.str_templete_code = this.jtf_code.getText();
+		this.str_templete_name = this.jtf_tem_name.getText();
+		this.li_closeType = 0;
+
+		if (ensureNotEmpty()) {
+		} else {
+			return;
+		}
+		try {
+			String[][] str_getArray = UIUtil.getStringArrayByDS(null,// datasource.getSelectedItem().toString(),
+					"select * from PUB_TEMPLET_1 where TEMPLETCODE = '"
+							+ this.str_templete_code.toUpperCase() + "'");//
+
+			if (str_getArray.length > 0) {// 模板已经存在的处理
+				int selected_id = JOptionPane.showConfirmDialog(this,
+						"你要插入的模板已经存在，要覆盖已经存在的模板编码吗？", "操作提示",
+						JOptionPane.YES_NO_OPTION);
+				if (selected_id == 0) {
+					System.out.println("11");
+					new Pr_Init_Pub_Templet(this.str_table_name,
+							this.str_templete_code, this.str_templete_name);
+					// UIUtil.callProcedure(datasource.getSelectedItem().toString(),
+					// "pr_init_pub_templet", getStringArray());
+					JOptionPane.showMessageDialog(this, "导入数据成功！");
+				} else {
+					return;
+				}
+			} else {// 模板不在的处理
+				System.out.println("12");
+				new Pr_Init_Pub_Templet(this.str_table_name,
+						this.str_templete_code, this.str_templete_name);
+				// UIUtil.callProcedure(datasource.getSelectedItem().toString(),
+				// "pr_init_pub_templet", getStringArray());
+
+				JOptionPane.showMessageDialog(this, "导入数据成功！");
+			}
+
+		} catch (Exception e) {
+			JOptionPane.showMessageDialog(this, "异常" + e.getMessage());
+		}
+		this.dispose();
+	}
+
+	/**
+	 * 取消
+	 */
+	private void onCancel() {
+
+		this.li_closeType = 1;
+		this.dispose();
+	}
+
+	/**
+	 * 关闭
+	 */
+	protected void onClose() {
+		this.li_closeType = 2;
+		this.dispose();
+	}
+
+	// 存储过程转换
+
+	/*
+	 * $RCSfile: SelectTableDialog.java,v $ Created on 2007-9-11 by wuyc of
+	 * vasg.dept
+	 * 
+	 * Copyright (c) 2007 Gxlu. All rights reserved.
+	 */
+
+	public class Pr_Init_Pub_Templet {
+
+		long v_order;
+
+		String v_itemtype;
+
+		String key = "";
+
+		HashVO[] v_primarykey = null;
+
+		HashVO[] cl = null;
+
+		Statement pstmt = null;
+
+		ResultSet rs = null;
+
+		String str_sql = null;
+
+		String _dsname = null;
+
+		public Pr_Init_Pub_Templet(String str_table_name,
+				String str_templete_code, String str_templete_name)
+				throws SQLException {
+
+			_dsname = datasource.getSelectedItem().toString();// 获取选择的数据源
+
+			/**
+			 * 
+			 */
+			try {
+
+				str_sql = "Select a.Column_Name, Data_Type, Data_Length, nvl(b.Comments,a.Column_Name) Comments  From User_Tab_Cols a, User_Col_Comments b Where a.Table_Name = b.Table_Name(+) And a.COLUMN_NAME=b.COLUMN_NAME And a.Table_Name ='"
+						+ str_table_name + "'";
+				cl = UIUtil.getHashVoArrayByDS(_dsname, str_sql);
+				// System.out.println("cl的值"+cl[0].getStringValue(0));
+
+			} catch (Exception e) {
+				e.printStackTrace();
+
+			}
+			/**
+			 * 
+			 */
+			try {
+
+				str_sql = "select COLUMN_NAME  from user_cons_columns where CONSTRAINT_NAME in (select CONSTRAINT_NAME from user_constraints where CONSTRAINT_TYPE='P' and TABLE_NAME='"
+						+ str_table_name + "')";
+				v_primarykey = UIUtil.getHashVoArrayByDS(_dsname, str_sql);
+
+				if (v_primarykey != null && v_primarykey[0] != null) {//当导入为视图时，主键设为空
+
+					key = v_primarykey[0].getStringValue(0);
+
+				} else
+					key = null;
+
+			} catch (Exception e) {
+				e.printStackTrace();
+
+			}
+			/**
+			 * 
+			 */
+			try {
+
+				str_sql = "delete pub_templet_1_item where pk_pub_templet_1 in (select pk_pub_templet_1 from pub_templet_1 where templetcode ='"
+						+ str_templete_code + "')";
+				UIUtil.executeUpdateByDS(null, str_sql);
+
+			} catch (Exception e) {
+				e.printStackTrace();
+
+			}
+			/**
+			 * 
+			 */
+			try {
+
+				str_sql = "delete pub_templet_1 where templetcode ='"
+						+ str_templete_code + "'";
+				UIUtil.executeUpdateByDS(null, str_sql);
+
+			} catch (Exception e) {
+				e.printStackTrace();
+
+			}
+			/**
+			 * 
+			 */
+			String v_pk = null;
+			try {
+				str_sql = "select s_pub_templet_1.nextval from dual";
+				v_pk = UIUtil.getHashVoArrayByDS(null, str_sql)[0]
+						.getStringValue(0);
+				// System.out.println("V_pk的值"+v_pk);
+			} catch (Exception e) {
+				e.printStackTrace();
+
+			}
+
+			/**
+			 * 
+			 */
+			try {
+
+				str_sql = "insert into pub_templet_1( pk_pub_templet_1, templetcode, templetname, tablename, datasourcename,pkname,pksequencename,savedtablename,cardcustpanel, listcustpanel ) values ( '"
+						+ v_pk
+						+ "', '"
+						+ str_templete_code
+						+ "', '"
+						+ str_templete_name
+						+ "', '"
+						+ str_table_name
+						+ "',  '"
+						+ _dsname
+						+ "',  '"
+						+ key
+						+ "','S_"
+						+ str_table_name
+						+ "',  '" + str_table_name + "', null , null )";
+				UIUtil.executeUpdateByDS(null, str_sql);
+
+			} catch (Exception e) {
+				e.printStackTrace();
+
+			}
+
+			/**
+			 * 
+			 */
+			v_order = 1;
+			for (int i = 0; i < cl.length; i++) {
+
+				v_itemtype = this.f_gettype(
+						cl[i].getStringValue("COLUMN_NAME"), cl[i]
+								.getStringValue("DATA_TYPE"), cl[i]
+								.getLognValue("DATA_LENGTH").longValue());
+
+				/**
+				 * 
+				 */
+				try {
+
+					str_sql = "insert into pub_templet_1_item(pk_pub_templet_1_item, pk_pub_templet_1, itemkey,itemname, itemtype, comboxdesc,refdesc,issave, isdefaultquery, ismustinput, loadformula, editformula, defaultvalueformula,colorformula,showorder,listwidth,cardwidth,listisshowable,listiseditable, cardisshowable, cardiseditable ) "
+							+ "values(s_pub_templet_1_item.nextval,'"
+							+ v_pk
+							+ "', '"
+							+ cl[i].getStringValue("COLUMN_NAME")
+							+ "', '"
+							+ cl[i].getStringValue("comments")
+							+ "', '"
+							+ v_itemtype
+							+ "', null, null, 'Y', '2','N', null,null,null,null,'"
+							+ v_order + "','145', '150', 'Y', '1','Y','1' )";
+
+					UIUtil.executeUpdateByDS(null, str_sql);
+
+					v_order = v_order++;
+
+				} catch (Exception e) {
+					e.printStackTrace();
+
+				}
+
+			}
+
+		}// constructor end
+
+		// 根据数据类型与长度自己算出默认的控件类型
+		private String f_gettype(String par_columnname, String par_datatype,
+				long par_length) {
+			if (par_datatype.equals("VARCHAR2"))
+				return "文本框";
+			else if (par_datatype.equals("NUMBER")) {
+				if (par_columnname.equals(v_primarykey))
+					return "文本框";
+				else
+					return "数字框";
+			} else if (par_datatype.equals("DATE"))
+				return "时间";
+			else if (par_datatype.equals("CHAR")) {
+				if (par_length == 19)
+					return "时间";
+				else if (par_length == 10)
+					return "日历";
+				else if (par_length == 1)
+					return "勾选框";
+			}
+
+			return "文本框";
+		}
+
+	}
+
+}
+/*******************************************************************************
+ * $RCSfile: SelectTableDialog.java,v $ $Revision: 1.6.2.1 $ $Date: 2007/09/30
+ * 05:23:41 $
+ * 
+ * $Log: SelectTableDialog.java,v $
+ * Revision 1.6.2.1  2010/01/20 10:10:07  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.6  2007/11/05 03:34:01  wangqi
+ * *** empty log message ***
+ * Revision 1.5 2007/09/30 05:23:41 wangqi ***
+ * empty log message ***
+ * 
+ * Revision 1.3 2007/07/02 00:30:26 sunxb *** empty log message ***
+ * 
+ * Revision 1.2 2007/05/31 07:38:15 qilin code format
+ * 
+ * Revision 1.1 2007/05/17 06:01:37 qilin no message
+ * 
+ * Revision 1.5 2007/03/02 05:02:49 shxch *** empty log message ***
+ * 
+ * Revision 1.4 2007/03/01 07:20:47 shxch *** empty log message ***
+ * 
+ * Revision 1.3 2007/02/10 08:51:58 shxch *** empty log message ***
+ * 
+ * Revision 1.2 2007/01/30 04:56:13 lujian *** empty log message ***
+ * 
+ * 
+ ******************************************************************************/

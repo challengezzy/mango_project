@@ -1,0 +1,61 @@
+/***********************************************************************
+ * $RCSfile: NovaInternalFrame.java,v $  $Revision: 1.1 $  $Date: 2007/05/31 07:02:38 $
+ * $Log: NovaInternalFrame.java,v $
+ * Revision 1.1  2007/05/31 07:02:38  qilin
+ * 界面重构，所有的JFrame改为JInternalFrame样式
+ *
+*************************************************************************/
+package smartx.framework.common.ui.component;
+
+import javax.swing.*;
+
+/**
+ * <p>Title: </p>
+ *
+ * <p>Description: </p>
+ *
+ * <p>Copyright: Copyright (c) 2007</p>
+ *
+ * <p>Company: </p>
+ *
+ * @author not attributable
+ * @version 1.0
+ */
+public class NovaInternalFrame extends JInternalFrame {
+    String menuPath;
+    public NovaInternalFrame() {
+        this("", true, true, true, true);
+    }
+
+    public NovaInternalFrame(String title) {
+        this(title, true, true, true, true);
+    }
+
+    public NovaInternalFrame(String title, boolean resizable) {
+        this(title, resizable, true, true, true);
+    }
+
+    public NovaInternalFrame(String title, boolean resizable, boolean closable) {
+        this(title, resizable, closable, true, true);
+    }
+
+    public NovaInternalFrame(String title, boolean resizable, boolean closable,
+                          boolean maximizable) {
+        this(title, resizable, closable, maximizable, true);
+    }
+
+    public NovaInternalFrame(String title, boolean resizable, boolean closable,
+                             boolean maximizable, boolean iconifiable) {
+        super(title, resizable, closable, maximizable, iconifiable);
+    }
+
+
+    public String getMenuPath() {
+        return menuPath;
+    }
+
+    public void setMenuPath(String menuPath) {
+        this.menuPath = menuPath;
+    }
+
+}

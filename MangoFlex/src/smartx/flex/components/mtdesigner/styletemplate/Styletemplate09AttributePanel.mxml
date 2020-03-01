@@ -1,0 +1,636 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseAttr:BaseAttributePanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+							 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:baseAttr="smartx.flex.components.mtdesigner.styletemplate.*"
+							 creationComplete="init()" label="{titleName}">
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:VBox width="100%" height="100%" id="systemConfigEditor" >
+		</mx:VBox>
+		
+		<mx:TitleWindow id="cusDefineBtnTw" title="子模板自定义按钮设置" width="{this.width-50}" height="{this.height-50}" 
+						showCloseButton="true" close="PopUpManager.removePopUp(cusDefineBtnTw)">
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="自定义按钮:" />
+				<mx:LinkButton id="addChildTBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加按钮" click="addChildTBtn_clickHandler(event)"/>
+				<mx:LinkButton id="delChildTBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除按钮" click="delChildTBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="childTBtnsDg" editable="true" dragEnabled="true" dropEnabled="true" dragMoveEnabled="true"
+						 allowMultipleSelection="false" dataProvider="{selectedChildTemplet.button}" click="childTBtnsDg_clickHandler(event)" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="ID" editable="true" dataField="@id" />
+					<mx:DataGridColumn headerText="名称" editable="true" dataField="@label" />
+					<mx:DataGridColumn headerText="提示信息" editable="true" dataField="@toolTip" />
+					<mx:DataGridColumn headerText="图片路径" editable="true" dataField="@icon" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="监听器:" />
+				<mx:LinkButton id="addChildTLstBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加监听器" click="addChildTLstBtn_clickHandler(event)"/>
+				<mx:LinkButton id="delChildTLstBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除监听器" click="delChildTLstBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="childTLstsDg" editable="true" allowMultipleSelection="false" 
+						 dataProvider="{childTBtnXml.listeners.listener}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="实现类" editable="true" dataField="*" labelFunction="cardLstsColLabelFunction" />
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="PopUpManager.removePopUp(cusDefineBtnTw)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.events.SliderEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Bindable]
+			private var buttonXML:XML;
+			
+			[Bindable]
+			private var cardButtonXML:XML;
+			
+			[Bindable]
+			private var layoutTypeCol:ArrayCollection = new ArrayCollection(
+			 [
+				 {layoutName:"水平放置",layoutType:"horizontal"},
+				 {layoutName:"垂直放置",layoutType:"vertical"}
+			 ]
+			);
+			
+			[Bindable]
+			private var selectedChildTemplet:XML;//选中的子模板
+			
+			private function init():void{
+				
+				if(sourceXML.direction.length() >0 ){
+					var direction:String = sourceXML.direction;
+					var objStyleType:Object = getLayoutItemByTypeCode(direction);
+					if(objStyleType != null ){
+						layoutTypeCob.selectedItem = objStyleType;
+						layoutTypeCob_changeHandler(null);
+					}
+					layoutPercentSld.value = Number(sourceXML.direction.@mainTempletPercent);
+				}else{
+					layoutTypeCob_changeHandler(null);
+				}
+				
+			}
+			
+			override protected function getXMLString():String{
+				return sourceXML.toString();
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <button id="在此填写按钮ID" label="在此填写按钮名称" toolTip="在此填写按钮提示信息" icon="在此填写按钮图标" ><listeners /></button>;
+				if( sourceXML.customListButton.length()<= 0 ){
+					var customListButtonXML:XML = new XML("<customListButton />");
+					sourceXML.appendChild(customListButtonXML);
+				}
+				
+				sourceXML.customListButton.appendChild(tempBtnXml);
+				
+				btnsDatagrid.invalidateList();
+				
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = btnsDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+					buttonXML = null;
+				}
+			}
+			
+			protected function addLstBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				var btnObj:Object = btnsDatagrid.selectedItem;
+				if( btnObj != null ){
+					if( buttonXML == null ){
+						buttonXML = <button id="" label="" toolTip="" icon="" ><listeners /></button>;
+					}
+					
+					var listener:XML = new XML("<listener>在此填写监听器实现类</listener>");
+					
+					buttonXML.listeners.appendChild(listener);
+					
+					lstsDatagrid.invalidateList();
+				}else{
+					SmartXMessage.show("请先选择一条按钮数据!");
+				}
+				
+				
+			}
+			
+			protected function musLstBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = lstsDatagrid.selectedItem;
+				if( item != null ){
+					var listenerXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(listenerXml);
+					lstsDatagrid.invalidateList();
+				}
+			}
+			
+			protected function btnsDatagrid_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = btnsDatagrid.selectedItem;
+				if(item != null ){
+					buttonXML = item as XML;
+					lstsDatagrid.invalidateList();
+				}
+				
+			}
+			
+			private function lstsColLabelFunction(item:Object,column:DataGridColumn):String{
+				var tempXml:XML = XML(item);
+				var result:String = tempXml.text();
+				return result;
+			}
+			
+			private function cardLstsColLabelFunction(item:Object,column:DataGridColumn):String{
+				var tempXml:XML = XML(item);
+				var result:String = tempXml.text();
+				return result;
+			}
+			
+			protected function bfIncListTxt_changeHandler(event:Event):void
+			{
+				var temp:String = bfIncListTxt.text;
+				sourceXML.interceptors.bfIncList = temp;
+			}
+			
+			protected function afIncListTxt_changeHandler(event:Event):void
+			{
+				var temp:String = afIncListTxt.text;
+				sourceXML.interceptors.afIncList = temp;
+				
+			}
+			
+			
+			protected function addCardBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <button id="在此填写按钮ID" label="在此填写按钮名称" toolTip="在此填写按钮提示信息" icon="在此填写按钮图标" ><listeners /></button>;
+				if( sourceXML.customCardButton.length()<= 0 ){
+					var customCardButtonXML:XML = new XML("<customCardButton />");
+					sourceXML.appendChild(customCardButtonXML);
+				}
+				
+				sourceXML.customCardButton.appendChild(tempBtnXml);
+				
+				cardBtnsDatagrid.invalidateList();
+				
+			}
+			
+			protected function musCardBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = cardBtnsDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+					buttonXML = null;
+				}
+				
+			}
+			
+			protected function addCardLstBtn_clickHandler(event:MouseEvent):void
+			{
+				var btnObj:Object = cardBtnsDatagrid.selectedItem;
+				if( btnObj != null ){
+					if( cardButtonXML == null ){
+						cardButtonXML = <button id="" label="" toolTip="" icon="" ><listeners /></button>;
+					}
+					
+					var listener:XML = new XML("<listener>在此填写监听器实现类</listener>");
+					
+					cardButtonXML.listeners.appendChild(listener);
+					
+					cardLstsDatagrid.invalidateList();
+				}else{
+					SmartXMessage.show("请先选择一条按钮数据!");
+				}
+				
+			}
+			
+			protected function musCardLstBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = cardLstsDatagrid.selectedItem;
+				if( item != null ){
+					var listenerXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(listenerXml);
+					cardLstsDatagrid.invalidateList();
+				}
+				
+			}
+			
+			protected function cardBtnsDatagrid_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = cardBtnsDatagrid.selectedItem;
+				if(item != null ){
+					cardButtonXML = item as XML;
+					cardLstsDatagrid.invalidateList();
+				}
+				
+			}
+			
+			protected function insertBfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = insertBfIncCardTxt.text;
+				sourceXML.interceptors.insertBfIncCard = temp;
+				
+			}
+			
+			protected function insertAfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = insertAfIncCardTxt.text;
+				sourceXML.interceptors.insertAfIncCard = temp;
+				
+			}
+			
+			protected function updateBfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = updateBfIncCardTxt.text;
+				sourceXML.interceptors.updateBfIncCard = temp;
+				
+			}
+			
+			protected function updateAfIncCardTxt_changeHandler(event:Event):void
+			{
+				var temp:String = updateAfIncCardTxt.text;
+				sourceXML.interceptors.updateAfIncCard = temp;
+				
+			}
+			
+			protected function layoutTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = layoutTypeCob.selectedItem;
+				if(item != null ){
+					var layoutType:String = item["layoutType"] as String;
+					sourceXML.direction = layoutType;
+				}
+			}
+			
+			private function getLayoutItemByTypeCode(type:String):Object{
+				var item:Object = null;
+				for each(var obj:Object  in layoutTypeCol ){
+					var tempType:String = obj["layoutType"] as String;
+					if(tempType != null && tempType != "" && type != null && type != "" && type == tempType ){
+						item = obj;
+						break;
+					}
+				}
+				return item;
+			}
+			
+			protected function addChildTempBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <childTemplate label="在此填写子控件显示名称" templetCode="在此填写模板编码" forienKey="在此填写外键关联的主表字段" mainTableKey="填写外键字段" initQueryCondition="" />;
+				if( sourceXML.childTemplates.length()<= 0 ){
+					var childTemplatesXML:XML = new XML("<childTemplates />");
+					sourceXML.appendChild(childTemplatesXML);
+				}
+				
+				sourceXML.childTemplates.appendChild(tempBtnXml);
+				
+				childTempDatagrid.invalidateList();
+				
+			}
+			
+			protected function musChildTempBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = childTempDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+				}
+				
+			}
+			
+			protected function addDVBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <dataValidator classname="在此填写数据验证器实现类" />;
+				if( sourceXML.cardDataValidators.length()<= 0 ){
+					var cardDataValidatorsXML:XML = new XML("<cardDataValidators />");
+					sourceXML.appendChild(cardDataValidatorsXML);
+				}
+				
+				sourceXML.cardDataValidators.appendChild(tempBtnXml);
+				
+				dataValidatorDatagrid.invalidateList();
+				
+			}
+			
+			protected function musDVBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = dataValidatorDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+				}
+				
+			}
+			
+			protected function deleteBfIncCardTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deleteBfIncCard = deleteBfIncCardTxt.text;
+				
+			}
+			
+			protected function deleteAfIncCardTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deleteAfIncCard = deleteAfIncCardTxt.text;
+				
+			}
+			
+			protected function bfIncBatchTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.bfIncBatch = bfIncBatchTxt.text;
+				
+			}
+			
+			protected function afIncBatchTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.afIncBatch = afIncBatchTxt.text;
+				
+			}
+			
+			protected function deletebfIncBatchTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deletebfIncBatch = deletebfIncBatchTxt.text;
+				
+			}
+			
+			protected function deleteafIncBatchTxt_changeHandler(event:Event):void
+			{
+				sourceXML.interceptors.deleteafIncBatch = deleteafIncBatchTxt.text;
+				
+			}
+			
+			protected function layoutPercentSld_changeHandler(event:SliderEvent):void{
+				sourceXML.direction.@mainTempletPercent = layoutPercentSld.value;
+				sourceXML.direction.@childrenTempletPercent = 100-layoutPercentSld.value;
+			}
+			
+			protected function showOperationTypeCbo_changeHandler(event:ListEvent):void{
+				sourceXML.showOperationButtonType = showOperationTypeCbo.selectedItem
+					?showOperationTypeCbo.selectedItem.data
+					:GlobalConst.STYLETEMPLATE_OPERATION_MENU;
+			}
+			
+			[Bindable]
+			private var childTBtnXml:XML;
+			
+			protected function addChildTBtn_clickHandler(event:MouseEvent):void{
+				var tempBtnXml:XML = <button id="在此填写按钮ID" label="在此填写按钮名称" 
+										toolTip="在此填写按钮提示信息" icon="在此填写按钮图标" >
+											<listeners />
+									 </button>;
+				
+				selectedChildTemplet.appendChild(tempBtnXml);
+			}
+			
+			protected function delChildTBtn_clickHandler(event:MouseEvent):void{
+				if(childTBtnsDg.selectedIndex < 0)
+					return;
+				CEPUtils.xmlDeleteNode(XML(childTBtnsDg.selectedItem));
+				childTBtnXml = null;
+			}
+			
+			protected function addChildTLstBtn_clickHandler(event:MouseEvent):void{
+				if(childTBtnsDg.selectedIndex < 0){
+					SmartXMessage.show("请先选择一个自定义按钮!");
+					return;
+				}
+				childTBtnXml.listeners.appendChild(<listener>在此填写监听器实现类</listener>);
+			}
+			
+			protected function delChildTLstBtn_clickHandler(event:MouseEvent):void{
+				if(childTLstsDg.selectedIndex < 0)
+					return;
+				CEPUtils.xmlDeleteNode(XML(childTLstsDg.selectedItem));
+			}
+			
+			protected function editChildTempBtnBtn_clickHandler(event:MouseEvent):void{
+				if(childTempDatagrid.selectedIndex < 0)
+					return;
+				
+				selectedChildTemplet = XML(childTempDatagrid.selectedItem);
+				
+				PopUpManager.addPopUp(cusDefineBtnTw,this,true);
+				PopUpManager.centerPopUp(cusDefineBtnTw);
+			}
+			
+			protected function childTBtnsDg_clickHandler(event:MouseEvent):void{
+				var item:Object = childTBtnsDg.selectedItem;
+				if(item != null )
+					childTBtnXml = item as XML;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:TabNavigator width="100%" height="100%" id="tabNavigator" resizeToContent="true" >
+		
+		<mx:VBox width="100%" height="100%" label="基本属性" >
+			
+			<mx:HBox width="100%" >
+				<mx:Label text="布局方式:" />
+				<mx:ComboBox id="layoutTypeCob" labelField="layoutName" change="layoutTypeCob_changeHandler(event)" dataProvider="{layoutTypeCol}" />
+				<mx:Label text="主子表尺寸比:" />
+				<mx:HSlider id="layoutPercentSld" minimum="0" maximum="100" snapInterval="1" 
+						   change="layoutPercentSld_changeHandler(event)" />
+			</mx:HBox>
+			
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="子控件列表:" />
+				<mx:LinkButton id="addChildTempBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加子控件" click="addChildTempBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musChildTempBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除子控件" click="musChildTempBtn_clickHandler(event)"/>
+				<mx:LinkButton id="editChildTempBtnBtn" icon="{AssetsFileLib.designIcon}" width="22" height="22" 
+							   toolTip="编辑子控件自定义按钮" click="editChildTempBtnBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="childTempDatagrid" editable="true" 
+						 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true"
+						 allowMultipleSelection="false" dataProvider="{sourceXML.childTemplates.childTemplate}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="名称" editable="true" dataField="@label" />
+					<mx:DataGridColumn headerText="模板编码" editable="true" dataField="@templetCode" width="150"/>
+					<mx:DataGridColumn headerText="外键字段" editable="true" dataField="@forienKey" width="100"/>
+					<mx:DataGridColumn headerText="关联主表字段" editable="true" dataField="@mainTableKey" width="100"/>
+					<mx:DataGridColumn headerText="初始化条件" editable="true" dataField="@initQueryCondition" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="数据验证器:" />
+				<mx:LinkButton id="addDVBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加数据验证器" click="addDVBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musDVBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除数据验证器" click="musDVBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="dataValidatorDatagrid" editable="true" 
+						 allowMultipleSelection="false" dataProvider="{sourceXML.cardDataValidators.dataValidator}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="实现类名" editable="true" dataField="@classname" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+		</mx:VBox>
+		
+		<mx:VBox width="100%" height="100%" label="服务端拦截器" paddingLeft="10">
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="列表前置拦截器:" width="165"/>
+				<mx:TextInput id="bfIncListTxt" width="360" text="{sourceXML.interceptors.bfIncList}" 
+							  change="bfIncListTxt_changeHandler(event)" toolTip="前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="列表后置拦截器:" width="165" />
+				<mx:TextInput id="afIncListTxt" width="360" text="{sourceXML.interceptors.afIncList}" 
+							  change="afIncListTxt_changeHandler(event)" toolTip="后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="批量前置拦截器:" width="165"/>
+				<mx:TextInput id="bfIncBatchTxt" width="360" text="{sourceXML.interceptors.bfIncBatch}" 
+							  change="bfIncBatchTxt_changeHandler(event)" toolTip="批量前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="批量后置拦截器:" width="165"/>
+				<mx:TextInput id="afIncBatchTxt" width="360" text="{sourceXML.interceptors.afIncBatch}" 
+							  change="afIncBatchTxt_changeHandler(event)" toolTip="批量后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="卡片插入前置拦截器:" width="165" />
+				<mx:TextInput id="insertBfIncCardTxt" width="360" text="{sourceXML.interceptors.insertBfIncCard}" 
+							  change="insertBfIncCardTxt_changeHandler(event)" toolTip="卡片插入前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="卡片插入后置拦截器:" width="165" />
+				<mx:TextInput id="insertAfIncCardTxt" width="360" text="{sourceXML.interceptors.insertAfIncCard}" 
+							  change="insertAfIncCardTxt_changeHandler(event)" toolTip="卡片插入后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="卡片更新前置拦截器:" width="165" />
+				<mx:TextInput id="updateBfIncCardTxt" width="360" text="{sourceXML.interceptors.updateBfIncCard}" 
+							  change="updateBfIncCardTxt_changeHandler(event)" toolTip="卡片更新前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="卡片更新后置拦截器:" width="165" />
+				<mx:TextInput id="updateAfIncCardTxt" width="360" text="{sourceXML.interceptors.updateAfIncCard}" 
+							  change="updateAfIncCardTxt_changeHandler(event)" toolTip="卡片更新后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="卡片删除前置拦截器:" width="165"/>
+				<mx:TextInput id="deleteBfIncCardTxt" width="360" text="{sourceXML.interceptors.deleteBfIncCard}" 
+							  change="deleteBfIncCardTxt_changeHandler(event)" toolTip="卡片删除前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="卡片删除后置拦截器:" width="165"/>
+				<mx:TextInput id="deleteAfIncCardTxt" width="360" text="{sourceXML.interceptors.deleteAfIncCard}" 
+							  change="deleteAfIncCardTxt_changeHandler(event)" toolTip="卡片删除后置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="批量删除前置前置拦截器:" width="165"/>
+				<mx:TextInput id="deletebfIncBatchTxt" width="360" text="{sourceXML.interceptors.deletebfIncBatch}" 
+							  change="deletebfIncBatchTxt_changeHandler(event)" toolTip="批量删除前置前置拦截器实现类" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" >
+				<mx:Label text="批量删除后置前置拦截器:" width="165" />
+				<mx:TextInput id="deleteafIncBatchTxt" width="360" text="{sourceXML.interceptors.deleteafIncBatch}" 
+							  change="deleteafIncBatchTxt_changeHandler(event)" toolTip="批量删除后置前置拦截器实现类" />
+			</mx:HBox>
+		</mx:VBox>
+		
+		<mx:VBox width="100%" height="100%" label="列表按钮" >
+			<mx:HBox width="100%">
+				<mx:Label text="列表操作按钮显示方式" />
+				<mx:ComboBox id="showOperationTypeCbo" change="showOperationTypeCbo_changeHandler(event)" 
+							 labelField="name" dataProvider="{showOperationButtonTypeDp}" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="列表按钮:" />
+				<mx:LinkButton id="addBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加列表按钮" click="addBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除列表按钮" click="musBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="btnsDatagrid" editable="true" allowMultipleSelection="false" 
+						 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true"
+						 dataProvider="{sourceXML.customListButton.button}" click="btnsDatagrid_clickHandler(event)" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="ID" editable="true" dataField="@id" />
+					<mx:DataGridColumn headerText="名称" editable="true" dataField="@label" />
+					<mx:DataGridColumn headerText="提示信息" editable="true" dataField="@toolTip" />
+					<mx:DataGridColumn headerText="图片路径" editable="true" dataField="@icon" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="监听器:" />
+				<mx:LinkButton id="addLstBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加监听器" click="addLstBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musLstBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除监听器" click="musLstBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="lstsDatagrid" editable="true" 
+						 allowMultipleSelection="false" dataProvider="{buttonXML.listeners.listener}" >
+				<mx:columns>
+					<mx:DataGridColumn id="lstsCol" headerText="实现类" editable="true" dataField="*" labelFunction="lstsColLabelFunction" />
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		
+		<mx:VBox width="100%" height="100%" label="卡片按钮" >
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="卡片按钮:" />
+				<mx:LinkButton id="addCardBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加卡片按钮" click="addCardBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musCardBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除卡片按钮" click="musCardBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="cardBtnsDatagrid" editable="true" 
+						 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true"
+						 allowMultipleSelection="false" dataProvider="{sourceXML.customCardButton.button}" 
+						 click="cardBtnsDatagrid_clickHandler(event)" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="ID" editable="true" dataField="@id" />
+					<mx:DataGridColumn headerText="名称" editable="true" dataField="@label" />
+					<mx:DataGridColumn headerText="提示信息" editable="true" dataField="@toolTip" />
+					<mx:DataGridColumn headerText="图片路径" editable="true" dataField="@icon" />
+				</mx:columns>
+			</mx:DataGrid>
+			
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="监听器:" />
+				<mx:LinkButton id="addCardLstBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加监听器" click="addCardLstBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musCardLstBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除监听器" click="musCardLstBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="cardLstsDatagrid" editable="true" allowMultipleSelection="false" 
+						 dataProvider="{cardButtonXML.listeners.listener}" >
+				<mx:columns>
+					<mx:DataGridColumn id="cardLstsCol" headerText="实现类" editable="true" dataField="*" labelFunction="cardLstsColLabelFunction" />
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		
+	</mx:TabNavigator>
+</baseAttr:BaseAttributePanel>

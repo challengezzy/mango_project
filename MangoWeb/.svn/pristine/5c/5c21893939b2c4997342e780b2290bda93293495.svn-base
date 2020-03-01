@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+		  xmlns:core="smartx.flex.components.core.*"
+		  xmlns:fx="http://ns.adobe.com/mxml/2009" width="100%" height="100%"
+		  fontSize="12" creationComplete="init()" xmlns:s="library://ns.adobe.com/flex/spark" >
+	<fx:Metadata>
+		[Event(name='edit',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='insert',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='beforeSave',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='save',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='returnToList',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='view',type='smartx.flex.components.event.StyleTemplateEvent')]
+	</fx:Metadata>
+	<fx:Declarations>
+		<mx:HBox width="100%" id="listButtonBox">
+			<mx:PopUpMenuButton label="操作" id="popUpMenuButton" dataProvider="{menuArrayCol}" openAlways="true"/>
+		</mx:HBox>
+		<fx:Object id="viewButton" label="查看" handler="{onEdit}" rightClick="true" />
+		<fx:Object id="deleteButton" label="删除"  handler="{deleteRow}" rightClick="true" />
+		<fx:Object id="createButton" label="新建规则"  handler="{onCreate}" rightClick="true" />
+		<fx:Object id="editButton" label="编辑规则"  handler="{onEdit}" rightClick="true" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.effects.Effect;
+			import mx.effects.EffectInstance;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+			
+			import smartx.bam.flex.modules.task.TaskCreatorWindow;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleComboxItemVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var templetCode:String = "T_BAM_BUSINESSRULE";
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			[Bindable]
+			public var initQueryCondition:String;
+			[Bindable]
+			public var scenarioId:String;
+			
+			[Bindable]
+			private var menuArrayCol:ArrayCollection = new ArrayCollection();
+			
+			private var templetVO:TempletVO; 
+			
+			private var formService:RemoteObject;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private function init():void{
+				if(templetCode == null)
+					throw Error("元原模板编号不能为null");
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+				formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				formService.getTempletVO(templetCode);
+				
+				listPanel.isShowAlert = false;
+				
+				listPanel.bfInterceptor = "smartx.bam.bs.scenariomnager.BusinessruleDelBfFromInterceptor";
+				
+				listPanel.query(false,true,true);
+				
+				initPopMenuButton();
+				
+				if(listPanel.rightClickMenu != null){
+					listPanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler,false,0,true);
+					for each(var obj:* in menuArrayCol){
+						if(obj.rightClick){
+							//需要添加到右键菜单
+							listPanel.rightClickMenuItems.push(obj);
+						}
+					}
+				}
+			}
+			
+			private function initPopMenuButton():void{
+				
+				menuArrayCol.removeAll();
+				menuArrayCol.addItem(viewButton);
+				menuArrayCol.addItem(deleteButton);
+				menuArrayCol.addItem(editButton);
+				menuArrayCol.addItem(createButton);
+				
+				
+				var menuPop:Menu = popUpMenuButton.popUp as Menu;
+				menuPop.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler);
+			}
+			
+			protected function popUpMenuButtonClickHandler(event:MenuEvent):void
+			{
+				var item:* = event.item;
+				if(item.handler != null)
+					item.handler();
+			}
+			
+			private function getTempletVOHandler(event:ResultEvent):void{
+				templetVO = event.result as TempletVO;
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			
+			public function onReturn():void{
+				listPanel.refreshData();
+				mainStack.selectedChild = listBox;
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.RETURN_TO_LIST));
+			}
+			
+			public function isListPanelShowing():Boolean{
+				return (mainStack.selectedChild == listBox);
+			}
+			
+			public function onEdit():void{
+				
+				var item:Object = listPanel.getSelectedRowValue();
+				
+				if(item == null){
+					
+					Alert.show("请先选择一条规则模板!","提示");
+					
+				}else{
+					
+					var templeteId:String = String(item["RULETEMPATEID"]);
+					var businessruleId:String = String(item["ID"]);
+					var besdesc:String = String(item["DESCRIPTION"]);
+					
+					var crp:CreateRulePanel = new CreateRulePanel();
+					crp.endpoint = endpoint;
+					crp.showSystemButton = false;
+					crp.isEdit = true;
+					crp.templeteId = templeteId;
+					crp.businessruleId = businessruleId;
+					crp.besdesc = besdesc;
+					crp.onQuery = onQuery;
+					
+					PopUpManager.addPopUp(crp,desktop,true);
+					PopUpManager.centerPopUp(crp);
+					
+				}
+			}
+			
+			private function deleteRow():void{
+				var item:* = listPanel.getSelectedRowValue();
+				
+				if(item == null){
+					Alert.show("请先选择一条数据!","提示");
+				}else{
+					listPanel.deleteRow();
+				}
+			}
+			
+			private function onCreate():void{
+				
+				var crp:CreateRulePanel = new CreateRulePanel();
+				crp.endpoint = endpoint;
+				crp.showSystemButton = false;
+				crp.isEdit = false;
+				crp.onQuery = onQuery;
+				
+				PopUpManager.addPopUp(crp,desktop,true);
+				PopUpManager.centerPopUp(crp);
+			}
+			
+			public function onQuery():void{
+				listPanel.query(false,true,true);
+			}
+			
+			private function onView():void{
+				if(listPanel.getSelectedRowValue() != null){
+					var row:Object = listPanel.getSelectedRowValue();
+					cardPanel.editable = false;
+					cardPanel.setDataValue(row);
+					mainStack.selectedChild = cardBox;
+					cardPanel.insertMode = false;
+					if(editable)
+						dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.EDIT));
+					else
+						dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.VIEW));
+				}
+				else
+					Alert.show("请选择一条记录");
+			}
+			
+			override protected function createChildren():void{
+				super.createChildren();
+				
+				listPanel.topArea.addChild(listButtonBox);
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all" >
+		<mx:VBox width="100%" height="100%" id="listBox" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+			<core:BillListPanel showInitingWindow="false" destination="{destination}" endpoint="{endpoint}" 
+								doubleClick="onEdit()" templetCode="{templetCode}" id="listPanel" editable="false" 
+								width="100%" height="100%"  showEditBox="false" debugMode="{debugMode}">
+			</core:BillListPanel>
+		</mx:VBox>
+		<mx:VBox label="" width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+			<mx:HBox width="100%" id="cardButtonBox">
+				<mx:Button id="returnButton" label="返回" click="onReturn()" icon="{AssetsFileLib.returnIcon}" />
+			</mx:HBox>
+			<core:BillCardPanel destination="{destination}" endpoint="{endpoint}" templetCode="{templetCode}" 
+								id="cardPanel" width="100%" height="100%" title="详细信息" debugMode="{debugMode}" 
+								showInitingWindow="false">
+			</core:BillCardPanel>
+		</mx:VBox>
+	</mx:ViewStack>	
+</mx:Module>

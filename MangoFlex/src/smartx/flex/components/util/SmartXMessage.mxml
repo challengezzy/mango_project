@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical"  minHeight="120" minWidth="260">
+	<fx:Declarations>
+		<mx:VBox id="mainBox" width="100%" height="100%" paddingLeft="5" paddingRight="5">
+			<mx:HBox height="100%" width="100%" horizontalAlign="center" verticalAlign="middle">
+				<mx:Image id="image" source="{msgIcon}" verticalAlign="middle" width="48" height="100%" scaleContent="false" 
+						  doubleClickEnabled="true" doubleClick="showDetail()"/>
+				<mx:VBox id="contentBox" width="100%" height="100%" verticalAlign="middle" horizontalAlign="center">
+					<mx:Text id="msgText" fontSize="14" width="100%" text="" paddingLeft="0" paddingRight="0"/>
+				</mx:VBox>
+			</mx:HBox>
+			<mx:HBox id="btnBox" horizontalAlign="center" width="100%" height="28">
+			</mx:HBox>
+		</mx:VBox>
+		<mx:TextArea id="detailText" text="" width="100%" height="100%" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.core.FlexGlobals;
+			import mx.core.IFlexDisplayObject;
+			import mx.core.IFlexModule;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.managers.ISystemManager;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			// 消息类型
+			public static const MESSAGE_INFO:int = 0;
+			public static const MESSAGE_WARN:int = 1;
+			public static const MESSAGE_ERROR:int = 2;
+			/**
+			 * 是、否选择项
+			 * */
+			public static const MESSAGE_CONFIRM:int = 3;
+			
+			/**
+			 * 是、否、取消选择项
+			 * */
+			public static const MESSAGE_QUERY:int = 3;
+			
+			private var yesLabel:String = "是";
+			private var noLabel:String = "否";
+			private var okLabel:String = "确认";
+			private var cancelLabel:String = "取消";
+			
+			private var yesName:String = "是";
+			private var noName:String = "否";
+			private var okName:String = "确认";
+			private var cancelName:String = "取消";
+			
+			// 消息窗口标题
+			private static const info_title:String = "提示";
+			private static const warn_title:String = "警告";
+			private static const error_title:String = "错误";
+			private static const confirm_title:String = "确认";
+			
+			private static const infoIcon:Class = AssetsFileLib.infoIcon;
+			private static const warningIcon:Class = AssetsFileLib.warningIcon;
+			private static const errorIcon:Class = AssetsFileLib.errorIcon;
+			private static const confirmIcon:Class = AssetsFileLib.confirmIcon;
+			
+			private var buttons:Array = [];
+			private var defaultBtn:Button;
+			[Bindable]
+			public var msgIcon:Class;
+			
+			private static var _message:SmartXMessage;
+			
+			/**
+			 * 消息框
+			 * 关闭消息框的返回值有：Alert.OK|Alert.YES|Alert.NO|Alert.CANCEL
+			 **/
+			public static function show(text:String = "",
+										messageType:int=MESSAGE_INFO,
+										detail:String="",
+										parent:Sprite = null,
+										closeHandler:Function = null):SmartXMessage{
+				
+				if(_message == null)
+					_message = new SmartXMessage();
+				
+				if(messageType == MESSAGE_INFO){
+					_message.showAlertMessage(text,info_title,Alert.OK,parent,null,infoIcon,detail);
+				}else if(messageType == MESSAGE_WARN){
+					_message.showAlertMessage(text,warn_title,Alert.OK,parent,null,warningIcon,detail);
+				}else if(messageType == MESSAGE_ERROR){
+					_message.showAlertMessage(text,error_title,Alert.OK,parent,null,errorIcon,detail);
+				}else if(messageType == MESSAGE_CONFIRM){
+					_message.showAlertMessage(text,confirm_title,Alert.YES|Alert.NO,parent,closeHandler,confirmIcon,detail,Alert.YES);
+				}else if(messageType == MESSAGE_QUERY ){
+					_message.showAlertMessage(text,confirm_title,Alert.YES|Alert.NO|Alert.CANCEL,parent,closeHandler,confirmIcon,detail,Alert.YES);
+				}
+				
+				return _message;
+				
+			}
+			
+			public function showAlertMessage(text:String = "", title:String = "",
+														  flags:uint = Alert.OK, 
+														  parent:Sprite = null, 
+														  closeHandler:Function = null, 
+														  iconClass:Class = null,
+														  detail:String = "",														  
+														  defaultButtonFlag:uint = Alert.OK ):void
+			{
+															
+				
+				addChild(mainBox);				
+				_message.msgIcon = iconClass;
+				_message.title = title;
+				msgText.text = text;
+				detailText.text = detail;
+				
+				if( detail==null || "" == StringUtil.trim(detail) )
+					image.doubleClickEnabled = false;
+				
+				buttons.splice(0);//情况按钮数组
+				btnBox.removeAllChildren();
+				createButtons(flags,defaultButtonFlag);
+								
+				if (closeHandler != null)
+					_message.addEventListener(CloseEvent.CLOSE, closeHandler);
+				
+				var modal:Boolean = true; //模式窗口				
+				if (!parent)
+				{
+					var sm:ISystemManager = ISystemManager(FlexGlobals.topLevelApplication.systemManager);
+					// no types so no dependencies
+					var mp:Object = sm.getImplementation("mx.managers.IMarshallPlanSystemManager");
+					if (mp && mp.useSWFBridge())
+						parent = Sprite(sm.getSandboxRoot());
+					else
+						parent = Sprite(FlexGlobals.topLevelApplication);
+				}
+				// Setting a module factory allows the correct embedded font to be found.
+				if (moduleFactory)
+					_message.moduleFactory = moduleFactory;    
+				else if (parent is IFlexModule)
+					_message.moduleFactory = IFlexModule(parent).moduleFactory;
+				else
+				{
+					if (parent is IFlexModuleFactory)
+						_message.moduleFactory = IFlexModuleFactory(parent);
+					else                
+						_message.moduleFactory = FlexGlobals.topLevelApplication.moduleFactory;
+					
+					// also set document if parent isn't a UIComponent
+					if (!parent is UIComponent)
+						_message.document = FlexGlobals.topLevelApplication.document;
+				}
+				
+				if(!_message.isPopUp){
+					PopUpManager.addPopUp(_message, parent, modal);
+					PopUpManager.centerPopUp(IFlexDisplayObject(_message));
+				}
+				
+			}
+			
+			private function showDetail():void{
+				if(!contentBox.contains(detailText) ){
+					contentBox.addChild(detailText);
+					this.height = height + 220;
+					this.width = width + 40;
+					PopUpManager.centerPopUp(IFlexDisplayObject(_message));
+				}
+				else{
+					contentBox.removeChild(detailText);
+					this.height = height - 220;
+					this.width = width - 40;
+					PopUpManager.centerPopUp(IFlexDisplayObject(_message));
+				}
+			}
+			
+			private function createButtons(buttonFlags:uint,defaultButtonFlag:uint):void
+			{
+				var button:Button;
+				if (buttonFlags & Alert.OK){
+					button = createButton(okLabel, okName);
+					if (defaultButtonFlag == Alert.OK)
+						defaultBtn = button;
+				}
+				
+				if (buttonFlags & Alert.YES){
+					button = createButton(yesLabel, yesName);
+					if (defaultButtonFlag == Alert.YES)
+						defaultBtn = button;
+				}
+				
+				if (buttonFlags & Alert.NO){
+					button = createButton(noLabel, noName);
+					if (defaultButtonFlag == Alert.NO)
+						defaultBtn = button;
+				}
+				
+				if (buttonFlags & Alert.CANCEL){
+					button = createButton(cancelLabel, cancelName);
+					if (defaultButtonFlag == Alert.CANCEL)
+						defaultBtn = button;
+				}
+				
+				if (!defaultBtn && buttons.length)
+					defaultBtn = buttons[0];
+				
+				// Set the default button to have focus.
+				if (defaultBtn)
+					defaultBtn.setFocus();
+			}
+			
+			/**
+			 *  @private
+			 *  Remove the popup and dispatch Click event corresponding to the Button Pressed.
+			 */
+			private function removeAlert(buttonPressed:String):void
+			{
+				this.visible = false;
+				
+				var closeEvent:CloseEvent = new CloseEvent(CloseEvent.CLOSE);
+				if (buttonPressed == yesName)
+					closeEvent.detail = Alert.YES;
+				else if (buttonPressed == noName)
+					closeEvent.detail = Alert.NO;
+				else if (buttonPressed == okName)
+					closeEvent.detail = Alert.OK;
+				else if (buttonPressed == cancelName )
+					closeEvent.detail = Alert.CANCEL;
+				
+				dispatchEvent(closeEvent);
+				
+				PopUpManager.removePopUp(_message);
+				
+				_message.removeAllChildren();
+				_message = null;
+				
+			}
+			
+			private function createButton(label:String, name:String):Button
+			{
+				var button:Button = new Button();
+				
+				button.label = label;
+				// The name is "是", "否", "确认", or "取消".
+				button.name = name;
+				
+				var buttonStyleName:String = getStyle("buttonStyleName");
+				if (buttonStyleName)
+					button.styleName = buttonStyleName;
+				
+				button.addEventListener(MouseEvent.CLICK, clickHandler);
+				button.addEventListener(KeyboardEvent.KEY_DOWN, keyDownHandler);
+				button.owner = parent;				
+				button.setActualSize(22, 65);
+				buttons.push(button);
+				
+				btnBox.addChild(button);
+				
+				return button;
+			}
+					
+			/**
+			 *  @private
+			 *  On a button click, dismiss the popup and send notification.
+			 */
+			private function clickHandler(event:MouseEvent):void
+			{
+				var name:String = Button(event.currentTarget).name;
+				removeAlert(name);
+			}
+			
+		]]>
+	</fx:Script>
+	
+</mx:Panel>

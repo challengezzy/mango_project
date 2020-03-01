@@ -1,0 +1,27 @@
+package smartx.system.web.service;
+
+import smartx.framework.common.vo.HashVO;
+
+
+/**
+ * 专门表示这些数据是用来展现Tree节点的
+ * @author James.W
+ *
+ */
+public class TreeVO {
+	private HashVO[] vos=null;
+
+	public TreeVO(HashVO[] vos){
+		this.vos=vos;
+	}
+	
+	public HashVO[] getVos() {
+		return vos;
+	}
+
+	public void setVos(HashVO[] vos) {
+		this.vos = vos;
+	}
+	
+	
+}

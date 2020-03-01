@@ -1,0 +1,59 @@
+package smartx.publics.datatask;
+
+import java.util.Map;
+
+/**
+ * 通用数据任务管理器接口
+ * @author zhangzy
+ * @version 1.0
+ * @updated 2011/8/30 14:30:21
+ */
+public interface CommTaskManagerIFC {
+
+	/**
+	 * 加载任务
+	 * 本方法是由其他程序调用的，因此不用再其内部提交事务，可以由调用者决定。
+	 * @param taskTempletId
+	 * @param taskTitle
+	 * @param taskCode
+	 * @param taskContent
+	 * @param param
+	 * @throws Exception
+	 */
+	public String addTask(String taskTempletId,String taskName, String taskContent,Map<String,String> paramMap)throws Exception;
+	
+	/**
+	 * 添加并立即启动数据任务
+	 * 本方法是由其他程序调用的，因此不用再其内部提交事务，可以由调用者决定。
+	 * @param taskTempletId
+	 * @param taskTitle
+	 * @param taskCode
+	 * @param taskContent
+	 * @param param
+	 * @throws Exception
+	 */
+	public String addAndStartTask(String taskTempletId,String taskName, String taskContent,Map<String,String> paramMap) throws Exception;
+ 
+	/**
+	 * 停止任务
+	 * 本方法是由其他程序调用的，因此不用再其内部提交事务，可以由调用者决定。
+	 * @param taskTitle
+	 */
+	public void stopTask(String taskTitle)throws Exception;
+
+	/**
+	 * 初始化
+	 */
+	public void init();
+	
+	/**
+	 * 停止所有任务运行
+	 */
+	public void stopProcessor();
+	
+	/**
+	 * 启动任务运行
+	 */
+	public void startProcessor();
+
+}

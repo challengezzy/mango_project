@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="vertical" width="800" height="500" xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+	close="PopUpManager.removePopUp(this)" showCloseButton="true" initialize="init()"
+	title="派发规则模板管理">
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			
+			[Bindable]
+			private var endpoint:String;
+			
+			private function init():void{
+				endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));	
+			}
+			
+		]]>
+	</mx:Script>
+	<styletemplate:StyleTemplate02 endpoint="{endpoint}" templetCode="T_PUB_WF_TASKASSIGNRULETEMPLATE" debugMode="true" height="100%" width="100%" editable="true"/>
+</mx:TitleWindow>

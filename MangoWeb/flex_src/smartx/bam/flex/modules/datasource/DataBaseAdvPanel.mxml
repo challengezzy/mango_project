@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="400" height="300" 
+			allowDrag="true" allowClose="true" allowMaximize="true" 
+			allowMinimize="true" allowResize="true" close="onClose()" fontSize="12" 
+			xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+			xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+			xmlns:core="smartx.flex.components.core.*"
+			xmlns:fx="http://ns.adobe.com/mxml/2009"
+			title="关系型数据库属性编辑"
+			>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.effects.Effect;
+			import mx.effects.EffectInstance;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+			
+			import smartx.bam.flex.modules.common.CustomerTextInput;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+
+			[Bindable]
+			public var config:String;
+			[Bindable]
+			public var bcp:BillCardPanel;
+			[Bindable]
+			public var dsType:String;
+			
+			private var dsTypeCol:ArrayCollection = new ArrayCollection();
+			
+			private var booleanCol:ArrayCollection = new ArrayCollection();
+			
+			private var lifeCol:ArrayCollection = new ArrayCollection();
+			
+			private var xml:XML;
+			
+			private function init():void{
+				
+				initData();
+				
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				if(config !=null && config != ""){
+					xml = new XML(config);
+				}
+				
+				if(dsType=="0"){
+					if(xml != null){
+					var dc0:XML = xml["database-connection"][0];
+					var lookName:String = dc0.@["context-look-name"];
+					jndiNameTxt.text = lookName;
+					if(dc0 != null ){
+						for each(var cp:XML in dc0["conn-property"]){
+							
+							var name:String = cp.@name;
+							var value:String = cp.@value;
+							
+							if(name == "java.naming.factory.initial"){
+								jndiFactoryTxt.text = value;
+							}
+							
+							if(name == "java.naming.provider.url"){
+								jndiUrlTxt.text = value;
+							}
+						}
+					}
+					}
+					
+					dbStack.selectedChild = jndiVbox;
+
+				}else if(dsType=="1"){
+					if(xml!=null){
+					var dc1:XML = xml["database-connection"][0];
+					var className:String = dc1.@["class-name"];
+					dbcpFactoryTxt.text = className;
+					if(dc1 != null ){
+						for each(var cp1:XML in dc1["conn-property"]){
+							
+							var name1:String = cp1.@name;
+							var value1:String = cp1.@value;
+							if(name1 == "username"){
+								dbcpDBNameTxt.text = value1;
+							}
+							if(name1 == "password"){
+								dbcpDBPwdTxt.text = value1;
+							}
+							if(name1 == "driverClassName"){
+								dbcpDriverTxt.text = value1;
+							}
+							if(name1 == "url"){
+								dbcpUrlTxt.text = value1;
+							}
+							if(name1 == "initialSize"){
+								dbcpPoolTxt.text = value1;
+							}
+						}
+					}
+					}
+					
+					dbStack.selectedChild = dbcpVbox;
+					
+				}else if(dsType=="2"){
+					if(xml != null){
+					var dc2:XML = xml["database-connection"][0];
+					var driverName:String = dc2.@["driver-name"];
+					jdbcDriverTxt.text = driverName;
+					if(dc2 != null ){
+						for each(var cp2:XML in dc2["conn-property"]){
+							
+							var name2:String = cp2.@name;
+							var value2:String = cp2.@value;
+							if(name2 == "username"){
+								jdbcDBNameTxt.text = value2;
+							}
+							if(name2 == "password"){
+								jdbcDBPwdTxt.text = value2;
+							}
+							if(name2 == "url"){
+								jdbcUrlTxt.text = value2;
+							}
+						}
+					}
+					}
+					
+					dbStack.selectedChild = jdbcVbox;
+				}
+				
+				if(xml != null ){
+					
+					var dps:XML = xml["database-properties"][0];
+					if(dps !=null){
+						
+						for each(var dp:XML in dps["dbref-property"]){
+							
+							var dpName:String = dp.@name;
+							var dpValue:String = dp.@value;
+							
+							if(dpName == "lifecycle"){
+								lifecycleCbb.selectedItem = dpValue;
+							}else if(dpName == "readonly"){
+								readonlyCbb.selectedItem = dpValue;
+							}else if(dpName == "autocommit"){
+								autocommitCbb.selectedItem = dpValue;
+							}else if(dpName == "transaction-isolation"){
+								tranlvlTxt.text = dpValue;
+							}else if(dpName == "catalog"){
+								catalogTxt.text = dpValue;
+							}else if(dpName == "lru-cache"){
+								cacheTxt.text = dpValue;
+							}
+							
+						}
+					}
+				}
+				
+			}
+			
+			private function initData():void{
+				
+				lifeCol.addItem("pooled");
+				lifeCol.addItem("retain");
+				lifecycleCbb.dataProvider = lifeCol;
+				lifecycleCbb.selectedItem = null;
+				
+				
+				booleanCol.addItem("true");
+				booleanCol.addItem("false");
+				
+				readonlyCbb.dataProvider = booleanCol;
+				readonlyCbb.selectedItem =null;
+				
+				autocommitCbb.dataProvider = booleanCol;
+				autocommitCbb.selectedItem =null;
+			}
+
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+
+			private function onClose():void{
+				PopUpManager.removePopUp(this);
+			}
+
+
+			protected function submitBtn_clickHandler(event:MouseEvent):void
+			{
+				var confXML:XML = new XML("<database-reference />");
+				
+				var dbconn:XML = new XML("<database-connection />");
+				
+				var dbp:XML = new XML("<database-properties />");
+				
+				if(dsType=="0"){
+					
+					dbconn.@["context-look-name"] = jndiNameTxt.text;
+					
+					var childXML0:String = "<conn-property name='java.naming.factory.initial' value='"+jndiFactoryTxt.text+"' />" +
+										   "<conn-property name='java.naming.provider.url' value='"+jndiUrlTxt.text+"' />";
+					dbconn.appendChild(new XMLList(childXML0));
+					
+				}else if(dsType=="1"){
+					
+					dbconn.@["class-name"] = dbcpFactoryTxt.text;
+					
+					var childXML1:String = "<conn-property name='username' value='"+dbcpDBNameTxt.text+"' />" +
+										   "<conn-property name='password' value='"+dbcpDBPwdTxt.text+"' />"+
+										   "<conn-property name='driverClassName' value='"+dbcpDriverTxt.text+"' />"+
+										   "<conn-property name='url' value='"+dbcpUrlTxt.text+"' />"+
+										   "<conn-property name='initialSize' value='"+dbcpPoolTxt.text+"' />";
+
+					
+					dbconn.appendChild(new XMLList(childXML1));
+					
+				}else if(dsType=="2"){
+					
+					dbconn.@["driver-name"] = jdbcDriverTxt.text;
+					
+					var childXML2:String = "<conn-property name='username' value='"+jdbcDBNameTxt.text+"' />" +
+										   "<conn-property name='password' value='"+jdbcDBPwdTxt.text+"' />"+
+										   "<conn-property name='url' value='"+jdbcUrlTxt.text+"' />";
+					
+					dbconn.appendChild(new XMLList(childXML2));
+				}
+				
+				if(lifecycleCbb.selectedItem != null ){
+					var lc:String = lifecycleCbb.selectedItem as String;
+					dbp.appendChild(new XMLList("<dbref-property name='lifecycle' value='"+lc+"' />"));
+				}
+				if(readonlyCbb.selectedItem != null){
+					var rc:String = readonlyCbb.selectedItem as String;
+					dbp.appendChild(new XMLList("<dbref-property name='readonly' value='"+rc+"' />"));
+				}
+				if(autocommitCbb.selectedItem != null){
+					var ac:String = autocommitCbb.selectedItem as String;
+					dbp.appendChild(new XMLList("<dbref-property name='autocommit' value='"+ac+"' />"));
+				}
+				if(tranlvlTxt.text != null){
+					dbp.appendChild(new XMLList("<dbref-property name='transaction-isolation' value='"+tranlvlTxt.text+"' />"));
+				}
+				if(catalogTxt.text != null){
+					dbp.appendChild(new XMLList("<dbref-property name='catalog' value='"+catalogTxt.text+"' />"));
+				}
+				if(cacheTxt.text != null){
+					dbp.appendChild(new XMLList("<dbref-property name='lru-cache' value='"+cacheTxt.text+"' />"));
+				}
+				
+				confXML.appendChild(dbconn);
+				confXML.appendChild(dbp);
+				
+				var dataValue:Object = bcp.getDataValue();
+				var confContent:String = confXML.toString();
+				dataValue["CONFIGURATION"] = confContent;
+				bcp.setDataValue(dataValue);
+				
+				onClose();
+				
+			}
+
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		
+		<mx:TabNavigator width="100%" height="100%" creationPolicy="all">
+		
+		<mx:ViewStack width="100%" height="100%" id="dbStack" creationPolicy="all" label="必填属性">
+			
+			<mx:VBox width="100%" id="jndiVbox"  height="100%" paddingRight="5" >
+				<mx:HBox width="100%" >
+					<mx:Label text="JNDI名称:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="jndiNameTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="JNDI工厂类:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="jndiFactoryTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="JNDI地址:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="jndiUrlTxt" width="100%"/>
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:VBox width="100%"  id="dbcpVbox" height="100%" paddingRight="5">
+				<mx:HBox width="100%" >
+					<mx:Label text="DBCP工厂类:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="dbcpFactoryTxt" width="100%" toolTip="建议使用apache的 org.apache.commons.dbcp.BasicDataSourceFactory,需要引入apache DBCP jar包"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="数据库用户:" width="100"/><mx:Label text="*" width="20" color="red" /><mx:TextInput id="dbcpDBNameTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="数据库密码:" width="100"/><mx:Label text="*" width="20" color="red" /><mx:TextInput id="dbcpDBPwdTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="驱动名称:" width="100"/><mx:Label text="*" width="20" color="red" /><mx:TextInput id="dbcpDriverTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="数据库URL:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="dbcpUrlTxt" width="100%" toolTip="提示:URL中的数据库用户名和密码须要与上述数据库用户名和密码填写一致!"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="连接池大小:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="dbcpPoolTxt" restrict="\-,0-9" width="100%"/>
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:VBox width="100%" id="jdbcVbox"  height="100%" paddingRight="5" >
+				<mx:HBox width="100%" >
+					<mx:Label text="驱动名称:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="jdbcDriverTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="数据库用户:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="jdbcDBNameTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="数据库密码:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="jdbcDBPwdTxt" width="100%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="数据库URL:" width="100" /><mx:Label text="*" width="20" color="red" /><mx:TextInput id="jdbcUrlTxt" width="100%" toolTip="提示:URL中的数据库用户名和密码须要与上述数据库用户名和密码填写一致!"/>
+				</mx:HBox>
+			</mx:VBox>
+			
+		</mx:ViewStack>
+		
+		<mx:VBox id="popVbox" height="100%" width="100%" label="可选属性" paddingRight="5" >
+			<mx:HBox width="100%" >
+				<mx:Label text="生命周期:" width="100" /><mx:ComboBox id="lifecycleCbb"  width="100%"/>
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label text="是否只读:" width="100" /><mx:ComboBox id="readonlyCbb"  width="100%"/>
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label text="是否自动提交:" width="100" /><mx:ComboBox id="autocommitCbb"  width="100%"/>
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label text="事务级别:" width="100" /><mx:TextInput id="tranlvlTxt" restrict="\-,0-9" width="100%"/>
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label text="目录:" width="100" /><mx:TextInput id="catalogTxt" width="100%"/>
+			</mx:HBox>
+			<mx:HBox width="100%" >
+				<mx:Label text="缓存:" width="100" /><mx:TextInput id="cacheTxt" restrict="\-,0-9" width="100%"/>
+			</mx:HBox>
+		</mx:VBox>
+	
+		</mx:TabNavigator>
+		
+		<mx:HBox id="buttonsHbox" width="100%" horizontalAlign="center">
+			<mx:Button id="submitBtn" label="确定" click="submitBtn_clickHandler(event)"/>
+			<mx:Button id="cancelBtn" label="取消" click="onClose()"/>
+		</mx:HBox>
+	</mx:VBox>
+	
+</SuperPanel>

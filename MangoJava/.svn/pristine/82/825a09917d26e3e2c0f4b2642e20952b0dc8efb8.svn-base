@@ -1,0 +1,667 @@
+package smartx.framework.common.bs;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.io.Reader;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Method;
+import java.net.InetAddress;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Vector;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+
+import org.apache.commons.pool.impl.GenericObjectPool;
+import org.jdom.Document;
+import org.jdom.Element;
+
+import smartx.framework.common.bs.dbaccess.dsmgr.DataSourceManager;
+import smartx.framework.common.job.bs.JobServer;
+import smartx.framework.common.utils.FileUtil;
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.metadata.bs.DBExplainerCache;
+import smartx.framework.metadata.bs.NovaAppModuleConfigIFC;
+import smartx.framework.metadata.bs.NovaServerEnvironment;
+import smartx.publics.file.TempFileDelService;
+
+
+/**
+ * 该类是平台启动类,该类声名为final类型是为了保证该类所有方法不被覆盖,项目初始化的逻辑只要重写一个BootServlet就可以了
+ * @author xch
+ *
+ */
+public final class BootServlet extends HttpServlet {
+
+    private static final long serialVersionUID = 2565224486025176567L;
+
+    public static String sysDefaultUserName;
+    public static String sysDefaultUserPwd;
+    public static String sysDefaultUserAdminPwd;
+
+    public BootServlet() {
+    }
+
+    /**
+     * 初始化数据库连接
+     */
+    public void init() throws ServletException {
+    	long ll_1 = System.currentTimeMillis();
+    	
+        //     或者通过ant打包时生成分支、标签和日期的properties文件。
+    	Sys.systemOutInfo();
+        
+        System.out.println("☆开始执行初始化启动程序[" + this.getClass().getName() + "]......"); //
+
+        //系统属性,用来判断当前虚拟机是客户端还是服务器端
+        System.setProperty("JVMSITE", "SERVER");  
+    	
+        //获得应用系统物理路径
+        String sysRootPath = this.getServletConfig().getServletContext().getRealPath("/").replace('\\', '/');
+        sysRootPath = sysRootPath.replace('\\', '/');
+        if(!sysRootPath.endsWith("/")){
+        	sysRootPath=sysRootPath+"/";
+        }
+        //FIXME 以后系统内所有使用System保存交互信息的方法都需要修改成为使用Sys
+        //TODO 需要在系统全局规划中给出在Sys类中的系统缓冲规划    NOVA2_SYS_ROOTPATH：应用系统物理路径：String
+        Sys.putInfo("NOVA2_SYS_ROOTPATH", sysRootPath);
+        NovaServerEnvironment.getInstance().put("NOVA2_SYS_ROOTPATH","系统根目录", sysRootPath);
+        System.setProperty("NOVA2_SYS_ROOTPATH", sysRootPath);
+		System.out.println("☆ 应用系统根路径[NOVA2_SYS_ROOTPATH]="+sysRootPath); //
+        
+		String str_confileFileName = this.getServletConfig().getInitParameter("configfile"); //
+        if (str_confileFileName == null) {str_confileFileName = SysConst.SmartXConfig; }
+        String str_filePath = sysRootPath + "WEB-INF/" + str_confileFileName; //
+        File file = new File(str_filePath);
+        if(!file.exists()){
+        	System.out.println("没有找到配置文件:"+str_confileFileName);
+        	str_filePath = sysRootPath + "WEB-INF/Nova2Config.xml";
+        }
+        Reader reader = null;
+		try {
+			reader = new InputStreamReader(new FileInputStream(new File(str_filePath)),"UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		Document doc=Sys.loadXML(reader);  
+        if(doc==null){
+        	System.err.println("☆由于没有获得系统配置信息，系统启动失败退出。");
+        	System.err.println("***********************系统退出************************");
+        	System.exit(0);
+        }
+        NovaServerEnvironment.getInstance().put(SysConst.KEY_SYSTEMCONFIGFILE,"系统配置文件内容", doc);
+        try {
+        	
+        	//初始化日志
+        	System.out.println("初始化日志开始...");
+            initLog4j(doc);
+            
+            // 初始化一些最基本的参数
+            NovaLogger.getLogger(this).debug("初始化系统参数...");
+            try {
+                initSomePars(doc,sysRootPath); //
+            } catch (Throwable tr) {
+                tr.printStackTrace(); //
+            }
+            NovaLogger.getLogger(this).debug("初始化系统参数。");
+            
+            //初始化系统启动时间标记戳，本时间戳每次启动都会不同，用以区分每次服务的启动。
+            //  后面的日志初始化将会用到本时间戳，在集群环境下可以区分到底是哪一个服务器的日志。
+            //  初始化参数后，判断当前是否集群环境，是则获取集群版本标识串，作为系统的启动时间戳。
+            initDeployVersion();
+            
+            
+            
+            
+            // 初始化数据库连接池..
+            NovaLogger.getLogger(this).debug("初始化数据库连接池...");
+            try {
+                initDataBasePool(doc);
+            } catch (Throwable tr) {
+            	NovaLogger.getLogger(this).error("", tr);
+            }
+            NovaLogger.getLogger(this).debug("初始化数据库连接池。");
+            
+            //初始化远程调用服务
+            try {
+				initServicePool(doc);
+			} catch (Exception e) {
+				NovaLogger.getLogger(this).error("", e);
+			}
+           
+            
+            //处理系统定时任务
+            String tmp=(String)Sys.getInfo("JOB_SERVICE");            
+            if(tmp!=null&&tmp.toLowerCase().equals("true")){
+            	initJobServer();//初始化JobServer
+            }
+            
+          	//启动文件清理进程
+            tmp = (String)Sys.getInfo("DELETE_TEMPFILE");
+            if(tmp!=null&&tmp.toLowerCase().equals("true")){
+            	TempFileDelService t = new TempFileDelService();
+            	t.startThread();
+            }
+            
+            // 清理用户在线状态
+            String runmode=(String)NovaServerEnvironment.getInstance().get("SERVER_RUNMODE");
+            if(runmode==null || runmode.equalsIgnoreCase("normal")){
+	            NovaLogger.getLogger(this).debug("清理用户在线状态...");
+	            try {
+	                Object loginService;
+	                GenericObjectPool pool = NovaServicePoolFactory.getInstance().getPool(
+	                    "smartx.system.login.ui.SystemLoginServiceIFC"); //取得池
+	                if (pool != null) {
+	                    loginService = pool.borrowObject(); //从池中得到实例!!!!
+	                } else {
+	                    loginService = Class.forName("smartx.system.login.bs.SystemLoginServiceImpl").newInstance();
+	                }
+	                if (loginService != null) {
+	                    Method method = loginService.getClass().getMethod("initUserOnlineStatus", null);
+	                    method.invoke(loginService, null);
+	                }
+	            } catch (Throwable ex) {
+	                NovaLogger.getLogger(this).error("清理用户在线状态发生错误",ex);
+	            }
+	            NovaLogger.getLogger(this).debug("清理用户在线状态。");
+            }
+            
+            NovaInitContext initContext = new NovaInitContext();
+            commitTrans(initContext);
+
+            try {
+                initSecondProjectBoot(doc);
+            } catch (Throwable ex) {
+                ex.printStackTrace();
+            }
+
+          
+            commitTrans(initContext); //提交事务!各项初始化都是吃掉异常的,即各步初始化互相独立,不参与一次事务回滚,所以这里永远是提交!!
+            closeConn(initContext); //关闭连接!
+            releaseContext(initContext); //释放资源
+
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+        } finally {
+            long ll_2 = System.currentTimeMillis();
+           System.out.println("\n☆执行初始化启动程序[" + this.getClass().getName() + "]结束,总共耗时[" + (ll_2 - ll_1) + "]\n"); //
+        }
+
+    }
+
+    private void initSomePars(Document doc,String sysRootPath) {
+        if (doc == null) {
+            return;
+        }
+
+        long ll_1 = System.currentTimeMillis();
+        String str_key = "WebAppRealPath";
+        //TODO 需要在系统全局规划中给出在Sys类中的系统缓冲规划    WebAppRealPath：应用系统物理路径：String
+        Sys.putInfo(str_key, sysRootPath);
+        NovaServerEnvironment.getInstance().put(str_key, "本应用的绝对地址", sysRootPath); //
+        NovaLogger.getLogger(this).debug("[" + str_key + "] = [" + sysRootPath + "]");
+          
+
+        try {
+            java.util.List initparams = doc.getRootElement().getChildren("init-param");
+            if (initparams != null) {
+                for (int i = 0; i < initparams.size(); i++) {
+                    if (initparams.get(i) instanceof org.jdom.Element) {
+                        org.jdom.Element param = (org.jdom.Element) initparams.get(i);
+                        if (param != null) {
+                            str_key = param.getAttributeValue("key");
+                            String str_value = param.getAttributeValue("value");
+                            String str_descr = param.getAttributeValue("descr");                            
+                            NovaLogger.getLogger(this).debug("配置参数："+str_key+" 取值："+str_value+" 解释："+str_descr);                            
+                            //TODO 需要在系统全局规划中给出在Sys类中的系统缓冲规划    str_key：str_descr：str_value
+                            Sys.putInfo(str_key, str_value);
+                            NovaServerEnvironment.getInstance().put(str_key, str_descr, str_value); // 往缓存中送入...
+                            
+                            NovaLogger.getLogger(this).debug("[" + str_key + "] = [" + str_value + "]");
+                        }
+                    }
+                }
+                //专门处理一下AppModule
+                String str_value=(String)Sys.getInfo("APPMODULE");
+                if(str_value!=null) {//old "AppModule"
+                    try {
+                    	String tmp = ((NovaAppModuleConfigIFC)Class.forName(str_value.trim()).newInstance()).getAppModuleName();
+                    	NovaServerEnvironment.getInstance().setAppModuleName(new String[]{tmp});
+                    	Sys.putInfo("APPMODULE",tmp);
+                    	NovaLogger.getLogger(this).debug("获得模块名称："+tmp);
+                    } catch (Exception ex) {
+                    	NovaLogger.getLogger(this).debug("获得模块名称："+str_value);                        
+                    }
+                }
+                
+            }
+            //2.secondprojectclient
+            org.jdom.Element secondProjectClient = doc.getRootElement().getChild("secondprojectclient");
+            if (secondProjectClient != null) {
+                Vector initClients = new Vector();
+                java.util.List sources = secondProjectClient.getChildren(); // 得到所有子结点!!
+                for (int i = 0; i < sources.size(); i++) { // 遍历所有子结点!!
+                    if (sources.get(i) instanceof org.jdom.Element) { //
+                        org.jdom.Element node = (org.jdom.Element) sources.get(i); //
+                        initClients.add(node.getText()); // 得到属性
+                    }
+                }
+                NovaServerEnvironment.getInstance().put("CLIENTINIT", initClients); // 往缓存中送入...
+            }
+            //3.secondprojectafterlogin
+            org.jdom.Element secondProjectAfterLogin = doc.getRootElement().getChild("secondprojectafterlogin");
+            if(secondProjectAfterLogin!=null){
+            	Vector initClients = new Vector();
+                java.util.List sources = secondProjectAfterLogin.getChildren(); // 得到所有子结点!!
+                for (int i = 0; i < sources.size(); i++) { // 遍历所有子结点!!
+                    if (sources.get(i) instanceof org.jdom.Element) { //
+                        org.jdom.Element node = (org.jdom.Element) sources.get(i); //
+                        initClients.add(node.getText()); // 得到属性
+                    }
+                }
+                NovaServerEnvironment.getInstance().put("CLIENTAFTERLOGIN", initClients); // 往缓存中送入...
+            }
+            
+            //4.secondprojectpanelclient
+            org.jdom.Element secondProjectClientPanelInit = doc.getRootElement().getChild("secondprojectpanelclient");
+            if (secondProjectClientPanelInit != null) {
+                Vector initPanelClients = new Vector();
+                java.util.List sources = secondProjectClientPanelInit.getChildren(); // 得到所有子结点!!
+                for (int i = 0; i < sources.size(); i++) { // 遍历所有子结点!!
+                    if (sources.get(i) instanceof org.jdom.Element) { //
+                        org.jdom.Element node = (org.jdom.Element) sources.get(i); //
+                        initPanelClients.add(node.getText()); // 得到属性
+                    }
+                }
+                NovaServerEnvironment.getInstance().put("CLIENTPANELINIT", initPanelClients); // 往缓存中送入...
+            }
+            
+            //5.secondprojectbeforelogout
+            org.jdom.Element secondProjectClientBeforeLogout = doc.getRootElement().getChild("secondprojectbeforelogout");
+            if (secondProjectClientBeforeLogout != null) {
+                Vector initPanelClients = new Vector();
+                java.util.List sources = secondProjectClientBeforeLogout.getChildren(); // 得到所有子结点!!
+                for (int i = 0; i < sources.size(); i++) { // 遍历所有子结点!!
+                    if (sources.get(i) instanceof org.jdom.Element) { //
+                        org.jdom.Element node = (org.jdom.Element) sources.get(i); //
+                        initPanelClients.add(node.getText()); // 得到属性
+                    }
+                }
+                NovaServerEnvironment.getInstance().put("CLIENTBEFORELOGOUT", initPanelClients); // 往缓存中送入...
+            }
+
+            
+            
+            
+            
+            org.jdom.Element defaultUser = doc.getRootElement().getChild("default-user");
+            if (defaultUser != null) {
+                BootServlet.sysDefaultUserName = defaultUser.getAttributeValue("name") != null ?
+                    defaultUser.getAttributeValue("name") : "";
+                    BootServlet.sysDefaultUserPwd = defaultUser.getAttributeValue("pwd") != null ?
+                    defaultUser.getAttributeValue("pwd") : "";
+                    BootServlet.sysDefaultUserAdminPwd = defaultUser.getAttributeValue("adminpwd") != null ?
+                    defaultUser.getAttributeValue("adminpwd") : "";
+            }
+
+            long ll_2 = System.currentTimeMillis();
+            NovaLogger.getLogger(this).debug("初始化基本参数结束,耗时[" + (ll_2 - ll_1) + "]");
+        } catch (Throwable tr) {
+            tr.printStackTrace();
+        }
+
+    }
+
+    /**
+     * 初始化数据库连接
+     *
+     */
+    public void initDataBasePool(Document doc) {
+        if (doc == null) {
+            return;
+        }
+
+        long ll_1 = System.currentTimeMillis();
+        NovaLogger.getLogger(this).debug("开始初始化数据库连接池...");
+        Element datasources = doc.getRootElement().getChild("datasources"); // 得到datasources子结点!!
+        if (datasources != null) {
+            List sources = datasources.getChildren("datasource"); // 得到所有子结点!!
+            DataSourceManager.initDS(sources);
+            
+            //服务器端设置变量
+            NovaServerEnvironment.getInstance().put("defaultdatasource", DataSourceManager.getDefaultDS()); // 设置默认数据源!!
+            String[] keys=DataSourceManager.getDataSources();
+            NovaServerEnvironment.getInstance().put("ALLDATASOURCENAMES",keys );
+            for(int i=0;i<keys.length;i++){
+                NovaServerEnvironment.getInstance().put(keys[i],DataSourceManager.getDataSourceUrl(keys[i]) ); //
+            }
+        }
+        long ll_2 = System.currentTimeMillis();
+        NovaLogger.getLogger(this).debug("初始化数据库连接池结束,耗时[" + (ll_2 - ll_1) + "]");
+    }
+
+    /**
+     * 初始化服务池
+     *
+     */
+    public void initServicePool(Document doc) {
+        if (doc == null) {
+            return;
+        }
+
+        long ll_1 = System.currentTimeMillis();
+        NovaLogger.getLogger(this).debug("开始初始化应用服务实例池...");
+        org.jdom.Element datasources = doc.getRootElement().getChild("moduleservices"); // 得到moduleservices子结点!!
+        if (datasources != null) {
+            java.util.List sources = datasources.getChildren(); // 得到所有子结点!!
+            for (int i = 0; i < sources.size(); i++) { // 遍历所有子结点!!
+                if (sources.get(i) instanceof org.jdom.Element) { //
+                    org.jdom.Element node = (org.jdom.Element) sources.get(i); //
+                    String str_servicename = node.getAttributeValue("name"); // 得到服务接口类的类名属性 //TODO 需要在配置Nova2Config说明中增加
+                    String str_shortname = node.getAttributeValue("shortname"); // 得到服务接口名称属性 //TODO 需要在配置Nova2Config说明中增加                   
+                    String str_implclass = node.getChild("implclass").getText(); //
+                    String str_initsize = node.getChild("initsize").getText(); //
+                    String str_maxsize = node.getChild("poolsize").getText(); //
+
+                    int li_initsize = Integer.parseInt(str_initsize); //
+                    int li_maxsize = Integer.parseInt(str_maxsize); //
+
+                    NovaServicePoolableObjectFactory factory = new NovaServicePoolableObjectFactory(str_servicename,str_implclass);
+                    GenericObjectPool pool = new GenericObjectPool(factory, li_maxsize); // 创建对象池,最多100个实例!!!
+                    try {
+                        for (int j = 0; j < li_initsize; j++) { // 先创建3个实例!!
+                            pool.addObject(); // 先创建一个实例
+                        }
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+
+                    NovaServicePoolFactory.getInstance().registPool(str_servicename, str_implclass, pool); // 注册一个池!!
+                    
+                    //TODO 需要在系统全局规划中给出在Sys类中的系统缓冲规划    SYS_SERVICE_MAP：系统服务注册信息：HashMap
+                    //服务注册到系统缓冲中，用于快速查找
+                    str_shortname=(str_shortname==null||str_shortname.trim().equals(""))
+                                  ?str_servicename.substring(str_servicename.lastIndexOf(".")+1)
+                                  :str_shortname.trim();
+                    HashMap smap=(HashMap)Sys.getInfo("SYS_SERVICE_MAP");
+                    if(smap==null){smap=new HashMap();}
+                    if(smap.containsKey(str_shortname)){
+                    	NovaLogger.getLogger(this).debug("存在同简称服务，前面的服务简称注册将被覆盖【全称不受影响】。");
+                    }
+                    smap.put(str_shortname, str_servicename);//用简称注册
+                    smap.put(str_servicename, str_servicename);//用全称注册
+                    Sys.putInfo("SYS_SERVICE_MAP", smap);
+                    // System.out.println("创建服务池[" + str_servicename + "][" +
+                    // str_implclass + "]"); //
+                }
+            }
+        }
+
+        long ll_2 = System.currentTimeMillis();
+        NovaLogger.getLogger(this).debug("初始化应用服务实例池结束,耗时[" + (ll_2 - ll_1) + "]");
+    }
+
+    
+    /**
+     * 初始化系统启动版本控制
+     * 根据设计：
+     * 1、客户端根据服务器端的启动版本决定是否重新缓冲类包
+     * 实现逻辑：
+     * 1、判断是否存在集群控制 CLUSTER_MODE、CLUSTER_VERSION
+     * 2、判断是否存在发布版本 DEPLOY_VERSION
+     * 3、根据前面判断决定是否直接启用启动时间戳 LAST_STARTTIME
+     */
+    public void initDeployVersion() {
+    	//判断是否集群模式
+        String CLUSTER_MODE=(String)Sys.getInfo("CLUSTER_MODE");
+        if(CLUSTER_MODE!=null&&CLUSTER_MODE.equalsIgnoreCase("true")){
+        	NovaLogger.getLogger(this).info("本系统启用了集群模式！");
+        	//TODO 虚拟服务名处理，将来留用
+        	String CLUSTER_NAME=(String)Sys.getInfo("CLUSTER_NAME");            	
+        	String CLUSTER_VERSION=(String)Sys.getInfo("CLUSTER_VERSION");
+        	Sys.putInfo("CLUSTER_NAME", CLUSTER_NAME);
+        	Sys.putInfo("LAST_STARTTIME", CLUSTER_VERSION);
+            NovaServerEnvironment.getInstance().put("LAST_STARTTIME", "系统发布版本（集群版本、发布版本或启动时间戳）", CLUSTER_VERSION); //
+        }else{
+        	//不是集群模式，需要判断是否设置了发布版本
+        	NovaLogger.getLogger(this).info("本系统没有启用集群模式！");
+        	String DEPLOY_VERSION=(String)Sys.getInfo("DEPLOY_VERSION");
+	    	if(DEPLOY_VERSION==null||DEPLOY_VERSION.equals("")){
+	    		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+	            String timestamp = sdf.format(new Date());
+	            NovaLogger.getLogger(this).info("本系统没有设置发布版本号【默认时间戳："+timestamp+"】！");
+	            Sys.putInfo("LAST_STARTTIME", timestamp);
+	            NovaServerEnvironment.getInstance().put("LAST_STARTTIME", "系统发布版本（集群版本、发布版本或启动时间戳）", timestamp); //            
+	    	}else{
+	    		NovaLogger.getLogger(this).info("本系统设置了发布版本号【"+DEPLOY_VERSION+"】！");
+	    		Sys.putInfo("LAST_STARTTIME", DEPLOY_VERSION);
+	            NovaServerEnvironment.getInstance().put("LAST_STARTTIME", "系统发布版本（集群版本、发布版本或启动时间戳）", DEPLOY_VERSION); //
+	    	}
+        }
+    }
+    /**
+     * 初始化NovaLogger
+     * 
+     */
+    private void initLog4j(Document doc){
+    	//得到log4j子结点!!
+    	org.jdom.Element log4j = doc.getRootElement().getChild("log4j"); 
+    	if(log4j==null){
+    		System.err.println("***************配置文件中未设置日志配置***************\n配置示例：\n<log4j>\n"+"\t<level>debug</level>\n\t<outputtype>3</outputtype>\n\t<clspath>smartx</clspath>\n</log4j>\n");
+    		System.err.println("***********************系统退出************************");
+    		System.exit(1);
+    	}
+    	//日志路径
+    	String logpath = (log4j.getChild("logpath")==null)
+    			            ?(String)Sys.getInfo("NOVA2_SYS_ROOTPATH")
+    			            :log4j.getChildText("logpath");    			            
+	    SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmssSSS");
+	    String LAST_STARTTIME = sdf.format(new Date());
+	    logpath=(logpath + "/"+ LAST_STARTTIME).replaceAll("//", "/");
+	    Sys.putInfo("LOG_PATH", logpath);
+	    
+		String level = log4j.getChildText("level");
+    	String outputtype = log4j.getChildText("outputtype");
+    	String clspath = log4j.getChildText("clspath");
+    	clspath=(clspath==null)?"smartx":clspath;
+    	
+    	Sys.putInfo("LOG_SETTING", level+","+outputtype+","+clspath);
+    	NovaServerEnvironment.getInstance().put("LOG_SETTING", level+","+outputtype+","+clspath);
+    	
+    	NovaLogger.getLogger(this).debug("初始化日志结束.");
+    }
+
+    /**
+     * 初始化群集信息
+     *
+     */
+    private void initClusterInfo() {
+        try {
+            long ll_1 = System.currentTimeMillis();
+            NovaLogger.getLogger(this).debug("开始初始化集群信息...");
+            String str_StartModel = System.getProperty("StartModel"); //
+            if (str_StartModel != null && str_StartModel.equals("CLUSTER")) { //集群模式启动
+                NovaLogger.getLogger(this).debug("集群模式启动,加入该WebServer的信息");
+                String str_StartSerial = System.getProperty("StartSerial");
+                String str_StartLevel = System.getProperty("StartLevel");
+                if (str_StartSerial != null && str_StartSerial.equals("1") && str_StartLevel != null &&
+                    str_StartLevel.equals("MASTER")) {
+                    NovaLogger.getLogger(this).debug("启动序号[" + str_StartSerial + "],主从模式[" + str_StartLevel + "](唯一访问入口)");
+                } else {
+                    NovaLogger.getLogger(this).debug("启动序号[" + str_StartSerial + "],主从模式[" + str_StartLevel + "]"); //
+                }
+
+                String str_ip = System.getProperty("ClusterIP_ForClientCall");
+                if (str_ip == null || str_ip.trim().equals("")) {
+                    str_ip = InetAddress.getLocalHost().getHostAddress();
+                    if (str_ip != null) {
+                        System.setProperty("ClusterIP_ForClientCall", str_ip); //设置IP
+                    }
+                }
+
+                String str_port = System.getProperty("TomcatPort");
+                NovaLogger.getLogger(this).debug("TomCat监听地址:[" + str_ip + "],端口[" + str_port + "]");
+
+                if (str_port == null) {
+                    throw new Exception("定义成集群模式启动,但没有定义TomcatPort参数!");
+                }
+
+                String str_sql_delete = "delete from pub_clusterhost where ip='" + str_ip + "' and port='" + str_port +
+                    "'";
+                String str_sql_insert = "insert into pub_clusterhost (ip,port,count) values('" + str_ip + "','" +
+                    str_port + "',0)";
+
+                try {
+                    CommDMO commDMO = new CommDMO();
+                    commDMO.executeBatchByDS(null, new String[] {str_sql_delete, str_sql_insert});
+                    long ll_2 = System.currentTimeMillis();
+                    NovaLogger.getLogger(this).debug("初始化群集信息结束,耗时[" + (ll_2 - ll_1) + "]");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } //
+
+            } else {
+                try {
+                    CommDMO commDMO = new CommDMO();
+                    commDMO.executeUpdateByDS(null, "delete from pub_clusterhost");
+                    long ll_2 = System.currentTimeMillis();
+                    NovaLogger.getLogger(this).debug("正常(非集群)模式启动,成功删除已有的所有集群信息,耗时[" + (ll_2 - ll_1) + "]");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } //
+            }
+        } catch (Exception e1) {
+            e1.printStackTrace();
+        }
+    }
+    
+    /**
+     * 二次开发项目启动信息
+     * @param doc
+     */
+    private void initSecondProjectBoot(Document doc) {
+        if (doc == null) {
+            return;
+        }
+
+        long ll_1 = System.currentTimeMillis();
+        NovaLogger.getLogger(this).debug("开始初始化二次开发项目Boot启动类...");
+        org.jdom.Element datasources = doc.getRootElement().getChild("secondprojectboot"); // 得到datasources子结点!!
+        String[] str_bootclass = null;
+        if (datasources != null) {
+            if (datasources != null) {
+                java.util.List sources = datasources.getChildren(); // 得到所有子结点!!
+                str_bootclass = new String[sources.size()];
+                for (int i = 0; i < sources.size(); i++) { // 遍历所有子结点!!
+                    if (sources.get(i) instanceof org.jdom.Element) { //
+                        org.jdom.Element node = (org.jdom.Element) sources.get(i); //
+                        str_bootclass[i] = node.getText(); // 得到属性
+                    }
+                }
+            }
+
+            for (int i = 0; i < str_bootclass.length; i++) {
+                if (str_bootclass[i] != null && !str_bootclass[i].trim().equals("")) {
+                    try {
+                        NovaLogger.getLogger(this).debug("开始创建二次开发项目启动类:[" + str_bootclass[i] + "].."); //
+                        Class.forName(str_bootclass[i].trim()).newInstance(); //
+                    } catch (Throwable e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        long ll_2 = System.currentTimeMillis();
+        NovaLogger.getLogger(this).debug("初始化二次开发项目Boot启动类结束,耗时[" + (ll_2 - ll_1) + "]");
+    }
+
+    /**
+     * 提交所有事务
+     * @param _initContext
+     */
+    private void commitTrans(NovaInitContext _initContext) {
+        //NovaLogger.getLogger(this).debug("提交该次远程访问所有事务!"); //
+        if (_initContext.isGetConn()) {
+            NovaDBConnection[] conns = _initContext.GetAllConns();
+            for (int i = 0; i < conns.length; i++) {
+                try {
+                    conns[i].transCommit();
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void rollbackTrans(NovaInitContext _initContext) {
+        //NovaLogger.getLogger(this).debug("回滚该次远程访问所有事务!"); //
+        if (_initContext.isGetConn()) {
+            NovaDBConnection[] conns = _initContext.GetAllConns();
+            for (int i = 0; i < conns.length; i++) {
+                try {
+                    conns[i].transRollback();
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void closeConn(NovaInitContext _initContext) {
+        //NovaLogger.getLogger(this).debug("关闭该次远程访问所有事务!"); //
+        if (_initContext.isGetConn()) {
+            NovaDBConnection[] conns = _initContext.GetAllConns();
+            for (int i = 0; i < conns.length; i++) {
+                try {
+                    conns[i].close(); //关闭指定数据源连接
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void releaseContext(NovaInitContext _initContext) {
+        //NovaLogger.getLogger(this).debug("释放该次远程访问所有资源!"); //
+        try {
+            _initContext.release(); //释放所有资源!!
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+        }
+    }
+    
+    
+    // TODO 以后要结合配置文件NOVA2CONFIG.XML文件，把所有的服务都移出去，保持主控启动类的封闭性。
+    private void initJobServer(){
+    	NovaLogger.getLogger(this).debug("初始化JobServer");
+    	JobServer.start();
+    	NovaLogger.getLogger(this).debug("初始化JobServer完成");
+    }
+  //关闭任务管理器
+    private void stopJobServer(){
+    	NovaLogger.getLogger(this).debug("终止JobServer");
+    	String force=System.getProperty("JOB_FORCE");
+    	boolean forced=(force!=null&&force.equalsIgnoreCase("true"));    	
+    	JobServer.stop(forced);
+    	NovaLogger.getLogger(this).debug("终止JobServer完成");
+    }
+
+	public void destroy(){
+		stopJobServer();
+		DataSourceManager.destroy();
+		super.destroy();
+	}
+
+}

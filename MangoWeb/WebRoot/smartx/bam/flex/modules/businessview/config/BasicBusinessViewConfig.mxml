@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<nbvc:BusinessViewConfig xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="net.brandonmeyer.containers.*" 
+					   xmlns:nbvc="smartx.bam.flex.modules.businessview.config.*" 
+					   layout="vertical" width="800" height="500"
+					   allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true"
+					   title="基本视图配置">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ListEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			override protected function init():void{
+				super.init();
+				if(!mainbox.contains(winHbox))
+					mainbox.addChild(winHbox);
+				if(contentXml == null){
+					contentXml = <basicBvDesign>
+									<schema />
+								 </basicBvDesign>;
+				}else
+					xmlConvertToProperty();
+			}
+			
+			override protected function setUniqueLabelField():void{
+				uniqueLabelField = "aliasName";
+			}
+			
+			private function addBusinessViewField():void{
+				var dgData:Object = new Object();
+				dgData.aliasName = getNewName("aliasName");
+				dgData.fieldName = getNewName("fieldName");
+				dgData.groupbyField = "false";
+				dataProvider.addItem(dgData);
+			}
+			
+			private function getNewName(fieldName:String):String{
+				var i:int=1;
+				while(true){
+					var name:String = fieldName+i;
+					if(isNameExists(name,fieldName)){					
+						i++;
+						continue;
+					}
+					return name;
+				}
+				return null;
+			}
+			
+			private function isNameExists(name:String,fieldName:String):Boolean{
+				for each(var data:Object in dataProvider){
+					if(data[fieldName] == name)
+						return true;
+				}
+				return false;
+			}
+			
+			private function delBusinessViewField():void{
+				var datas:Array = dataGrid.selectedItems;
+				for each(var data:Object in datas){
+					dataProvider.removeItemAt(dataProvider.getItemIndex(data));
+				}
+			}
+			
+			private function getHeaderEpl():String{
+				var headerEpl:String = "module "+PREFIX_MODULE.concat(bvCode).concat(";\n");
+				return headerEpl;
+			}
+			
+			private function getBodyEpl():String{
+				var bodyEpl:String = "\n";
+				var createSchema:String = "create schema ".concat(eventName).concat(" as(");
+				var groupbyFlag:Boolean = false;
+				for(var i:Number=0;i<dataProvider.length;i++){
+					var data:Object = dataProvider.getItemAt(i);
+					var aliasName:String = data.aliasName;
+					var fieldName:String = data.fieldName;
+					var fieldType:String  =data.fieldType;
+					if(i==dataProvider.length-1)
+						createSchema = createSchema.concat(aliasName).concat(" ").concat(fieldType).concat(");\n");
+					else
+						createSchema = createSchema.concat(aliasName).concat(" ").concat(fieldType).concat(",");
+				}
+				bodyEpl = bodyEpl.concat(createSchema);
+				return bodyEpl;
+			}
+			
+			override public function getEpl():String{
+				var epl:String = getHeaderEpl().concat(getBodyEpl());
+				if(isKeepBvChx.selected)
+					epl = epl.concat(getWindowEpl());
+				return epl;
+			}
+			
+			override protected function propertyConvertToXml():void{
+				clearContentXml();
+				if(isKeepBvChx.selected){
+					contentXml.schema.@isSave = "true";
+					contentXml.schema.@value = windowTypeCbo.selectedItem["data"]=="unique"?uniqueCbo.selectedItem[uniqueLabelField]:windowParamTxt.text;
+					contentXml.schema.@unit = windowTypeCbo.selectedItem["data"];
+				}
+				else
+					contentXml.schema.@isSave = "false";
+				for each(var data:Object in dataProvider){
+					var field:XML = <field />;
+					field.@alias = data["aliasName"];
+					field.@name = data["fieldName"];
+					field.@type = data["fieldType"];
+					contentXml.schema.appendChild(field);
+				}
+			}
+			
+			private function xmlConvertToProperty():void{
+				for each(var field:XML in contentXml.schema.field){
+					var data:Object = {aliasName:field.@alias,fieldName:field.@name,fieldType:field.@type};
+					dataProvider.addItem(data);
+				}
+				
+				setWindow();
+			}
+			
+			private function clearContentXml():void{
+				delete contentXml.schema.*;
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:VBox id="mainbox" width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="可从工作集拖动字段" />
+					<mx:HBox width="100%" horizontalAlign="right">
+						<mx:Button icon="{AssetsFileLib.addIcon}" toolTip="添加字段" label="添加字段" 
+								   click="addBusinessViewField()"/>
+						<mx:Button icon="{AssetsFileLib.minuseIcon}" toolTip="删除字段" label="删除字段" 
+								   click="delBusinessViewField()"/>
+					</mx:HBox>
+				</mx:HBox>
+				<mx:DataGrid id="dataGrid" width="100%" height="100%" dataProvider="{dataProvider}" editable="true"
+							 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" allowMultipleSelection="true">
+					<mx:columns>
+						<mx:DataGridColumn headerText="字段名称" editable="true" dataField="aliasName" />
+						<mx:DataGridColumn headerText="字段表达式" editable="true" dataField="fieldName" />
+						<mx:DataGridColumn headerText="字段类型" editable="true" dataField="fieldType" editorDataField="value">
+							<mx:itemEditor>
+								<fx:Component>
+									<mx:ComboBox>
+										<mx:dataProvider>  
+											<fx:String>String</fx:String>  
+											<fx:String>int</fx:String>  
+											<fx:String>double</fx:String>  
+											<fx:String>float</fx:String>  
+											<fx:String>long</fx:String>
+											<fx:String>Date</fx:String>
+											<fx:String>boolean</fx:String>  
+										</mx:dataProvider>  
+									</mx:ComboBox>
+								</fx:Component>
+							</mx:itemEditor>
+						</mx:DataGridColumn>
+					</mx:columns>
+				</mx:DataGrid>
+				
+			</mx:VBox>
+		</mx:VBox>
+		<mx:HBox id="btnBox" width="100%" paddingTop="5" horizontalAlign="right" paddingRight="5">
+			<mx:Button id="showMtBtn" label="显示元数据XML" visible="{debugMode}" click="{Alert.show(getContentXml())}"/>
+			<mx:Button id="showSqlBtn" label="显示EPL表达式" click="showEpl()"/>
+			<mx:Button id="saveBvBtn" label="确定" click="confirmFun()"/>
+			<mx:Button id="cancellBtn" label="取消" click="close()"/>
+		</mx:HBox>
+	</mx:VBox>
+</nbvc:BusinessViewConfig>

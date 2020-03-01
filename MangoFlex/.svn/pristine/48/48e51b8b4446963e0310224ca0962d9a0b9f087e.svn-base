@@ -1,0 +1,175 @@
+package smartx.flex.components.itemcomponent
+{
+	import actionscriptdatetimelibrary.DateTimeField;
+	
+	import com.hurlant.eval.ast.NullableType;
+	
+	import flash.events.MouseEvent;
+	
+	import mx.collections.ArrayCollection;
+	import mx.containers.HBox;
+	import mx.controls.DataGrid;
+	import mx.controls.Label;
+	import mx.events.CalendarLayoutChangeEvent;
+	import mx.formatters.DateFormatter;
+	import mx.utils.ObjectUtil;
+	
+	import smartx.flex.components.event.UIComponentEvent;
+	import smartx.flex.components.util.CompareUtil;
+	import smartx.flex.components.util.TempletDataUtil;
+	import smartx.flex.components.vo.ItemVO;
+	import smartx.flex.components.vo.TempletItemVO;
+	
+	/**
+	 * 日期范围条件框，只做为条件查询用
+	 * */
+	public class ItemConditionDateRange extends ItemUIComponent
+	{
+		private var minDateTimeInput:DateTimeField = new DateTimeField();
+		private var maxDateTimeInput:DateTimeField = new DateTimeField();
+		
+		private var dateFormatter:DateFormatter = new DateFormatter();
+		private var formatString:String = "YYYY-MM-DD";
+		
+		public function ItemConditionDateRange(templetItemVO:TempletItemVO,showLabel:Boolean=true)
+		{
+			dateFormatter.formatString = formatString;
+			
+			var hyphenLable:Label = new Label();
+			hyphenLable.text = "-";
+			hyphenLable.setStyle("textAlign","center");
+			
+			var rangBox:HBox = new HBox();
+			rangBox.setStyle("horizontalGap",0);
+			rangBox.setStyle("verticalAlign","middle");
+			rangBox.addChild(minDateTimeInput);
+			rangBox.addChild(hyphenLable);
+			rangBox.addChild(maxDateTimeInput);
+			
+			super(templetItemVO, rangBox, showLabel);
+			
+			minDateTimeInput.dayNames=["日","一","二","三","四","五","六"]; 
+			minDateTimeInput.monthNames=["一","二","三","四","五","六","七","八","九","十","十一","十二"]; 
+			minDateTimeInput.setStyle("borderStyle","solid");
+			minDateTimeInput.showToday = true;
+			minDateTimeInput.setStyle("todayColor","red");
+			minDateTimeInput.showTime = false;
+			minDateTimeInput.formatString = "YYYY-MM-DD";
+			minDateTimeInput.selectedDateTime = new Date();
+			minDateTimeInput.width = 100;
+			minDateTimeInput.addEventListener(CalendarLayoutChangeEvent.CHANGE,dataChange);
+			
+			maxDateTimeInput.dayNames=["日","一","二","三","四","五","六"]; 
+			maxDateTimeInput.monthNames=["一","二","三","四","五","六","七","八","九","十","十一","十二"]; 
+			maxDateTimeInput.setStyle("borderStyle","solid");
+			maxDateTimeInput.showToday = true;
+			maxDateTimeInput.setStyle("todayColor","red");
+			maxDateTimeInput.showTime = false;
+			maxDateTimeInput.formatString = "YYYY-MM-DD";
+			maxDateTimeInput.selectedDateTime = new Date();
+			maxDateTimeInput.width = 100;
+			maxDateTimeInput.addEventListener(CalendarLayoutChangeEvent.CHANGE,dataChange);
+		}
+		
+		public override function getQueryConditon(isPreciseQuery:Boolean=false):String{
+			//构建日期范围查询条件
+			var condStr:String = " (1=1) ";
+			if(minDateTimeInput.selectedDateTime == null && maxDateTimeInput.selectedDateTime == null ){
+				return " (1=1) ";
+			}else if(minDateTimeInput.selectedDateTime != null && maxDateTimeInput.selectedDateTime != null){
+				condStr =" ("+templetItemVO.itemkey+" >= to_date('"+dateFormatter.format(minDateTimeInput.selectedDateTime)+"','YYYY-MM-DD') "
+						+"and "+templetItemVO.itemkey+" <= to_date('"+dateFormatter.format(maxDateTimeInput.selectedDateTime)+"','YYYY-MM-DD')+1 ) ";
+						
+			}else if(minDateTimeInput.selectedDateTime == null && maxDateTimeInput.selectedDateTime != null){
+				condStr ="("+templetItemVO.itemkey+" <= to_date('"+dateFormatter.format(maxDateTimeInput.selectedDateTime)+"','YYYY-MM-DD')+1 ) ";
+				
+			}else if(minDateTimeInput.selectedDateTime != null && maxDateTimeInput.selectedDateTime == null){
+				condStr =" ("+templetItemVO.itemkey+" >= to_date('"+dateFormatter.format(minDateTimeInput.selectedDateTime)+"','YYYY-MM-DD') )";
+			} 
+			return condStr;
+		}
+		
+		public override function get realValue():Object{
+			if(minDateTimeInput.selectedDateTime!=null)
+				return dateFormatter.format(minDateTimeInput.selectedDateTime);
+			return null;
+		}
+		
+		public override function get stringValue():String{
+			if(minDateTimeInput.selectedDateTime!=null)
+				return dateFormatter.format(minDateTimeInput.selectedDateTime);
+			return null;
+		}
+		
+		public override function get sqlStringValue():String{
+			if(realValue == null)
+				return "null";
+			if(templetItemVO.itemtype.toLowerCase() == "date"){
+				return 	"to_date('"+ stringValue + "','YYYY-MM-DD')";
+			}
+			else{
+				return "'"+stringValue+"'";
+			}
+		}
+		
+		
+		protected override function clearContent(event:MouseEvent):void{
+			minDateTimeInput.selectedDateTime = null;
+			maxDateTimeInput.selectedDateTime = null;
+			dataChange(null);
+		}
+		
+		// Define the getter method.
+		public override function set data(value:Object):void {
+			super.data = value;
+			if(value == null)
+				return;
+			if(value[templetItemVO.itemkey]!=null){
+				var str:String = value[templetItemVO.itemkey];
+				minDateTimeInput.selectedDateTime = TempletDataUtil.dateStrToDate(str);
+				maxDateTimeInput.selectedDateTime = TempletDataUtil.dateStrToDate(str);
+			}	
+			else{
+				minDateTimeInput.selectedDateTime = null;
+				maxDateTimeInput.selectedDateTime = null;
+			}
+		}
+		
+		public override function set editable(editable:Boolean):void{
+			this._editable = editable;
+			minDateTimeInput.enabled = editable;
+			maxDateTimeInput.enabled = editable;
+		}
+		
+		private function dataChange(event:CalendarLayoutChangeEvent):void{
+			dispatchEvent(new UIComponentEvent(UIComponentEvent.REAL_VALUE_CHANGE));
+		}
+		
+		public override function getSortFunction(fieldName:String):Function{
+			return function(obj1:Object,obj2:Object):int{
+				if(obj1[fieldName] != null && obj2[fieldName] == null)
+					return -1;
+				if(obj1[fieldName] == null && obj2[fieldName] != null)
+					return 1;
+				if(obj1[fieldName] && obj2[fieldName]){
+					if(CompareUtil.hashTotalColumn(obj1)){
+						if(column){
+							return (column.sortDescending?-1:1)*1;
+						}else{
+							return 1;
+						}
+					}else if(CompareUtil.hashTotalColumn(obj2)){
+						if(column){
+							return (column.sortDescending?-1:1)*-1;
+						}else{
+							return -1;
+						}
+					}else{
+						return ObjectUtil.stringCompare(String(obj1[fieldName]),String(obj2[fieldName]),true);
+					}
+				}
+				return 0;
+			}
+		}
+	}
+}

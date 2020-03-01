@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*" 
+		 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%"
+		 xmlns:containers="flexlib.containers.*"
+		 creationComplete="init()" >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.flexmonster.pivot.view.ViewType;
+			import com.flexmonster.pivot.view.charts.ChartType;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			[Bindable]
+			private var measureXMLList:XMLList = new XMLList();//测量值字段
+			[Bindable]
+			private var allColumnsXmlList:XMLList = new XMLList();//可选列字段
+			[Bindable]
+			private var rowsXmlList:XMLList = new XMLList(); //行字段显示
+			[Bindable]
+			private var columnsXmlList:XMLList = new XMLList();//列字段显示
+			[Bindable]
+			private var filtersXmlList:XMLList = new XMLList();//过滤字段显示
+			
+			[Bindable]
+			private var fieldMapXmlList:XMLList = new XMLList();//字段名称映射
+			private var fieldXml:XML = <root/>;
+			
+			private var viewTypeStr:String = ViewType.GRID;
+			private var chartTypeStr:String = ChartType.BAR;
+			private var showConfigButtonStr:String = "false";
+			private var showToolBarStr:String = "false";
+			private var showFieldListStr:String = "false";
+			
+			//视图类型
+			[Bindable]
+			private var viewTypeCboData:ArrayCollection = new ArrayCollection([
+				{label:MTChartConst.OLAP_VIEWTYPE_GRID_NAME,value: ViewType.GRID },
+				{label:MTChartConst.OLAP_VIEWTYPE_CHARTS_NAME,value: ViewType.CHARTS }
+				
+			]);
+			
+			[Bindable]
+			private var chartTypeCboData:ArrayCollection = new ArrayCollection([
+				{label:MTChartConst.OLAP_CHARTTYPE_BAR_NAME, value: ChartType.BAR },
+				{label:MTChartConst.OLAP_CHARTTYPE_LINE_NAME, value: ChartType.LINE },
+				{label:MTChartConst.OLAP_CHARTTYPE_PIE_NAME, value: ChartType.PIE },
+				{label:MTChartConst.OLAP_CHARTTYPE_SCATTER_NAME, value: ChartType.SCATTER}
+			]);
+			
+			//测量值类型
+			[Bindable]
+			public var measureTypeCboData:ArrayCollection = new ArrayCollection([
+				{label:MTChartConst.OLAP_MEASURE_COUNT_NAME,data: MTChartConst.OLAP_MEASURE_COUNT },
+				{label:MTChartConst.OLAP_MEASURE_SUM_NAME,data: MTChartConst.OLAP_MEASURE_SUM },
+				{label:MTChartConst.OLAP_MEASURE_AVERAGE_NAME,data: MTChartConst.OLAP_MEASURE_AVERAGE },
+				{label:MTChartConst.OLAP_MEASURE_MAX_NAME,  data: MTChartConst.OLAP_MEASURE_MAX },
+				{label:MTChartConst.OLAP_MEASURE_MIN_NAME,data: MTChartConst.OLAP_MEASURE_MIN},
+				{label:MTChartConst.OLAP_MEASURE_PRODUCT_NAME,data: MTChartConst.OLAP_MEASURE_PRODUCT },
+				{label:MTChartConst.OLAP_MEASURE_PERCENT_NAME,data: MTChartConst.OLAP_MEASURE_PERCENT }
+			]);
+			
+			//数据类型
+			[Bindable]
+			public var fieldTypeCboData:ArrayCollection = new ArrayCollection([
+				{label:"维度",data: "+" },
+				{label:"数值",data: "-" },
+				{label:"月份",data: "m+" },
+				{label:"日期",data: "d+" },
+				{label:"3层日期",data: "D+" },
+				{label:"4层日期",data: "D4+" },
+				{label:"维度按数值排序",data: "n+" },
+				{label:"真实ID",data: "id+" }
+			]);
+			
+			
+			private function init():void{
+				
+			}
+			
+			override public function generalFormComplete():void{
+				if(contentXml.extend.length() == 0){
+					var extendXML:XML = <extend/>;
+					contentXml.appendChild(extendXML);
+				}
+				if(contentXml.extend.olapConfig.length() == 0){
+					var olapXml:XML = <olapConfig><viewType/><sql/><showFieldList/><chartType/><showConfigButton/><showToolBar/>
+										<allCol/><rows/><columns/><filters/><measures/><fieldMaps/>
+									  </olapConfig>;
+					contentXml.extend.appendChild(<olapConfig/>);
+				}
+				
+				initProperty();
+			}
+			
+			override public function initTableStructComplete():void{
+				
+				if(tableDataStruct != null && isTableChanged > 0){
+					//初始化所有可选列，只有第一次的时候才进行初始化
+					//1，先清空原数据
+					var measureXml:XML = <measures/>;
+					var allXml:XML = <allCol/>;
+					var columnXml:XML = <columns/>
+					if(fieldXml != null)
+						delete fieldXml.fieldNameMap;
+					
+					var columnName:String;
+					var columnType:String;
+					for(var i:int=0;i< tableDataStruct.table_header.length; i++){
+						columnName = tableDataStruct.table_header[i].toString();//flexpivot控件中，大小写敏感，这里采用小写
+						columnType = tableDataStruct.table_body_type[i];
+						
+						//这里不再根据字段类型判断是否是测试量，由用户配置
+//						if("NUMBER" == columnType || "NUMERIC" == columnType){
+//							var tempXML:XML = <field><columnField/><isMeasureField>false</isMeasureField>
+//												<measureTypeField>{MTChartConst.OLAP_MEASURE_SUM}</measureTypeField></field>;
+//							tempXML.columnField = columnName;
+//							measureXml.appendChild(tempXML);
+//						}else{
+//							
+//							allXml.appendChild(<item type={columnType}>{columnName}</item>);
+//						}
+						allXml.appendChild(<item type={columnType}>{columnName}</item>);
+						
+						var temp:XML =<fieldNameMap><fieldName/><displayName/><fieldType/><csvTitleName/></fieldNameMap>;
+						temp.fieldName = columnName;
+						temp.displayName = columnName;
+						temp.fileType = "+";
+						temp.csvTitleName = temp.fileType + columnName;
+						fieldXml.appendChild(temp);				
+					}					
+					//重新初始化个维度数据
+					fieldMapXmlList = fieldXml.fieldNameMap;
+					allColumnsXmlList = allXml.item;
+					measureXMLList = measureXml.field;
+					//初始化列维度数据，加入 测量值
+					columnXml.appendChild(<item type={MTChartConst.OLAP_MEASURE_FLAG_COLUMN}>{MTChartConst.OLAP_MEASURE_FLAG_COLUMN}</item>);
+					columnsXmlList = columnXml.item;					
+					filtersXmlList = new XMLList();
+					rowsXmlList = new XMLList();
+					
+					measureDataGrid.invalidateList();
+					//重新设置跟踪表的变化
+					isTableChanged = false;
+				}
+				
+			}
+			
+			//将XML转换为属性
+			private function initProperty():void{
+				var olapConfig:XML = contentXml.extend.olapConfig[0];
+				
+				//如果直接为空，则直接返回
+				if(olapConfig == null )
+					return ;
+				
+				//显示类型
+				if(olapConfig.viewType.length() > 0 ){
+					for each(var obj:Object in viewTypeCboData){
+						if(obj.value == olapConfig.viewType){
+							viewTypeComBox.selectedItem = obj;
+							break;
+						}
+					}
+				}				
+				//图形类型
+				if(olapConfig.chartType.length() > 0){
+				     for each(var obj2:Object in chartTypeCboData){
+					    if(obj2.value == olapConfig.chartType){
+						    chartTypeComBox.selectedItem = obj2;
+						    break;
+					    }
+				     }
+				}
+				
+				//是否显示配置按钮
+				if( olapConfig.showConfigButton.length() > 0){
+					if("true" == olapConfig.showConfigButton)
+						showConfigButtonChk.selected = true;
+					else
+						showConfigButtonChk.selected = false;
+				}
+				
+				//是否显示工具栏
+				if( olapConfig.showFieldList.length() > 0){
+					if("true" == olapConfig.showFieldList)
+						showFieldListChk.selected = true;
+					else
+						showFieldListChk.selected = false;
+				}
+				
+				//是否显示工具栏
+				if( olapConfig.showToolBar.length() > 0){
+					if("true" == olapConfig.showToolBar)
+						showToolBarChk.selected = true;
+					else
+						showToolBarChk.selected = false;
+				}
+				
+				measureXMLList = olapConfig.measures.field;
+				allColumnsXmlList = olapConfig.allCol.item;
+				rowsXmlList = olapConfig.rows.item;
+				columnsXmlList = olapConfig.columns.item;
+				filtersXmlList = olapConfig.filters.item;
+				fieldMapXmlList = olapConfig.fieldMaps.fieldNameMap;
+				
+				fieldXml.appendChild(fieldMapXmlList);
+			}
+			
+			override public function propertyConvertXml():void{
+				//根据属性值生成XML
+				delete contentXml.extend;
+				contentXml.appendChild(<extend />);
+				contentXml.extend.appendChild(<olapConfig><viewType/><showFieldList/><sql/><chartType/>
+												<showConfigButton/><showToolBar/>
+												<allCol/><rows/><columns/><filters/><measures/><fieldMaps/>
+											</olapConfig>);
+						
+				viewTypeStr = viewTypeComBox.selectedItem.value;
+				chartTypeStr = chartTypeComBox.selectedItem.value;
+				showConfigButtonStr = showConfigButtonChk.selected ? "true" : "false";
+				showToolBarStr = showToolBarChk.selected ? "true" : "false";
+				showFieldListStr = showFieldListChk.selected ? "true" : "false";
+				
+				contentXml.extend.olapConfig.viewType = viewTypeStr;
+				contentXml.extend.olapConfig.chartType = chartTypeStr;
+				contentXml.extend.olapConfig.showConfigButton = showConfigButtonStr;
+				contentXml.extend.olapConfig.showToolBar = showToolBarStr;
+				contentXml.extend.olapConfig.sql = sql;
+				contentXml.extend.olapConfig.showFieldList = showFieldListStr;
+				
+				delete contentXml.extend.olapConfig.measures.field;
+				contentXml.extend.olapConfig.measures.appendChild(measureXMLList);
+				
+				delete contentXml.extend.olapConfig.allCol.item;
+				contentXml.extend.olapConfig.allCol.appendChild(allColumnsXmlList);
+				
+				delete contentXml.extend.olapConfig.rows.item;
+				contentXml.extend.olapConfig.rows.appendChild(rowsXmlList);
+				
+				delete contentXml.extend.olapConfig.columns.item;
+				contentXml.extend.olapConfig.columns.appendChild(columnsXmlList);
+				
+				delete contentXml.extend.olapConfig.filters.item;
+				contentXml.extend.olapConfig.filters.appendChild(filtersXmlList);
+				
+				delete contentXml.extend.olapConfig.fieldMaps.fieldNameMap;
+				contentXml.extend.olapConfig.fieldMaps.appendChild(fieldMapXmlList);
+			}
+			
+			private function dragEnterHandler( evt: DragEvent ):void {
+				evt.target.dropEnabled = ( evt.target != evt.dragInitiator );
+			}
+			
+			private function dragCompleteHandler( evt: DragEvent ):void {
+				
+			}
+			
+			private function addField():void{
+				
+				if(newFieldComboBox.text != null && newFieldComboBox.text != ""){
+					for ( var i:int =0; i < fieldMapXmlList.length() ; i++ )
+					{
+						if ( fieldMapXmlList[i].fieldName == newFieldComboBox.text ){
+							//这里可以处理一下，如果有重复字段，不进行添加
+							return;  
+						}
+					}
+					var temp:XML =<fieldNameMap><fieldName/><displayName/></fieldNameMap>;
+					temp.fieldName = newFieldComboBox.text;
+					fieldXml.appendChild(temp);				
+					fieldMapXmlList = fieldXml.fieldNameMap;
+					measureDataGrid.invalidateList();
+				}
+			}
+			
+			private function deleteField():void{
+				var selectedIndex:int = fieldMapDataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				
+				delete fieldMapXmlList[selectedIndex];
+				//重新设置缓存fieldXml
+				delete fieldXml.fieldNameMap;				
+				fieldXml.appendChild(fieldMapXmlList);
+				
+				fieldMapDataGrid.invalidateList();
+			}
+			
+			private function refreshConfig():void{
+				var selectedIndex:int = fieldMapDataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				
+				
+			}
+			
+			public function fieldTypeChangedHandler(data:Object):void{
+				
+				var i:int = 0;
+				var columnName:String = data.fieldName;
+				
+				//字段类型设置为测试字段
+				if(data.fieldType == "-"){
+					var measureXml:XML = <root/>;
+					measureXml.appendChild(measureXMLList);
+					//是统计字段
+					var tempXML:XML = <field><columnField/><isMeasureField>false</isMeasureField>
+							<measureTypeField>{MTChartConst.OLAP_MEASURE_SUM}</measureTypeField></field>;
+					
+					tempXML.columnField = columnName;					
+					measureXml.appendChild(tempXML);					
+					measureXMLList = measureXml.field;
+					
+					for(i=0;i<allColumnsXmlList.length();i++){
+						if(allColumnsXmlList[i].toString() == columnName)
+							delete allColumnsXmlList[i];
+					}
+					
+					for(i=0;i<rowsXmlList.length();i++){
+						if(rowsXmlList[i].toString() == columnName)
+							delete rowsXmlList[i];
+					}
+					for(i=0;i<columnsXmlList.length();i++){
+						if(columnsXmlList[i].toString() == columnName)
+							delete columnsXmlList[i];
+					}
+					for(i=0;i<filtersXmlList.length();i++){
+						if(filtersXmlList[i].toString() == columnName)
+							delete filtersXmlList[i];
+					}
+					
+					trace("--------增加测量字段--------");
+				}else{
+					//判断measurelist是否包含，不包含不用处理，否则移动到可配置维度中
+					var isMeasure:Boolean = false;
+					for(i=0;i<measureXMLList.length();i++){
+						if(measureXMLList[i].columnField.toString() == columnName){
+							delete measureXMLList[i];
+							isMeasure = true;
+						}
+					}
+					
+					//字段类型从数值字段，变更为维度字段
+					if(isMeasure){
+						var allXml:XML = <root/>;
+						allXml.appendChild(allColumnsXmlList);
+						allXml.appendChild(<item type="VARCHAR2">{columnName}</item>);
+						
+						allColumnsXmlList = allXml.item;
+					}
+					
+				}
+				allList.invalidateList();
+				rowsList.invalidateList();
+				columnsList.invalidateList();
+				filtersList.invalidateList();
+				measureDataGrid.invalidateList();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" >
+		<mx:HBox width="98%" height="75">
+			<mx:VBox width="50%" height="100%">
+				<mx:FormItem label="显示类型">
+					<mx:ComboBox id="viewTypeComBox" dataProvider="{viewTypeCboData}" />
+				</mx:FormItem>
+				<mx:FormItem label="图表类型">
+					<mx:ComboBox id="chartTypeComBox" dataProvider="{chartTypeCboData}" />
+				</mx:FormItem>
+			</mx:VBox>
+			<mx:VBox width="50%" height="100%">
+				<mx:FormItem label="是否显示工具栏">
+					<mx:CheckBox id="showToolBarChk"/>
+				</mx:FormItem>
+				<mx:FormItem label="是否显示配置按钮">
+					<mx:CheckBox id="showConfigButtonChk" />
+				</mx:FormItem>
+				<mx:FormItem label="是否显示配置域">
+					<mx:CheckBox id="showFieldListChk"/>
+				</mx:FormItem>
+			</mx:VBox>
+		</mx:HBox>
+		<mx:HRule width="98%"/>
+		<mx:VBox width="98%" height="200">
+			<mx:HBox width="100%" paddingLeft="5">
+				<mx:ComboBox id="newFieldComboBox" editable="true" dataProvider="{fieldList}"/>
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addField()"/>
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteField()"/>
+				<!--
+				<mx:LinkButton icon="{AssetsFileLib.refreshIcon}" width="22" height="22" toolTip="刷新维度设置" click="refreshConfig()"/>
+				-->
+				<mx:Label text="  设置各字段在OLAP图中的显示名称" color="red"/>
+			</mx:HBox>
+			<mx:DataGrid id="fieldMapDataGrid" width="100%" height="100%" editable="true" dataProvider="{fieldMapXmlList}" paddingLeft="5">
+				<mx:columns>
+					<mx:DataGridColumn headerText="字段名称" editable="false" dataField="fieldName"/>
+					<mx:DataGridColumn headerText="显示名称" editable="true" dataField="displayName" />
+					<mx:DataGridColumn headerText="文件列标题" editable="true" dataField="csvTitleName" visible="false"/>
+					<mx:DataGridColumn headerText="字段类型" editable="true" dataField="fieldType" width="140" 
+									   editorDataField="value" rendererIsEditor="true" >
+						<mx:itemRenderer>
+							<fx:Component>
+								<mx:HBox>
+									<fx:Script>
+										<![CDATA[
+											import mx.events.ListEvent;
+											public function get value():String
+											{
+												return String( data.fieldType );
+											}
+											override public function set data(obj:Object):void
+											{
+												super.data = obj;
+												if(obj.fieldType.length() == 0 || obj.fieldType == ""){
+													fieldTypeCombo.selectedIndex = 0;
+													return;
+												}
+												for each (var item:Object in outerDocument.fieldTypeCboData){
+													if(String(obj.fieldType) == item.data){
+														fieldTypeCombo.selectedItem = item;
+														return;
+													}
+												}
+												fieldTypeCombo.selectedIndex = 1;//默认选择第一项
+											}
+											
+											protected function fieldTypeCombo_changeHandler(event:ListEvent):void
+											{
+												data.fieldType = fieldTypeCombo.selectedItem.data; 
+												data.csvTitleName = fieldTypeCombo.selectedItem.data + data.displayName;
+												
+												outerDocument.fieldTypeChangedHandler(data);
+											}
+											
+										]]>
+									</fx:Script>
+									<mx:ComboBox id="fieldTypeCombo" labelField="label" dataProvider="{outerDocument.fieldTypeCboData}" 
+												 change="fieldTypeCombo_changeHandler(event)"
+												 toolTip="选择字段类型"/>
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		<mx:HRule width="98%"/>
+		<mx:HBox width="98%" height="400">
+			<mx:VBox  width="50%" height="100%" paddingLeft="5" paddingRight="5" paddingBottom="10">
+				<mx:Label text="选择维度:" />
+				<mx:List id="allList" width="100%" height="60%" allowMultipleSelection="true" dataProvider="{allColumnsXmlList}"
+						 toolTip="拖动项目到行、列、过滤器列表完成配置"
+						 dragEnabled="true" dragMoveEnabled="true" dragComplete="dragCompleteHandler(event)" dragEnter="dragEnterHandler(event);"/>
+				<mx:Label text="选择测量值" />
+				<mx:DataGrid id="measureDataGrid" width="100%" height="37%" editable="true" dataProvider="{measureXMLList}" >
+					<mx:columns>
+						<mx:DataGridColumn headerText="数据字段" editable="false" dataField="columnField" />
+						<mx:DataGridColumn headerText="是否测量" dataField="isMeasureField" editable="false" textAlign="center" width="40">
+							<mx:itemRenderer>
+								<fx:Component>
+									<mx:CheckBox paddingLeft="10" selected="{data.isMeasureField=='false'?false:true}"  toolTip="选择是否测量值字段"
+												 click="{data.isMeasureField = data.isMeasureField=='false'?'true':'false'}"/>
+								</fx:Component>
+							</mx:itemRenderer>
+						</mx:DataGridColumn>
+						<mx:DataGridColumn headerText="测量类型" editable="true" dataField="measureTypeField" width="100" 
+										   editorDataField="value" rendererIsEditor="true" >
+							<mx:itemRenderer>
+								<fx:Component>
+								<mx:HBox>
+									<fx:Script>
+										<![CDATA[
+											public function get value():String
+											{
+												return String( data.measureTypeField );
+											}
+											override public function set data(obj:Object):void
+											{
+												super.data = obj;
+												if(obj.measureTypeField.length() == 0 || obj.measureTypeField == ""){
+													measureTypeFieldCombo.selectedIndex = 0;
+													return;
+												}
+												for each (var item:Object in outerDocument.measureTypeCboData){
+													if(String(obj.measureTypeField) == item.data){
+														measureTypeFieldCombo.selectedItem = item;
+														return;
+													}
+												}
+												measureTypeFieldCombo.selectedIndex = 1;//默认选择第一项
+											}
+										]]>
+									</fx:Script>
+									<mx:ComboBox id="measureTypeFieldCombo" labelField="label" dataProvider="{outerDocument.measureTypeCboData}" 
+												 change="{data.measureTypeField = measureTypeFieldCombo.selectedItem.data}" toolTip="选择数据聚合类型"/>
+								</mx:HBox>
+								</fx:Component>
+							</mx:itemRenderer>
+						</mx:DataGridColumn>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+			<mx:VBox width="50%" height="100%" paddingLeft="10" paddingRight="20" paddingBottom="10">
+				<mx:Label text="行维度:" />
+			    <mx:List id="rowsList" width="100%" height="33%" dragEnabled="true" dataProvider="{rowsXmlList}" 
+						 toolTip="拖拽进行排序或拖拽到列、过滤器维度"
+						 dragMoveEnabled="true" dragComplete="dragCompleteHandler(event)" dragEnter="dragEnterHandler(event);"/>
+				<mx:Label text="列维度:" />
+				<mx:List id="columnsList" width="100%" height="33%" dragEnabled="true" dataProvider="{columnsXmlList}" 
+						 toolTip="拖拽进行排序或拖拽到行、过滤器维度"
+						 dragMoveEnabled="true" dragEnter="dragEnterHandler(event);"/>
+				<mx:Label text="过滤器:" />
+				<mx:List id="filtersList" width="100%" height="33%" dragEnabled="true" dataProvider="{filtersXmlList}" 
+						 dragMoveEnabled="true" dragEnter="dragEnterHandler(event);"/>
+			</mx:VBox>
+		</mx:HBox>
+	</mx:VBox>
+			
+</designer:BaseDesigner>

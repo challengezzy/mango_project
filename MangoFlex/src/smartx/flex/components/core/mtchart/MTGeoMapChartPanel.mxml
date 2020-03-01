@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:mtchart="smartx.flex.components.core.mtchart.*" 
+		   xmlns:ammap="http://www.ammap.com/com_internal"
+		   width="100%" height="100%"
+		   initialize="preInit()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.ammap.AmMap;
+			import com.ammap.events.MapObjectEvent;
+			import com.ammap.mapClasses.DataSet;
+			import com.ammap.mapClasses.MapArea;
+			import com.ammap.mapClasses.MapObject;
+			import com.ammap.mapClasses.SmallMap;
+			import com.ammap.mapClasses.ZoomControl;
+			import com.ammap.mapClasses.settings.AreasSettings;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.TextArea;
+			
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			[Bindable]
+			private var mapURL:String; 
+			private var nameField:String = "instanceName";
+			private var valueField:String = "value";
+			
+			private var ammap:AmMap = new AmMapWrapper();
+			private var dataSet:DataSet = new DataSet();
+
+			
+			override protected function preInit():void{
+				super.preInit();
+				//初始化ammap
+				ammap.percentHeight = 100;
+				ammap.percentWidth = 100;
+				ammap.developerMode = false;
+				ammap.addEventListener(MapObjectEvent.CLICK_MAP_OBJECT,ammap_clickMapObjectHandler);
+				ammap.areasSettings = new AreasSettings();
+				ammap.areasSettings.autoZoom = true;
+				ammap.dataSets = [dataSet];
+				
+				var xml:XML = metadataTemplet.contentXML;
+				mapURL = String(xml.extend.mapURL); 
+				dataSet.mapURL = mapURL;
+				if(xml.extend.nameField.length()>0)
+					nameField = String(xml.extend.nameField);
+				if(xml.extend.valueField.length()>0)
+					valueField = String(xml.extend.valueField);
+				if(xml.extend.backgroundColor.length()>0)
+					ammap.setStyle("backgroundColor",parseInt(xml.extend.backgroundColor,16));
+				
+				if(xml.extend.rollOverColor.length()>0)
+					ammap.areasSettings.rollOverColor = parseInt(xml.extend.rollOverColor,16);
+				if(xml.extend.selectedColor.length()>0)
+					ammap.areasSettings.selectedColor = parseInt(xml.extend.selectedColor,16);
+				if(xml.extend.unlistedAreasColor.length()>0)
+					ammap.areasSettings.unlistedAreasColor = parseInt(xml.extend.unlistedAreasColor,16);
+				
+				if(xml.extend.enableZoomControl == "true")
+					ammap.zoomControl.visible = true;
+				else
+					ammap.zoomControl.visible = false;
+				if(xml.extend.enableSmallMap == "true"){
+					ammap.smallMap = new SmallMap();
+					ammap.smallMap.percentHeight = 20;
+					ammap.smallMap.percentWidth = 20;
+				}
+				if(xml.extend.areas.mapArea.length()>0){
+					var areas:Array = [];
+					for each(var mapArea:XML in xml.extend.areas.mapArea){
+						var area:MapArea = new MapArea();
+						area.instanceName = String(mapArea.@instanceName);
+						if(mapArea.@color.length()>0)
+							area.color = parseInt(mapArea.@color,16);
+						if(mapArea.@title.length()>0)
+							area.title = String(mapArea.@title);
+						if(mapArea.@value.length()>0)
+							area.value = Number(mapArea.@value);
+						if(mapArea.@mouseEnabled == "false")
+							area.mouseEnabled = false;
+						areas = areas.concat(area);
+					}
+					dataSet.areas = areas;
+				}
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				mainBox.addChild(ammap);
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			override public function refreshComplete():void{
+				if(dataProvider.length > 0){
+					for each(var area:MapArea in dataSet.areas){
+						var name:String = area.instanceName;
+						for each(var obj:* in dataProvider){
+							if(obj[nameField] == name){
+								area.customData = obj;
+								area.value = obj[valueField];
+								break;
+							}
+						}
+					}
+				}
+				super.refreshComplete();
+			}
+			
+			protected function ammap_clickMapObjectHandler(event:MapObjectEvent):void
+			{
+				var mapObject:MapObject = event.mapObject;
+				selectedItems = new ArrayCollection([mapObject.customData]);
+				selectedEvent();
+			}
+			
+			public override function destroy():void{
+				if(ammap != null){
+					ammap.clearMap();
+				}
+				super.destroy();
+			}
+			
+		]]>
+	</fx:Script>
+</mtchart:MTChartPanel>

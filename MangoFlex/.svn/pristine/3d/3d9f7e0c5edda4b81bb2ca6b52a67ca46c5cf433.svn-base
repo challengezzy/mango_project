@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   creationComplete="creationComplete()"
+			   close="PopUpManager.removePopUp(this)" layout="vertical"
+			   xmlns:containers="net.brandonmeyer.containers.*" 
+			   width="660" height="540" xmlns:core="smartx.flex.components.core.*"
+			   title="数据信息" allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.text.engine.TabAlignment;
+			
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Bindable]
+			public var templetCode:String;//原数据编码
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			private var smartxFormService:RemoteObject;
+			
+			public var excelMTCode:String; //EXCEL导出的元数据模板编码
+			public var reportName:String="XLS";//下载的文件名
+			public var isShowExcelBtn:Boolean = false; //是否显示导出EXCEL按钮
+			[Bindable]
+			public var excelBtnLabel:String = "导出格式化EXCEL数据";
+			
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			[Bindable]
+			public var initQueryCondition:String="";
+			
+			public var excelInitQueryCondition:String="";
+			
+			private function creationComplete():void{
+				smartxFormService = new RemoteObject();
+				smartxFormService.endpoint = endpoint;
+				smartxFormService.destination = destination;
+				
+				smartxFormService.excelExport.addEventListener(ResultEvent.RESULT,exportDataToExcelOkHandler);
+				smartxFormService.excelExport.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				if(!isShowExcelBtn){
+					buttonBar.removeChild(expXlsExcelDataBtn);
+				}
+				
+				//先查询下数据
+				listPanel.query();
+			}
+
+			private function expCurrentData():void{
+				listPanel.exportCurData2CSV();
+			}
+			
+			private function expAllData():void{
+				listPanel.exportAllData2CSV();
+			}
+			
+			private function expExcelData():void{
+				if(listPanel.getQuerySQL() == "n/a"){
+					SmartXMessage.show("请先填入查询条件后再导出，以控制查询导出数据量！",SmartXMessage.MESSAGE_INFO);
+					return;
+				}
+				
+				var condition:String = " and "+ listPanel.getQueryCondition() + excelInitQueryCondition; 
+				
+				smartxFormService.excelExport(excelMTCode, condition, reportName+".zip");
+				OperatingTipUtil.startOperat("正在生成EXCEL导出文件");
+			}
+			
+			
+			public function exportDataToExcelOkHandler(event:ResultEvent):void{
+				var fileUrl:String = event.result as String;
+				//下载生成的excel文件
+				OperatingTipUtil.endOperat();
+				navigateToURL(new URLRequest(encodeURI(fileUrl)));
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("导出EXCEL文件失败",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox horizontalAlign="left" id="buttonBar" width="100%" paddingLeft="5" paddingTop="5">
+		<mx:Button id="expCurrentDataButton" toolTip="导出当前页数据，CSV格式"
+				   icon="{AssetsFileLib.exportExcelIcon}" label="导出当前页数据" click="expCurrentData()" height="22"/>
+		<mx:Button id="expAllDataButton" toolTip="导出全部查询数据，CSV格式"
+				   icon="{AssetsFileLib.exportExcelIcon}" label="导出全部数据" click="expAllData()"  height="22"/>
+		<mx:Button id="expXlsExcelDataBtn" toolTip="导出格式化的EXCEL数据"
+				   icon="{AssetsFileLib.exportExcelIcon}" label="{excelBtnLabel}" click="expExcelData()"  height="22"/>
+		<mx:Button id="closeBtn" icon="{AssetsFileLib.closeIcon}" label="关闭" click="PopUpManager.removePopUp(this)"  height="22"/>
+	</mx:HBox>
+	<mx:VBox id="contentBox" height="100%" width="100%">
+		<core:BillListPanel id="listPanel" showDataAfterInit="true" editable="false" debugMode="{debugMode}"
+							showEditBox="false" initQueryCondition="{initQueryCondition}"
+							destination="{destination}" endpoint="{endpoint}" templetCode="{templetCode}" >
+		</core:BillListPanel>
+	</mx:VBox>
+	<mx:HRule width="100%" />
+</containers:SuperPanel>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpMenu xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:util="myreport.util.*" fontSize="12" fontFamily="Simsun"
+				creationComplete="Init()">
+	<!--
+	
+	Copyright (c), Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+ 
+	<mx:Script>
+		<![CDATA[
+ 
+			private static var g_Instance:TableRowMenu;
+			
+			public static function get Instance():TableRowMenu
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new TableRowMenu();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			
+			private function Init():void
+			{
+ 
+			}
+ 
+			private var _Callback:Function;
+ 
+			/**
+			 * @param callback: function(command:String):void
+			 */ 
+			public function Show(stageX:Number, stageY:Number, callback:Function):void
+			{
+				_Callback = callback;
+				PopUp(stageX, stageY);
+ 
+			}
+			
+			protected override function OnHandleMouseDown(e:Event):Boolean
+			{
+				var btn:LinkButton = e.target as LinkButton;
+				if(btn && contains(btn))
+				{
+					return true;
+				}
+				return false;
+			}
+ 
+			private function OnItemClick(e:Event):void
+			{
+				if(_Callback!=null)
+				{
+					var btn:LinkButton = e.currentTarget as LinkButton;
+					_Callback(btn.id);
+				}
+				Hide();
+			}
+ 
+		]]>
+	</mx:Script>
+	
+	<mx:LinkButton id="AddTableRow" label="添加表格行" click="OnItemClick(event)" fontWeight="normal"/>
+	<mx:LinkButton id="AddSubReportRow" label="添加子报表行" click="OnItemClick(event)" fontWeight="normal"/>
+ 
+</util:PopUpMenu>

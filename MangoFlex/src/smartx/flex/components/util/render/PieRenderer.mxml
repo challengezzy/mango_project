@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:degrafa="http://www.degrafa.com/2007" left="0" right="3">
+	
+	<!--Use the Degrafa namespace, don't need the IDropInListItemRenderer 
+	in this case.-->
+	
+	<mx:Script>
+		<![CDATA[
+			
+			[Bindable]
+    		private var dataValue1:Number;
+			
+			[Bindable]
+    		private var dataValue2:Number;
+						
+			[Bindable]
+    		private var capacity:Number;
+    		
+			//Get the data for both bars.			    		
+    		override public function set data(value:Object):void{
+    			
+    			super.data = value;
+    			dataValue1= data["used"]; 
+				dataValue2= data["free"]; 
+    			capacity= data.capacity; 
+				this.toolTip = String(dataValue1/dataValue2);
+    		}
+    		
+						
+		]]>
+	</mx:Script>
+	
+	<mx:filters>
+		<mx:DropShadowFilter alpha=".5" distance="2" />
+	</mx:filters>
+	
+	<!--Use a composition as we are rendering multiple items-->    
+    <degrafa:GeometryComposition id="barcomp" graphicsTarget="{[this]}">
+    
+        <!--Used pie slice-->
+        <degrafa:EllipticalArc id="pie1" closureType="pie" arc="{((((dataValue1 / capacity)*100)*360)/100)}" 
+            startAngle="0" height="19"
+            width="19" x="3" y="0">
+             <degrafa:fill>
+                 <degrafa:LinearGradientFill>
+                     <degrafa:GradientStop color="#FF9800" />
+                     <degrafa:GradientStop color="#DB4105" />
+                 </degrafa:LinearGradientFill>
+             </degrafa:fill>
+        </degrafa:EllipticalArc>
+        
+        <!--Free pie slice-->
+        <degrafa:EllipticalArc closureType="pie" arc="{((((dataValue2 / capacity)*100)*360)/100)}" 
+            startAngle="{pie1.arc}" height="19"
+            width="19" x="3" y="0">
+             <degrafa:fill>
+                 <degrafa:LinearGradientFill>
+                     <degrafa:GradientStop color="#EEE" />
+                     <degrafa:GradientStop color="#CCC" />
+                 </degrafa:LinearGradientFill>
+             </degrafa:fill>
+        </degrafa:EllipticalArc>
+                        
+    </degrafa:GeometryComposition> 			        	   
+    	
+</mx:Canvas>

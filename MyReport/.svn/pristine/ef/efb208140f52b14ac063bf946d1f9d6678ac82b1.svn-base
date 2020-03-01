@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="300"
+		   creationComplete="Init()" xmlns:util="myreport.util.*" xmlns:design="myreport.design.*" 
+		   horizontalScrollPolicy="off" verticalScrollPolicy="off">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+ 
+			import flash.filters.GlowFilter;
+			
+			import mx.collections.ArrayCollection;
+			
+			import myreport.data.report.ReportSettings;
+			private var _SettingXML:XML;
+			public var SidePanelVisible:Boolean = true;
+			
+			private function Init():void
+			{
+				_DesignContent.addEventListener(DesignEvent.SELECTION_CHANGED, OnDesignEvent);
+				_DesignContent.addEventListener(DesignEvent.DELETE, OnDesignEvent);
+				_SidePanel.addEventListener(DesignEvent.EDIT_PROPERTY, OnDesignEvent);
+				_SidePanel.addEventListener(DesignEvent.EDIT_STYLE, OnDesignEvent);
+				_SidePanel.addEventListener(DesignEvent.EDIT_CONTROL, OnDesignEvent);
+				_SidePanel.addEventListener(DesignEvent.EDIT_CONDITION_STYLE, OnDesignEvent);
+				
+				_Info.filters = [new flash.filters.GlowFilter(0xffffff, 0.8)];
+			}
+			
+			private function OnDesignEvent(event:DesignEvent):void
+			{
+				if (event.type == DesignEvent.SELECTION_CHANGED)
+				{
+//					trace("select...");
+					if(_DesignContent.SelectedItem)
+					{
+						_SidePanel.removeAllChildren();
+						var editor:DisplayObject = _DesignContent.SelectedItem.Editor as DisplayObject;
+						if (editor)
+							_SidePanel.addChild(editor);
+					}
+				}
+				else if (event.type == DesignEvent.DELETE)
+				{
+					if(_DesignContent.SelectedItem == event.target)
+					{
+						_SidePanel.removeAllChildren();
+						_DesignContent.SelectedItem.Selected = false;
+						_DesignContent.SelectedItem = null;
+					}
+				}
+				else if (event.type == DesignEvent.EDIT_PROPERTY)
+				{
+					_DesignContent.EditProperty(event.Target, event.Value);
+
+				}
+				else if (event.type == DesignEvent.EDIT_STYLE)
+				{
+					_DesignContent.EditStyle(event.Target, event.Value);
+				}
+				else if (event.type == DesignEvent.EDIT_CONTROL)
+				{
+					_DesignContent.EditControl(event.Value);
+				}
+				else if (event.type == DesignEvent.EDIT_CONDITION_STYLE)
+				{
+					_DesignContent.EditConditionStyle(event.Value);
+				}
+			}
+			
+			public function Load(setting:XML, tableData:ArrayCollection, parameterData:Object):void
+			{
+				_SettingXML = setting;
+				_DesignContent.Load(setting, tableData, parameterData);
+				_SidePanel.removeAllChildren();
+			}
+			
+			public function get Data():ReportSettings
+			{
+				return _DesignContent.Data;
+			}
+			public function Refresh():void
+			{
+				_DesignContent.Load(_SettingXML, Data.TableData, Data.ParameterData);
+			}
+			
+			public function GetSettingXML():String
+			{
+				return Data.ToXML();
+			}
+			
+			public function Save():void
+			{
+				_SettingXML = new XML(GetSettingXML());
+			}
+			
+			public function ShowOrHideSidePanel():void
+			{
+				SidePanelVisible = !SidePanelVisible;
+				if (SidePanelVisible)
+				{
+					if (!_Main.contains(_Side))
+						_Main.addChild(_Side);
+				}
+				else
+				{
+					if (_Main.contains(_Side))
+						_Main.removeChild(_Side);
+				}
+			}
+		]]>
+	</mx:Script>
+	<mx:HDividedBox id="_Main" width="100%" height="100%" horizontalGap="6">
+		<mx:Canvas width="100%" height="100%">
+			<mx:VBox width="100%" height="100%" verticalAlign="top" horizontalAlign="center" 
+					 paddingLeft="24" paddingBottom="24" paddingRight="24" paddingTop="24" backgroundColor="#B7BABC">
+				<design:DesignContent  id="_DesignContent"/>
+			</mx:VBox>
+		</mx:Canvas>
+		<mx:Canvas id="_Side" width="220" height="100%" backgroundColor="#B7BABC">
+			<util:ToolBar height="23" width="100%" paddingLeft="1">
+				<mx:Label text="属性" fontSize="12" fontWeight="bold"/>
+			</util:ToolBar>
+			<mx:Canvas id="_SidePanel" x="2" y="23" width="100%" height="100%"
+					   horizontalScrollPolicy="off" backgroundColor="#FFFFFF">
+			</mx:Canvas>
+		</mx:Canvas>
+	</mx:HDividedBox>
+	<mx:Label id="_Info" x="6" y="6" textAlign="center" text="按下键盘“Ctrl”键，可以选择多个同类型的项进行编辑。"/>
+</mx:Canvas>

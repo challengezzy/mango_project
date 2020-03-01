@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<projectMetadata>
+  <generatedHTMLResources/>
+<swf bgcolor="ffffff" fullPath="/MangoWeb/bin-debug/MangoWeb.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/bin-debug/ADGTest1.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="ffffff" fullPath="/MangoWeb/bin-debug/DataGridSelectAll.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/bin-debug/GridColumnGroup.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/bin-debug/ItemEditor.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/bin-debug/TestApp.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/bin-debug/DataGridLink.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="f2f2f2" fullPath="/MangoWeb/bin-debug/SmartXWeb.swf" height="100%" pageTitle="欢迎使用" width="100%"/>
+  <swf bgcolor="f2f2f2" fullPath="/MangoWeb/WebRoot/MangoWeb.swf" height="100%" pageTitle="mango" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/WebRoot/ADGTest1.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/WebRoot/DataGridLink.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="ffffff" fullPath="/MangoWeb/WebRoot/DataGridSelectAll.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/WebRoot/GridColumnGroup.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/WebRoot/ItemEditor.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="f2f2f2" fullPath="/MangoWeb/WebRoot/SmartXWeb.swf" height="100%" pageTitle="欢迎使用" width="100%"/>
+  <swf bgcolor="869ca7" fullPath="/MangoWeb/WebRoot/TestApp.swf" height="100%" pageTitle="" width="100%"/>
+<swf bgcolor="ffffff" fullPath="/MangoWeb/WebRoot/DashboardObjectViewer.swf" height="100%" pageTitle="" width="100%"/>
+  <swf bgcolor="ffffff" fullPath="/MangoWeb/WebRoot/BAM.swf" height="100%" pageTitle="" width="100%"/>
+</projectMetadata>

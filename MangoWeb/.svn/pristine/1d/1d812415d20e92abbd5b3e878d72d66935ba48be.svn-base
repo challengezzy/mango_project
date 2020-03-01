@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" width="630"
+					   xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*" 
+					   xmlns:components="smartx.bam.flex.modules.dashboardobject.designer.components.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			private var groupCollectionDp:XMLListCollection = new XMLListCollection();
+			[Bindable]
+			private var summaryRowDp:XMLListCollection = new XMLListCollection();
+			[Bindable]
+			private var summaryFieldDp:XMLListCollection = new XMLListCollection();
+			[Bindable]
+			private var groupColumnDp:XMLListCollection = new XMLListCollection();
+			[Bindable]
+			private var MAX_PAGESIZE:int = 1000;//每页最大条数
+			[Bindable]
+			private var summaryFields:ArrayCollection = new ArrayCollection();//统计字段集合
+			[Bindable]
+			private var rendererDp:XMLListCollection = new XMLListCollection();
+			[Bindable]
+			private var rendererParamDp:XMLListCollection = new XMLListCollection();
+			
+			/** 统计方式*/
+			[Bindable]
+			internal var statisticTypes:ArrayCollection = new ArrayCollection([
+				{label:"求和",data:"SUM"},
+				{label:"最小值",data:"MIN"},
+				{label:"最大值",data:"MAX"},
+				{label:"平均值",data:"AVG"},
+				{label:"计数",data:"COUNT"}
+			]);
+			
+			private const GROUP_COLUMN:String = "groupColumn";
+			private const COLUMN:String = "column";
+			
+			[Bindable]
+			private var groupType:ArrayCollection = new ArrayCollection([
+				{label:"分组字段",data:COLUMN},
+				{label:"分组",data:GROUP_COLUMN}
+			]);
+			
+			[Bindable]
+			private var selectedGroupColumn:Object;//选中的分组字段
+			
+			override public function generalFormComplete():void{
+				if(contentXml.extend.GroupCollection.length() == 0)
+					contentXml.extend.appendChild(<GroupCollection />);
+				
+				if(contentXml.extend.GroupColumns.length() == 0)
+					contentXml.extend.appendChild(<GroupColumns />);
+				
+				if(contentXml.extend.Renderers.length() == 0)
+					contentXml.extend.appendChild(<Renderers />);
+				
+				groupCollectionDp.source = contentXml.extend.GroupCollection.GroupingField;
+				
+				groupColumnDp.source = contentXml.extend.GroupColumns.children();
+				
+				rendererDp.source = contentXml.extend.Renderers.Renderer;
+				
+				addEventListener(KeyboardEvent.KEY_DOWN,columnTreeKeyDownHandler);
+			}
+			
+			private function columnTreeKeyDownHandler(event:KeyboardEvent):void{
+				if(event.charCode == Keyboard.ESCAPE){
+					groupColumnTree.selectedIndex = -1;
+					selectedGroupColumn = null;
+				}
+			}
+			
+			private function addGroupField():void{
+				if(fieldList.length == 0){
+					SmartXMessage.show("无法取得数据字段！");
+					return;
+				}
+				groupCollectionDp.addItem(<GroupingField name={fieldList.getItemAt(0)} />);
+			}
+			
+			private function delGroupField():void{
+				if(groupDataGrid.selectedIndex < 0)
+					return;
+				groupCollectionDp.removeItemAt(groupDataGrid.selectedIndex);
+			}
+			
+			private function addSummaryRow():void{
+				if(groupDataGrid.selectedIndex < 0){
+					SmartXMessage.show("请选择分层字段！");
+					return;
+				}
+				summaryRowDp.addItem(<SummaryRow summaryPlacement="group"/>);
+			}
+			
+			private function delSummaryRow():void{
+				if(summaryRowDg.selectedIndex < 0)
+					return;
+				summaryRowDp.removeItemAt(summaryRowDg.selectedIndex);
+			}
+			
+			private function addSummaryField():void{
+				if(summaryRowDg.selectedIndex < 0){
+					SmartXMessage.show("请选择统计行！");
+					return;
+				}
+				summaryFieldDp.addItem(<SummaryField dataField="" label="名称" summaryOperation="SUM" />);
+			}
+			
+			private function delSummaryField():void{
+				if(summaryFieldDg.selectedIndex < 0)
+					return;
+				summaryFieldDp.removeItemAt(summaryFieldDg.selectedIndex);
+			}
+			
+			
+			private function pageSizeInput_changeHandler(event:Event):void{
+				if(Number(pageSizeInput.text) > MAX_PAGESIZE){
+					SmartXMessage.show("每页最大为"+MAX_PAGESIZE+"条!",SmartXMessage.MESSAGE_ERROR);
+					contentXml.extend.pageSize = pageSizeInput.text;
+				}
+			}
+			
+			private function summaryOpertionLabelFun(item:Object, column:DataGridColumn):String{
+				var type:String = String(item.@summaryOperation);
+				for each(var o:Object in statisticTypes){
+					if(type == o.data)
+						return o.label;
+				}
+				
+				return "";
+			}
+			
+			private function groupDataGrid_itemClickHandler(event:ListEvent):void{
+				if(groupDataGrid.selectedIndex < 0)
+					return;
+				summaryRowDp.source = groupDataGrid.selectedItem.SummaryRow;
+			}
+			
+			private function summaryRowDg_itemClickHandler(event:ListEvent):void{
+				if(summaryRowDg.selectedIndex < 0)
+					return;
+				summaryFieldDp.source = summaryRowDg.selectedItem.SummaryField;
+			}
+			
+			private function groupColumnTree_itemClickHandler():void{
+				selectedGroupColumn = groupColumnTree.selectedItem;
+				if(String(selectedGroupColumn.@type) == COLUMN){
+					currentState = "column";
+					initColumnProperty();
+				}else
+					currentState = "groupColumn";
+			}
+			
+			private function initColumnProperty():void{
+				summaryFields.removeAll();
+				summaryFields.addAll(fieldList);
+				
+				for each(var groupingField:XML in contentXml.extend.GroupCollection.GroupingField){
+					for each(var summaryRow:XML in groupingField.SummaryRow){
+						for each(var groupField:XML in summaryRow.SummaryField){
+							if(String(groupField.@label) != "")
+								summaryFields.addItem(String(groupField.@label));
+						}
+					}
+				}
+				
+				for each(var data:String in summaryFields){
+					if(String(selectedGroupColumn.@dataField) == data){
+						columnCbo.selectedItem = data;
+						break;
+					}else
+						columnCbo.selectedIndex = -1;
+				}
+			}
+			
+			private function addGroupColumn():void{
+				var type:String = groupTypeCbo.selectedItem.data;
+				if(selectedGroupColumn && String(selectedGroupColumn.@type) == COLUMN){
+					SmartXMessage.show("分组字段不能添加叶子节点！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				if(type == GROUP_COLUMN){
+					if(selectedGroupColumn)
+						selectedGroupColumn.appendChild(<GroupColumn type={GROUP_COLUMN} headerText="" />);
+					else
+						groupColumnDp.addItem(<GroupColumn type={GROUP_COLUMN} headerText="" />);
+				}else if(type == COLUMN){
+					if(selectedGroupColumn)
+						selectedGroupColumn.appendChild(<GroupColumn type={COLUMN} width="80" dataField="" headerText=""/>);
+					else
+						groupColumnDp.addItem(<GroupColumn type={COLUMN} width="80" dataField="" headerText=""/>);
+				}
+				
+				expandAll();
+			}
+			
+			private function delGroupColumn():void{
+				if(groupColumnTree.selectedIndex < 0)
+					return;
+				SmartXMessage.show("是否删除该节点以及所有子节点?",SmartXMessage.MESSAGE_CONFIRM,"",this,function(event:CloseEvent):void{
+					if(event.detail == Alert.YES)
+						CEPUtils.xmlDeleteNode(XML(selectedGroupColumn));
+				});
+			}
+			
+			private function groupColumnMakeUp():void{
+				if(selectedGroupColumn==null || selectedGroupColumn.parent() == undefined)
+					return;
+				var index:int = selectedGroupColumn.childIndex();
+				if(index == 0)
+					return;
+				var newXml:XML = selectedGroupColumn.copy();
+				var parentXml:XML = selectedGroupColumn.parent();
+				CEPUtils.xmlDeleteNode(XML(selectedGroupColumn));
+				parentXml.insertChildBefore(parentXml.children()[index-1],newXml);
+				callLater(function():void{
+					groupColumnTree.selectedItem =newXml;
+					groupColumnTree_itemClickHandler();
+				});
+			}
+			
+			private function groupColumnMakeDown():void{
+				if(selectedGroupColumn==null || selectedGroupColumn.parent() ==undefined)
+					return;
+				var index:int = selectedGroupColumn.childIndex();
+				var parentXml:XML = selectedGroupColumn.parent();
+				if(index == parentXml.children().length() - 1)
+					return;
+				var newXml:XML = selectedGroupColumn.copy();
+				CEPUtils.xmlDeleteNode(XML(selectedGroupColumn));
+				parentXml.insertChildAfter(parentXml.children()[index],newXml);
+				callLater(function():void{
+					groupColumnTree.selectedItem =newXml;
+					groupColumnTree_itemClickHandler();
+				});
+			}
+			
+			private function columnCbo_changeHandler(event:ListEvent):void{
+				//上次分组字段的数据字段和字段ID的副本
+				var dataFieldDup:String =  ObjectUtil.copy(selectedGroupColumn.@dataField).toString();
+				var columnIdDup:String =  ObjectUtil.copy(selectedGroupColumn.@id).toString();
+				
+				selectedGroupColumn.@dataField = columnCbo.selectedItem;
+				selectedGroupColumn.@id = columnCbo.selectedItem.toString().concat(CEPUtils.randomString(5));
+				
+				if(dataFieldDup != null && dataFieldDup != "" && columnIdDup != null && columnIdDup != "")
+				for each(var renderer:XML in contentXml.extend.Renderers.Renderer){
+					if(String(renderer.@columnId)==columnIdDup && String(renderer.@dataField) == dataFieldDup){
+						renderer.@columnId = selectedGroupColumn.@id;
+						renderer.@dataField = selectedGroupColumn.@dataField;
+					}
+				}
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in groupColumnTree.dataProvider){
+					groupColumnTree.expandChildrenOf(item,true);
+				}
+			}
+			
+			private function addRenderer():void{
+				rendererDp.addItem(<Renderer columnId="" dataField="" rendererClass="渲染器类" ><params /></Renderer>);
+			}
+			
+			private function delRenderer():void{
+				if(rendererDg.selectedIndex < 0)
+					return;
+				rendererDp.removeItemAt(rendererDg.selectedIndex);
+			}
+			
+			private function rendererDg_itemClickHandler(event:ListEvent):void{
+				if(rendererDg.selectedIndex < 0)
+					return;
+				rendererParamDp.source = rendererDg.selectedItem.params.param;
+			}
+			
+			private function addRendererParam():void{
+				rendererParamDp.addItem(<param name="属性" value="值" />);
+			}
+			
+			private function delRendererParam():void{
+				if(rendererParamDg.selectedIndex < 0)
+					return;
+				rendererParamDp.removeItemAt(rendererParamDg.selectedIndex);
+			}
+			
+		]]>
+	</fx:Script>
+	<designer:states>
+		<s:State name="groupColumn" />
+		<s:State name="column" />
+	</designer:states>
+	<mx:VBox width="100%" height="100%">
+		<mx:TabNavigator width="100%" height="100%">
+			<mx:VBox label="列表设置" width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HDividedBox width="100%" height="220" borderStyle="solid">
+					<mx:VBox width="52%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+						<mx:HBox id="treeButtonBox" width="100%" borderStyle="solid">
+							<mx:ComboBox id="groupTypeCbo" dataProvider="{groupType}" labelField="label" />
+							<mx:LinkButton width="22" height="22" click="addGroupColumn()"
+										   icon="{AssetsFileLib.addIcon}"
+										   toolTip="新增(按ESC可以取消当前选中的节点)"/>
+							<mx:LinkButton width="22" height="22" click="delGroupColumn()"
+										   icon="{AssetsFileLib.minuseIcon}"
+										   toolTip="删除"/>
+							<mx:LinkButton width="22" height="22" click="groupColumnMakeUp()"
+										   icon="{AssetsFileLib.upIcon}"
+										   toolTip="上移(只允许同级节点)"/>
+							<mx:LinkButton width="22" height="22" click="groupColumnMakeDown()"
+										   icon="{AssetsFileLib.downIcon}"
+										   toolTip="下移(只允许同级节点)"/>
+						</mx:HBox>
+						<mx:Tree id="groupColumnTree" width="100%" height="100%" dataProvider="{groupColumnDp}" 
+								 labelField="@headerText" itemClick="groupColumnTree_itemClickHandler()"/>
+					</mx:VBox>
+					<mx:VBox width="48%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+						<mx:HBox width="100%" horizontalAlign="left" includeIn="column">
+							<mx:Label text="列字段" width="20%" />
+							<mx:ComboBox id="columnCbo" dataProvider="{summaryFields}" change="columnCbo_changeHandler(event)" />
+						</mx:HBox>
+						<mx:HBox width="100%" horizontalAlign="left">
+							<mx:Label text.column="显示名" text.groupColumn="分组名" width="20%"/>
+							<mx:TextInput id="headerTxt" text="{selectedGroupColumn.@headerText}" 
+										  change="{selectedGroupColumn.@headerText = headerTxt.text}" />
+						</mx:HBox>
+						<mx:HBox width="100%" horizontalAlign="left" includeIn="column">
+							<mx:Label text="列宽度" width="20%" />
+							<mx:HSlider id="widthSld" minimum="0" maximum="400" snapInterval="1" 
+										change="{selectedGroupColumn.@width = widthSld.value}" 
+										value="{Number(selectedGroupColumn.@width)}"/>
+						</mx:HBox>
+					</mx:VBox>
+				</mx:HDividedBox>
+				<mx:VBox width="100%">
+					<mx:CheckBox label="是否分层展示数据" id="isHierarchicalChk" 
+								 selected="{contentXml.extend.GroupCollection.@grouping=='true'?true:false}"
+								 click="{contentXml.extend.GroupCollection.@grouping=isHierarchicalChk.selected?'true':'false'}"/>
+					<mx:HBox width="100%" height="140">
+						<mx:VBox width="30%" height="100%">
+							<mx:HBox width="100%">
+								<mx:Label text="分层字段选择" />
+								<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addGroupField()"/>
+								<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delGroupField()"/>
+							</mx:HBox>
+							<mx:DataGrid id="groupDataGrid" width="100%" height="100%" dataProvider="{groupCollectionDp}" editable="true"
+										 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true" itemClick="groupDataGrid_itemClickHandler(event)">
+								<mx:columns>
+									<mx:DataGridColumn headerText="分层数据列" dataField="@name">
+										<mx:itemEditor>
+											<fx:Component>
+												<mx:HBox width="100%" horizontalAlign="center">
+													<fx:Script>
+														<![CDATA[
+															import mx.events.ListEvent;
+															
+															public function get text():String{
+																return nameCbo.selectedItem==null?"":String(nameCbo.selectedItem);
+															}
+															
+															override public function set data(value:Object):void{
+																super.data = value;
+																if(value != null){
+																	nameCbo.selectedItem = String(value.@name);
+																}else
+																	nameCbo.selectedIndex = -1;
+															}
+															
+															private function nameCbo_changeHandler(event:ListEvent):void{
+																data.@name = text;
+															}
+															
+														]]>
+													</fx:Script>
+													<mx:ComboBox id="nameCbo" width="100%" dataProvider="{outerDocument.fieldList}"
+																 change="nameCbo_changeHandler(event)"/>
+												</mx:HBox>
+											</fx:Component>
+										</mx:itemEditor>
+									</mx:DataGridColumn>
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:VBox>
+						<mx:VBox width="30%" height="100%">
+							<mx:HBox width="100%">
+								<mx:Label text="分层统计行" />
+								<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addSummaryRow()"/>
+								<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delSummaryRow()"/>
+							</mx:HBox>
+							<mx:DataGrid id="summaryRowDg" width="100%" height="100%" dataProvider="{summaryRowDp}" editable="true"
+										 itemClick="summaryRowDg_itemClickHandler(event)">
+								<mx:columns>
+									<mx:DataGridColumn headerText="展示位置" dataField="@summaryPlacement" editable="false">
+										<mx:itemRenderer>
+											<fx:Component>
+												<mx:HBox width="100%" horizontalAlign="center">
+													<fx:Script>
+														<![CDATA[
+															import mx.collections.ArrayCollection;
+															
+															private var placementArr:ArrayCollection = new ArrayCollection();
+															
+															override public function set data(value:Object):void{
+																super.data = value;
+																
+																if(String(data.@summaryPlacement) != ""){
+																	placementArr = new ArrayCollection(String(data.@summaryPlacement).split(" "));
+																}else
+																	placementArr.removeAll();
+															}
+															
+															private function firstChk_changeHandler(event:Event):void{
+																if(firstChk.selected)
+																	placementArr.addItem("first");
+																else
+																	placementArr.removeItemAt(placementArr.getItemIndex("first"));
+																convert();
+															}
+															
+															private function lastChk_changeHandler(event:Event):void{
+																if(lastChk.selected)
+																	placementArr.addItem("last");
+																else
+																	placementArr.removeItemAt(placementArr.getItemIndex("last"));
+																convert();
+															}
+															
+															private function groupChk_changeHandler(event:Event):void{
+																if(groupChk.selected)
+																	placementArr.addItem("group");
+																else
+																	placementArr.removeItemAt(placementArr.getItemIndex("group"));
+																convert();
+															}
+															
+															private function convert():void{
+																var s:String="";
+																for each(var o:String in placementArr){
+																	s = s.concat(o).concat(" ");
+																}
+																data.@summaryPlacement = s.substr(0,s.length-1);
+															}
+															
+														]]>
+													</fx:Script>
+													
+													<mx:CheckBox id="groupChk" label="嵌入" labelPlacement="left" 
+																 selected="{String(data.@summaryPlacement).indexOf('group') >=0?true:false}"
+																 change="groupChk_changeHandler(event)"/>
+													<mx:CheckBox id="firstChk" label="首部" labelPlacement="left"
+																 selected="{String(data.@summaryPlacement).indexOf('first') >=0?true:false}"
+																 change="firstChk_changeHandler(event)"/>
+													<mx:CheckBox id="lastChk" label="末部" labelPlacement="left" 
+																 selected="{String(data.@summaryPlacement).indexOf('last') >=0?true:false}"
+																 change="lastChk_changeHandler(event)"/>
+													
+												</mx:HBox>
+											</fx:Component>
+										</mx:itemRenderer>
+									</mx:DataGridColumn>
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:VBox>
+						<mx:VBox width="40%" height="100%">
+							<mx:HBox width="100%">
+								<mx:Label text="统计列设置" />
+								<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addSummaryField()"/>
+								<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delSummaryField()"/>
+							</mx:HBox>
+							<mx:DataGrid id="summaryFieldDg" width="100%" height="100%" dataProvider="{summaryFieldDp}" editable="true">
+								<mx:columns>
+									<mx:DataGridColumn headerText="数据列" dataField="@dataField" >
+										<mx:itemEditor>
+											<fx:Component>
+												<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off">
+													<fx:Script>
+														<![CDATA[
+															import mx.events.ListEvent;
+															
+															public function get text():String{
+																return dataFieldCbo.selectedItem==null?"":String(dataFieldCbo.selectedItem);
+															}
+															
+															override public function set data(value:Object):void{
+																super.data = value;
+																if(value != null){
+																	dataFieldCbo.selectedItem = String(value.@dataField);
+																}else
+																	dataFieldCbo.selectedIndex = -1;
+															}
+															
+															private function dataFieldCbo_changeHandler(event:ListEvent):void{
+																data.@dataField = text;
+															}
+															
+														]]>
+													</fx:Script>
+													<mx:ComboBox id="dataFieldCbo" width="100%" dataProvider="{outerDocument.fieldList}"
+																 change="dataFieldCbo_changeHandler(event)"/>
+												</mx:HBox>
+											</fx:Component>
+										</mx:itemEditor>
+									</mx:DataGridColumn>
+									<mx:DataGridColumn headerText="名称" dataField="@label"  />
+									<mx:DataGridColumn headerText="统计方式" dataField="@summaryOperation" 
+													   labelFunction="summaryOpertionLabelFun">
+										<mx:itemEditor>
+											<fx:Component>
+												<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off">
+													<fx:Script>
+														<![CDATA[
+															import mx.events.ListEvent;
+															
+															public function get text():String{
+																return statisticTypeCbo.selectedItem==null?"":statisticTypeCbo.selectedItem.data;
+															}
+															
+															override public function set data(value:Object):void{
+																super.data = value;
+																for each(var o:Object in statisticTypeCbo.dataProvider){
+																	if(String(data.@summaryOperation) == o.data){
+																		statisticTypeCbo.selectedItem = o;
+																		break;
+																	}else
+																		statisticTypeCbo.selectedIndex = -1;
+																}
+															}
+															
+															private function statisticTypeCbo_changeHandler(event:ListEvent):void{
+																data.@summaryOperation = text;
+															}
+															
+														]]>
+													</fx:Script>
+													
+													<mx:ComboBox id="statisticTypeCbo" width="100%" dataProvider="{outerDocument.statisticTypes}" 
+																 change="statisticTypeCbo_changeHandler(event)"/>
+												</mx:HBox>
+											</fx:Component>
+										</mx:itemEditor>
+									</mx:DataGridColumn>
+								</mx:columns>
+							</mx:DataGrid>
+						</mx:VBox>
+					</mx:HBox>
+				</mx:VBox>
+				<mx:HBox width="100%" height="175">
+					<mx:VBox width="50%" height="100%">
+						<mx:HBox width="100%">
+							<mx:Label text="渲染器" />
+							<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addRenderer()"/>
+							<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delRenderer()"/>
+						</mx:HBox>
+						<mx:DataGrid id="rendererDg" width="100%" height="100%" dataProvider="{rendererDp}" 
+									 itemClick="rendererDg_itemClickHandler(event)" editable="true">
+							<mx:columns>
+								<mx:DataGridColumn headerText="字段" dataField="@dataField">
+									<mx:itemEditor>
+										<fx:Component>
+											<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off"
+													 creationComplete="init()">
+												<fx:Script>
+													<![CDATA[
+														import mx.collections.ArrayCollection;
+														import mx.events.ListEvent;
+														
+														import smartx.flex.components.util.Hashtable;
+														
+														[Bindable]
+														private var dp:ArrayCollection = new ArrayCollection();
+														
+														private var groupColumnIdMap:Hashtable  = new Hashtable();
+														
+														private function init():void{
+															recursiveGroupColumn( outerDocument.contentXml.extend.GroupColumns.children());
+														}
+														
+														private function recursiveGroupColumn(xmllist:XMLList):void{
+															for each(var groupColumn:XML in xmllist){
+																if(String(groupColumn.@type) == "column"){
+																	dp.addItem(String(groupColumn.@dataField));
+																	groupColumnIdMap.add(String(groupColumn.@dataField),String(groupColumn.@id));
+																}else
+																	recursiveGroupColumn(groupColumn.children());
+															}
+														}
+														
+														public function get text():String{
+															return dataFieldCbo.selectedItem==null?"":String(dataFieldCbo.selectedItem);
+														}
+														
+														override public function set data(value:Object):void{
+															super.data = value;
+															if(value != null){
+																dataFieldCbo.selectedItem = String(value.@dataField);
+															}else
+																dataFieldCbo.selectedIndex = -1;
+														}
+														
+														private function dataFieldCbo_changeHandler(event:ListEvent):void{
+															data.@dataField = text;
+															data.@columnId = groupColumnIdMap.find(text);
+														}
+														
+													]]>
+												</fx:Script>
+												<mx:ComboBox id="dataFieldCbo" width="100%" dataProvider="{dp}"
+															 change="dataFieldCbo_changeHandler(event)"/>
+											</mx:HBox>
+										</fx:Component>
+									</mx:itemEditor>
+								</mx:DataGridColumn>
+								<mx:DataGridColumn headerText="渲染器类" dataField="@rendererClass" />
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:VBox>
+					<mx:VBox width="50%" height="100%">
+						<mx:HBox width="100%">
+							<mx:Label text="渲染器参数" />
+							<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addRendererParam()"/>
+							<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delRendererParam()"/>
+						</mx:HBox>
+						<mx:DataGrid id="rendererParamDg" width="100%" height="100%" dataProvider="{rendererParamDp}" editable="true">
+							<mx:columns>
+								<mx:DataGridColumn headerText="属性" dataField="@name" />
+								<mx:DataGridColumn headerText="值" dataField="@value" />
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:VBox>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:CheckBox label="是否显示搜索框" id="showQueryBoxInput" selected="{contentXml.extend.showQueryBox=='true'?true:false}"
+								 click="{contentXml.extend.showQueryBox = showQueryBoxInput.selected?'true':'false'}"/>
+					<mx:CheckBox label="是否显示分页控件" id="showPageBoxInput" selected="{contentXml.extend.showPageBox=='true'?true:false}"
+								 click="{contentXml.extend.showPageBox = showPageBoxInput.selected?'true':'false'}"/>
+					<mx:CheckBox label="是否显示自定义按钮控件" id="showCustomButtonBoxInput" 
+								 selected="{contentXml.extend.showCustomButtonBox=='true'?true:false}"
+								 click="{contentXml.extend.showCustomButtonBox = showCustomButtonBoxInput.selected?'true':'false'}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="页大小" />
+					<mx:TextInput id="pageSizeInput" restrict="0-9" toolTip="最大每页{MAX_PAGESIZE.toString()}条"
+								  change="pageSizeInput_changeHandler(event)" text="{contentXml.extend.pageSize}"/>
+				</mx:HBox>
+			</mx:VBox>
+			<components:CustomButtonDesigner id="customBtnDesignVbox" width="100%" height="100%" label="自定义按钮" 
+											paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" />
+		</mx:TabNavigator>
+	</mx:VBox>
+</designer:BaseDesigner>

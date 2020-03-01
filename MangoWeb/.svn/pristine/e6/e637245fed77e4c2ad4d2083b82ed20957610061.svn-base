@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								 xmlns:s="library://ns.adobe.com/flex/spark" 
+								 xmlns:mx="library://ns.adobe.com/flex/mx" 
+								 xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*"
+								 creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<fx:XML source="../../../assets/data/mapList.xml" id="mapListXML" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.ResultEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			private function init():void{
+				
+			}
+			
+			override public function generalFormComplete():void{
+				var url:String = String(contentXml.extend.mapURL);
+				var temp:XMLList = mapListXML.map.(@url==url);
+				if(temp.length()>0)
+					mapURLInput.selectedItem = temp[0];
+			}
+			
+			override public function confirmChecked():Boolean{
+				if(mapURLInput.selectedIndex<0){
+					SmartXMessage.show("请选择地图类型");
+					return false;
+				}
+				return true;
+			}
+			
+			override public function initTableStructComplete():void{
+				nameFieldInput.selectedIndex = -1; 
+				for(var i:int=0;i<fieldList.length;i++){
+					if(fieldList.getItemAt(i) == String(contentXml.extend.nameField))
+						nameFieldInput.selectedIndex = i;
+				}
+				
+				valueFieldInput.selectedIndex = -1; 
+				for(i=0;i<fieldList.length;i++){
+					if(fieldList.getItemAt(i) == String(contentXml.extend.valueField))
+						valueFieldInput.selectedIndex = i;
+				}
+				
+			}
+			
+			private function generateAreas():void{
+				var url:String = contentXml.extend.mapURL=mapURLInput.selectedItem.@url;
+				if(url==null || url=="")
+					return;
+				//加载区域设置
+				var areasXML:XML = mapListXML.map.(@url==url)[0].areas[0];
+				delete contentXml.extend.areas;
+				contentXml.extend.appendChild(areasXML);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" 
+			 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:Form width="100%" height="100%">
+			<mx:FormItem label="地图类型" required="true">
+				<mx:ComboBox id="mapURLInput"
+							 dataProvider="{mapListXML.map}" labelField="@label" change="generateAreas()"
+							 selectedIndex="-1"/>
+			</mx:FormItem>
+			<mx:FormItem label="背景颜色">
+				<mx:ColorPicker id="backgroundColorInput" selectedColor="{parseInt(contentXml.extend.backgroundColor,16)}"
+								 change="{contentXml.extend.backgroundColor=backgroundColorInput.selectedColor.toString(16)}"/>
+			</mx:FormItem>
+			<mx:FormItem label="鼠标经过区域颜色">
+				<mx:ColorPicker id="rollOverColorInput" selectedColor="{parseInt(contentXml.extend.rollOverColor,16)}"
+								change="{contentXml.extend.rollOverColor=rollOverColorInput.selectedColor.toString(16)}"/>
+			</mx:FormItem>
+			<mx:FormItem label="鼠标选中区域颜色">
+				<mx:ColorPicker id="selectedColorInput" selectedColor="{parseInt(contentXml.extend.selectedColor,16)}"
+								change="{contentXml.extend.selectedColor=selectedColorInput.selectedColor.toString(16)}"/>
+			</mx:FormItem>
+			<mx:FormItem label="未定义区域颜色">
+				<mx:ColorPicker id="unlistedAreasColorInput" selectedColor="{parseInt(contentXml.extend.unlistedAreasColor,16)}"
+								change="{contentXml.extend.unlistedAreasColor=unlistedAreasColorInput.selectedColor.toString(16)}"/>
+			</mx:FormItem>
+			<mx:FormItem label="是否显示工具条">
+				<mx:CheckBox id="enableZoomControlInput"
+							 selected="{contentXml.extend.enableZoomControl=='true'}"
+							 change="{contentXml.extend.enableZoomControl=enableZoomControlInput.selected?'true':'false'}"/>
+			</mx:FormItem>
+			<mx:FormItem label="是否显示缩略图">
+				<mx:CheckBox id="enableSmallMapInput"
+							 selected="{contentXml.extend.enableSmallMap=='true'}"
+							 change="{contentXml.extend.enableSmallMap=enableSmallMapInput.selected?'true':'false'}"/>
+			</mx:FormItem>
+			<mx:FormItem label="区域ID对应字段">
+				<mx:ComboBox dataProvider="{fieldList}" id="nameFieldInput" selectedIndex="-1"
+							 change="{contentXml.extend.nameField=nameFieldInput.selectedLabel}"
+							 />
+			</mx:FormItem>
+			<mx:FormItem label="区域数据值对应字段">
+				<mx:ComboBox dataProvider="{fieldList}" id="valueFieldInput" selectedIndex="-1"
+							 change="{contentXml.extend.valueField=valueFieldInput.selectedLabel}"/>
+			</mx:FormItem>
+			<mx:FormItem label="区域设置" >
+				<mx:VBox width="400" height="250">
+					<mx:HBox width="100%">
+						<mx:LinkButton width="20" height="20" icon="{AssetsFileLib.refreshIcon}"
+									   toolTip="重新生成区域设置信息"
+									   click="generateAreas()" />
+					</mx:HBox>
+					<mx:DataGrid id="areasInput" width="100%" height="100%" dataProvider="{contentXml.extend.areas.mapArea}"
+								 editable="true">
+						<mx:columns>
+							<mx:DataGridColumn headerText="ID" editable="false" dataField="@instanceName" />
+							<mx:DataGridColumn headerText="标题" editable="true" dataField="@title" />
+							<mx:DataGridColumn headerText="颜色" editable="true" dataField="@color" rendererIsEditor="true">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:HBox horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+											<fx:Script>
+												<![CDATA[
+													import mx.states.RemoveChild;
+													
+													import smartx.flex.components.assets.AssetsFileLib;
+													
+													public function get text():String
+													{
+														return String( data.@color );
+													}
+													
+													protected function noColorSetLabel_clickHandler(event:MouseEvent):void
+													{
+														currentState = "setted";
+														data.@color = "FFFFFF";
+														areaColorInput.selectedColor = parseInt("FFFFFF",16);
+													}
+													
+													override public function set data(value:Object):void
+													{
+														super.data = value;
+														if(value.@color.length()>0){
+															currentState = "setted";
+															var code:String = value.@color;
+															callLater(function(colorCode:String):void{
+																areaColorInput.selectedColor = parseInt(colorCode,16);
+															},[code]
+															);
+															
+														}
+														else{
+															currentState = "noset";
+														}
+													}
+													
+													protected function linkbutton1_clickHandler(event:MouseEvent):void
+													{
+														//清空设置
+														delete data.@color;
+														currentState = "noset";
+													}
+													
+												]]>
+											</fx:Script>
+											<mx:states>
+												<s:State name="noset"/>
+												<s:State name="setted"/>
+											</mx:states>
+											<mx:LinkButton label="未设置颜色" toolTip="点击设置颜色" id="noColorSetLabel"
+														   click="noColorSetLabel_clickHandler(event)" includeIn="noset"/>
+											<mx:HBox includeIn="setted" horizontalGap="1">
+												<mx:ColorPicker id="areaColorInput" change="{data.@color=areaColorInput.selectedColor.toString(16)}"/>
+												<mx:LinkButton toolTip="清除设置" icon="{AssetsFileLib.closeIcon}" click="linkbutton1_clickHandler(event)"/>
+											</mx:HBox>
+											
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="允许鼠标动作" editable="true" dataField="@mouseEnabled"
+											   rendererIsEditor="true">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:HBox horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+											<fx:Script>
+												<![CDATA[
+													public function get text():String
+													{
+														return String( data.@mouseEnabled );
+													}
+												]]>
+											</fx:Script>
+											<mx:CheckBox selected="{data.@mouseEnabled!='false'}" 
+														 change="{data.@mouseEnabled=event.target.selected?'true':'false'}"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+			</mx:FormItem>
+		</mx:Form>
+	</mx:VBox>
+</designer:BaseDesigner>

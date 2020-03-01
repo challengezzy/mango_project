@@ -1,0 +1,637 @@
+<root>
+	<exportobjects name="smartx">
+		<exportobject id="metadata" tableName="pub_metadata_templet"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,code,owner,scope,content,type from pub_metadata_templet where scope='SMARTX' and code not in ('mt_initmetadata') ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="metadata-create" tableName="pub_metadata_templet"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default"
+			ignoreWhenExists="true">
+			<data>
+				<sql><![CDATA[select name,code,owner,scope,content,type from pub_metadata_templet where code in ('mt_initmetadata') ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="menu" tableName="pub_menu" pkName="id"
+			visiblePkName="name" fkType="RefField" fkName="parentmenuid"
+			datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,
+       localname,
+       icon,
+       seq,
+       command,
+       showintoolbar,
+       toolbarseq,
+       appmodule,
+       comments,
+       isflex
+  from pub_menu
+ where isFlex = 'Y' and
+ id in (select id from pub_menu mm start with isFlex = 'Y' and APPMODULE='SMARTX' connect by prior parentmenuid=id)  ]]></sql>
+				<children>
+					<exportobject reference="menu" />
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="sysdic" tableName="bfbiz_sysdictionary"
+			pkName="id" fkName="" visiblePkName="classid,attributeid,value"
+			datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select value,
+       valuecn,
+       valueen,
+       t.seqno,
+       t.systemcomments,
+       t.usercomments,
+       t.type,
+       t.abbrev,
+       t.version,
+       t.classid,
+       t.attributeid,
+       t.appmodule,
+       t.state
+  from bfbiz_sysdictionary t
+where appmodule='SMARTX']]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="pubjob" 
+			tableName="pub_job" pkName="id" fkName="" visiblePkName="name"
+			datasource="datasource_default" description="导出循环任务">
+			<data>
+				<sql><![CDATA[select name,status,cronexpression,oneshotrundate,indicator,operator,createdate,implclassname,jobgroup,lastmodifydate,description,version,oid,persisttype,jobtag from pub_job where name in ('工作流实例定期归档')]]></sql>
+			</data>
+		</exportobject>
+		
+	</exportobjects>
+	<exportobjects name="bam">
+		<exportobject id="pubjob" 
+			tableName="pub_job" pkName="id" fkName="" visiblePkName="name"
+			datasource="datasource_default" description="导出循环任务">
+			<data>
+				<sql><![CDATA[select name,status,cronexpression,oneshotrundate,indicator,operator,createdate,implclassname,jobgroup,lastmodifydate,description,version,oid,persisttype,jobtag from pub_job where name in ('告警消息归档','任务数据归档')]]></sql>
+			</data>
+		</exportobject>
+		<exportobject id="systemsettings" tableName="bam_systemsettings" ignoreWhenExists="true"
+			pkName="id" fkName="" visiblePkName="key" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select key,keycn,value from bam_systemsettings]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="metadata" tableName="pub_metadata_templet"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,code,owner,scope,content,type from pub_metadata_templet where scope='BAM' and code not in ('MT_SYNONYMS') ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="metadata-create" tableName="pub_metadata_templet"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default"
+			ignoreWhenExists="true">
+			<data>
+				<sql><![CDATA[select name,code,owner,scope,content,type from pub_metadata_templet where code in ('MT_SYNONYMS') ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="menu" tableName="pub_menu" pkName="id"
+			visiblePkName="name" fkType="RefField" fkName="parentmenuid"
+			datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,
+       localname,
+       icon,
+       seq,
+       command,
+       showintoolbar,
+       toolbarseq,
+       appmodule,
+       comments,
+       isflex
+  from pub_menu
+ where isFlex = 'Y' and
+ id in (select id from pub_menu mm start with isFlex = 'Y' and APPMODULE='BAM' connect by prior parentmenuid=id)  ]]></sql>
+				<children>
+					<exportobject reference="menu" />
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="sysdic" tableName="bfbiz_sysdictionary"
+			pkName="id" fkName="" visiblePkName="classid,attributeid,value"
+			datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select value,
+       valuecn,
+       valueen,
+       t.seqno,
+       t.systemcomments,
+       t.usercomments,
+       t.type,
+       t.abbrev,
+       t.version,
+       t.classid,
+       t.attributeid,
+       t.appmodule,
+       t.state
+  from bfbiz_sysdictionary t
+where appmodule='BAM']]></sql>
+				<children />
+			</data>
+		</exportobject>
+	</exportobjects>
+	<exportobjects name="dqcBasic">
+	    <exportobject id="dqcworkposition" tableName="pub_workposition" description="DQC工位信息"
+	    		pkName="id" visiblePkName="name"  datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,appmodule,comments,version from pub_workposition where appmodule='DQC']]></sql>
+				<children/>
+			</data>
+		</exportobject>
+		<exportobject id="dqcmetadata"  tableName="pub_metadata_templet"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default" description="导出DQC相关的元数据模板">
+			<data>
+				<sql><![CDATA[select name, code, owner, scope, content, type
+                  from pub_metadata_templet
+                 where SCOPE='DQC']]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="pubrole" tableName="pub_role" description="导出DQC的角色" pkName="id" visiblePkName="name" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select name,appmodule,comments,version ,predefined from pub_role where appmodule='DQC']]></sql>
+				<children>
+					<exportobject id="roleparameter" 
+					tableName="pub_role_parameter" pkName="id" visiblePkName="parametername,{roleid}" 
+					fkType="RefField" fkName="roleid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select parametername,comments,value,roleid from pub_role_parameter]]></sql>
+							<children/>
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="dbfolder" description="导出仪表盘及其目录，以及分配给角色的仪表盘权限"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=1 start with code='DQC' connect by prior id=parentid]]></sql>
+				<children>
+					<exportobject reference="dbfolder" />
+					<exportobject id="dbolayout"
+						tableName="BAM_DASHBOARD" pkName="id" visiblePkName="code" fkType="RefField"
+						fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DESCRIPTION,REFRESHINTERVAL,LAYOUT_MTCODE,SEQ from BAM_DASHBOARD ]]></sql>
+							<children>
+								<exportobject id="dbrole"
+									tableName="pub_role" pkName="id" visiblePkName="name" fkType="RefTable"
+									fkTable="bam_role_dashboard" idToParent="dashboardid"
+									idToChild="roleid" datasource="datasource_default">
+									<data>
+										<sql><![CDATA[select name,appmodule,comments,version ,predefined from pub_role where appmodule='DQC']]></sql>
+										<children />
+									</data>
+								</exportobject>
+								<exportobject id="dbworkposition"
+									tableName="pub_workposition" pkName="id" visiblePkName="name" fkType="RefTable"
+									fkTable="bam_workposition_dashboard" idToParent="dashboardid"
+									idToChild="workpositionid" datasource="datasource_default">
+									<data>
+										<sql><![CDATA[select name,appmodule,comments,version from pub_workposition where appmodule='DQC']]></sql>
+										<children />
+									</data>
+								</exportobject>
+							</children>
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="dbmetadata"  tableName="pub_metadata_templet" description="导出仪表盘相关的元数据模板"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name, code, owner, scope, content, type
+								  from pub_metadata_templet
+								 where code in
+								       (select db.layout_mtcode
+								          from bam_dashboard db
+								         where folderid in (select id
+								                              from bam_folder
+								                             where type = 1
+								                             start with code = 'DQC'
+								                            connect by prior id = parentid))
+								]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="menu" tableName="pub_menu" description="导出DQC的菜单，以及与菜单相关的工位和角色权限"
+			pkName="id" visiblePkName="name" fkType="RefField" fkName="parentmenuid"
+			datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select name,localname,icon,seq,command,showintoolbar,toolbarseq,appmodule,comments,isflex from pub_menu where isFlex='Y' and appmodule='DQC' ]]></sql>
+				<children>
+					<exportobject reference="menu" />
+					
+					<exportobject id="menurole"
+						tableName="pub_role" pkName="id" visiblePkName="name" fkType="RefTable"
+						fkTable="pub_role_menu" idToParent="menuid" idToChild="roleid"
+						datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select name,appmodule,comments,version ,predefined from pub_role where appmodule='DQC' ]]></sql>
+							<children />
+						</data>
+					</exportobject>
+					<exportobject id="menuworkposition"
+									tableName="pub_workposition" pkName="id" visiblePkName="name" fkType="RefTable"
+									fkTable="pub_workposition_menu" idToParent="menuid"
+									idToChild="workpositionid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select name,appmodule,comments,version from pub_workposition where appmodule='DQC']]></sql>
+							<children />
+						</data>
+					</exportobject>
+					
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="relationaldatasource" ignoreWhenExists="true" description="导出关系型数据源"
+			tableName="bam_relationaldatasource" pkName="id" visiblePkName="name,type"
+			fkType="RefField" fkName="" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select name,type,configuration from bam_relationaldatasource]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="queryfolder" description="导出查询视图"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=4 start with code='DQC' connect by prior id=parentid]]></sql>
+				<children>
+					<exportobject reference="queryfolder" />
+					<exportobject id="queryview" fileType="smartxmeta"
+						tableName="BAM_QUERYVIEW" pkName="id" visiblePkName="code" fkType="RefField"
+						fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DATASOURCENAME,SQL,DESCRIPTION from BAM_QUERYVIEW ]]></sql>
+							<children />
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="dbometadata"  tableName="pub_metadata_templet" description="导出仪表盘对象相关的元数据模板"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select name, code, owner, scope, content, type
+                  from pub_metadata_templet
+                 where code in
+                       (select dbo.mtcode
+                          from bam_dashboardobject dbo
+                         where folderid in (select id
+                                              from bam_folder
+								                             where type = 2
+								                             start with code = 'DQC'
+								                            connect by prior id = parentid)
+                                            )
+								]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="dbofolder" description="导出仪表盘对象"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=2 start with code='DQC' connect by prior id=parentid]]></sql>
+				<children>
+					<exportobject reference="dbofolder" />
+					<exportobject id="dboitems" 
+						tableName="BAM_DASHBOARDOBJECT" pkName="id" visiblePkName="code"
+						fkType="RefField" fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,MTCODE from bam_dashboardobject ]]></sql>
+							<children>
+								<exportobject id="accessfilter" 
+									tableName="bam_accessfilter" pkName="id" visiblePkName="code"
+									fkType="RefTable" fkTable="bam_r_accessfilter_do" idToParent="dashboardobjectid"
+									idToChild="accessfilterid" datasource="datasource_default">
+									<data>
+										<sql><![CDATA[ select a.name,a.code,a.condition,a.description from bam_accessfilter a]]></sql>
+										<children />
+									</data>
+								</exportobject>
+							</children>
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="datataskmetadata"  tableName="pub_metadata_templet" description="导出数据任务相关的元数据模板"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select name, code, owner, scope, content, type
+                  from pub_metadata_templet
+                 where code in
+                       (select mtcode from PUB_DATATASK_TEMPLET)
+								]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="datatask" description="导出数据任务，此处全部导出，没有区分"
+			tableName="PUB_DATATASK_TEMPLET" pkName="id" visiblePkName="code"
+			fkType="RefField" fkName="" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select name,code,type,cronexpression,description,mtcode from PUB_DATATASK_TEMPLET]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="reporttemplate" description="DQC报表模板导出"
+			tableName="PUB_REPORT_TEMPLATE" pkName="id" visiblePkName="code"
+			fkType="RefField" fkName="" datasource="datasource_default" >
+			<data>
+				<sql><![CDATA[select code,name,mtcode,datasource,jasperfilepath,jasperxml,editdate,
+       					param1,param2,param3,param4,param5,param6,param7,param8,param9 FROM PUB_REPORT_TEMPLATE ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		
+		
+	</exportobjects>
+	<exportobjects name="dqcOnDQC">
+		<exportobject id="dqc_dictionary" 
+			tableName="dqc_sysdictionary" pkName="id" visiblePkName="classid,attributeid,value"
+			fkType="RefField" fkName="" datasource="datasource_dqc" description="导出DQC的数据字典">
+			<data>
+				<sql><![CDATA[ select value,valuecn,valueen,t.seqno,t.comments,t.classid,t.attributeid,t.version,t.state from dqc_sysdictionary t ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="dqc_checkexamine" description="检查结果考核模板"
+			tableName="DQC_CHK_EXAMINETEMPLATE" pkName="id" visiblePkName="CODE" fkType="RefField"
+			fkName="" datasource="datasource_dqc">
+			<data>
+				<sql><![CDATA[SELECT NAME,CODE,DESCRIPTION FROM DQC_CHK_EXAMINETEMPLATE]]></sql>
+				<children>
+					<exportobject id="dqc_chkexamineitem" tableName="DQC_CHK_EXAMINEITEM" pkName="id" visiblePkName="check_item,{templateid}"
+						fkType="RefField" fkName="templateid" datasource="datasource_dqc">
+						<data>
+							<sql><![CDATA[ select templateid,check_item,priority from dqc_chk_examineitem ]]></sql>
+							<children />
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		
+	</exportobjects>
+	
+	<exportobjects name="test">
+		<exportobject id="meta" fileType="smartxmeta" tableName="pub_metadata_templet"
+			pkName="id" fkName="" visiblePkName="code" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,code,owner,scope,content,type from pub_metadata_templet]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="menu" fileType="smartxmeta" tableName="pub_menu"
+			pkName="id" visiblePkName="name" fkType="RefField" fkName="parentmenuid"
+			datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,localname,icon,seq,command,showintoolbar,toolbarseq,appmodule,comments,isflex from pub_menu where isFlex='Y' and name in (select name from pub_menu start with name in('管理控制台','设计工作台','用户门户') and isFlex='Y' connect by prior id=parentmenuid) ]]></sql>
+				<children>
+					<exportobject reference="menu" />
+					<exportobject id="user" fileType="smartxmeta"
+						tableName="pub_user" pkName="id" visiblePkName="loginname" fkType="RefTable"
+						fkTable="pub_user_menu" idToParent="menuid" idToChild="userid"
+						datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select code,name,pwd,adminpwd,creator,createdate,telephone,mobile,email,regionid,regioncode,expdate,pwdexpdate,department,no,exttelephone,phstelephone,comments,logintime,logincount,
+              	logintimecount,isonline,appmodule,version,extendattribute1,extendattribute2,extendattribute3,extendattribute4,extendattribute5,extendattribute6,extendattribute7,extendattribute8,extendattribute9,
+              	extendattribute10,extendattribute11,extendattribute12,extendattribute13,extendattribute14,extendattribute15,extendattribute16,extendattribute17,extendattribute18,extendattribute19,extendattribute20,
+              	loginname,predefined,accountstatus from pub_user pu where pu.loginname in('user','admin','workbench') ]]></sql>
+							<children />
+						</data>
+					</exportobject>
+					<exportobject id="role" fileType="smartxmeta"
+						tableName="pub_role" pkName="id" visiblePkName="name" fkType="RefTable"
+						fkTable="pub_role_menu" idToParent="menuid" idToChild="roleid"
+						datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select name,appmodule,comments,version ,predefined from pub_role where name in ('业务设计人员','系统管理员','普通用户') ]]></sql>
+							<children />
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="sysdic" fileType="smartxmeta"
+			tableName="bfbiz_sysdictionary" pkName="id" fkName=""
+			visiblePkName="classid,attributeid,valueen,value" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select value,valuecn,valueen,t.seqno,t.systemcomments,t.usercomments,t.type,t.abbrev,t.version,t.classid,t.attributeid,t.appmodule,t.state from bfbiz_sysdictionary t]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="pubjob" fileType="smartxmeta"
+			tableName="pub_job" pkName="id" fkName="" visiblePkName="name"
+			datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,status,cronexpression,oneshotrundate,indicator,operator,createdate,implclassname,jobgroup,lastmodifydate,description,version,oid,persisttype,jobtag from pub_job ]]></sql>
+			</data>
+		</exportobject>
+		<exportobject id="pubstreammodle" fileType="smartxmeta"
+			tableName="pub_cep_streammodule" pkName="id" visiblePkName="name,providername"
+			fkType="RefField" fkName="" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select NAME,SOURCE,CREATOR,MODIFYTIME,0 as STATUS,PROVIDERNAME from pub_cep_streammodule where name in (select STREAMMODULENAME from bam_businessview) ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="relationaldatasource" fileType="smartxmeta"
+			tableName="bam_relationaldatasource" pkName="id" visiblePkName="name,type"
+			fkType="RefField" fkName="" datasource="datasource_default" ignoreWhenExists="true">
+			<data>
+				<sql><![CDATA[select name,type,configuration from bam_relationaldatasource]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="eventdatasource" fileType="smartxmeta"
+			tableName="bam_eventdatasource" pkName="id" visiblePkName="code"
+			fkType="RefField" fkName="" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,code,adaptorclass,code,status from bam_eventdatasource]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="scenariofolder" fileType="smartxmeta"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE from BAM_FOLDER where TYPE=0 ]]></sql>
+				<children>
+					<exportobject reference="scenariofolder" />
+					<exportobject id="scenariodata" fileType="smartxmeta"
+						tableName="BAM_BUSINESSSCENARIO" pkName="id" visiblePkName="code"
+						fkType="RefField" fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DESCRIPTION,DATASOURCETYPE,DATASOURCECODE from BAM_BUSINESSSCENARIO ]]></sql>
+							<children>
+								<exportobject id="ruletemplate" fileType="smartxmeta"
+									tableName="bam_ruletemplate" pkName="id" visiblePkName="code"
+									fkType="RefField" fkName="BUSINESSSCENARIOID" datasource="datasource_default">
+									<data>
+										<sql><![CDATA[select NAME,CODE,DESCRIPTION,CONDITION,HOLDSFOR,RESETCONDITION,RESETHOLDSFOR,SEVERITY,SUBJECT,BODY,SHOWCONDITION from bam_ruletemplate ]]></sql>
+										<children>
+											<exportobject id="rtpara" fileType="smartxmeta"
+												tableName="bam_ruletemplateparameter" pkName="id"
+												fkName="ruletemplateid" visiblePkName="name,{ruletemplateid}"
+												datasource="datasource_default">
+												<data>
+													<sql><![CDATA[select name,type,description,caption,ruletemplateid from bam_ruletemplateparameter ]]></sql>
+													<children />
+												</data>
+											</exportobject>
+										</children>
+									</data>
+								</exportobject>
+							</children>
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="bvfolder" fileType="smartxmeta"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=3 ]]></sql>
+				<children>
+					<exportobject reference="bvfolder" />
+					<exportobject id="businessview" fileType="smartxmeta"
+						tableName="BAM_BUSINESSVIEW" pkName="id" visiblePkName="code"
+						fkType="RefField" fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DESCRIPTION,ISPERSISTVIEWDATA,STREAMNAME,STREAMWINDOWNAME,STREAMMODULENAME,TYPE,METADATA from BAM_BUSINESSVIEW ]]></sql>
+							<children />
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="queryfolder" fileType="smartxmeta"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=4 ]]></sql>
+				<children>
+					<exportobject reference="queryfolder" />
+					<exportobject id="queryview" fileType="smartxmeta"
+						tableName="BAM_QUERYVIEW" pkName="id" visiblePkName="code" fkType="RefField"
+						fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DATASOURCENAME,SQL,DESCRIPTION from BAM_QUERYVIEW ]]></sql>
+							<children />
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="dbolayoutfolder" fileType="smartxmeta"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=1 ]]></sql>
+				<children>
+					<exportobject reference="dbolayoutfolder" />
+					<exportobject id="dbolayout" fileType="smartxmeta"
+						tableName="BAM_DASHBOARD" pkName="id" visiblePkName="code" fkType="RefField"
+						fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DESCRIPTION,REFRESHINTERVAL,LAYOUT_MTCODE,SEQ from BAM_DASHBOARD ]]></sql>
+							<children>
+								<exportobject id="user" fileType="smartxmeta"
+									tableName="pub_user" pkName="id" visiblePkName="loginname"
+									fkType="RefTable" fkTable="bam_user_dashboard" idToParent="dashboardid"
+									idToChild="userid" datasource="datasource_default">
+									<data>
+										<sql><![CDATA[select code,name,pwd,adminpwd,creator,createdate,telephone,mobile,email,regionid,regioncode,expdate,pwdexpdate,department,no,exttelephone,phstelephone,comments,logintime,logincount,
+         		     	logintimecount,isonline,appmodule,version,extendattribute1,extendattribute2,extendattribute3,extendattribute4,extendattribute5,extendattribute6,extendattribute7,extendattribute8,extendattribute9,
+         		     	extendattribute10,extendattribute11,extendattribute12,extendattribute13,extendattribute14,extendattribute15,extendattribute16,extendattribute17,extendattribute18,extendattribute19,extendattribute20,
+         		     	loginname,predefined,accountstatus from pub_user pu where pu.loginname in('user','admin','workbench') ]]></sql>
+										<children />
+									</data>
+								</exportobject>
+								<exportobject id="role" fileType="smartxmeta"
+									tableName="pub_role" pkName="id" visiblePkName="name" fkType="RefTable"
+									fkTable="bam_role_dashboard" idToParent="dashboardid"
+									idToChild="roleid" datasource="datasource_default">
+									<data>
+										<sql><![CDATA[select name,appmodule,comments,version ,predefined from pub_role where name in ('业务设计人员','系统管理员','普通用户') ]]></sql>
+										<children />
+									</data>
+								</exportobject>
+							</children>
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="dboitemsfolder" fileType="smartxmeta"
+			tableName="BAM_FOLDER" pkName="id" visiblePkName="code,type" fkType="RefField"
+			fkName="parentid" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=2 ]]></sql>
+				<children>
+					<exportobject reference="dboitemsfolder" />
+					<exportobject id="dboitems" fileType="smartxmeta"
+						tableName="BAM_DASHBOARDOBJECT" pkName="id" visiblePkName="code"
+						fkType="RefField" fkName="folderid" datasource="datasource_default">
+						<data>
+							<sql><![CDATA[select NAME,CODE,DESCRIPTION,TYPE,MTCODE from bam_dashboardobject ]]></sql>
+							<children>
+								<exportobject id="accessfilter" fileType="smartxmeta"
+									tableName="bam_accessfilter" pkName="id" visiblePkName="code"
+									fkType="RefTable" fkTable="bam_r_accessfilter_do" idToParent="dashboardobjectid"
+									idToChild="accessfilterid" datasource="datasource_default">
+									<data>
+										<sql><![CDATA[ select a.name,a.code,a.condition,a.description from bam_accessfilter a]]></sql>
+										<children />
+									</data>
+								</exportobject>
+							</children>
+						</data>
+					</exportobject>
+				</children>
+			</data>
+		</exportobject>
+		<exportobject id="pubuser" fileType="smartxmeta"
+			tableName="pub_user" pkName="id" fkName="" visiblePkName="loginname,appmodule"
+			datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select code,name,pwd,adminpwd,creator,createdate,telephone,mobile,email,regionid,regioncode,expdate,pwdexpdate,department,no,exttelephone,phstelephone,comments,logintime,logincount,logintimecount,isonline,appmodule,version,extendattribute1,extendattribute2,extendattribute3,extendattribute4,extendattribute5,extendattribute6,extendattribute7,extendattribute8,extendattribute9,extendattribute10,extendattribute11,extendattribute12,extendattribute13,extendattribute14,extendattribute15,extendattribute16,extendattribute17,extendattribute18,extendattribute19,extendattribute20,loginname,predefined,accountstatus from pub_user pu where pu.loginname in('user','admin','workbench') ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="datatask" fileType="smartxmeta"
+			tableName="PUB_DATATASK_TEMPLET" pkName="id" visiblePkName="code"
+			fkType="RefField" fkName="" datasource="datasource_default">
+			<data>
+				<sql><![CDATA[select name,code,type,cronexpression,description,mtcode from PUB_DATATASK_TEMPLET]]></sql>
+				<children />
+			</data>
+		</exportobject>
+		<exportobject id="dqc_dictionary" fileType="smartxmeta"
+			tableName="dqc_sysdictionary" pkName="id" visiblePkName="classid,attributeid,value"
+			fkType="RefField" fkName="" datasource="datasource_dqc">
+			<data>
+				<sql><![CDATA[ select value,valuecn,valueen,t.seqno,t.comments,t.classid,t.attributeid,t.version,t.state from dqc_sysdictionary t ]]></sql>
+				<children />
+			</data>
+		</exportobject>
+	</exportobjects>
+</root>

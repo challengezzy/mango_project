@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns="net.brandonmeyer.containers.*"
+			allowClose="true" allowDrag="true" allowMaximize="true" allowResize="false" allowMinimize="false"
+			xmlns:mx="library://ns.adobe.com/flex/mx"  xmlns:core="smartx.flex.components.core.*" creationComplete="init(event)"
+			width="700" height="650"  close="PopUpManager.removePopUp(this)" xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+			>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.BillListPanelEvent;
+			import smartx.flex.components.styletemplate.StyleTemplate02;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+		
+			[Bindable]
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var forienKey:String;
+			[Bindable]
+			public var pkValue:String;
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var arro:Array;
+			
+			private var stytemp:StyleTemplate02= new StyleTemplate02();
+			
+			protected function save_clickHandler(event:MouseEvent):void
+			{
+				arro=stytemp.listPanel.getCurrentData().toArray();
+				
+				PopUpManager.removePopUp(this);
+				dispatchEvent(new Event("CONOK"));
+			}
+			
+			protected function back_clickHandler(event:MouseEvent):void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			
+			protected function init(event:FlexEvent):void
+			{
+				stytemp.endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT).toString();
+				stytemp.templetCode=templetCode;		
+				stytemp.editable=true;
+				stytemp.initQueryCondition=forienKey+"!='"+pkValue+"'";
+				stytemp.allowMultipleSelection =true;
+				stytemp.showDataAfterInit = true;
+				stytemp.isShowAlert = true;
+				stytemp.percentHeight=100;
+				stytemp.percentWidth=100;
+				stytemp.addEventListener(FlexEvent.CREATION_COMPLETE,creatcomplete);
+				vbox.addChild(stytemp);
+				stytemp.operationList.removeAll();
+				
+			}
+			
+			protected function creatcomplete(event:FlexEvent):void
+			{
+				stytemp.listPanel.maxHeight=630;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:VBox id="vbox" width="100%" height="100%" />
+		<mx:HBox width="100%" height="30" horizontalAlign="center" verticalAlign="middle">
+			<mx:Button id ="save" label="确定"  click="save_clickHandler(event)"/>
+			<mx:Button id="back"  label="关闭" click="back_clickHandler(event)"/>
+		</mx:HBox>
+	</mx:VBox>
+	
+</SuperPanel>

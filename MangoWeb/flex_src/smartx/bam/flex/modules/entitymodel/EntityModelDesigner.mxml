@@ -1,0 +1,1557 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:containers="net.brandonmeyer.containers.*"
+					   xmlns:ext="smartx.flex.components.core.ext.*"
+					   width="880" height="500" allowClose="true" allowDrag="true"
+					   allowResize="true" close="PopUpManager.removePopUp(this)"
+					   creationComplete="creationComplete()" layout="vertical" title="领域实体管理">
+	<fx:Declarations>
+		<mx:TitleWindow id="entityWindow" width="250" height="160"
+						close="PopUpManager.removePopUp(entityWindow)" showCloseButton="true">
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Label text="名称"/>
+				<mx:TextInput id="entityNameTxt" width="120"/>
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Label text="编码"/>
+				<mx:TextInput id="entityCodeTxt" width="120"/>
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="addEntityBtn_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(entityWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="contentXmlTw" width="800" height="500"
+						close="PopUpManager.removePopUp(contentXmlTw)" showCloseButton="true"
+						title="元数据">
+			<mx:TextArea id="contentXmlText" width="100%" height="100%" editable="false"/>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="relatonWindow" width="320" height="340"
+						close="PopUpManager.removePopUp(relatonWindow)" showCloseButton="true"
+						title="新增关系">
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					 paddingTop="5">
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="名称"/>
+					<mx:TextInput id="newRelationNameTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="编码"/>
+					<mx:TextInput id="newRelationCodeTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" text="描述"/>
+					<mx:TextInput id="newRelationDescTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="所属实体"/>
+					<mx:ComboBox id="newOwnerEntityCob" width="75%" dataProvider="{allNotAbstractEntities}"
+								 labelField="@name"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label width="25%" color="blue" text="目标实体"/>
+					<mx:ComboBox id="newGoalEntityCob" width="75%" dataProvider="{allNotAbstractEntities}"
+								 labelField="@name"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label width="25%" color="blue" text="读取语句"/>
+					<mx:TextArea id="newInputSqlTxt" width="75%" height="100"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="addNewRelation()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(relatonWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="ruleWindow" width="350" height="200"
+						close="PopUpManager.removePopUp(ruleWindow)" showCloseButton="true"
+						title="新增规则">
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					 paddingTop="5">
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="名称"/>
+					<mx:TextInput id="newRuleNameTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="编码"/>
+					<mx:TextInput id="newRuleCodeTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="所属实体"/>
+					<mx:ComboBox id="newOwnerRuleEntityCob" width="75%"
+								 dataProvider="{allNotAbstractEntities}" labelField="@name"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="addNewRule()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(ruleWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="dimensionWindow" width="250" height="118"
+						close="PopUpManager.removePopUp(dimensionWindow)" showCloseButton="true"
+						title="选择维度类型">
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					 paddingTop="5">
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="维度类型"/>
+					<mx:ComboBox id="dimensionTypeCob" width="75%" dataProvider="{dimensionTypeCol}"
+								 labelField="name"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="addNewDimensionHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(dimensionWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			import com.flexmonster.pivot.data.consts.FilterType;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.flex.collections.HashMap;
+			
+			import smartx.bam.flex.modules.entitymodel.entitytab.AttributeTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.CubeTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.DimensionTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityDashbordTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityEditorTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityFilterItemPanel;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityFiltersTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityRelationTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityViewerTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.FiltersTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.GisAppInfoTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.GisAppToolTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.GisInfoTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.GisLayerManagerTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.MappingInfoTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.RelationTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.VirtualEntityTab;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityTaskViewWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityTaskWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.modules.entitymodel.utils.GeoServerConfigWindow;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.bam.flex.vo.DQCConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			[Bindable]
+			private var treeDataProvider:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var _contentXml:XML;
+			[Bindable]
+			private var operationList:ArrayCollection = new ArrayCollection();
+			
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			public var confirmFun:Function;
+			
+			public var saveFun:Function;
+			
+			public var saveNoAlertFun:Function;
+			
+			private var formService:RemoteObject;
+			[Bindable]
+			private var selectedItem:Object;
+			
+			private var menuid:String;
+			
+			public var entityModelCode:String;
+			
+			public var datasourceName:String;
+			
+			public var dwDsName:String;
+			[Bindable]
+			private var dimensionTypeCol:ArrayCollection = new ArrayCollection([
+				{name:"实体维度",value:DimensionTab.ENTITY_DIMENSION},
+				{name:"时间维度",value:DimensionTab.TIME_DIMENSION},
+				{name:"同义词维度",value:DimensionTab.SYNONYMS_DIMENSION}
+			]);
+			[Bindable]
+			private var entitiesCache:HashMap = new HashMap();//实体对象集合(key:实体CODE,value:实体XML)
+			[Bindable]
+			private var parentEntityCboDp:ArrayCollection = new ArrayCollection();//父实体集合
+			[Bindable]
+			private var allEntitiesCol:ArrayCollection = new ArrayCollection();
+			
+			private var entitiesArrCache:HashMap = new HashMap();
+			[Bindable]
+			private var entitiesArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var relationsArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var rulesArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var dashboardArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var dimensionArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var entityDimensionArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var timeDimensionArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var synDimensionArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var cubesArr:ArrayCollection = new ArrayCollection();
+			
+			private var queryResultCol:ArrayCollection = new ArrayCollection();
+			
+			private var queryDatagridWindow:QueryDatagridWindow = new QueryDatagridWindow();
+			
+			private var sql:String;
+			
+			private var isQuery:Boolean = false;
+			
+			private var importFromRelation:ImportFromRelationDb = new ImportFromRelationDb();
+			//所有继承属性
+			private var allInheritAtt:ArrayCollection = new ArrayCollection();
+			//所有继承显示属性
+			private var allInheritDisplayAtt:ArrayCollection = new ArrayCollection();
+			//所有继承关系
+			private var allInheritRelation:ArrayCollection = new ArrayCollection();
+			
+			public var insertMode:Boolean;
+			
+			private var bamService:RemoteObject;
+			[Bindable]
+			private var allNotAbstractEntities:ArrayCollection = new ArrayCollection();//所有非抽象实体
+			[Bindable]
+			private var allVirtualEntities:ArrayCollection = new ArrayCollection();
+			
+			private var virtualEntityTab:VirtualEntityTab = new VirtualEntityTab();
+			[Bindable]
+			private var allAttributes:ArrayCollection = new ArrayCollection();//所有属性（包括继承属性）
+			
+			private var gisArr:ArrayCollection = new ArrayCollection();
+			
+			private var attributeTab:AttributeTab = new AttributeTab();
+			
+			private var mappingTab:MappingInfoTab = new MappingInfoTab();
+			
+			private var relationTab:RelationTab = new RelationTab();
+			
+			private var filtersTab:FiltersTab = new FiltersTab();
+			
+			private var entityViewerTab:EntityViewerTab = new EntityViewerTab();
+			
+			private var entityDashbordTab:EntityDashbordTab = new EntityDashbordTab();
+			
+			private var dimensionTab:DimensionTab = new DimensionTab();
+			
+			private var cubeTab:CubeTab = new CubeTab();
+			
+			private var entityEditorTab:EntityEditorTab = new EntityEditorTab();
+			
+			private var gisInfoTab:GisInfoTab = new GisInfoTab();
+			
+			private var gisLayerManagerTab:GisLayerManagerTab = new GisLayerManagerTab();
+			
+			private var gisApplicationArr:ArrayCollection = new ArrayCollection();
+			
+			private var gisAppInfoTab:GisAppInfoTab = new GisAppInfoTab();
+			
+			private var gisAppToolTab:GisAppToolTab = new GisAppToolTab();
+			
+			private var entityFiltersTab:EntityFiltersTab = new EntityFiltersTab();
+			
+			private var entityRelationTab:EntityRelationTab = new EntityRelationTab();
+			
+			private function creationComplete():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取表结构错误！",SmartXMessage.MESSAGE_ERROR,"错误："+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.generateEntitySql.addEventListener(ResultEvent.RESULT,generateEntitySqlHandler);
+				bamService.generateEntitySql.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("生成SQL错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.deleteEntityDashbord.addEventListener(ResultEvent.RESULT,deleteEntityDashbordHandler);
+				bamService.deleteEntityDashbord.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("删除仪表盘时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				var operationMenu:Menu = operationButton.popUp as Menu;
+				operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+				initButtons();
+				
+				if(_contentXml == null || _contentXml == ""){
+					_contentXml = <root>
+									 <entityModelCode>{entityModelCode}</entityModelCode>
+									 <datasource>{datasourceName}</datasource>
+									 <dwdatasource>{dwDsName}</dwdatasource>
+									 <entities />
+ 									 <dashboards />
+									 <dimensions />
+									 <geoServer />
+									 <gisApplications />
+								  </root>;	
+				}else {
+					if(_contentXml.entityModelCode.length() == 0)
+						_contentXml.appendChild(<entityModelCode>{entityModelCode}</entityModelCode>);
+					delete _contentXml.datasource;
+					_contentXml.appendChild( <datasource>{datasourceName}</datasource>);
+					
+					delete _contentXml.dwdatasource;
+					_contentXml.appendChild( <dwdatasource>{dwDsName}</dwdatasource>);
+					
+					if(_contentXml.geoServer.length() == 0)
+						_contentXml.appendChild(<geoServer />);
+					if(_contentXml.gisApplications.length() == 0)
+						_contentXml.appendChild(<gisApplications />);
+				}
+				refreshTree();
+			}
+			
+			//刷新树，将XML转换成ARRAYCOLLECTION
+			private function refreshTree():void{
+				treeDataProvider.removeAll();
+				entitiesCache.clear();
+				allEntitiesCol.removeAll();
+				entitiesArrCache.clear();
+				entitiesArr.removeAll();
+				relationsArr.removeAll();
+				rulesArr.removeAll();
+				dashboardArr.removeAll();
+				dimensionArr.removeAll();
+				entityDimensionArr.removeAll();
+				timeDimensionArr.removeAll();
+				synDimensionArr.removeAll();
+				cubesArr.removeAll();
+				allNotAbstractEntities.removeAll();
+				allVirtualEntities.removeAll();
+				gisArr.removeAll();
+				gisApplicationArr.removeAll();
+				treeDataProvider.addItem({name:"实体",type:"parent",children:entitiesArr});
+				treeDataProvider.addItem({name:"虚拟实体",type:"parent",children:allVirtualEntities});
+				treeDataProvider.addItem({name:"关系",type:"parent",children:relationsArr});
+				treeDataProvider.addItem({name:"过滤规则",type:"parent",children:rulesArr});
+				treeDataProvider.addItem({name:"仪表盘",type:"parent",children:dashboardArr});
+				treeDataProvider.addItem({name:"维度管理",type:"parent",children:dimensionArr});
+				treeDataProvider.addItem({name:"指标",type:"parent",children:cubesArr});
+				treeDataProvider.addItem({name:"GIS应用",type:"parent",children:gisArr});
+				
+				//维度管理树
+				dimensionArr.addItem({name:"时间维度",type:"dimensionLabel",children:timeDimensionArr});
+				dimensionArr.addItem({name:"同义词维度",type:"dimensionLabel",children:synDimensionArr});
+				dimensionArr.addItem({name:"实体维度",type:"dimensionLabel",children:entityDimensionArr});
+				//GIS应用树
+				gisArr.addItem({name:"图层管理",type:"layerManager"});
+				gisArr.addItem({name:"应用管理",type:"parent",children:gisApplicationArr});
+				
+				
+				var entitiesTempArr:ArrayCollection = new ArrayCollection();
+				//先加载所有的实体类
+				for each(var entity:XML in _contentXml.entities.entity){
+					entitiesCache.put(String(entity.@code),entity);
+					allEntitiesCol.addItem(entity);
+					if(entity.@isAbstract == "false")
+						allNotAbstractEntities.addItem(entity);
+					var entityObj:Object = {name:entity.@name,code:entity.@code,content:entity,
+						type:entity.@type=="virtual"?"virtualEntity":(entity.@isAbstract=="true"?"abstractEntity":"entity")};
+					entitiesArrCache.put(String(entity.@code),entityObj);
+					entitiesTempArr.addItem(entityObj);
+					
+				}
+				//拼装树结构
+				for each(var entityData:Object in entitiesTempArr){
+					
+					//判断是否有父实体，如果有则加到父实体对象下
+					if(entitiesArrCache.containsKey(String(entityData.content.@parentEntityCode))){
+						var parentEntity:Object = entitiesArrCache.getValue(String(entityData.content.@parentEntityCode));
+						if(parentEntity.hasOwnProperty("children")){
+							ArrayCollection(parentEntity.children).addItem(entityData)
+						}else{
+							var tempArr:ArrayCollection = new ArrayCollection();
+							tempArr.addItem(entityData);
+							parentEntity.children = tempArr;
+						}
+					}else{
+						if(entityData.content.@type == "virtual")
+							allVirtualEntities.addItem(entityData);
+						else
+							entitiesArr.addItem(entityData);
+					}
+					
+					for each(var relation:XML in entityData.content.relations.relation){
+						var relationObj:Object = {name:relation.@name,code:relation.@code,content:relation,type:"relation",entityCode:String(entityData.content.@code)};
+						relationsArr.addItem(relationObj);
+					}
+					
+					for each(var rule:XML in entityData.content.rules.rule){
+						var ruleObj:Object = {name:rule.@name,code:rule.@code,content:rule,type:"rule",entityCode:String(entityData.content.@code)};
+						rulesArr.addItem(ruleObj);
+					}
+					
+					
+					//轮循所有指标
+					for each(var cubeXml:XML in entityData.content.cubes.Cube){
+						var cubeItem:Object = {name:cubeXml.@name,code:cubeXml.@code,entityCode:String(entityData.content.@code),content:cubeXml,type:"cube"};
+						cubesArr.addItem(cubeItem);
+					}
+					
+				}
+				
+				//轮循所有仪表盘
+				for each(var dashbordXml:XML in _contentXml.dashbords.dashbord){
+					var dashbordItem:Object = {name:dashbordXml.@name,code:dashbordXml.@code,content:dashbordXml,type:"dashbord"};
+					dashboardArr.addItem(dashbordItem);
+				}
+				
+				//轮循所有维度
+				for each(var dimensionXml:XML in _contentXml.dimensions.Dimension){
+					var dimensionObj:Object = {name:dimensionXml.@name,code:dimensionXml.@code,dimensionType:dimensionXml.@type,content:dimensionXml,type:"dimension"};
+					var dimensionType:String = dimensionXml.@type;
+					if(dimensionType == DimensionTab.ENTITY_DIMENSION){
+						entityDimensionArr.addItem(dimensionObj);
+					}else if(dimensionType == DimensionTab.TIME_DIMENSION){
+						timeDimensionArr.addItem(dimensionObj);
+					}else if(dimensionType == DimensionTab.SYNONYMS_DIMENSION){
+						synDimensionArr.addItem(dimensionObj);
+					}
+				}
+				//拼装所有GIS应用
+				for each(var gisAppXml:XML in _contentXml.gisApplications.gisApplication){
+					var gisAppObj:Object = {name:gisAppXml.@name,code:gisAppXml.@code,content:gisAppXml,type:"gisApp"};
+					gisApplicationArr.addItem(gisAppObj);
+				}
+				
+				expandAll();
+			}
+			
+			private function initButtons():void{
+				operationList.addAll(new ArrayCollection([
+					{name:"新增抽象实体",id:"addAbstractEntity",icon:AssetsFileLib.listviewIcon},
+					{name:"新增虚拟实体",id:"addVirtualEntity",icon:AssetsFileLib.listviewIcon},
+					{name:"新增实体",id:"addEntity",icon:AssetsFileLib.listviewIcon},
+					{name:"新增关系",id:"addRelation",icon:AssetsFileLib.relationIcon},
+					{name:"新增过滤规则",id:"addRule",icon:AssetsFileLib.filterIcon},
+					{name:"新增仪表盘",id:"addDashbord",icon:AssetsFileLib.subDatataskIcon},
+					{name:"新增维度",id:"addDimension",icon:AssetsFileLib.edittextIcon},
+					{name:"新增指标",id:"addCube",icon:AssetsFileLib.exportExcelIcon},
+					{name:"新增GIS应用",id:"addGisApp",icon:AssetsFileLib.gisIcon},
+					{name:"删除",id:"delete",icon:AssetsFileLib.delete2Icon}
+				]));
+			}
+			
+			private function operationButton_itemClickHandler(event:MenuEvent):void{
+				menuid = event.item["id"];
+				if(menuid == "addAbstractEntity"){
+					addEntityWindow("新增抽象实体");
+				}else if(menuid == "addEntity"){
+					addEntityWindow("新增实体");
+				}else if(menuid == "addVirtualEntity"){
+					addEntityWindow("新增虚拟实体");
+				}else if(menuid == "addRelation"){
+					PopUpManager.addPopUp(relatonWindow,this,true);
+					PopUpManager.centerPopUp(relatonWindow);
+					newRelationNameTxt.text = "";
+					newRelationCodeTxt.text = "";
+					newRelationDescTxt.text = "";
+				}else if(menuid == "addRule"){
+					PopUpManager.addPopUp(ruleWindow,this,true);
+					PopUpManager.centerPopUp(ruleWindow);
+					newRuleNameTxt.text = "";
+					newRuleCodeTxt.text = "";
+				}else if(menuid == "delete"){
+					deleteHander();
+				}else if(menuid == "addDashbord"){
+					addNewDashbordHandler();
+				}else if(menuid == "addDimension"){
+					PopUpManager.addPopUp(dimensionWindow,this,true);
+					PopUpManager.centerPopUp(dimensionWindow);
+				}else if(menuid == "addCube"){
+					addNewCubeHandler();
+				}else if(menuid == "addGisApp"){
+					addEntityWindow("新增GIS应用");
+				}
+			}
+			
+			private function addEntityWindow(title:String=null):void{
+				PopUpManager.addPopUp(entityWindow,this,true);
+				PopUpManager.centerPopUp(entityWindow);
+				entityNameTxt.text = "";
+				entityCodeTxt.text = "";
+				entityWindow.title = title;
+			}
+			
+			public function set contentXml(content:String):void{
+				this._contentXml = XML(content);
+			}
+			
+			public function get contentXml():String{
+				return _contentXml.toXMLString();
+			}
+			
+			private function addNewCubeHandler():void{
+				var seletedCubeXml:XML = <Cube />;
+				
+				seletedCubeXml.@name = "";
+				seletedCubeXml.@code = "";
+				
+				cubeTab.contentXml = _contentXml;
+				cubeTab.isEdit = false;
+				cubeTab.endpoint = endpoint;
+				cubeTab.saveFun = saveFun;
+				cubeTab.refresh = refreshTree;
+				cubeTab.seletedCubeXml = seletedCubeXml ;
+				cubeTab.allEntityCol = allEntitiesCol;
+				cubeTab.dwDsName = dwDsName;
+				cubeTab.saveNoAlert = saveNoAlertFun;
+				cubeTab.insertMode = insertMode;
+				
+				currentState = "cube";
+				
+				if(!cubeTabNa.contains(cubeTab)){
+					cubeTabNa.addChild(cubeTab);
+				}
+				
+				if(cubeTab.isCreationComplete){
+					cubeTab.showHandler();
+				}
+			}
+			
+			private function addNewDimensionHandler():void{
+				var typeItem:Object = dimensionTypeCob.selectedItem;
+				
+				if(typeItem != null ){
+					
+					var dimensionType:String = typeItem["value"] as String;
+					
+					var seletedDimensionXml:XML = <Dimension><Hierarchy> <Table /></Hierarchy></Dimension>;
+					
+					seletedDimensionXml.@name = "";
+					seletedDimensionXml.@type = dimensionType;
+					
+					dimensionTab.contentXml = _contentXml;
+					dimensionTab.isEdit = false;
+					dimensionTab.saveFun = saveFun;
+					dimensionTab.saveNoAlertFun = saveNoAlertFun;
+					dimensionTab.refresh = refreshTree;
+					dimensionTab.seletedDimensionXml = seletedDimensionXml;
+					dimensionTab.entityCol = allEntitiesCol;
+					dimensionTab.dwDsName = dwDsName;
+					dimensionTab.endpoint = endpoint;
+					dimensionTab.selectedItem = selectedItem;
+					
+					currentState = "dimension";
+					
+					if(!dimensionTabNa.contains(dimensionTab)){
+						dimensionTabNa.addChild(dimensionTab);
+					}
+					
+					if(dimensionTab.isCreationComplete){
+						dimensionTab.showHandler();
+					}
+					PopUpManager.removePopUp(dimensionWindow)
+				}
+			}
+			
+			private function addNewDashbordHandler():void{
+				var seletedDashbordXml:XML = <dashbord />;
+				
+				seletedDashbordXml.@name = "仪表盘1";
+				seletedDashbordXml.@desc = "";
+				seletedDashbordXml.@reftime = "";
+				
+				entityDashbordTab.contentXml = _contentXml;
+				entityDashbordTab.isEdit = false;
+				entityDashbordTab.endpoint = endpoint;
+				entityDashbordTab.saveFun = saveFun;
+				entityDashbordTab.refresh = refreshTree;
+				entityDashbordTab.seletedDashbordXml = seletedDashbordXml;
+				
+				currentState = "dashbord";
+				
+				if(!dashbordTabNa.contains(entityDashbordTab)){
+					dashbordTabNa.addChild(entityDashbordTab);
+				}
+				
+				if(entityDashbordTab.isCreationComplete){
+					entityDashbordTab.showHandler();
+				}
+			}
+			
+			private function importFromRelationDs():void{
+				var newParentEntityDp:ArrayCollection = ObjectUtil.copy(allEntitiesCol) as ArrayCollection;
+				importFromRelation.parentEntityCboDp = newParentEntityDp;
+				importFromRelation.endpoint = this.endpoint;
+				importFromRelation.debugMode = this.debugMode;
+				importFromRelation.dataSourceName = datasourceName;
+				importFromRelation.confirmFun = importFromRelationConfirm;
+				PopUpManager.addPopUp(importFromRelation,this,true);
+				PopUpManager.centerPopUp(importFromRelation);
+				importFromRelation.showHandler();
+			}
+			
+			private function importFromRelationConfirm():void{
+				if(importFromRelation.getImportXml().length() == 0)
+					SmartXMessage.show("导入失败！");
+				else{
+					var importXmlList:XMLList = importFromRelation.getImportXml().entity;
+					for each(var importEntity:XML in importXmlList){
+						EntityUtil.getNewEntityCode(importEntity,_contentXml.entities.entity);
+						_contentXml.entities.appendChild(importEntity);
+					}
+					
+					SmartXMessage.show("导入成功！");
+					refreshTree();
+				}
+				PopUpManager.removePopUp(importFromRelation);
+			}
+			
+			private function iconFunction(item:Object):*{
+				switch(item.type){
+					case "abstractEntity":
+						return AssetsFileLib.listviewIcon;
+					case "entity":
+						return AssetsFileLib.listviewIcon;
+					case "virtualEntity":
+						return AssetsFileLib.listviewIcon;
+					case "relation":
+						return AssetsFileLib.relationIcon;
+					case "rule":
+						return AssetsFileLib.filterIcon;
+					case "dashbord":
+						return AssetsFileLib.subDatataskIcon;
+					case "dimension":
+						return AssetsFileLib.edittextIcon;
+					case "cube":
+						return AssetsFileLib.exportExcelIcon;
+					case "gisApp":
+						return AssetsFileLib.gisIcon;
+				}
+			}
+			
+			private function switchState():void{
+				switch(selectedItem.type){
+					case "parent":
+						currentState = "normal";
+						break;
+					case "abstractEntity":
+						currentState = "abstractEntity";
+						changeAbstractEntityTab();
+						break;
+					case "entity":
+						currentState = "entity";
+						changeEntityTab();
+						infoBox_showHandler(null);
+						break;
+					case "virtualEntity":
+						currentState = "virtualEntity";
+						changeVirtualEntityTab();
+						infoBox_showHandler(null);
+						break;
+					case "relation":
+						currentState = "relation";
+						initEntityRelationTab();
+						break;
+					case "rule":
+						currentState = "rule";
+						initEntityFilterTab();
+						break;
+					case "dashbord":
+						currentState = "dashbord";
+						initDashbordData();
+						break;
+					case "dimension":
+						currentState = "dimension";
+						initDimensionData();
+						break;
+					case "dimensionLabel":
+						currentState = "normal";
+						break;
+					case "cube":
+						currentState = "cube";
+						initCubeData();
+						break;
+					case "layerManager":
+						currentState = "gisInfo";
+						initGisLayerManagerTab();
+						break;
+					case "gisApp":
+						currentState = "gisInfo";
+						initGisAppTab();
+						break;
+					default:
+						currentState = "normal";
+						break;
+				}
+			}
+			
+			private function changeEntityTab():void{
+				clearTabs();
+				initAttributeTab();
+				initMappingTab();
+				initRelationTab();
+				initFiltersTab();
+				initEntity();
+				initEntityEditorTab();
+				
+				if(!mainTab.contains(attributeTab))
+					mainTab.addChild(attributeTab);
+				if(!mainTab.contains(mappingTab))
+					mainTab.addChild(mappingTab);
+				if(!mainTab.contains(relationTab))
+					mainTab.addChild(relationTab);
+				if(!mainTab.contains(filtersTab))
+					mainTab.addChild(filtersTab);
+				if(!mainTab.contains(entityViewerTab))
+					mainTab.addChild(entityViewerTab);
+				if(!mainTab.contains(entityEditorTab))
+					mainTab.addChild(entityEditorTab);
+				
+				attributeTab.showHandler();
+				if(mappingTab.isCreationComplete)
+					mappingTab.showHandler();
+				relationTab.showHandler();
+				if(filtersTab.isCreationComplete)
+					filtersTab.resetItems();
+				
+				if(entityViewerTab.isCreationComplete){
+					entityViewerTab.showHandler();
+				}
+				entityEditorTab.showHandler();
+				isGisEntity_changeHandler(null);
+			}
+			
+			private function initAttributeTab():void{
+				attributeTab.contentXml = _contentXml;
+				attributeTab.selectedItem = selectedItem;
+				attributeTab.allInheritAtt = allInheritAtt;
+				attributeTab.allInheritDisplayAtt = allInheritDisplayAtt;
+				attributeTab.allEntityDp = allNotAbstractEntities;
+			}
+			
+			private function initMappingTab():void{
+				mappingTab.contentXml = _contentXml;
+				mappingTab.selectedItem = selectedItem;
+				mappingTab.endpoint = endpoint;
+				mappingTab.datasourceName = datasourceName;
+				mappingTab.addEventListener(FlexEvent.CREATION_COMPLETE,mappingTab_creationCompleteHandler);
+			}
+			
+			private function mappingTab_creationCompleteHandler(event:FlexEvent):void{
+				mappingTab.showHandler();
+				mappingTab.removeEventListener(FlexEvent.CREATION_COMPLETE,mappingTab_creationCompleteHandler);
+			}
+			
+			private function initRelationTab():void{
+				relationTab.contentXml = _contentXml;
+				relationTab.selectedItem = selectedItem;
+				relationTab.allEntitiesCol = allEntitiesCol;
+				relationTab.refreshFun = refreshTree;
+				relationTab.allInheritRelation = allInheritRelation;
+				relationTab.endpoint = endpoint;
+			}
+			
+			private function initEntityRelationTab():void{
+				entityRelationTab.contentXml = _contentXml;
+				entityRelationTab.selectedItem = selectedItem;
+				entityRelationTab.refreshTree = refreshTree;
+				entityRelationTab.allEntitiesCol = allNotAbstractEntities;
+				entityRelationTab.deleteXmlNode = deleteXmlNode;
+				entityRelationTab.relationsArr = relationsArr;
+				entityRelationTab.selectItemByCode = selectItemByCode;
+				entityRelationTab.entitiesCache = entitiesCache;
+				entityRelationTab.endpoint = endpoint;
+				
+				if(!relationsTabNa.contains(entityRelationTab))
+					relationsTabNa.addChild(entityRelationTab);
+				
+				if(entityRelationTab.isCreationComplete)
+					entityRelationTab.showHandler();
+			}
+			
+			private function initFiltersTab():void{
+				filtersTab.contentXml = _contentXml;
+				filtersTab.selectedItem = selectedItem;
+				filtersTab.endpoint = endpoint;
+				filtersTab.refreshFun = refreshTree;
+				filtersTab.rulesArr = rulesArr;
+				filtersTab.entitiesCache = entitiesCache;
+				filtersTab.insertMode = insertMode;
+				filtersTab.selectedRule = null;
+				filtersTab.debugMode = debugMode;
+				filtersTab.allInheritAtts = allInheritAtt;
+				filtersTab.allInheritRelation = allInheritRelation;
+			}
+			
+			private function initEntityFilterTab():void{
+				entityFiltersTab.contentXml = _contentXml;
+				entityFiltersTab.selectedItem = selectedItem;
+				entityFiltersTab.endpoint = endpoint;
+				entityFiltersTab.refreshTree = refreshTree;
+				entityFiltersTab.entitiesCache = entitiesCache;
+				entityFiltersTab.allEntitiesCol = allNotAbstractEntities;
+				entityFiltersTab.allInheritRelation = allInheritRelation;
+				entityFiltersTab.allInheritAtt = allInheritAtt;
+				entityFiltersTab.insertMode = insertMode;
+				entityFiltersTab.deleteXmlNode = deleteXmlNode;
+				entityFiltersTab.rulesArr = rulesArr;
+				entityFiltersTab.selectItemByCode = selectItemByCode;
+				entityFiltersTab.debugMode = debugMode;
+				
+				if(!filtersTabNa.contains(entityFiltersTab))
+					filtersTabNa.addChild(entityFiltersTab);
+				
+				if(entityFiltersTab.isCreationComplete)
+					entityFiltersTab.showHandler();
+				
+			}
+			
+			private function initVirtualEntityTab():void{
+				virtualEntityTab.contentXml = _contentXml;
+				virtualEntityTab.selectedItem = selectedItem;
+				virtualEntityTab.entityDataProvider = allNotAbstractEntities;
+			}
+			
+			private function initEntity():void{
+				entityViewerTab.contentXml = _contentXml;
+				entityViewerTab.selectedItem = selectedItem;
+				entityViewerTab.endpoint = endpoint;
+				entityViewerTab.datasourceName = datasourceName;
+				entityViewerTab.saveFun = saveFun;
+			}
+			
+			private function initEntityEditorTab():void{
+				entityEditorTab.contentXml = _contentXml;
+				entityEditorTab.selectedItem = selectedItem;
+			}
+			
+			private function changeAbstractEntityTab():void{
+				clearTabs();
+			}
+			
+			private function changeVirtualEntityTab():void{
+				clearTabs();
+				initRelationTab();
+				initFiltersTab();
+				initVirtualEntityTab();
+				
+				if(!mainTab.contains(virtualEntityTab))
+					mainTab.addChild(virtualEntityTab);
+				if(!mainTab.contains(relationTab))
+					mainTab.addChild(relationTab);
+				if(!mainTab.contains(filtersTab))
+					mainTab.addChild(filtersTab);
+				
+				virtualEntityTab.showHandler();
+				relationTab.showHandler();
+				if(filtersTab.isCreationComplete)
+					filtersTab.resetItems();
+				
+			}
+			
+			private function clearTabs():void{
+				if(mainTab.contains(attributeTab))
+					mainTab.removeChild(attributeTab);
+				if(mainTab.contains(mappingTab))
+					mainTab.removeChild(mappingTab);
+				if(mainTab.contains(relationTab))
+					mainTab.removeChild(relationTab);
+				if(mainTab.contains(filtersTab))
+					mainTab.removeChild(filtersTab);
+				if(mainTab.contains(virtualEntityTab))
+					mainTab.removeChild(virtualEntityTab);
+				if(mainTab.contains(entityViewerTab))
+					mainTab.removeChild(entityViewerTab);
+				if(mainTab.contains(entityEditorTab))
+					mainTab.removeChild(entityEditorTab);
+				if(mainTab.contains(gisInfoTab))
+					mainTab.removeChild(gisInfoTab);
+			}
+			
+			private function deleteHander():void{
+				if(selectedItem == null)
+					return;
+				switch(selectedItem.type){
+					case "parent":
+						break;
+					case "abstractEntity":
+						SmartXMessage.show("是否删除该抽象实体及子实体？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "entity":
+						SmartXMessage.show("是否删除该实体及子实体？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "relation":
+						SmartXMessage.show("是否删除该关系？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "rule":
+						SmartXMessage.show("是否删除该规则？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "virtualEntity":
+						SmartXMessage.show("是否删除该虚拟实体？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "dashbord":
+						SmartXMessage.show("是否删除该仪表盘？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "dimension":
+						SmartXMessage.show("是否删除该维度？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "cube":
+						SmartXMessage.show("是否删除该指标？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "gisApp":
+						SmartXMessage.show("是否删除该GIS应用？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+				}
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				if(Alert.YES == event.detail)
+					deleteXmlNode(selectedItem.content);
+			}
+			
+			private function deleteXmlNode(node:XML):void{
+				if(node != null ){
+					if(node.name() == "entity" ){
+						deleteEntity(node);
+						CEPUtils.xmlDeleteNode(node);
+						this.refreshTree();
+						currentState = "normal";
+					}else if(node.name() == "dashbord"){
+						var dashBordCode:String = String(node.@code);
+						var obj:Object = new Object();
+						obj["code"] = dashBordCode;
+						bamService.deleteEntityDashbord(obj);
+					}else{
+						CEPUtils.xmlDeleteNode(node);
+						this.refreshTree();
+						currentState = "normal";
+					}
+				}
+			}
+			
+			private function deleteEntityDashbordHandler(event:ResultEvent):void{
+				CEPUtils.xmlDeleteNode(selectedItem.content);
+				this.refreshTree();
+				saveFun();
+				currentState = "normal";
+			}
+			
+			private function deleteEntity(node:XML):void{
+				for each(var entity:XML in allEntitiesCol){
+					if(String(entity.@parentEntityCode) == String(node.@code)){
+						CEPUtils.xmlDeleteNode(entity);
+						deleteEntity(entity);
+					}
+				}
+			}
+			//初始化属性（包括所有继承属性）
+			private function initAllAttributes():void{
+				allAttributes.removeAll();
+				allInheritAtt = EntityUtil.getInheritAttributes(selectedItem.content,_contentXml);
+				allAttributes.addAll(allInheritAtt);
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					allAttributes.addItem(att);
+				}
+			}
+			
+			protected function entityModelTree_itemClickHandler(event:ListEvent):void{
+				selectedItem = entityModelTree.selectedItem;
+				if(selectedItem.type == "entity" || selectedItem.type == "virtualEntity")
+					initAllAttributes();
+				if(selectedItem.type == "entity"){
+					allInheritDisplayAtt = EntityUtil.getInheritAttributes(selectedItem.content,_contentXml,true);
+					allInheritRelation = EntityUtil.getAllInheritEntity(selectedItem.content,_contentXml)
+				}
+				switchState();
+				callLater(function():void{
+					if(selectedItem.type == "entity"){
+						setParentEntityCboDp();
+						setPrimaryKeyAttName();
+						setDimensionAttName();	
+					}
+				});
+			}
+			
+			private function addEntityBtn_confirmHandler():void{
+				var name:String = StringUtil.trim(entityNameTxt.text);
+				var code:String = StringUtil.trim(entityCodeTxt.text);
+				
+				if(name == ""){
+					SmartXMessage.show("名称不能为空！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				
+				if(code == ""){
+					SmartXMessage.show("编码不能为空！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				
+				if(menuid != "addGisApp" && entitiesCache.containsKey(code)){
+					SmartXMessage.show("该实体编码已经存在！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				if(menuid == "addAbstractEntity"){
+					_contentXml.entities[0].appendChild(<entity type="entity" name={name} code={code} 
+						isAbstract="true" />);
+				}else if(menuid == "addEntity"){
+					if(selectedItem && (selectedItem.type == "entity" || selectedItem.type == "abstractEntity"))
+						_contentXml.entities[0].appendChild(<entity type="entity" name={name} code={code} isAbstract="false" 
+							parentEntityCode={selectedItem.code} idAttributeName="" desc="" ><attributes /><mappingInfo /><relations /></entity>);
+					else
+						_contentXml.entities[0].appendChild(<entity type="entity" name={name} code={code} 
+							isAbstract="false" parentEntityCode="" idAttributeName="" desc="" ><attributes /><mappingInfo /><relations /></entity>);
+				}else if(menuid == "addVirtualEntity"){
+					_contentXml.entities[0].appendChild(<entity type="virtual" name={name} code={code}
+						desc=""><joinEntities /><joinExpression /><attributes /><relations /></entity>);
+				}else if(menuid == "addGisApp"){
+					_contentXml.gisApplications[0].appendChild(<gisApplication name={name} code={code}><mapInfo><layers><basicLayers /><entityLayers /></layers></mapInfo><widgets /></gisApplication>);
+				}
+				refreshTree();
+				PopUpManager.removePopUp(entityWindow);
+			}
+			
+			private function initDashbordData():void{
+				if(!dashbordTabNa.contains(entityDashbordTab)){
+					dashbordTabNa.addChild(entityDashbordTab);
+				}
+				entityDashbordTab.contentXml = _contentXml;
+				entityDashbordTab.isEdit = true;
+				entityDashbordTab.endpoint = endpoint;
+				entityDashbordTab.saveFun = saveFun;
+				entityDashbordTab.refresh = refreshTree;
+				entityDashbordTab.seletedDashbordXml = selectedItem.content as XML;
+				if(entityDashbordTab.isCreationComplete){
+					entityDashbordTab.showHandler();
+				}
+			}
+			
+			private function initDimensionData():void{
+				if(!dimensionTabNa.contains(dimensionTab)){
+					dimensionTabNa.addChild(dimensionTab);
+				}
+				dimensionTab.contentXml = _contentXml;
+				dimensionTab.isEdit = true;
+				dimensionTab.saveFun = saveFun;
+				dimensionTab.saveNoAlertFun = saveNoAlertFun;
+				dimensionTab.refresh = refreshTree;
+				dimensionTab.seletedDimensionXml = selectedItem.content as XML;
+				dimensionTab.entityCol = allEntitiesCol;
+				dimensionTab.dwDsName = dwDsName;
+				dimensionTab.endpoint = endpoint;
+				dimensionTab.selectedItem = selectedItem;
+				if(dimensionTab.isCreationComplete){
+					dimensionTab.showHandler();
+				}
+			}
+			
+			private function initCubeData():void{
+				if(!cubeTabNa.contains(cubeTab)){
+					cubeTabNa.addChild(cubeTab);
+				}
+				cubeTab.contentXml = _contentXml;
+				cubeTab.isEdit = true;
+				cubeTab.endpoint = endpoint;
+				cubeTab.saveFun = saveFun;
+				cubeTab.refresh = refreshTree;
+				cubeTab.seletedCubeXml = selectedItem.content as XML;
+				cubeTab.allEntityCol = allEntitiesCol;
+				cubeTab.dwDsName = dwDsName;
+				cubeTab.selectedItem = selectedItem;
+				cubeTab.saveNoAlert = saveNoAlertFun;
+				cubeTab.insertMode = insertMode;
+				if(cubeTab.isCreationComplete){
+					cubeTab.showHandler();
+				}
+			}
+			
+			private function setParentEntityCboDp():void{
+				parentEntityCboDp.removeAll();
+				var nullItem:XML = <entity name='' />;
+				parentEntityCboDp.addItem(nullItem);
+				for each(var key:String in entitiesCache.getKeys()){
+					if(key == selectedItem.code)
+						continue;
+					parentEntityCboDp.addItem(entitiesCache.getValue(key));
+				}
+				parentEntityCbo.selectedItem = _contentXml.entities.entity.(@code==selectedItem.content.@parentEntityCode).length()==0
+					?nullItem:_contentXml.entities.entity.(@code==selectedItem.content.@parentEntityCode)[0];
+			}
+			
+			//设置主键属性
+			private function setPrimaryKeyAttName():void{
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					if(att.@name == selectedItem.content.@idAttributeName){
+						primaryKeyAttCbo.selectedItem = att;
+						break;
+					}else
+						primaryKeyAttCbo.selectedItem = null;
+				}
+			}
+			//设置分区维度属性
+			private function setDimensionAttName():void{
+				for each(var att:XML in allAttributes){
+					if(att.@name == selectedItem.content.@dimensionAttribute){
+						dimensionAttributeCbo.selectedItem = att;
+						break;
+					}else
+						dimensionAttributeCbo.selectedItem = null;
+				}
+			}
+			
+			private function showXml():void{
+				PopUpManager.addPopUp(contentXmlTw,this,true);
+				PopUpManager.centerPopUp(contentXmlTw);
+				contentXmlText.text = _contentXml.toXMLString();
+			}
+			
+			private function showEntityXml():void{
+				if(selectedItem != null){
+					PopUpManager.addPopUp(contentXmlTw,this,true);
+					PopUpManager.centerPopUp(contentXmlTw);
+					contentXmlText.text = selectedItem.content;
+				}
+			}
+			
+			protected function parentEntityCbo_changeHandler(event:ListEvent):void{
+				var item:Object = parentEntityCbo.selectedItem;
+				if(item.@name == "")
+					selectedItem.content.@parentEntityCode = "";
+				else
+					selectedItem.content.@parentEntityCode = item.@code;
+				refreshTree();
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in treeDataProvider){
+					entityModelTree.expandChildrenOf(item,true);
+				}
+			}
+			
+			protected function infoEntityNameTxt_changeHandler(event:Event):void{
+				selectedItem.content.@name = infoEntityNameTxt.text;
+			}
+			
+			protected function infoDescTxt_changeHandler(event:Event):void{
+				selectedItem.content.@desc = infoDescTxt.text;
+			}
+			
+			protected function primaryKeyAttCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.@idAttributeName = primaryKeyAttCbo.selectedItem.@name;
+			}
+			
+			protected function infoBox_showHandler(event:FlexEvent):void{
+				if(primaryKeyAttCbo){
+					primaryKeyAttCbo.dataProvider = selectedItem.content.attributes.attribute;
+					setPrimaryKeyAttName();
+				}
+				setDimensionAttName();
+			}
+			
+			private function addNewRelation():void{
+				if(StringUtil.trim(newRelationCodeTxt.text) == ""){
+					SmartXMessage.show("编码不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(StringUtil.trim(newRelationNameTxt.text) == ""){
+					SmartXMessage.show("名称不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(isExistItem(newRelationCodeTxt.text,relationsArr)){
+					SmartXMessage.show("编码重复！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(newGoalEntityCob.selectedItem == null ){
+					SmartXMessage.show("目标实体不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(newOwnerEntityCob.selectedItem == null ){
+					SmartXMessage.show("所属实体不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(StringUtil.trim(newInputSqlTxt.text) == ""){
+					SmartXMessage.show("读取语句不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				OperatingTipUtil.startOperat("查询中...",this);
+				formService.getTableDataStructByDS(datasourceName,"select * from ("+newInputSqlTxt.text+") where 1=2");
+				
+			}
+			
+			private function isExistItem(code:String,itemsArr:ArrayCollection):Boolean{
+				var isExist:Boolean = false;
+				for each(var item:Object in itemsArr){
+					var itemCode:String = String(item.code);
+					if(itemCode != null && itemCode != "" && itemCode == code){
+						isExist = true;
+						break;
+					}
+				}
+				return isExist;
+			}
+			
+			private function selectItemByCode(code:String,itemsArr:ArrayCollection):void{
+				for each(var item:Object in itemsArr){
+					var itemCode:String = String(item.code);
+					if(itemCode != null && itemCode != "" && itemCode == code){
+						entityModelTree.selectedItem = item;
+						entityModelTree.scrollToIndex(entityModelTree.selectedIndex+1);
+						entityModelTree_itemClickHandler(null);
+						break;
+					}
+				}
+			}
+			
+			private function addNewRule():void{
+				if(StringUtil.trim(newRuleCodeTxt.text) == ""){
+					SmartXMessage.show("编码不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(StringUtil.trim(newRuleNameTxt.text) == ""){
+					SmartXMessage.show("名称不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(isExistItem(newRuleCodeTxt.text,rulesArr)){
+					SmartXMessage.show("编码重复！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				var tempRuleXML:XML = <rule />;
+				var entityXml:XML = newOwnerRuleEntityCob.selectedItem as XML;
+				if(entityXml.rules.length() <= 0 ){
+					entityXml.appendChild(new XML("<rules />"));
+				}
+				tempRuleXML.@name = newRuleNameTxt.text;
+				tempRuleXML.@code = newRuleCodeTxt.text;
+				tempRuleXML.@toEntityCode = entityXml.@code;
+				
+				entityXml.rules.appendChild(tempRuleXML);
+				this.refreshTree();
+				selectItemByCode(newRuleCodeTxt.text,rulesArr);
+				PopUpManager.removePopUp(ruleWindow);
+			}
+			
+			private function onQuery():void{
+				isQuery = true;
+				getSQL(null);
+			}
+			
+			protected function dimensionAttributeCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.@dimensionAttribute = dimensionAttributeCbo.selectedItem.@name;
+			}
+			
+			protected function dimensionAttributeValueTxt_changeHandler(event:Event):void{
+				selectedItem.content.filter = dimensionAttributeValueTxt.text;
+			}
+			
+			private function getSQL(ruleStr:String):void{
+				if(selectedItem)
+					bamService.generateEntitySql(XML(selectedItem.content).toXMLString(),_contentXml.toXMLString(),ruleStr);
+			}
+			
+			private function showSql():void{
+				isQuery = false;
+				var ruleStr:String = "";
+				if(filtersTab.selectedRule != null)
+					ruleStr = filtersTab.selectedRule.toXMLString();
+				getSQL(ruleStr);
+			}
+			
+			private function generateEntitySqlHandler(event:ResultEvent):void{
+				sql = event.result as String;
+				if(isQuery){
+					isQuery = false;
+					var entityXml:XML = selectedItem.content as XML;
+					var entityCode:String = String(entityXml.@code);
+					var sharedObjectCode:String = entityModelCode+"_"+entityCode;
+					queryDatagridWindow.attributesXml = selectedItem.content.@type=="virtual"?selectedItem.content.attributes[0]
+													:EntityUtil.displayAttributeWrap(selectedItem.content,_contentXml);
+					queryDatagridWindow.sharedObjectCode = sharedObjectCode;
+					queryDatagridWindow.sharedObjectSpaceName = BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_FILTERINFO;
+					queryDatagridWindow.sql = sql;
+					queryDatagridWindow.dataSource = _contentXml.datasource;
+					queryDatagridWindow.debugMode = debugMode;
+					
+					desktop != null?PopUpManager.addPopUp(queryDatagridWindow,desktop,true)
+									:PopUpManager.addPopUp(queryDatagridWindow,this,true);
+					
+					PopUpManager.centerPopUp(queryDatagridWindow);
+					queryDatagridWindow.refresh();
+				}else{
+					PopUpManager.addPopUp(contentXmlTw,this,true);
+					PopUpManager.centerPopUp(contentXmlTw);
+					contentXmlTw.title = "查看SQL";
+					contentXmlText.text = sql;
+				}
+			}
+			
+			protected function isGisEntity_changeHandler(event:Event):void{
+				if(isGisEntity.selected){
+					selectedItem.content.@isGis = "true";
+					initGisTab();
+					if(!mainTab.contains(gisInfoTab))
+						mainTab.addChild(gisInfoTab);
+					if(gisInfoTab.isCreationComplete)
+						gisInfoTab.showHandler();
+				}else if(!isGisEntity.selected && mainTab.contains(gisInfoTab)){
+					mainTab.removeChild(gisInfoTab);
+					selectedItem.content.@isGis = "false";
+				}
+			}
+			
+			private function initGisTab():void{
+				gisInfoTab.selectedItem = selectedItem;
+				gisInfoTab.contentXml = _contentXml;
+				gisInfoTab.endpoint = endpoint;
+				gisInfoTab.allInheritAtt = allInheritAtt;
+				gisInfoTab.insertMode = insertMode;
+			}
+			
+			private var geoserverConfig:GeoServerConfigWindow = new GeoServerConfigWindow();
+			
+			private function geoServerConfig():void{
+				geoserverConfig.geoServerXml = _contentXml.geoServer[0];
+				geoserverConfig.endpoint = endpoint;
+				PopUpManager.addPopUp(geoserverConfig,this,true);
+				PopUpManager.centerPopUp(geoserverConfig);
+				geoserverConfig.refresh();
+			}
+			
+			private function initGisLayerManagerTab():void{
+				clearGisTab();
+				gisLayerManagerTab.contentXml = _contentXml;
+				gisLayerManagerTab.endpoint = endpoint;
+				
+				if(!gisTabNa.contains(gisLayerManagerTab))
+					gisTabNa.addChild(gisLayerManagerTab);
+				
+				if(gisLayerManagerTab.isCreationComplete)
+					gisLayerManagerTab.showHandler();
+			}
+			
+			private function clearGisTab():void{
+				gisTabNa.removeAllChildren();
+			}
+			
+			private function initGisAppTab():void{
+				clearGisTab();
+				
+				gisAppInfoTab.selectedItem = selectedItem;
+				gisAppInfoTab.contentXml = _contentXml;
+				gisAppInfoTab.endpoint = endpoint;
+				if(!gisTabNa.contains(gisAppInfoTab))
+					gisTabNa.addChild(gisAppInfoTab);
+				if(gisAppInfoTab.isCreationComplete)
+					gisAppInfoTab.showHandler();
+				
+				gisAppToolTab.selectedItem = selectedItem;
+				gisAppToolTab.contentXml = _contentXml;
+				gisAppToolTab.endpoint = endpoint;
+				if(!gisTabNa.contains(gisAppToolTab))
+					gisTabNa.addChild(gisAppToolTab);
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				if(tableDataStruct.table_header.length < 2){
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("字段数量不能小于两个!");
+					return;
+				}
+				if(tableDataStruct.table_header[0].toString().toLowerCase() != 'fromid' 
+					|| tableDataStruct.table_header[1].toString().toLowerCase() != "toid"){
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("字段别名不正确，第一个字段应该为fromid,第二个字段应该为toid！");
+					return;
+				}
+				OperatingTipUtil.endOperat();
+				var tempRelationXML:XML = <relation />;
+				var entityXml:XML = newOwnerEntityCob.selectedItem as XML;
+				if(entityXml.relations.length() <= 0 ){
+					entityXml.appendChild(new XML("<relations />"));
+				}
+				
+				var goalEntityXml:XML = newGoalEntityCob.selectedItem as XML;
+				var goalEntityCode:String = "";
+				if(goalEntityXml != null ){
+					goalEntityCode = goalEntityXml.@code;
+				}
+				
+				tempRelationXML.@toEntityCode = goalEntityCode;
+				tempRelationXML.@name = newRelationNameTxt.text;
+				tempRelationXML.@code = newRelationCodeTxt.text;
+				tempRelationXML.@desc = newRelationDescTxt.text;
+				tempRelationXML.datasource = datasourceName;
+				tempRelationXML.fetchSQL = newInputSqlTxt.text;
+				
+				entityXml.relations.appendChild(tempRelationXML);
+				
+				refreshTree();
+				
+				selectItemByCode(newRelationCodeTxt.text,relationsArr);
+				
+				PopUpManager.removePopUp(relatonWindow);
+			}
+			
+		]]>
+	</fx:Script>
+	<containers:states>
+		<s:State name="normal"/>
+		<s:State name="entity"/>
+		<s:State name="abstractEntity"/>
+		<s:State name="virtualEntity"/>
+		<s:State name="relation"/>
+		<s:State name="rule"/>
+		<s:State name="dashbord"/>
+		<s:State name="dimension"/>
+		<s:State name="cube"/>
+		<s:State name="gisInfo"/>
+	</containers:states>
+	<mx:VBox width="100%" height="100%">
+		<mx:HDividedBox width="100%" height="100%">
+			<mx:VBox width="25%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					 paddingTop="5">
+				<mx:HBox id="treeButtonBox" width="100%" paddingBottom="5" paddingLeft="5"
+						 paddingRight="5" paddingTop="5">
+					<mx:PopUpMenuButton id="operationButton" label="操作"
+										dataProvider="{operationList}" labelField="name"
+										openAlways="true"/>
+					<mx:LinkButton click="importFromRelationDs()" icon="{AssetsFileLib.importIcon}"
+								   toolTip="从关系存储模型导入"/>
+					<mx:LinkButton click="geoServerConfig()" icon="{AssetsFileLib.designIcon}"
+								   toolTip="GeoServer配置"/>
+					<mx:LinkButton visible="{debugMode}" click="showXml()"
+								   icon="{AssetsFileLib.viewIcon}" toolTip="查看XML"/>
+					<mx:LinkButton visible="{debugMode}" click="showEntityXml()"
+								   icon="{AssetsFileLib.browseIcon}" toolTip="预览当前节点XML"/>
+					<mx:LinkButton visible="{debugMode}" click="showSql()"
+								   icon="{AssetsFileLib.advancedqueryIcon}" toolTip="查看SQL"/>
+				</mx:HBox>
+				<ext:TreeWrapper id="entityModelTree" width="100%" height="100%" allowMultipleSelection="false" dataProvider="{treeDataProvider}"
+								 iconFunction="iconFunction" itemClick="entityModelTree_itemClickHandler(event)" labelField="name"/>
+			</mx:VBox>
+			<mx:VBox width="75%" height="100%">
+				<mx:TabNavigator id="mainTab" includeIn="abstractEntity,entity,virtualEntity"
+								 width="100%" height="100%" creationPolicy="all" paddingTop="3">
+					<mx:VBox width="100%" height="100%" label="基本信息" paddingBottom="5"
+							 paddingLeft="5" paddingRight="5" paddingTop="5" show="infoBox_showHandler(event)">
+						<mx:HBox width="100%">
+							<mx:Label width="25%" text="名称"/>
+							<mx:TextInput id="infoEntityNameTxt" width="50%"
+										  change="infoEntityNameTxt_changeHandler(event)"
+										  text="{selectedItem.content.@name}"/>
+						</mx:HBox>
+						<mx:HBox width="100%">
+							<mx:Label width="25%" text="编码"/>
+							<mx:TextInput id="infoEntityCodeTxt" width="50%" editable="false"
+										  text="{selectedItem.content.@code}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="abstractEntity,entity" width="100%">
+							<mx:Label width="25%" text="是否抽象"/>
+							<mx:CheckBox id="isAbstractChk" enabled="false"
+										 selected="{selectedItem.content.@isAbstract=='true'?true:false}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity" width="100%">
+							<mx:Label width="25%" text="GIS实体"/>
+							<mx:CheckBox id="isGisEntity" change="isGisEntity_changeHandler(event)"
+										 selected="{selectedItem.content.@isGis=='true'?true:false}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity" width="100%">
+							<mx:Label width="25%" text="父实体"/>
+							<mx:ComboBox id="parentEntityCbo" width="50%"
+										 change="parentEntityCbo_changeHandler(event)"
+										 dataProvider="{parentEntityCboDp}" labelField="@name"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%">
+							<mx:Label width="25%" text="主键属性"/>
+							<mx:ComboBox id="primaryKeyAttCbo" width="50%"
+										 change="primaryKeyAttCbo_changeHandler(event)"
+										 dataProvider="{selectedItem.content.attributes.attribute}"
+										 labelField="@name"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%">
+							<mx:Label width="25%" text="分区统计维度属性"/>
+							<mx:ComboBox id="dimensionAttributeCbo" width="50%"
+										 change="dimensionAttributeCbo_changeHandler(event)"
+										 dataProvider="{allAttributes}" labelField="@name"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%">
+							<mx:Label width="25%" text="分区统计维度值"/>
+							<mx:TextInput id="dimensionAttributeValueTxt" width="50%"
+										  change="dimensionAttributeValueTxt_changeHandler(event)"
+										  text="{selectedItem.content.filter}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%">
+							<mx:Label width="25%" text="描述"/>
+							<mx:TextArea id="infoDescTxt" width="50%" height="200"
+										 change="infoDescTxt_changeHandler(event)"
+										 text="{selectedItem.content.@desc}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%"
+								 horizontalAlign="center">
+							<mx:Button label="实时查询" click="onQuery()"/>
+							<mx:Button label="实体数据语法分析"/>
+							<mx:Button label="分析调度"/>
+						</mx:HBox>
+					</mx:VBox>
+				</mx:TabNavigator>
+				<mx:TabNavigator id="relationsTabNa" includeIn="relation" width="100%" height="100%" creationPolicy="all"
+								 paddingTop="3" />
+				
+				<mx:TabNavigator id="filtersTabNa" includeIn="rule" width="100%" height="100%" creationPolicy="all"
+								 paddingTop="3" />
+
+				<mx:TabNavigator id="dashbordTabNa" includeIn="dashbord" width="100%" height="100%"
+								 creationPolicy="all" paddingTop="3" />
+				
+				<mx:TabNavigator id="dimensionTabNa" includeIn="dimension" width="100%" height="100%"
+								 creationPolicy="all" paddingTop="3" />
+					
+				<mx:TabNavigator id="cubeTabNa" includeIn="cube" width="100%" height="100%"
+								 creationPolicy="all" paddingTop="3" />
+				
+				<mx:TabNavigator id="gisTabNa" includeIn="gisInfo" width="100%" height="100%"
+								 creationPolicy="all" paddingTop="3" />
+			</mx:VBox>
+		</mx:HDividedBox>
+		<mx:HBox width="100%" horizontalAlign="right" paddingRight="5">
+			<mx:Button label="保存" click="saveFun()" icon="{AssetsFileLib.saveIcon}"/>
+			<mx:Button label="确定" click="confirmFun()"/>
+			<mx:Button label="取消" click="PopUpManager.removePopUp(this);"/>
+		</mx:HBox>
+	</mx:VBox>
+</containers:SuperPanel>

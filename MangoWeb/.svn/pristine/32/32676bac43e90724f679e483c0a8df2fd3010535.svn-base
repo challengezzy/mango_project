@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+		   xmlns:core="smartx.flex.components.core.*"
+		   xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   fontSize="12" creationComplete="init()" xmlns:s="library://ns.adobe.com/flex/spark" >
+	<fx:Metadata>		       
+		[Event(name='edit',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='insert',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='beforeSave',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='save',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='returnToList',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='view',type='smartx.flex.components.event.StyleTemplateEvent')]
+	</fx:Metadata>
+	<fx:Declarations>
+		<mx:HBox width="100%" id="listButtonBox" paddingLeft="5">
+			<mx:PopUpMenuButton label="操作" id="popUpMenuButton" dataProvider="{menuArrayCol}" openAlways="true"/>
+		</mx:HBox>
+		<fx:Object id="viewButton" label="编辑" handler="{onEdit}" rightClick="true" />
+		<fx:Object id="insertButton" label="新增"  handler="{onCreate}" rightClick="true" />
+		<fx:Object id="deleteButton" label="删除"  handler="{deleteRow}" rightClick="true" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.core.IFlexDisplayObject;
+			import mx.effects.Effect;
+			import mx.effects.EffectInstance;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.ItemVO;
+			import smartx.flex.components.vo.SimpleComboxItemVO;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var initQueryCondition:String;
+			[Bindable]
+			public var scenarioId:String;
+			
+			[Bindable]
+			private var menuArrayCol:ArrayCollection = new ArrayCollection();
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			private var templetVO:TempletVO; 
+			
+			private var ruleCode:String;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var userName:String;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private function init():void{
+				if(templetCode == null)
+					throw Error("元原模板编号不能为null");
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				formService = new RemoteObject(destination);
+				bamService = new RemoteObject("smartXBAMService");
+				if(endpoint!=null){
+					formService.endpoint = endpoint;
+					bamService.endpoint = endpoint;
+				}
+				
+				
+				formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+				formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.getTempletVO(templetCode);
+				
+				bamService.deleteRuleTemplete.addEventListener(ResultEvent.RESULT,deleteRuleTempleteHandler);
+				bamService.deleteRuleTemplete.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				userName = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME));
+				
+				listPanel.isShowAlert = false;
+				listPanel.query(false,true,true);
+				
+				initPopMenuButton();
+				
+				if(listPanel.rightClickMenu != null){
+					listPanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler,false,0,true);
+					for each(var obj:* in menuArrayCol){
+						if(obj.rightClick){
+							//需要添加到右键菜单
+							listPanel.rightClickMenuItems.push(obj);
+						}
+					}
+				}
+				
+			}
+			
+			override protected function createChildren():void{
+				super.createChildren();
+				
+				listPanel.topArea.addChild(listButtonBox);
+				
+			}
+			
+			private function initPopMenuButton():void{
+				
+				menuArrayCol.removeAll();
+				menuArrayCol.addItem(viewButton);
+				menuArrayCol.addItem(insertButton);
+				menuArrayCol.addItem(deleteButton);
+				
+				var menuPop:Menu = popUpMenuButton.popUp as Menu;
+				menuPop.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler);
+			}
+			
+			protected function popUpMenuButtonClickHandler(event:MenuEvent):void
+			{
+				var item:* = event.item;
+				if(item.handler != null)
+					item.handler();
+			}
+			
+			private function deleteRuleTempleteHandler(event:ResultEvent):void{
+				endOperat();
+				listPanel.query();
+			}
+			
+			private function getTempletVOHandler(event:ResultEvent):void{
+				templetVO = event.result as TempletVO;
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endOperat();
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			public function onReturn():void{
+				listPanel.refreshData();
+				mainStack.selectedChild = listBox;
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.RETURN_TO_LIST));
+			}
+			
+			public function isListPanelShowing():Boolean{
+				return (mainStack.selectedChild == listBox);
+			}
+			
+			public function onEdit():void{
+				if(listPanel.getSelectedRowValue() != null){
+					
+					var row:Object = listPanel.getSelectedRowValue();
+					
+					var artm:AlertRuleTempleteManager = new AlertRuleTempleteManager();
+					artm.isEdit = true;
+					artm.endpoint = endpoint;
+					artm.scenarioId = this.scenarioId;
+					artm.templateId = row["ID"] as String;
+					
+					PopUpManager.addPopUp(artm,desktop,true);
+					PopUpManager.centerPopUp(artm);
+				}
+				else{
+					Alert.show("请选择一条记录");
+				}
+					
+			}
+			
+			public function onCreate():void{
+				
+				var artm:AlertRuleTempleteManager = new AlertRuleTempleteManager();
+				artm.endpoint = endpoint;
+				artm.scenarioId = this.scenarioId;
+				artm.isEdit = false;
+				
+				PopUpManager.addPopUp(artm,desktop,true);
+				PopUpManager.centerPopUp(artm);
+				
+			}
+			
+			
+			public function onSaveAndReturn():void{
+				returnAfterSave = true;
+				listPanel.query(false,true,true);
+			}
+			private function onSaveSuccessful():void{
+				if(returnAfterSave)
+					onReturn();
+				returnAfterSave = false;
+			}
+			
+			private function deleteRow():void{
+				
+				var item:Object = listPanel.getSelectedRowValue();
+				
+				if(item == null){
+					Alert.show("请先选择一条数据!","提示");
+				}else{
+					
+					ConfirmUtil.confirm("确定要删除吗?",desktop,confirmHandler);
+
+				}
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				
+				if(event.detail == Alert.YES){
+					var item:Object = listPanel.getSelectedRowValue();
+					var templeteId:String = item["ID"] as String;
+					startOperat();
+					bamService.deleteRuleTemplete(templeteId);
+				}
+			}
+			
+			private function startOperat():void{
+				
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在执行……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,desktop,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endOperat():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all" >
+		<mx:VBox width="100%" height="100%" id="listBox" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+			<core:BillListPanel showLoadingWindow="false" showInitingWindow="false" destination="{destination}" endpoint="{endpoint}" doubleClick="onEdit()" templetCode="{templetCode}" id="listPanel" editable="false" width="100%" height="100%"  showEditBox="false" debugMode="{debugMode}" initQueryCondition="{initQueryCondition}">
+			</core:BillListPanel>
+		</mx:VBox>
+	</mx:ViewStack>	
+</mx:Canvas>

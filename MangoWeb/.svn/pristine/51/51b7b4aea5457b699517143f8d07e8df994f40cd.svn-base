@@ -1,0 +1,405 @@
+<mx:Canvas xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" 
+		   xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+		   xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+		   xmlns:core="smartx.flex.components.core.*"
+		   xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   >
+	
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Metadata>		       
+		[Event(name='queryComplete',type='smartx.bam.flex.modules.report.utils.ReportEvent')]
+		[Event(name='initComplete',type='smartx.bam.flex.modules.report.utils.ReportEvent')]
+	</fx:Metadata>
+	<fx:Script>
+		<![CDATA[
+			import mx.containers.HBox;
+			import mx.controls.Button;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletVO;
+			
+			
+			[Bindable]
+			public var endpoint:String;
+			
+			[Bindable]
+			public var mtContent:XML;
+			
+			[Bindable]
+			public var customeParams:Object;
+			
+			[Bindable]
+			public var sysParams:Object;
+			
+			[Bindable]
+			private var componentMap:Hashtable = new Hashtable();//控件MAP（key:控件ID,value:控件）
+			
+			[Bindable]
+			private var affectMap:Hashtable = new Hashtable();
+			
+			[Bindable]
+			private var defaultValueMap:Hashtable = new Hashtable();
+			
+			[Bindable]
+			private var defaultValueComponent:Hashtable = new Hashtable();
+			
+			[Bindable]
+			private var taskCode:String;
+			
+			[Bindable]
+			public var hideFunction:Function = function():void{
+				
+			};
+			
+			[Bindable]
+			public var templetCode:String;
+			public var templetVO:TempletVO;
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			private var bamService:RemoteObject;
+			
+			[Bindable]
+			public var confirmFunc:Function = function():void{
+				
+			}
+			
+			public function init():void{
+				
+				if(mtContent != null ){
+					
+					bamService = new RemoteObject(BAMConst.BAM_Service);
+					if(endpoint!=null){
+						bamService.endpoint = endpoint;
+					}
+					
+					bamService.onReportQuery.addEventListener(ResultEvent.RESULT,onReportQueryHandler);
+					bamService.onReportQuery.addEventListener(FaultEvent.FAULT,faultHandler);
+					
+					if(customeParams == null ){
+						customeParams = new Object();
+					}
+					
+					if(sysParams != null){
+						var objInfo:Object = ObjectUtil.getClassInfo(sysParams);
+						var fieldArr:Array = objInfo["properties"] as Array;
+						if(fieldArr != null ){
+							for each(var fieldName:String in fieldArr){
+								var paramValue:String = String(sysParams[fieldName]);
+								if( customeParams[fieldName] != null && customeParams[fieldName] )//已经有值，以自定义值为准
+									continue;
+								
+								customeParams[fieldName] = paramValue;
+							}
+						}
+					}
+					
+					initQueryFieldPanel();
+					
+				}else{
+					throw Error("元数据不能为空!");
+				}
+			}
+			
+			private function onReportQueryHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var version:String = event.result as String;
+				dispatchEvent(new ReportEvent(ReportEvent.QUERY_COMPLETE,version));
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("执行后台查询出错!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private function valueChangeHandler(event:ReportEvent):void{
+				var rc:ReportComponent = event.target as ReportComponent;
+				var componentId:String = rc.id;
+				
+				var rcValue:String = rc.stringValue;
+				if(rcValue == null || rcValue=="undefined" )
+					rcValue = "";
+				customeParams[rc.getKeyName()] = rcValue;
+				
+				var affectId:String = affectMap.find(componentId);
+				if(!BAMUtil.isEmpty(affectId)){
+					var affectComponent:ReportComponent = componentMap.find(affectId);
+					if(affectComponent != null ){
+						affectComponent.refresh(rc.getKeyName(),rc.stringValue);
+					}
+				}
+			}
+			
+			public function initQueryFieldPanel():void{
+				
+				componentMap.clear();
+				affectMap.clear();
+				defaultValueMap.clear();
+				defaultValueComponent.clear();
+				
+				taskCode = String(mtContent.queryPanel.queryTask.@ref);
+				
+				for each(var itemComponentXml:XML in mtContent.queryPanel.itemComponents.itemComponent){
+					
+					var componentId:String = String(itemComponentXml.@id);
+					var labelName:String = String(itemComponentXml.@label);
+					var keyName:String = String(itemComponentXml.@key);
+					var itemtype:String = String(itemComponentXml.@type);
+					var defaultValue:String = String(itemComponentXml.@defaultValue);
+					var defaultName:String = String(itemComponentXml.@defaultName);
+					var affectId:String = String(itemComponentXml.@affect);
+					var isMandatory:Boolean = String(itemComponentXml.@mandatory)=="true"?true:false;
+					var inputWidth:String = String(itemComponentXml.@inputWidth);
+					var visiable:Boolean = String(itemComponentXml.@visiable).toLowerCase()=="false"?false:true;
+					
+					customeParams[keyName] = "";
+					
+					if(!BAMUtil.isEmpty(defaultValue)){
+						defaultValueMap.add(componentId,defaultValue);
+						defaultValueComponent.add(componentId,false);
+					}
+					
+					if(!BAMUtil.isEmpty(affectId)){
+						affectMap.add(componentId,affectId);
+					}
+					
+					if(itemtype == "下拉框"){
+						
+						var fetchSQL:String = "";
+						var dataArr:Array = new Array();
+						
+						var fetchMethod:String = String(itemComponentXml.@fetchMethod);
+						if(fetchMethod=="static"){
+							for each(var dateItemXml:XML in itemComponentXml.dataProvider.item){
+								var temp:Object = new Object();
+								var tempId:String = BAMUtil.expression(String(dateItemXml.@id),customeParams);
+								var tempLabel:String = BAMUtil.expression(String(dateItemXml.@label),customeParams);
+								
+								temp["ID"] = tempId;
+								temp["CODE"] = tempId;
+								temp["NAME"] = tempLabel;
+								
+								dataArr.push(temp);
+							}
+						}else{
+							fetchSQL = String(itemComponentXml.fetchSQL);
+						}
+						
+						var novaComboBox:ReportComboBox = new ReportComboBox(labelName,keyName,endpoint,BAMConst.BAM_Service,customeParams,isMandatory,fetchSQL,dataArr);
+						novaComboBox.id = componentId;
+						if(BAMUtil.isNumber(inputWidth)){
+							novaComboBox.setInputWidth(parseInt(inputWidth));
+						}
+						
+						novaComboBox.addEventListener(ReportEvent.REAL_VALUE_CHANGE,valueChangeHandler);
+						novaComboBox.addEventListener(ReportEvent.DATA_LOAD_COMPLETE,dataLoadCompleteHandler);
+						
+						novaComboBox.addEventListener(ReportEvent.SET_DEFAULT_VALUE,setDefaultHandler);
+						
+						visiable?queryFieldPanel.addChild(novaComboBox):null;
+						
+						componentMap.add(componentId,novaComboBox);
+						
+					}
+					else if(itemtype == "参照"){
+						
+						var refFetchSQL:String = String(itemComponentXml.fetchSQL);
+						
+						var reportRefPanel:ReportRefPanel = new ReportRefPanel(labelName,keyName,endpoint,destination,customeParams,isMandatory,refFetchSQL);
+						reportRefPanel.id = componentId;
+						if(BAMUtil.isNumber(inputWidth)){
+							reportRefPanel.setInputWidth(parseInt(inputWidth));
+						}
+						
+						reportRefPanel.addEventListener(ReportEvent.REAL_VALUE_CHANGE,valueChangeHandler);
+						
+						reportRefPanel.addEventListener(ReportEvent.SET_DEFAULT_VALUE,setDefaultHandler);
+						//reportRefPanel.addEventListener(ReportEvent.INIT_COMPLETE,refPanelInitCompleteHandler);
+						
+						visiable?queryFieldPanel.addChild(reportRefPanel):null;
+						
+						componentMap.add(componentId,reportRefPanel);
+						
+						defaultName = BAMUtil.expression(defaultName,customeParams);
+						defaultValue = BAMUtil.expression(defaultValue,customeParams);
+						reportRefPanel.setValue(defaultValue,defaultName,true);
+					}
+					else if(itemtype == "日期"){
+						
+						var reportDateTimeField:ReportDateTimeField = new ReportDateTimeField(labelName,keyName,customeParams,isMandatory);
+						reportDateTimeField.id = componentId;
+						if(BAMUtil.isNumber(inputWidth)){
+							reportDateTimeField.setInputWidth(parseInt(inputWidth));
+						}
+						
+						reportDateTimeField.addEventListener(ReportEvent.REAL_VALUE_CHANGE,valueChangeHandler);
+						
+						reportDateTimeField.addEventListener(ReportEvent.SET_DEFAULT_VALUE,setDefaultHandler);
+						
+						visiable?queryFieldPanel.addChild(reportDateTimeField):null;
+						
+						componentMap.add(componentId,reportDateTimeField);
+						
+					}
+				}
+				
+				var hbox:HBox = new HBox();
+				
+				var queryBtn:Button = new Button();
+				queryBtn.height = 22;
+				queryBtn.width = 58;
+				queryBtn.label = "查询";
+				queryBtn.addEventListener(MouseEvent.CLICK,clickHandler);
+				
+				hbox.addChild(queryBtn);
+				
+//				var resetBtn:Button = new Button();
+//				resetBtn.height = 22;
+//				resetBtn.width = 58;
+//				resetBtn.label = "重置";
+//				resetBtn.addEventListener(MouseEvent.CLICK,resetHandler);
+				
+				var resetBtn:Button = new Button();
+				resetBtn.height = 22;
+				resetBtn.label = "隐藏查询框";
+				resetBtn.addEventListener(MouseEvent.CLICK,hideQueryPanel);
+				
+				hbox.addChild(resetBtn);
+				
+				queryFieldPanel.addChild(hbox);
+				
+				callLater(function():void{
+					
+					var tempKeyArr:Array = defaultValueMap.getKeySet();
+					if(tempKeyArr != null ){
+						for each(var tempComponentId:String in tempKeyArr){
+							var tempComponent:ReportComponent = componentMap.find(tempComponentId);
+							if(tempComponent is ReportRefPanel)//参照框单独设置默认值
+								continue;
+								
+							var tempValue:String = defaultValueMap.find(tempComponentId);
+							tempValue = BAMUtil.expression(tempValue,customeParams);
+							if(!BAMUtil.isEmpty(tempValue)){
+								if(tempComponent != null ){
+									tempComponent.setValue(tempValue,null,true);
+								}
+							}
+						}
+					}
+				});
+			}
+			
+			private function dataLoadCompleteHandler(event:ReportEvent):void{
+				var reportCp:ReportComponent = event.target as ReportComponent;
+				var componentId:String = reportCp.id;
+				var tempValue:String = defaultValueMap.find(componentId);
+					tempValue = BAMUtil.expression(tempValue,customeParams);
+					reportCp.setValue(tempValue,null,true);
+			}
+			
+			private function setDefaultHandler(event:ReportEvent):void{
+				var reportCp:ReportComponent = event.target as ReportComponent;
+				var componentId:String = reportCp.id;
+				defaultValueComponent.add(componentId,true);
+				if(checkDefaultValue(defaultValueComponent)){
+					dispatchEvent(new ReportEvent(ReportEvent.INIT_COMPLETE));
+				}
+			}
+			
+//			private function refPanelInitCompleteHandler(event:ReportEvent):void{
+//				var reportCp:ReportComponent = event.target as ReportComponent;
+//				var componentId:String = reportCp.id;
+//				var tempValue:String = defaultValueMap.find(componentId);
+//				tempValue = BAMUtil.expression(tempValue,customeParams);
+//				reportCp.setValue(tempValue,true);
+//			}
+			
+			private function checkDefaultValue(defaultValueComponent:Hashtable):Boolean{
+				var keys:Array = defaultValueComponent.getKeySet();
+				var flag:Boolean = false;
+				if(keys!=null){
+					for each(var key:String in keys){
+						var hasSetDefaultValue:Boolean = defaultValueComponent.find(key);
+						if(hasSetDefaultValue == false){
+							flag = false;
+							break;
+						}else{
+							flag = true;
+							continue;
+						}
+					}
+				}
+				return flag;
+			}
+			
+			public function chechCondition(needAlert:Boolean=true):Boolean{
+				var flag:Boolean = true;
+				var keys:Array = componentMap.getKeySet();
+				if(keys != null ){
+					for each(var key:String in keys){
+						var reportComponent:ReportComponent = componentMap.find(key);
+						if(reportComponent.getIsMandatory()){
+							if(BAMUtil.isEmpty(customeParams[reportComponent.getKeyName()])){
+								if(needAlert){
+									SmartXMessage.show("'"+reportComponent.getLabelName()+"'不能为空!");
+								}
+								flag =  false;
+								break;
+							}
+						}
+					}
+				}
+				return flag;
+			}
+			
+			private function clickHandler(event:MouseEvent):void{
+				onQuery();
+			}
+			
+			private function resetHandler(event:MouseEvent):void{
+				onReset();
+			}
+			
+			private function hideQueryPanel(event:MouseEvent):void{
+				hideFunction();
+			}
+			
+			public function onQuery(needChechCondition:Boolean=true,needAlert:Boolean=true):void{
+				if(needChechCondition){
+					if(!chechCondition(needAlert)){
+						return;
+					}
+				}
+				OperatingTipUtil.startOperat("正在查询....");
+				bamService.onReportQuery(taskCode,customeParams);
+			}
+			
+			public function onReset():void{
+				var componentKeysArr:Array = componentMap.getKeySet();
+				if(componentKeysArr != null ){
+					for each(var keyname:String in componentKeysArr){
+						var tempRC:ReportComponent = componentMap.find(keyname);
+						tempRC.clearContent(null);
+					}
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%" height="100%" >
+		<mx:Tile width="100%" height="100%" id="queryFieldPanel" 
+				 verticalAlign="middle" horizontalAlign="left" 
+				 paddingTop="10" paddingBottom="10" paddingLeft="10" paddingRight="10">
+		</mx:Tile>
+
+	</mx:HBox>
+</mx:Canvas>

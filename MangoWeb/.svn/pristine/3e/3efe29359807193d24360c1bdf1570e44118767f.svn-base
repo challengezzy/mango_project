@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="630" height="350" fontSize="12">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			[Bindable]
+			public var dataList:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			public var headerItems:Array = new Array();
+			
+			[Bindable]
+			public var selectedItem:Object;
+			
+			public var closeByConfirm:Boolean = false;
+			
+			
+			[Bindable]
+			public var seletedItemsArray:ArrayCollection = new ArrayCollection();
+			
+
+			
+			public function search():void{
+				dataList.refresh();
+			}
+			public function close(isConfirm:Boolean):void{
+				if(isConfirm){
+						var obj:Object = dataGrid.selectedItem;
+						if(obj == null){
+							Alert.show("请选择一行数据！","错误");
+							return;
+						}
+						
+						selectedItem = obj;
+
+				}
+				closeByConfirm = isConfirm;
+				PopUpManager.removePopUp(this);
+				dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+			}
+		]]>
+	</mx:Script>
+	<mx:Spacer height="3"/>
+	<mx:DataGrid width="100%" height="100%" id="dataGrid" dataProvider="{dataList}" columns="{headerItems}" doubleClickEnabled="true" doubleClick="close(true)" allowMultipleSelection="false" />
+	<mx:HBox width="100%" horizontalAlign="center">
+		<mx:Button label="确定" click="close(true)"/>
+		<mx:Button label="取消" click="close(false)"/>
+	</mx:HBox>
+</mx:TitleWindow>

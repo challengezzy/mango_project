@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+			   xmlns:util="myreport.util.*"
+			   layout="vertical" showCloseButton="true"
+			   fontSize="12" fontFamily="Simsun" 
+			   close="Close()"
+			   width="284" height="334" title="编辑控件属性" 
+			   creationComplete="Init()" >
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.CloneUtil;
+			import hlib.DisposeUtil;
+ 
+			import myreport.data.report.ControlSetting;
+ 
+			private static var g_Instance:ControlEditor;
+			public static function get Instance():ControlEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ControlEditor();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+ 
+			private function Init():void
+			{
+ 
+			}
+			
+			private var _Setting:ControlSetting;
+			private var _Callback:Function;
+			/**
+			 * @param:callback => function(setting:ControlSetting):void
+			 */ 
+			public function Show(setting:ControlSetting, callback:Function):void
+			{
+				if (visible)
+					return;
+				
+				_Setting = CloneUtil.Clone(setting);
+				_Callback = callback;
+				
+				PopUp();
+ 
+				DisposeUtil.Dispose(_Panel);
+				
+				for each(var style:String in _Setting.StyleNames)
+				{
+					_Panel.addChild(DesignUtil.CreateControlEditor(_Setting, style));
+				}
+			}
+			
+			private function Confirm():void
+			{
+				if (_Callback != null)
+				{
+					_Callback(_Setting);
+				}
+				Close();
+			}
+ 
+			protected override function OnClose():void
+			{
+				if(_Setting)
+					_Setting.Dispose();
+				_Callback = null;
+				_Setting = null;
+			}
+ 
+		]]>
+	</mx:Script>
+ 	<mx:Canvas width="100%" height="100%" horizontalScrollPolicy="off">
+		<mx:VBox width="100%" id="_Panel" paddingLeft="32" paddingRight="32" paddingBottom="8" paddingTop="8">
+		</mx:VBox>
+	</mx:Canvas>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

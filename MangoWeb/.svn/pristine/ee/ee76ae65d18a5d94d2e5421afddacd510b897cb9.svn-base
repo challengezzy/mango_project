@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"  layout="vertical" 
+				width="350" height="130" xmlns:containers="flexlib.containers.*" 
+				close="PopUpManager.removePopUp(this)" showCloseButton="true" title="选择数据库类型"
+				creationComplete="init()" xmlns:synonyms="smartx.bam.flex.modules.synonyms.*" 
+				xmlns:common="smartx.bam.flex.modules.common.*" xmlns:controls="flexlib.controls.*">
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			public var address:String;
+			
+			[Bindable]
+			public var selectedItem:Object;
+			
+			[Bindable]
+			private var databaseTypeCol:ArrayCollection= new ArrayCollection();
+			
+			private var headTxt:String = "/dbe/main.jsp?";
+			
+			private var cotentXml:XML;
+			
+			private function init():void{
+				
+				databaseTypeCol.removeAll();
+				
+				var oralce:Object = new Object;
+				oralce["dbtype"] = "ORACLE";
+				databaseTypeCol.addItem(oralce);
+				
+				var Derby:Object = new Object;
+				Derby["dbtype"] = "Derby";
+				databaseTypeCol.addItem(Derby);
+				
+				var MS_SQLSERVER:Object = new Object;
+				MS_SQLSERVER["dbtype"] = "MS_SQLSERVER";
+				databaseTypeCol.addItem(MS_SQLSERVER);
+				
+				var MySQL:Object = new Object;
+				MySQL["dbtype"] = "MySQL";
+				databaseTypeCol.addItem(MySQL);
+				
+				var HSQL_Server:Object = new Object;
+				HSQL_Server["dbtype"] = "HSQL_Server";
+				databaseTypeCol.addItem(HSQL_Server);
+				
+				var PostgreSQL:Object = new Object;
+				PostgreSQL["dbtype"] = "PostgreSQL";
+				databaseTypeCol.addItem(PostgreSQL);
+				
+				var DB2:Object = new Object;
+				DB2["dbtype"] = "DB2";
+				databaseTypeCol.addItem(DB2);
+				
+				databaseTypeCbb.selectedItem = oralce;
+				
+				cotentXml = new XML(selectedItem["CONFIGURATION"]);
+			}
+			
+			protected function submitBtn_clickHandler(event:MouseEvent):void
+			{
+				var dbtypeItem:Object = databaseTypeCbb.selectedItem;
+				
+				if(dbtypeItem == null){
+					SmartXMessage.show("数据库类型不能为空!");
+					return;
+				}
+				
+				var url:String = "";
+				for each(var conXml:XML in cotentXml["database-connection"]["conn-property"]){
+					var popName:String = String(conXml.@name);
+					if(popName.toLowerCase()=="url"){
+						url = String(conXml.@value);
+					}
+				}
+				
+				var dbtype:String = dbtypeItem["dbtype"] as String;
+				
+				address = address+headTxt+"url="+url+"&dbtype="+dbtype+"&singlelogin=true";
+				
+				var dbw:DataBaseViewPanel = new DataBaseViewPanel();
+				dbw.serverAddress = address;
+				
+				PopUpManager.addPopUp(dbw,this.root,true);
+				PopUpManager.centerPopUp(dbw);
+				
+				dbw.maximize();
+				
+				PopUpManager.removePopUp(this);
+			}
+			
+			protected function cancelBtn_clickHandler(event:MouseEvent):void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:FormItem label="数据库类型" required="true" horizontalAlign="center" >
+		<mx:ComboBox id="databaseTypeCbb" dataProvider="{databaseTypeCol}" labelField="dbtype" width="220"/>
+	</mx:FormItem  >
+	<mx:HBox width="100%" height="100%" horizontalAlign="center" >
+		<mx:Button id="submitBtn" icon="{AssetsFileLib.okIcon}" label="确定" click="submitBtn_clickHandler(event)" />
+		<mx:Button id="cancelBtn" icon="{AssetsFileLib.closeIcon}" label="取消" click="cancelBtn_clickHandler(event)" />
+	</mx:HBox>
+</mx:TitleWindow>

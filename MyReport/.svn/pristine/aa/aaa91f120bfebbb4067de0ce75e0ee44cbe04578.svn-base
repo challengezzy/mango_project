@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Grid xmlns:mx="http://www.adobe.com/2006/mxml" verticalGap="1">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.chart.ChartData;
+	 
+			private var _Data:ChartData;
+			public function set Data(value:ChartData):void
+			{
+				_Data = value;
+				PaddingLeft.text = _Data.PaddingLeft.toString();
+				PaddingRight.text = _Data.PaddingRight.toString();
+				PaddingTop.text = _Data.PaddingTop.toString();
+				PaddingBottom.text = _Data.PaddingBottom.toString();
+				Gap.text = _Data.Gap.toString();
+				
+				BeginBackgroundColor.selectedColor = _Data.BeginBackgroundColor;
+				EndBackgroundColor.selectedColor = _Data.EndBackgroundColor;
+				BorderColor.selectedColor = _Data.BorderColor;
+				
+				TitleVisible.selected = _Data.TitleVisible;
+				
+				TitleTextColor.selectedColor = _Data.TitleTextColor;
+				TitleFontSize.text = _Data.TitleFontSize.toString();
+				TitleFontBold.selected = _Data.TitleFontBold;
+				
+				SubtitleVisible.selected = _Data.SubtitleVisible;
+				
+				SubtitleTextColor.selectedColor = _Data.SubtitleTextColor;
+				SubtitleFontSize.text = _Data.SubtitleFontSize.toString();
+				SubtitleFontBold.selected = _Data.SubtitleFontBold;
+			}
+			
+			public function SetValues():void
+			{
+				_Data.PaddingLeft = Number(PaddingLeft.text);
+				_Data.PaddingRight = Number(PaddingRight.text);
+				_Data.PaddingTop = Number(PaddingTop.text);
+				_Data.PaddingBottom = Number(PaddingBottom.text);
+				_Data.Gap = Number(Gap.text);
+				
+				_Data.BeginBackgroundColor = BeginBackgroundColor.selectedColor;
+				_Data.EndBackgroundColor = EndBackgroundColor.selectedColor;
+				_Data.BorderColor = BorderColor.selectedColor;
+				
+				_Data.TitleVisible = TitleVisible.selected;
+				
+				_Data.TitleTextColor = TitleTextColor.selectedColor;
+				_Data.TitleFontSize = Number(TitleFontSize.text);
+				_Data.TitleFontBold = TitleFontBold.selected;
+				
+				_Data.SubtitleVisible = SubtitleVisible.selected;
+				
+				_Data.SubtitleTextColor = SubtitleTextColor.selectedColor;
+				_Data.SubtitleFontSize = Number(SubtitleFontSize.text);
+				_Data.SubtitleFontBold = SubtitleFontBold.selected;
+			}
+		]]>
+	</mx:Script>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="左边距："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="PaddingLeft" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="右边距："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="PaddingRight" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="上边距："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="PaddingTop" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="下边距："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="PaddingBottom" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="内部元件间距："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="Gap" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="前背景色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="BeginBackgroundColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="后背景色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="EndBackgroundColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="边框颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="BorderColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="TitleVisible" label="显示主标题"/>
+		</mx:GridItem>
+	</mx:GridRow>
+
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="主标题文本颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="TitleTextColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="主标题字体大小："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="TitleFontSize" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="TitleFontBold" label="主标题字体加粗"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="SubtitleVisible" label="显示副标题"/>
+		</mx:GridItem>
+	</mx:GridRow>
+
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="副标题文本颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="SubtitleTextColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="副标题字体大小："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="SubtitleFontSize" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="SubtitleFontBold" label="副标题字体加粗"/>
+		</mx:GridItem>
+	</mx:GridRow>
+</mx:Grid>

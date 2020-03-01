@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!-- 报表数据根节点 -->
+<ReportData>
+	<!-- 参数节点 -->
+	<Parameters>
+		<Set></Set>
+		<Set></Set>
+	</Parameters>
+	<!-- 表格节点 -->
+	<Table>
+		<!-- 行节点 -->
+		<Row>
+			<Set></Set>
+			<Set></Set>
+		</Row>
+		<Row>
+			<Set name="{数据属性名称}" type="{数据类型}" url="{是否加载连接}">{数据值}</Set>
+			<Set></Set>
+		</Row>
+	</Table>
+</ReportData>

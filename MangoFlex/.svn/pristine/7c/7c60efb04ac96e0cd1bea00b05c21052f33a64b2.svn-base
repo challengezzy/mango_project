@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import actionscriptdatetimelibrary.DateTimeField;
+			import actionscriptdatetimelibrary.TimeInput;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Label;
+			import mx.controls.TextInput;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.core.UIComponent;
+			import mx.events.ListEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.core.cep.StreamEvent;
+			import smartx.flex.components.core.cep.StreamEventField;
+			import smartx.flex.components.core.cep.StreamInstance;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public var destination:String = GlobalConst.SERVICE_CEP;
+			public var endpoint:String;
+			private var cepService:RemoteObject;
+
+			public var streamInstanceMap:Object;
+			[Bindable]
+			public var providerName:String;
+			[Bindable]
+			private var inputEventProvider:ArrayCollection = new ArrayCollection();
+			
+			private var eventFieldControlMap:Object = new Object();
+			
+			private function init():void{
+				cepService = new RemoteObject(destination);
+				if(endpoint!=null)
+					cepService.endpoint = endpoint;
+				cepService.sendEvent.addEventListener(ResultEvent.RESULT,doSuccessfulHandler);
+				cepService.sendEvent.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				cepService.queryEvent.addEventListener(ResultEvent.RESULT,queryEventHandler);
+				cepService.queryEvent.addEventListener(FaultEvent.FAULT,faultHandler);
+			}
+			
+			private function queryEventHandler(event:ResultEvent):void{
+				var events:Array = event.result as Array;
+				resultDataGrid.columns = new Array();
+				var columnNames:Array = new Array();
+				var dataProvider:ArrayCollection = new ArrayCollection();
+				resultDataGrid.dataProvider = dataProvider;
+				if(events.length == 0)
+					return;
+				for each(var item:Object in events){
+					for(var name:String in item){
+						if (name != "mx_internal_uid"){
+							if(columnNames.indexOf(name)<0){
+								columnNames = columnNames.concat(name);
+								var temp:DataGridColumn = new DataGridColumn(name);
+								resultDataGrid.columns = resultDataGrid.columns.concat(temp);
+							}
+						}	
+					}
+					dataProvider.addItem(item);
+				}
+				resultDataGrid.dataProvider = dataProvider;
+			}
+			
+			private function doSuccessfulHandler(event:ResultEvent):void{
+				Alert.show("操作成功");
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			public function refresh():void{
+				inputEventProvider.removeAll();
+				for(var key:String in streamInstanceMap){
+					var streamInstance:StreamInstance = streamInstanceMap[key] as StreamInstance;
+					if(streamInstance != null){
+						inputEventProvider.addItem(streamInstance);
+						inputComboBox.invalidateDisplayList();
+					}
+				}
+				generateEventInputBox();
+			}
+
+			protected function inputComboBox_changeHandler(event:ListEvent):void
+			{
+				generateEventInputBox();
+			}
+			
+			private function generateEventInputBox():void{
+				eventInputBox.removeAllChildren();
+				if(inputComboBox.selectedItem != null){
+					var streamInstance:StreamInstance = inputComboBox.selectedItem as StreamInstance;
+					var event:StreamEvent = streamInstance.getOutputStreamEvent();
+					eventFieldControlMap = new Object();
+					for each(var field:StreamEventField in event.fieldList){
+						var type:String = field.type;
+						var hbox:HBox = new HBox();
+						hbox.percentWidth = 100;
+						var label:Label = new Label();
+						label.text = field.name;
+						hbox.addChild(label);
+						eventInputBox.addChild(hbox);
+						var input:UIComponent;
+						if(type == "int"){
+							var numberInput:TextInput = new TextInput();
+							numberInput.restrict = "0-9";
+							input = numberInput;
+						}
+						else if(type == "double"){
+							var doubleInput:TextInput = new TextInput();
+							doubleInput.restrict = "0-9.";
+							input = doubleInput;
+						}
+						else if(type == "java.util.Date"){
+							var dateInput:DateTimeField = new DateTimeField();
+							dateInput.showTime = true;
+							dateInput.formatString = "YYYY-MM-DD HH:ii:ss";
+							input = dateInput;
+							input.width = 170;
+						}
+						else {
+							input = new TextInput();
+						}
+						input.setStyle("borderStyle","solid");
+						hbox.addChild(input);
+						eventFieldControlMap[field.name] = input;
+					}
+				}		
+			}
+			
+			private function sendEvent():void{
+				if(inputComboBox.selectedItem != null){
+					var streamInstance:StreamInstance = inputComboBox.selectedItem as StreamInstance;
+					var eventType:String = streamInstance.name;
+					var event:StreamEvent = streamInstance.getOutputStreamEvent();
+					var eventObject:Object = new Object();
+					for each(var field:StreamEventField in event.fieldList){
+						var type:String = field.type;
+						if(type == "java.util.Date"){
+							var dateInput:DateTimeField = DateTimeField(eventFieldControlMap[field.name]);
+							eventObject[field.name] = dateInput.selectedDateTime;
+						}
+						else{
+							var input:TextInput = TextInput(eventFieldControlMap[field.name]);
+							if(type == "int")
+								eventObject[field.name] = int(input.text);
+							else if(type == "double")
+								eventObject[field.name] = Number(input.text);
+							else
+								eventObject[field.name] = input.text;
+						}
+					}
+					cepService.sendEvent(providerName,eventObject,eventType);
+				}
+			}
+			
+			
+			private function queryEvent():void{
+				cepService.queryEvent(providerName,queryTextInput.text);
+			}
+		]]>
+	</fx:Script>
+	<mx:VDividedBox width="100%" height="100%">
+		<mx:HDividedBox width="100%" height="60%">
+			<mx:VBox width="100%" height="100%" paddingLeft="3" paddingRight="3" paddingTop="3" paddingBottom="3">
+				<mx:TabNavigator width="100%" height="100%">
+					<mx:VBox label="手工输入" width="100%" height="100%" 
+							 paddingLeft="1" paddingRight="1" paddingTop="1" paddingBottom="1">
+						<mx:ComboBox id="inputComboBox" width="60%" dataProvider="{inputEventProvider}" labelField="name" change="inputComboBox_changeHandler(event)"/>
+						<mx:VBox id="eventInputBox" width="100%" height="100%" borderStyle="solid" 
+								 paddingLeft="3" paddingRight="3" paddingTop="5" paddingBottom="5"/>
+						<mx:VBox width="100%" horizontalAlign="center">
+							<mx:Button label="发送" click="sendEvent()"/>
+						</mx:VBox>
+					</mx:VBox>
+					<mx:VBox label="查询" width="100%" height="100%"
+							 paddingLeft="3" paddingRight="3" paddingTop="3" paddingBottom="3">
+						<mx:TextArea width="100%" height="100%" id="queryTextInput" borderStyle="solid"/>
+						<mx:VBox width="100%" horizontalAlign="center">
+							<mx:Button label="查询" click="queryEvent()"/>
+						</mx:VBox>
+					</mx:VBox>
+				</mx:TabNavigator>
+			</mx:VBox>
+			<!--
+			<mx:VBox width="50%" height="100%" paddingLeft="3" paddingRight="3" paddingTop="3" paddingBottom="3">
+				<mx:TabNavigator width="100%" height="100%">
+					<mx:VBox label="事件流查看" width="100%" height="100%"
+							 paddingLeft="1" paddingRight="1" paddingTop="1" paddingBottom="1">
+						
+					</mx:VBox>
+				</mx:TabNavigator>
+			</mx:VBox>
+			-->
+		</mx:HDividedBox>
+		<mx:VBox width="100%" height="40%" paddingLeft="3" paddingRight="3" paddingTop="3" paddingBottom="3">
+			<mx:TabNavigator width="100%" height="100%">
+				<mx:VBox label="结果" width="100%" height="100%"
+						 paddingLeft="3" paddingRight="3" paddingTop="3" paddingBottom="3">
+					<mx:DataGrid id="resultDataGrid" width="100%" height="100%"/> 
+				</mx:VBox>
+			</mx:TabNavigator>
+		</mx:VBox>
+	</mx:VDividedBox>
+</mx:VBox>

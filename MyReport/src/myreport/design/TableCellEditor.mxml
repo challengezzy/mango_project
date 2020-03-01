@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 width="200" height="100%" fontFamily="Simsun" fontSize="12" horizontalAlign="center" 
+		  xmlns:design="myreport.design.*" xmlns:util="myreport.util.*" creationComplete="Init()"
+		  paddingBottom="8">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.DisposeUtil;
+			
+			import mx.collections.ArrayCollection;
+			
+			import myreport.ReportEngine;
+			import myreport.data.report.ControlSetting;
+			import myreport.data.report.Define;
+			import myreport.data.report.ReportSettings;
+			import myreport.data.report.TableCellSetting;
+			import myreport.res.Asset;
+			private static var g_Instance:TableCellEditor;
+			
+			public static function get Instance():TableCellEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new TableCellEditor();
+					g_Instance.initialize();
+					g_Instance.percentHeight = 100;
+					g_Instance.percentWidth = 100;
+				}
+				return g_Instance;
+			}
+			
+			private var _Data:TableCellSetting;
+			private var _Settings:ReportSettings;
+			
+			private function Init():void
+			{
+				_Format.dataProvider = DesignUtil.GetFormatSource();
+				_Control.dataProvider = DesignUtil.GetControlSource();
+				if(_Data)
+					Refresh();
+			}
+			
+			public function SetData(settings:ReportSettings, item:Object):void
+			{
+				_Settings = settings;
+				_Data = item as TableCellSetting;
+				_BindingValue.dataProvider = DesignUtil.GetParameterSource(settings);
+				_BindingColumn.dataProvider = DesignUtil.GetColumnSource(settings);
+				
+				Refresh();
+			}
+
+			public function Refresh():void
+			{
+				_Value.text = _Data.Value;
+				_BindingValue.selectedIndex = -1;
+				_BindingValue.text = _Data.BindingValue;
+				_BindingColumn.selectedIndex = -1;
+				_BindingColumn.text = _Data.BindingColumn;
+				_Format.selectedIndex = -1;
+				_Format.text = _Data.Format;
+				_Style.Style = _Data.Style;
+ 
+				_ColSpan.text = _Data.ColSpan.toString();
+				_CanGrow.selected = _Data.CanGrow;
+				_MergeSameContent.selected = _Data.MergeSameContent;
+				_ShowNullValue.selected = _Data.ShowNullValue;
+				_RowSpan.text = _Data.RowSpan.toString();
+				_ColSpanExpression.text = _Data.ColSpanExpression;
+ 
+				var controls:ArrayCollection = _Control.dataProvider as ArrayCollection;
+				for each(var item:Object in controls)
+				{
+					if(item.data == _Data.Control.Type)
+					{
+						_Control.selectedItem = item;
+						break;
+					}
+				}
+			}
+			
+			private function OnEdit(event:Event):void
+			{
+				var value:Number;
+				if(event.currentTarget == _ColSpan)
+				{
+					value = Number(event.currentTarget.text);
+					if(isNaN(value))
+						return;
+					if(value>_Settings.TableColumnSettings.length)
+						value = _Settings.TableColumnSettings.length;				
+					if(value<1)
+						value = 1;
+					EditProperty(Define.PRO_COL_SPAN, uint(value));
+				}
+				else if(event.currentTarget == _RowSpan)
+				{
+					value = Number(event.currentTarget.text);
+					if(isNaN(value))
+						return;			
+					if(value<1)
+						value = 1;
+					EditProperty(Define.PRO_ROW_SPAN, uint(value));
+ 
+				}
+				else if(event.currentTarget == _Value)
+				{
+					EditProperty(Define.PRO_VALUE, _Value.text);
+				}
+				else if(event.currentTarget == _BindingValue)
+				{
+					EditProperty(Define.PRO_BINDING_VALUE, _BindingValue.text);
+				}
+				else if(event.currentTarget == _BindingColumn)
+				{
+					EditProperty(Define.PRO_BINDING_COLUMN, _BindingColumn.text);
+				}
+				else if(event.currentTarget == _Format)
+				{
+					EditProperty(Define.PRO_FORMAT, _Format.text);
+				}
+				else if(event.currentTarget == _CanGrow)
+				{
+					EditProperty(Define.PRO_CAN_GROW, _CanGrow.selected);
+				}
+				else if(event.currentTarget == _MergeSameContent)
+				{
+					EditProperty(Define.PRO_MERGE_SAME_CONTENT, _MergeSameContent.selected);
+				}
+				else if(event.currentTarget == _ShowNullValue)
+				{
+					EditProperty(Define.PRO_SHOW_NULL_VALUE, _ShowNullValue.selected);
+				}
+				else if(event.currentTarget == _Control)
+				{
+					var control:Object = DesignUtil.GetDefaultControlSetting(_Control.selectedItem.data);
+					EditControl(control);
+				}
+				else if(event.currentTarget == _ColSpanExpression)
+				{
+					EditProperty(Define.PRO_COL_SPAN_EXPRESSION, _ColSpanExpression.text);
+				}
+			}
+			
+			private function EditProperty(target:Object, value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_PROPERTY, true);
+				e.Target = target;
+				e.Value = value;
+				dispatchEvent(e);
+			}
+ 
+			private function EditControl(value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_CONTROL, true);
+				e.Value = value;
+				dispatchEvent(e);
+			}
+			private function EditConditionStyle(value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_CONDITION_STYLE, true);
+				e.Value = value;
+				dispatchEvent(e);
+			}
+			private function ItemChanged(event:Event):void
+			{
+				if (event.currentTarget != _Format || _Format.selectedItem == null)
+					return;
+				_Format.text = _Format.selectedItem.data;
+				_Format.selectedIndex = -1;
+				OnEdit(event);
+			}
+			
+			private function ShowExpressionEditor(e:Event):void
+			{
+		 		if(e.currentTarget == _ValueButton)
+				{
+					ExpressionEditor.Instance.Show(_Value.text, _Settings, function(value:String):void
+					{
+						_Value.text = value;
+						EditProperty(Define.PRO_VALUE, _Value.text);
+					});
+				}
+				else if(e.currentTarget == _ColSpanExpressionButton)
+				{
+					ExpressionEditor.Instance.Show(_ColSpanExpression.text, _Settings, function(value:String):void
+					{
+						_ColSpanExpression.text = value;
+						EditProperty(Define.PRO_COL_SPAN_EXPRESSION, _ColSpanExpression.text);
+					});
+				}
+			}
+			
+			private function ShowConditionStyleEditor():void
+			{
+				ConditionStyleEditor.Instance.Show(_Settings, _Data.ConditionStyleSettings, 
+					function(value:Array):void
+					{
+						DisposeUtil.Dispose(_Data.ConditionStyleSettings);
+						EditConditionStyle(value);
+					});
+			}
+			
+			private function ShowControlProperties():void
+			{
+				if(_Data.Control.Type == "")
+					return;
+				else if(DesignUtil.TryEditChart(_Data.Control, _Settings, function(data:*):void
+				{
+					_Data.Control.Chart = data;
+					EditControl(_Data.Control);
+				}))
+				{
+					
+				}
+				else
+					ControlEditor.Instance.Show(_Data.Control, 
+						function(data:ControlSetting):void
+						{
+							EditControl(data);
+							
+						});
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="文本"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:HBox width="80%" horizontalAlign="center" horizontalGap="1">
+		<mx:TextInput width="100%" id="_Value" enter="OnEdit(event)" focusOut="OnEdit(event)"/>
+		<util:ToolButton id="_ValueButton" width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+						click="ShowExpressionEditor(event)"/>
+	</mx:HBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="绑定参数"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:ComboBox width="160" editable="true" cornerRadius="0" id="_BindingValue"
+				 enter="OnEdit(event)" focusOut="OnEdit(event)" change="OnEdit(event)"
+				 fontWeight="normal" paddingLeft="0">
+	</mx:ComboBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="绑定列"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:ComboBox width="160" editable="true" cornerRadius="0" id="_BindingColumn"
+				 enter="OnEdit(event)" focusOut="OnEdit(event)" change="OnEdit(event)"
+				 fontWeight="normal" paddingLeft="0">
+	</mx:ComboBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="样式"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:VBox>
+		<design:StyleEditor id="_Style"/>	
+		<util:ToolButton icon="{Asset.ICON_CONDITION_STYLE}" label="条件样式" click="ShowConditionStyleEditor()"/>	
+	</mx:VBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="格式化"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:ComboBox width="160" editable="true" cornerRadius="0" id="_Format" enter="OnEdit(event)"
+				 focusOut="OnEdit(event)" change="ItemChanged(event)" fontWeight="normal"
+				 paddingLeft="0" labelField="label">
+	</mx:ComboBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="控件"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:VBox>
+		<mx:ComboBox width="160" id="_Control" paddingLeft="0" change="OnEdit(event)" fontWeight="normal" labelField="label">
+		</mx:ComboBox>
+		<util:ToolButton icon="{Asset.ICON_PROPERTIES}" label="控件属性" click="ShowControlProperties()"/>			
+	</mx:VBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="列合并表达式"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:HBox width="80%" horizontalAlign="center" horizontalGap="1">
+		<mx:TextInput width="100%" id="_ColSpanExpression" enter="OnEdit(event)"
+					  focusOut="OnEdit(event)"/>
+		<util:ToolButton id="_ColSpanExpressionButton" width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+						 click="ShowExpressionEditor(event)"/>
+	</mx:HBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="其他"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:Grid verticalGap="3" horizontalGap="3">
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="列合并"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_ColSpan" enter="OnEdit(event)"
+							 focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+ 
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="行合并"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_RowSpan" enter="OnEdit(event)"
+							 focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" colSpan="2" horizontalAlign="center">
+				<mx:CheckBox label="行高自动递增" id="_CanGrow" change="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" colSpan="2" horizontalAlign="center">
+				<mx:CheckBox label="合并相同内容" id="_MergeSameContent" change="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" colSpan="2" horizontalAlign="center">
+				<mx:CheckBox label="显示空值" id="_ShowNullValue" change="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+</mx:VBox>

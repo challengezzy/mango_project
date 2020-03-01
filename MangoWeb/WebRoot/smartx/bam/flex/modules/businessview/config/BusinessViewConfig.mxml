@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="net.brandonmeyer.containers.*" 
+					   layout="vertical" width="400" height="300" close="close()" creationComplete="init()"
+					   allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:HBox width="100%" id="winHbox">
+			<mx:CheckBox id="isKeepBvChx" label="在视图中保留:" change="isKeepBvChx_changeHandler(event)"/>
+			<mx:TextInput id="windowParamTxt" restrict="0-9"/>
+			<mx:ComboBox id="windowTypeCbo" dataProvider="{windowType}" enabled="false" change="windowTypeCbo_changeHandler(event)"/>
+		</mx:HBox>
+		<mx:ComboBox id="uniqueCbo" dataProvider="{dataProvider}" labelField="{uniqueLabelField}" />
+		<mx:TitleWindow id="eplTw" title="EPL语句" showCloseButton="true" width="450" height="400" close="PopUpManager.removePopUp(eplTw)">
+			<mx:TextArea id="eplText" width="100%" height="100%" editable="false" />
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.TextArea;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.ConfirmUtil;
+			
+			public var confirmFun:Function;
+			
+			public var windowName:String;//对应事件流窗口名称
+			[Bindable]
+			public var eventName:String;//对应事件名称
+			
+			public var bvCode:String;//视图编码
+			
+			public var contentXml:XML;
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			protected var bvTreeData:XMLList;
+			
+			protected var bvTreeXml:XML = <refbvs />;
+			
+			protected var EPL_UTIL_PARSEDATE:String = "BamEplUtil.parseDate";
+			
+			protected var EPL_UTIL_DATECONVERTTOLONG:String = "BamEplUtil.dateConvertToLong";
+			
+			protected var EPL_UTIL_LONGCONVERTTODATE:String = "BamEplUtil.longConvertToDate";
+			
+			protected var EPL_UTIL_BIGDECIMALCONVERTTOLONG:String = "BamEplUtil.bigDecimalConvertToLong";
+			
+			//命名窗口类型（时间，长度）
+			[Bindable]
+			protected var windowType:ArrayCollection = new ArrayCollection([
+				{label:"天",data:"day"},
+				{label:"小时",data:"hour"},
+				{label:"分钟",data:"min"},
+				{label:"秒",data:"sec"},
+				{label:"毫秒",data:"msec"},
+				{label:"长度",data:"length"},
+				{label:"去重",data:"unique"}
+			]);
+			
+			[Bindable]
+			protected var dataProvider:ArrayCollection = new ArrayCollection();
+			
+			protected var PREFIX_MODULE:String = "module_";
+			[Bindable]
+			protected var uniqueLabelField:String;
+			
+			protected function init():void{
+				setUniqueLabelField();
+			}
+			
+			protected function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			public function getEpl():String{return null};
+			
+			public function getContentXml():String{
+				propertyConvertToXml();
+				return contentXml.toXMLString();
+			};
+			
+			protected function convertFieldType(type:String):String{
+				if(type=="VARCHAR2")
+					return "String";
+				else if(type=="BIGINT")
+					return "long";
+				else if(type=="INTEGER")
+					return "int";
+				else if(type=="DOUBLE")
+					return "double";
+				else if(type=="BOOLEAN")
+					return "boolean";
+				else if(type=="DATE")
+					return "java.util.Date";
+				else if(type=="NUMBER" || type == "NUMERIC")
+					return "java.math.BigDecimal";
+				else
+					return type;
+			}
+			
+			protected function propertyConvertToXml():void{};
+			
+			//验证表单
+			public function checkOut():Boolean{return true};
+			
+			protected function isKeepBvChx_changeHandler(event:Event):void{
+				if(isKeepBvChx.selected)
+					windowTypeCbo.enabled = true;
+				else
+					windowTypeCbo.enabled = false;
+			}
+			
+			protected function setUniqueLabelField():void{};
+			
+			protected function windowTypeCbo_changeHandler(event:ListEvent):void{
+				if(windowTypeCbo.selectedItem.data == "unique"){
+					if(winHbox.contains(windowParamTxt))
+						winHbox.removeChild(windowParamTxt);
+					if(!winHbox.contains(uniqueCbo))
+						winHbox.addChildAt(uniqueCbo,1);
+				}else{
+					if(winHbox.contains(uniqueCbo))
+						winHbox.removeChild(uniqueCbo);
+					if(!winHbox.contains(windowParamTxt))
+						winHbox.addChildAt(windowParamTxt,1);
+				}
+			}
+			
+			protected function getWindowEpl():String{
+				var windowEpl:String = "\n\ncreate window ".concat(windowName);
+				if(windowTypeCbo.selectedItem.data == "unique"){
+					windowEpl = windowEpl.concat(".std:unique(").concat(uniqueCbo.selectedItem[uniqueLabelField]).concat(")");
+				}else{
+					if(windowParamTxt.text != ""){
+						if(windowTypeCbo.selectedItem["data"]=="length")
+							windowEpl = windowEpl.concat(".win:length(").concat(windowParamTxt.text).concat(")");
+						else
+							windowEpl = windowEpl.concat(".win:time(").concat(windowParamTxt.text).concat(" ").concat(windowTypeCbo.selectedItem["data"]).concat(")");
+					}else
+						windowEpl = windowEpl.concat(".win:keepall()");
+				}
+				windowEpl = windowEpl.concat(" select * from ").concat(eventName).concat(";\n");
+				windowEpl = windowEpl.concat("insert into ").concat(windowName).concat(" select * from ").concat(eventName).concat(";");
+				return windowEpl;
+			}
+			
+			protected function setWindow():void{
+				if(contentXml.schema.@isSave == "true"){
+					isKeepBvChx.selected = true;
+					if(contentXml.schema.@unit == "unique"){
+						for each(var unData:Object in dataProvider){
+							if(unData[uniqueLabelField] == contentXml.schema.@value)
+								uniqueCbo.selectedItem = unData;
+						}
+					}else	
+						windowParamTxt.text = contentXml.schema.@value;
+					isKeepBvChx_changeHandler(null);
+					for each(var typeDate:Object in windowType){
+						if(typeDate.data == contentXml.schema.@unit)
+							windowTypeCbo.selectedItem = typeDate;
+					}
+				}
+				else
+					isKeepBvChx.selected = false;
+				windowTypeCbo_changeHandler(null);
+			}
+			
+			protected function showEpl():void{
+				PopUpManager.addPopUp(eplTw,this,true);
+				PopUpManager.centerPopUp(eplTw);
+				eplText.text = getEpl();
+			}
+		]]>
+	</fx:Script>
+</containers:SuperPanel>

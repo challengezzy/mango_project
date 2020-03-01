@@ -1,0 +1,188 @@
+/**************************************************************************
+ * $RCSfile: FileListPanel.java,v $  $Revision: 1.3 $  $Date: 2007/05/31 07:38:17 $
+ **************************************************************************/
+package smartx.framework.metadata.ui.componentscard;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import smartx.framework.common.ui.*;
+
+
+public class FileListPanel extends JPanel {
+    /**
+     *
+     */
+    private static final long serialVersionUID = -4494833836273195514L;
+
+    private JLabel jlb_image = null;
+
+    private JPanel jpn_left = null;
+
+    private JLabel jlb_title = null;
+
+    private String str_init_image = null;
+
+    private JScrollPane jsp_left = null;
+
+    private JLabel[] labels = null;
+
+    private String str_selectedicon = null;
+
+    public FileListPanel(String _init_image) {
+        str_init_image = _init_image;
+        str_selectedicon = _init_image;
+        init();
+    }
+
+    private void init() {
+        jlb_title = new JLabel("图标预览:");
+        jlb_title.setPreferredSize(new Dimension(80, 20));
+        jlb_title.setHorizontalAlignment(JLabel.RIGHT);
+        jlb_image = new JLabel("");
+        jlb_image.setPreferredSize(new Dimension(40, 40));
+        jlb_image.setHorizontalAlignment(JLabel.CENTER);
+        jlb_image.setVerticalAlignment(JLabel.CENTER);
+
+        JPanel jpn_north = new JPanel();
+        jpn_north.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 15));
+        jpn_north.add(jlb_title);
+        jpn_north.add(jlb_image);
+
+        jpn_left = new JPanel();
+        jpn_left.setLayout(new FlowLayout(FlowLayout.LEFT, 20, 20));
+        jsp_left = new JScrollPane(jpn_left);
+        jsp_left.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        jsp_left.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
+        this.setLayout(new BorderLayout()); //
+        this.add(jsp_left, BorderLayout.CENTER); //
+        this.add(jpn_north, BorderLayout.NORTH); //
+        addElement();
+    }
+
+    private void addElement() {
+        String[] str_images = null;
+        JLabel jlb_temp = null;
+        try {
+            str_images = (String[]) NovaClientCache.getInstance().get("PLUTO_IMAGENAMES");
+            ImageIcon[] images = (ImageIcon[]) NovaClientCache.getInstance().get("PLUTO_IMAGES");
+            if (str_images == null) {
+                str_images = UIUtil.getImageFileNames(); //
+                images = new ImageIcon[str_images.length];
+
+                labels = new JLabel[str_images.length]; //
+                int li_count = images.length;
+                int h = (li_count / 10 + 1) * 40 > 400 ? (li_count / 10) * 40 : 400;
+                jpn_left.setPreferredSize(new Dimension(380, h));
+
+                for (int i = 0; i < str_images.length; i++) {
+                    images[i] = UIUtil.getImage(str_images[i]);
+                    addImageItem(i, images[i], str_images[i]);
+                    if (str_images[i].equals(str_init_image)) {
+                        jlb_temp = labels[i];
+                        jlb_image.setIcon(jlb_temp.getIcon());
+                    }
+                }
+//				NovaClientCache.getInstance().put("PLUTO_IMAGENAMES", str_images);
+//				NovaClientCache.getInstance().put("PLUTO_IMAGES", images);
+            } else {
+                labels = new JLabel[str_images.length]; //
+                int li_count = images.length;
+                int h = (li_count / 10 + 1) * 40 > 400 ? (li_count / 10) * 40 : 400;
+                jpn_left.setPreferredSize(new Dimension(380, h));
+
+                for (int i = 0; i < images.length; i++) { // 把所有从服务器端获得的文件名的文件全部加载到面板中去
+                    addImageItem(i, images[i], str_images[i]);
+                    if (str_images[i].equals(str_init_image)) {
+                        jlb_temp = labels[i];
+                        jlb_image.setIcon(jlb_temp.getIcon());
+                    }
+                }
+            }
+            jpn_left.updateUI();
+            onSelected(jlb_temp);
+        } catch (Exception e) {
+            System.out.println("\nException!!!!!!");
+            e.printStackTrace();
+        }
+    }
+
+    private void addImageItem(int _index, ImageIcon _image, String _file) {
+        if (_image == null) {
+            labels[_index] = new JLabel("×");
+            labels[_index].setForeground(Color.RED);
+        } else {
+            labels[_index] = new JLabel(_image);
+        }
+        labels[_index].setToolTipText(_file);
+        labels[_index].setPreferredSize(new Dimension(20, 20));
+
+        labels[_index].addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                JLabel label_sel = (JLabel) e.getSource(); //
+                str_selectedicon = label_sel.getToolTipText();
+                if (e.getButton() == MouseEvent.BUTTON1 && e.getClickCount() == 1) {
+                    onSelected(label_sel); //
+                } else if (e.getButton() == MouseEvent.BUTTON1 && e.getClickCount() >= 2) {
+                    onEnsure(e); //
+                }
+            }
+        });
+        jpn_left.add(labels[_index]); //
+    }
+
+    /**
+     * 实现选中某个JLabel
+     *
+     * @param _label
+     */
+    private void onSelected(JLabel _label) {
+        for (int i = 0; i < labels.length; i++) {
+            labels[i].setBorder(BorderFactory.createEmptyBorder());
+        }
+        if (_label != null) {
+            jlb_image.setIcon(_label.getIcon());
+            _label.setBorder(BorderFactory.createLineBorder(Color.red, 3)); //
+        }
+    }
+
+    /**
+     * 实现双击，选中图标，并关闭Dialog
+     *
+     * @param e
+     */
+    private void onEnsure(MouseEvent e) {
+        Object obj = this.getParent().getParent().getParent().getParent();
+        if (obj instanceof UIPhotoRefDialog) {
+            ( (UIPhotoRefDialog) obj).onBtnOk();
+        }
+    }
+
+    public String getSelectedIcon() {
+        return str_selectedicon;
+    }
+}
+/*******************************************************************************
+ * $RCSfile: FileListPanel.java,v $ $Revision: 1.3 $ $Date: 2007/05/31 07:38:17 $
+ *
+ * $Log: FileListPanel.java,v $
+ * Revision 1.3  2007/05/31 07:38:17  qilin
+ * code format
+ *
+ * Revision 1.2  2007/05/22 07:58:46  qilin
+ * no message
+ *
+ * Revision 1.1  2007/05/17 06:01:07  qilin
+ * no message
+ *
+ * Revision 1.4  2007/03/01 02:58:02  shxch
+ * 纠正获取图标文件名数组的方法
+ * Revision 1.3 2007/02/02 07:58:44 shxch
+ * 纠正取图片的远程服务类NovaBSCommUtild的名字
+ *
+ * Revision 1.2 2007/01/30 05:14:31 lujian *** empty log message ***
+ *
+ *
+ ******************************************************************************/

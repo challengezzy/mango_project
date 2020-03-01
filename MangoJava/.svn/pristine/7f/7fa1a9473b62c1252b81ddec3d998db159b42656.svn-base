@@ -1,0 +1,388 @@
+package smartx.publics.datatask;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.apache.log4j.Logger;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.bs.SysConst;
+import smartx.framework.common.job.bs.JobServer;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.vo.DMOConst;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.metadata.bs.NovaServerEnvironment;
+import smartx.publics.datatask.vo.DataTaskConst;
+import smartx.publics.datatask.vo.DataTaskInstance;
+
+/**
+ * 通用任务管理实现
+ * 
+ * 1、读取任务表，获得现阶段应该启动的任务列表
+ * 2、按顺序启动任务。任务自行判断是否应该执行
+ * @author zhangzy
+ * @updated 2011/8/16
+ */
+public class CommTaskManager implements CommTaskManagerIFC {
+	private static Logger logger = NovaLogger.getLogger(CommTaskManager.class);
+	
+	private boolean runTask=false; //停止任务管理器的控制
+	
+	private boolean isInited = false;
+	
+	private static CommTaskManager commTaskMng;
+	
+	private CommTaskManager(){
+		//任务数据相关初始化
+		init();
+	}
+	
+	public static CommTaskManager getInstance(){
+		if(commTaskMng == null){
+			commTaskMng = new CommTaskManager();
+		}
+			
+		
+		return commTaskMng;
+	}
+
+	/**
+	 * 初始化
+	 */
+	public void init(){
+		if( isInited == true){
+			return ; //初始化只做一次
+		}
+		
+		//修改在服务器关闭时一些正在进行中的任务状态
+		destroyInvalidTask();
+		
+		String tmp = (String)NovaServerEnvironment.getInstance().get(SysConst.KEY_DATATASK_SERVICE);
+        if(tmp!=null&&tmp.toLowerCase().equals("true")){
+         	startProcessor(); //启动任务处理线程
+         }
+        isInited = true;
+	}
+	
+	private void destroyInvalidTask(){
+		CommDMO dmo=new CommDMO();
+		try{
+			String update = "update PUB_DATATASK set STATUS=? where STATUS=?";
+			dmo.executeUpdateByDS(DMOConst.DS_DEFAULT,update,-1,1);
+			dmo.commit(DMOConst.DS_DEFAULT);
+		}catch(Exception e){
+			try {
+				dmo.rollback(DMOConst.DS_DEFAULT);
+			} catch (Exception e1) {
+				logger.debug("",e1);
+			}
+		}finally{
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+	
+	
+	/**
+	 * 加载数据任务
+	 * @return datataskId
+	 */
+	public String addTask(String taskTempletId,String taskName, String taskContent,Map<String,String> paramMap) throws Exception{
+		CommDMO dmo = new CommDMO();		
+		//判断是否有相同的任务正在处理或等待处理
+		String sqlsel="SELECT COUNT(*) TASKNUM FROM PUB_DATATASK WHERE NAME= '"+ taskName + "' AND STATUS IN (0,1)";
+		if(dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sqlsel)[0].getIntegerValue("TASKNUM").intValue()>0){
+			throw new Exception("存在相同的数据任务【" + taskName + "】正在处理中！");
+		}
+		
+		String paramStr = paramParser(paramMap);
+		//任务内容保存解析后的数据内容 
+		taskContent = StringUtil.buildExpression(paramMap, taskContent);
+		
+		String datataskId = dmo.getSequenceNextValByDS(DMOConst.DS_DEFAULT, "S_PUB_DATATASK");
+		String sql="INSERT INTO PUB_DATATASK(ID, DATATASKTEMPLETID, NAME, STATUS, TASKCONTENT,PARAMVALUE)" +
+				" VALUES(?,?,?,0,?,?)";
+		
+		dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql,datataskId,taskTempletId,taskName,taskContent,paramStr);
+		
+		return datataskId;
+	}
+	
+	//添加并启动数据任务
+	public String addAndStartTask(String taskTempletId,String taskName, String taskContent,Map<String, String> paramMap) throws Exception{
+		CommDMO dmo = new CommDMO();		
+		//判断是否有相同的任务正在处理或等待处理
+//		String sqlsel="SELECT COUNT(*) TASKNUM FROM PUB_DATATASK WHERE NAME= '"+ taskName + "' AND STATUS IN (0,1)";
+//		if(dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sqlsel)[0].getIntegerValue("TASKNUM").intValue()>0){
+//			throw new Exception("存在相同的数据任务【" + taskName + "】正在处理中！");
+//		}
+		String paramStr = paramParser(paramMap);
+		//任务内容保存解析后的数据内容 
+		taskContent = StringUtil.buildExpression(paramMap, taskContent);
+		
+		String datataskId = dmo.getSequenceNextValByDS(DMOConst.DS_DEFAULT, "S_PUB_DATATASK");
+		String sql="INSERT INTO PUB_DATATASK(ID, DATATASKTEMPLETID, NAME, STATUS, TASKCONTENT,PARAMVALUE)" +
+				" VALUES(?,?,?,0,?,?)";		
+		dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql,datataskId,taskTempletId,taskName,taskContent,paramStr);
+		
+		TaskAbstractThread taskThread = new DataTaskExecThread();
+		DataTaskInstance dti = new DataTaskInstance();
+		dti.setId(new Integer(datataskId).intValue());
+		dti.setName(taskName);
+		dti.setDatataskTempletid(taskTempletId);
+		dti.setParamValue(paramStr);
+		dti.setStatus("0");
+		dti.setTaskContent(taskContent);
+		
+		//即时启动数据任务
+		_tasktable.put("TASK_"+dti.getId(), taskThread);
+		dmo.commit(DMOConst.DS_DEFAULT);
+		taskThread.init(dti);
+		taskThread.start();
+		
+		return datataskId;
+	}
+	
+	/**
+	 * 参数MAP转换为字符串
+	 * @param paramMap
+	 * @return
+	 */
+	private String paramParser(Map<String, String> paramMap){
+		String paramStr = "";//数据任务参数值
+		if(paramMap != null){
+			for(Entry<String,String> param :  paramMap.entrySet()){
+				String value = param.getValue() == null ?"":param.getValue();
+				paramStr = paramStr + param.getKey() + DataTaskConst.PARAM_KEYVALUE + value + DataTaskConst.PARAM_SPLIT;
+			}
+		}
+		
+		return paramStr;
+	}
+	
+	public Map<String, String> getTaskParamById(String taskTempletId) throws Exception{
+		Map<String, String> paramMap = new HashMap<String,String>();
+		CommDMO dmo=new CommDMO();
+		String sql = "SELECT MT.CONTENT,D.MTCODE,D.NAME FROM PUB_METADATA_TEMPLET MT,PUB_DATATASK_TEMPLET D WHERE D.MTCODE=MT.CODE AND D.ID = ?";
+		HashVO[] vos= dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sql,taskTempletId);
+		
+		if(vos.length < 1)
+			throw new Exception("根据taskTempletId=" + taskTempletId + " 没有找到对应的数据模板定义！");
+		String taskContent = vos[0].getStringValue("CONTENT");
+		
+		String[] keys = StringUtil.getFormulaMacPars(taskContent);
+		for(int j=0;j<keys.length;j++){
+			String paramKey = keys[j];
+			paramMap.put(paramKey, "");//目前只返回所有节点即可
+		}
+		
+		return paramMap;
+	}
+
+	/**
+	 * 停止任务
+	 * @param taskTitle
+	 */
+	public void stopTask(String taskTitle)throws Exception{
+		String sql="UPDATE PUB_DATATASK SET STATUS=-1 WHERE ID="+ taskTitle +" AND STATUS IN (0,1)";
+		
+		CommDMO dmo=new CommDMO();
+		dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql);		
+	}
+	
+	/**
+	 * 停止所有任务运行
+	 */
+	public void stopProcessor(){
+		runTask=false;
+	}
+	
+	/**
+	 * 启动任务处理线程
+	 */
+	public void startProcessor(){
+		if(runTask)//如果循环线程已经启动，就不再初始化
+			return;
+		
+		runTask=true;
+		
+		(new TaskProcessor()).start();
+		
+		//添加循环任务处理
+		CommDMO dmo=new CommDMO();		
+		try{
+			String sql="SELECT * FROM V_PUB_DATATASKTEMPLET WHERE TYPE=1";
+			HashVO[] vos= dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sql);
+ 			for(int i=0;i<vos.length;i++){
+ 				JobDataMap dataMap = new JobDataMap();
+ 				dataMap.put("ID", vos[i].getStringValue("ID"));
+ 				//原始的任务内容 ，此处不进行参数解析
+ 				dataMap.put("CONTENT", vos[i].getStringValue("CONTENT"));
+ 				String jobName = vos[i].getStringValue("CODE");
+ 				try{
+				
+ 					JobDetail jobDetail = new JobDetail();
+ 					jobDetail.setJobClass(DataTaskCronJob.class);
+ 					jobDetail.setGroup("DataTask");
+ 					jobDetail.setName(jobName);
+ 					jobDetail.setJobDataMap(dataMap);
+				
+ 					JobServer.addCronJob(jobDetail, vos[i].getStringValue("CRONEXPRESSION"));
+ 				}catch (Exception e) {
+					logger.error("初始化循环数据任务【"+jobName+"】异常！",e);
+					continue;
+				}
+ 				logger.debug("初始化循环数据任务【"+jobName+"】成功！");
+			}
+		}catch(Exception e){
+			e.printStackTrace();
+			logger.error("初始化循环数据任务时发生异常！",e);
+			try{dmo.rollback(DMOConst.DS_DEFAULT);}catch(Exception ex){};
+		}finally{
+			try{dmo.releaseContext(DMOConst.DS_DEFAULT);}catch(Exception e){};
+		}
+	}
+	
+	private int interval= 30;                   //间隔时间
+	private boolean ismainprocessor= true;    //是否任务主处理器
+	
+	/**
+	 * 获得任务管理器配置，必须事实跟踪配置情况，因此不缓冲读取xml。
+	 * @return
+	 */
+	private void getTaskManagerSetting(){
+		//interval=Integer.parseInt(config.getChildText("interval"));
+		//interval=interval<=0?120:interval;
+		//ismainprocessor="true".equalsIgnoreCase(config.getChildText("ismainprocessor"));
+
+	}
+	
+	/**
+	 * 任务执行线程缓冲
+	 */
+	private static Hashtable<String,Object> _tasktable=new Hashtable<String,Object>();
+	
+	/**
+	 * 执行任务处理
+	 */
+	private void doDataTask()throws Exception{
+		HashVO[] taskVoList =  getTaskList();
+		
+		for(int i=0;i<taskVoList.length;i++){
+			HashVO vo = taskVoList[i];
+			DataTaskInstance taskVo = new DataTaskInstance();
+			taskVo.setId(vo.getIntegerValue("ID").intValue());
+			taskVo.setName(vo.getStringValue("NAME"));
+			taskVo.setParamValue(vo.getStringValue("PARAMVALUE"));
+			taskVo.setTaskContent(vo.getStringValue("TASKCONTENT"));
+			taskVo.setBeginTime(vo.getStringValue("BEGINTIME"));
+			taskVo.setEndTime(vo.getStringValue("ENDTIME"));
+			taskVo.setDatataskTempletid(vo.getStringValue("DATATASKTEMPLETID"));
+			taskVo.setRate(vo.getStringValue("RATE"));
+			taskVo.setStatus(vo.getStringValue("STATUS"));
+			taskVo.setLastMassage(vo.getStringValue("LASTMASSAGE"));
+			
+			int status = vo.getIntegerValue("STATUS").intValue();
+			int taskId = taskVo.getId();
+			
+			if(status ==0){//未开始的任务
+				if(_tasktable.containsKey("TASK_"+taskId)){
+					//继续运行不用处理
+					logger.info("任务在执行队列中，不能再生成新的任务实例！");
+				}else{
+					TaskAbstractThread th = new DataTaskExecThread();
+					th.init(taskVo);
+					_tasktable.put("TASK_"+taskId, th);
+					th.start();
+				}
+			}else if(status ==-1){
+				//强制终止的任务
+				updateStoppedTask(taskId);
+//				deailTaskLog(taskId+"");
+				//等线程完全运行完后，清理任务。
+//				if(_tasktable.containsKey("TASK_"+taskId)){
+//					if(!((Thread)_tasktable.get("TASK_"+taskId)).isAlive()){
+//						updateStoppedTask(taskId);
+//						_tasktable.remove("TASK_"+taskId);
+//					}
+//				}else{
+//					updateStoppedTask(taskId);
+//				}
+			}
+		}
+		
+		//清除已结束的线程
+		//Iterator是工作在一个独立的线程中，并且拥有一个 mutex锁，就是说Iterator在工作的时候，是不允许被迭代的对象被改变的
+		ArrayList<String> delList = new ArrayList<String>();
+		for(Entry e :  _tasktable.entrySet()){
+			Thread taskThread = (Thread)e.getValue();
+			if( !taskThread.isAlive())
+				delList.add(e.getKey().toString());
+		}
+		for(String key : delList){
+			_tasktable.remove(key);
+//			deailTaskLog(key.split("_")[1]);
+		}
+	}
+	
+	//获取未处理任务列表
+	private HashVO[] getTaskList() throws Exception{
+		CommDMO dmo=new CommDMO();		
+		try{
+			String sql="SELECT * FROM PUB_DATATASK WHERE STATUS IN (0,-1) AND ROWNUM<10000";
+			HashVO[] vos= dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sql);
+			return vos;
+		}finally{
+			try{dmo.releaseContext(DMOConst.DS_DEFAULT);}catch(Exception e){};
+		}
+	}
+	
+	private void updateStoppedTask(int taskId){
+		CommDMO dmo=new CommDMO();		
+		try{
+			String sql="UPDATE PUB_DATATASK SET STATUS=10,ENDTIME=SYSDATE,RATE=100,LASTMASSAGE='任务被强制终止！' WHERE ID="+taskId;
+			dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql);
+			dmo.commit(DMOConst.DS_DEFAULT);
+		}catch(Exception e){
+			try{dmo.rollback(DMOConst.DS_DEFAULT);}catch(Exception ex){};
+		}finally{
+			try{dmo.releaseContext(DMOConst.DS_DEFAULT);}catch(Exception e){};
+		}
+	}
+	
+	/**
+	 * 任务处理器
+	 * @author zhangzy
+	 */
+	class TaskProcessor extends Thread{
+		public void run(){
+			/**
+			 * 读取配置获得所有任务管理配置
+			 * 检索间隔、是否作为主任务处理节点
+			 */
+			//读取任务循环
+			while(runTask){
+				getTaskManagerSetting();
+				
+				if(ismainprocessor){
+					//logger.info("当前服务器被设置为任务处理服务器，开始任务处理...");
+					try{
+						doDataTask();						
+					}catch(Exception e){
+						logger.error("发生异常",e);
+					}
+				}else{
+					//logger.info("当前服务器不是是任务服务器节点，直接结束！");
+				}
+				try{sleep(interval*1000);}catch(Exception e){};
+			}
+			logger.info("任务管理器停止运行！");
+		}
+	}
+	
+}

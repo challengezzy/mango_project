@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mt:AbstractMTRefInput xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			  xmlns:s="library://ns.adobe.com/flex/spark" 
+			  xmlns:mx="library://ns.adobe.com/flex/mx" 
+			  xmlns:mt="smartx.flex.components.mtdesigner.*"
+			  width="100%">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			
+			override protected function getRefTitle():String{
+				return "选择：同义词";
+			}
+			
+			override protected function getHeaders():Array{
+				var headers:Array = ["名称","编码","描述#"];
+				return headers;
+			}
+			
+			override protected function getTableBody():Array{
+				var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(GlobalConst.MTCODE_SYNONYMS);
+				var tableBody:Array = [];
+				for each(var synonymsXml:XML in metadataTemplet.contentXML.synonyms){
+					var row:Array = [String(synonymsXml.@name),String(synonymsXml.@code),String(synonymsXml.@description)];
+					tableBody.push(row);
+				}
+				return tableBody;
+			}
+			
+		]]>
+	</fx:Script>
+</mt:AbstractMTRefInput>

@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtdesigner:MTDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:mtdesigner="smartx.flex.components.mtdesigner.*" 
+					   layout="vertical" creationComplete="init()">
+	<fx:Declarations>
+		<mx:HDividedBox id="synonymsBox" label="同义词配置" width="100%" height="100%" 
+						paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:VBox width="50%" height="100%">
+				<mx:Label text="同义词" />
+				<mx:HBox width="100%">
+					<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建同义词"
+								   id="addSynonymsBtn" click="addSynonymsBtn_clickHandler()" />
+					<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除同义词"
+								   id="removeSynonymsBtn" click="removeSynonymsBtn_clickHandler()" />
+					<mx:LinkButton icon="{AssetsFileLib.importIcon}" width="22" height="22" toolTip="从数据字典导入"
+								   id="importFromSysdictionaryBtn" click="importFromSysdictionaryBtn_clickHandler(event)" />
+					<mx:LinkButton icon="{AssetsFileLib.SQLTransIcon}" width="22" height="22" toolTip="通过SQL导入"
+								   id="importFromSqlBtn" click="importFromSqlBtn_clickHandler(event)" />
+					<mx:Label text="共有同义词{sourceXML.synonyms.length()}条" />
+				</mx:HBox>
+				<mx:DataGrid id="synonymsDg" width="100%" height="100%" dataProvider="{sourceXML.synonyms}" 
+							 itemClick="synonymsDg_itemClickHandler(event)" editable="true">
+					<mx:columns>
+						<mx:DataGridColumn headerText="名称" dataField="@name" editable="true" />
+						<mx:DataGridColumn headerText="编码" dataField="@code" editable="false"/>
+						<mx:DataGridColumn headerText="描述" dataField="@description" editable="true" />
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+			<mx:VBox width="50%" height="100%">
+				<mx:Label text="同义词属性" />
+				<mx:HBox width="100%">
+					<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建同义词属性"
+								   id="addSynonymsVarBtn" click="addSynonymsVarBtn_clickHandler()" />
+					<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除同义词属性"
+								   id="removeSynonymsVarBtn" click="removeSynonymsVarBtn_clickHandler()" />
+					<mx:LinkButton icon="{AssetsFileLib.upIcon}" width="22" height="22" toolTip="上移"
+								   id="upSynonymsVarBtn" click="upSynonymsVarBtn_clickHandler()" />
+					<mx:LinkButton icon="{AssetsFileLib.downIcon}" width="22" height="22" toolTip="下移"
+								   id="downSynonymsVarBtn" click="downSynonymsVarBtn_clickHandler()" />
+				</mx:HBox>
+				<mx:DataGrid id="synonymsVar" height="100%" width="100%" dataProvider="{sourceXML.synonyms.(@code==synonymsCode).variable}" editable="true">
+					<mx:columns>
+						<mx:DataGridColumn headerText="属性" dataField="@name" editable="false" />
+						<mx:DataGridColumn headerText="值" dataField="@value" editable="true"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+		</mx:HDividedBox>
+		<mx:TitleWindow id="addSynonymsWindow" width="230" height="150" title="添加同义词" 
+						showCloseButton="true" close="PopUpManager.removePopUp(addSynonymsWindow)">
+			<mx:HBox width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="名称" />
+				<mx:TextInput id="nameTxt" width="100" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="编码" />
+				<mx:TextInput id="codeTxt" width="100" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="addSynonyms_clickHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(addSynonymsWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="addSynonymsVarWindow" width="230" height="150" title="添加属性" 
+						showCloseButton="true" close="PopUpManager.removePopUp(addSynonymsVarWindow)">
+			<mx:HBox width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="名称" width="20%"/>
+				<mx:TextInput id="varNameTxt" width="100" />
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="值" width="20%"/>
+				<mx:TextInput id="valueTxt" width="100" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="addSynonymsVar_clickHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(addSynonymsVarWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="sqlWindow" width="600" height="400" title="SQL导入" showCloseButton="true"
+						close="PopUpManager.removePopUp(sqlWindow)">
+			<mx:Label width="100%" height="20%" text="注:名称(字段别名必须为synname),编码(字段别名必须为syncode),描述(字段别名必须为syndesc)&#13;    属性名(字段别名必须为name),属性值(字段别名必须为value) 最多只支持导入5000条,如果超过将&#13;    只导入前5000条！" color="red" />
+			<mx:TextArea id="sqlTxt" width="100%" height="90%"  />
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="sqlImport_clickHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(sqlWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			[Bindable]
+			private var synonymsCode:String = "";
+			
+			private var smartXFormService:RemoteObject;
+			
+			private var type:String;
+			
+			private const SMARTX_DICTIONARY:String = "SMARTX";
+			
+			private const DQC_DICTIONARY:String = "dqc";
+			
+			private const NORMAL:String = "normal";
+			
+			private const SQL:String = "sql";
+			
+			private const MAX_RESULT:Number = 5000;//SQL导入最大导入数
+			
+			private var classId:String;
+			
+			private var attributeId:String;
+			
+			private var typeChooserWindow:ComboBoxWindow = new ComboBoxWindow();
+			
+			private var loadingWindow:LoadingWindow = new LoadingWindow();
+			
+			private function init():void{
+				this.sourceTextArea.editable = false;
+				tabNavigator.removeAllChildren();
+				tabNavigator.addChildAt(synonymsBox,0);
+				smartXFormService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint != null)
+					smartXFormService.endpoint = endpoint;
+				smartXFormService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				smartXFormService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("查询数据时出错!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					loadingWindow.stopOper();
+				});
+				typeChooserWindow.title = "选择数据字典类型";
+				typeChooserWindow.confirmFunc = typeChooserConfirm;
+				typeChooserWindow.width = 300;
+				typeChooserWindow.height = 180;
+				typeChooserWindow.dataProvider = new ArrayCollection([
+					{name:"平台数据字典",data:SMARTX_DICTIONARY},
+					{name:"DQC数据字典",data:DQC_DICTIONARY}
+				]);
+			}
+			
+			private function typeChooserConfirm():void{
+				var typeObject:* = typeChooserWindow.getSelectedItem();
+				if(typeObject != null){
+					if(typeObject.data == SMARTX_DICTIONARY)
+						initSmartXSysdictionary();
+					else if(typeObject.data == DQC_DICTIONARY)
+						initDqcDialog();
+				}
+				PopUpManager.removePopUp(typeChooserWindow);
+			}
+			
+			private function addSynonymsBtn_clickHandler():void{
+				PopUpManager.addPopUp(addSynonymsWindow,this,true);
+				PopUpManager.centerPopUp(addSynonymsWindow);
+				nameTxt.text = "";
+				codeTxt.text = "";
+				type = NORMAL;
+			}
+			
+			private function addSynonyms_clickHandler():void{
+				if(nameTxt.text == ""){
+					SmartXMessage.show("同义词名称不能为空!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				if(codeTxt.text == ""){
+					SmartXMessage.show("同义词编码不能为空!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				var existSynonyms:XMLList = sourceXML.synonyms.(@code==codeTxt.text);
+				if(existSynonyms.length() > 0){
+					SmartXMessage.show("该同义词已存在！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				var synonyms:XML = <synonyms name={nameTxt.text} code={codeTxt.text} description="" />
+				sourceXML.appendChild(synonyms);
+				
+				if(type == SMARTX_DICTIONARY){
+					smartXFormService.getSimpleHashVoArrayByDS(null,"select b.valuecn name,b.value value from bfbiz_sysdictionary b " +
+						"where b.attributeid = '"+attributeId+"' and b.classid = '"+classId+"'");
+				}else if(type == DQC_DICTIONARY){
+					smartXFormService.getSimpleHashVoArrayByDS("datasource_dqc","SELECT distinct S.DESCRIPTION name,S.VALUE value" +
+						" FROM DQC_NM_DICTIONARY S WHERE S.CLASSNAME = '"+classId+"' AND S.ATTRIBUTENAME = '"+attributeId+"' order by s.value asc");
+				}
+				PopUpManager.removePopUp(addSynonymsWindow);
+			}
+			
+			private function removeSynonymsBtn_clickHandler():void{
+				if(synonymsDg.selectedIndex < 0){
+					SmartXMessage.show("请选择要删除的同义词!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				delete sourceXML.synonyms.(@code==synonymsDg.selectedItem["@code"])[0];
+			}
+			
+			private function addSynonymsVarBtn_clickHandler():void{
+				if(synonymsCode == ""){
+					SmartXMessage.show("请先选择同义词!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				PopUpManager.addPopUp(addSynonymsVarWindow,this,true);
+				PopUpManager.centerPopUp(addSynonymsVarWindow);
+				varNameTxt.text = "";
+				valueTxt.text = "";
+			}
+			
+			private function addSynonymsVar_clickHandler():void{
+				if(varNameTxt.text == ""){
+					SmartXMessage.show("属性名称不能为空!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				if(valueTxt.text == ""){
+					SmartXMessage.show("属性值不能为空!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				var existSynonymsVar:XMLList = sourceXML.synonyms.(@code==synonymsCode)[0].variable.(@name==varNameTxt.text);
+				if(existSynonymsVar.length() > 0){
+					SmartXMessage.show("该同义词属性已存在！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				var synonymsVar:XML = <variable name={varNameTxt.text} value={valueTxt.text} />;
+				sourceXML.synonyms.(@code==synonymsCode)[0].appendChild(synonymsVar);
+				PopUpManager.removePopUp(addSynonymsVarWindow);
+			}
+			
+			private function removeSynonymsVarBtn_clickHandler():void{
+				if(synonymsVar.selectedIndex < 0){
+					SmartXMessage.show("请选择要删除的同义词属性!",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				delete sourceXML.synonyms.(@code==synonymsCode).variable.(@name==synonymsVar.selectedItem["@name"])[0];
+			}
+			
+			private function synonymsDg_itemClickHandler(event:ListEvent):void{
+				synonymsCode = synonymsDg.selectedItem["@code"];
+			}
+			
+			private function importFromSysdictionaryBtn_clickHandler(event:MouseEvent):void{
+				PopUpManager.addPopUp(typeChooserWindow,this,true);
+				PopUpManager.centerPopUp(typeChooserWindow);
+			}
+			
+			private function initSmartXSysdictionary():void{
+				var smartXDialog:RefDialog = new RefDialog();
+				smartXDialog.init2(smartXFormService,"select b.classid 类名,b.attributeid 属性名 from bfbiz_sysdictionary b where b.state=1 group by b.classid,b.attributeid",null);
+				smartXDialog.title = "选择平台数据字典";
+				smartXDialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(smartXDialog.closeByConfirm){
+						PopUpManager.addPopUp(addSynonymsWindow,synonymsBox,true);
+						PopUpManager.centerPopUp(addSynonymsWindow);
+						nameTxt.text = smartXDialog.refPK;
+						codeTxt.text = smartXDialog.refCode;
+						classId = smartXDialog.refPK;
+						attributeId = smartXDialog.refCode;
+						type = SMARTX_DICTIONARY;
+					}
+				});
+				PopUpManager.addPopUp(smartXDialog,this,true);
+				PopUpManager.centerPopUp(smartXDialog);
+			}
+			
+			private function initDqcDialog():void{
+				var dqcDialog:RefDialog = new RefDialog();
+				dqcDialog.init2(smartXFormService,"select s.classname 类名,s.attributename 属性名 from DQC_NM_DICTIONARY s group by s.classname,s.attributename","datasource_dqc");
+				dqcDialog.title = "选择DQC数据字典";
+				dqcDialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dqcDialog.closeByConfirm){
+						PopUpManager.addPopUp(addSynonymsWindow,synonymsBox,true);
+						PopUpManager.centerPopUp(addSynonymsWindow);
+						nameTxt.text = dqcDialog.refPK;
+						codeTxt.text = dqcDialog.refCode;
+						classId = dqcDialog.refPK;
+						attributeId = dqcDialog.refCode;
+						type = DQC_DICTIONARY;
+					}
+				});
+				PopUpManager.addPopUp(dqcDialog,this,true);
+				PopUpManager.centerPopUp(dqcDialog);
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var result:Array = event.result as Array;
+				var resultCount:Number = 0;//新增导入数
+				for each(var data:Object in result){
+					var shv:SimpleHashVO = data as SimpleHashVO;
+					var synonymsVar:XML;
+					
+					if(type == SQL){//通过SQL方式导入
+//						if(result.length > MAX_RESULT){
+//							SmartXMessage.show("导入数超过"+MAX_RESULT.toString()+"条，请分批导入！",SmartXMessage.MESSAGE_ERROR);
+//							loadingWindow.stopOper();
+//							return;
+//						}
+						synonymsVar = <variable name={shv.dataMap["name"]} value={shv.dataMap["value"]} />;
+						var synonymsList:XMLList = sourceXML.synonyms.(@code==shv.dataMap["syncode"]);
+						if(synonymsList.length() > 0){
+							if(synonymsList[0].variable.(@value==shv.dataMap["value"]).length() == 0)
+								synonymsList[0].appendChild(synonymsVar);
+						}else{
+							var synonyms:XML = <synonyms name={shv.dataMap["synname"]} code={shv.dataMap["syncode"]} 
+												description={shv.dataMap["syndesc"]==null?"":shv.dataMap["syndesc"]} />;
+							synonyms.appendChild(synonymsVar);
+							sourceXML.appendChild(synonyms);
+							resultCount++;
+						}
+					}else{
+						synonymsVar = <variable />;
+						for(var att:String in shv.dataMap){
+							synonymsVar.@[att] = shv.dataMap[att];
+						}
+						sourceXML.synonyms.(@code==codeTxt.text)[0].appendChild(synonymsVar);
+					}
+				}
+				loadingWindow.stopOper();
+				SmartXMessage.show("共导入"+resultCount+"个同义词！");
+			}
+			
+			private function importFromSqlBtn_clickHandler(event:MouseEvent):void{
+				PopUpManager.addPopUp(sqlWindow,this,true);
+				PopUpManager.centerPopUp(sqlWindow);
+			}
+			
+			private function sqlImport_clickHandler():void{
+				if(StringUtil.trim(sqlTxt.text) == ""){
+					SmartXMessage.show("请填写要导入的SQL");
+					return;
+				}
+				loadingWindow.startOper("导入中...",this);
+				type = SQL;
+				PopUpManager.removePopUp(sqlWindow);
+				var content:Array = sqlTxt.text.split(";");
+				var sql:String = content[0];
+				var datasource:String = null;
+				if(content.length > 1)
+					datasource = StringUtil.replace(content[1],"ds=","");
+				smartXFormService.getSimpleHashVoArrayUnlimitedByDS(datasource,sql);
+			}
+			
+			private function upSynonymsVarBtn_clickHandler():void{
+				var varSelectedItem:Object = synonymsVar.selectedItem;
+				if(varSelectedItem==null || varSelectedItem.parent() ==undefined)
+					return;
+				var index:int = varSelectedItem.childIndex();
+				if(index == 0)
+					return;
+				var newXml:XML = XML(varSelectedItem).copy();
+				CEPUtils.xmlDeleteNode(XML(varSelectedItem));
+				
+				sourceXML.synonyms.(@code==synonymsCode)[0]
+					.insertChildBefore(sourceXML.synonyms.(@code==synonymsCode)[0].children()[index-1],newXml);
+				
+				callLater(function():void{
+					synonymsVar.selectedItem =newXml;
+					if(synonymsVar.selectedIndex > 1)
+						synonymsVar.scrollToIndex(synonymsVar.selectedIndex-1);
+				});
+			}
+			
+			private function downSynonymsVarBtn_clickHandler():void{
+				var varSelectedItem:Object = synonymsVar.selectedItem;
+				if(varSelectedItem==null || varSelectedItem.parent() ==undefined)
+					return;
+				var index:int = varSelectedItem.childIndex();
+				if(index == varSelectedItem.parent().children().length() -1)
+					return;
+				var newXml:XML = XML(varSelectedItem).copy();
+				CEPUtils.xmlDeleteNode(XML(varSelectedItem));
+				sourceXML.synonyms.(@code==synonymsCode)[0]
+					.insertChildAfter(sourceXML.synonyms.(@code==synonymsCode)[0].children()[index],newXml);
+				callLater(function():void{
+					synonymsVar.selectedItem =newXml;
+					synonymsVar.scrollToIndex(synonymsVar.selectedIndex-1);
+				});
+			}
+			
+		]]>
+	</fx:Script>
+</mtdesigner:MTDesigner>

@@ -1,0 +1,742 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		   creationComplete="createCompleteHandler()" 
+		   removedFromStage="vbox1_removedFromStageHandler(event)"
+		   addedToStage="vbox1_addedToStageHandler(event)">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<!--
+		<mx:HBox width="100%" id="toolBox">
+		<mx:HBox width="100%" id="chartButtonBox">
+		<mx:LinkButton id="refreshBtn" icon="{AssetsFileLib.refreshIcon}" width="22" height="22" toolTip="刷新" click="refresh(null)"/>
+		<mx:LinkButton id="editBtn" icon="{AssetsFileLib.editingIcon}" width="22" height="22" toolTip="编辑" click="edit()"/>
+		<mx:LinkButton id="detailBtn" icon="{AssetsFileLib.listviewIcon}" width="22" height="22" toolTip="详情" click="detail()"/>
+		<mx:LinkButton id="setVarBtn" icon="{AssetsFileLib.setIcon}" width="22" height="22" toolTip="设置" click="setVar()"/>
+		<mx:LinkButton id="startBtn" icon="{AssetsFileLib.startIcon}" width="22" height="22" toolTip="启动" click="start()"/>
+		<mx:LinkButton id="stopBtn" icon="{AssetsFileLib.stopIcon}" width="22" height="22" toolTip="停止" click="stop()"/>
+		<mx:LinkButton id="exportBtn" icon="{AssetsFileLib.exportIcon}" width="22" height="22" toolTip="导出仪表盘对象" click="export()"/>
+		</mx:HBox>
+		<mx:Image id="loadingImage" source="{AssetsFileLib.Red_glowIcon}" width="22" height="22" toolTip="数据读取中" visible="{isLoading}"
+		click="{isLoading=false}"/>
+		</mx:HBox>
+		-->
+		<mx:VBox id="mainBox" width="100%" height="100%" left="0" top="0" horizontalAlign="center"
+				 paddingLeft="0" paddingRight="0" paddingTop="2">
+			<mx:Label id="titleLabel" text="{title}" width="100%" height="22" textAlign="center" fontSize="14" fontWeight="bold"/>
+		</mx:VBox>
+		
+		<mx:LinkButton alpha="0.7" id="menuBtn" icon="{AssetsFileLib.submitIcon}" width="22" height="22" left="0" top="0"
+					   toolTip="操作" click="onRightMouseClick(event)" visible="{showMenuBtn}"/>
+		<mx:LinkButton alpha="0.7" id="setvarBtn" icon="{AssetsFileLib.setIcon}" width="22" height="22" left="24" top="0"
+					   toolTip="设置变量" click="{setVar()}" visible="{showSetVarBtn}"/>
+		<mx:Image id="loadingImage" source="{AssetsFileLib.Red_glowIcon}" width="22" height="22" right="0" top="0"
+				  visible="{isLoading}"  click="{isLoading=false}"/>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			import com.events.FCEvent;
+			import com.siloon.plugin.rightClick.RightClickManager;
+			
+			import mx.charts.chartClasses.ChartBase;
+			import mx.charts.events.ChartEvent;
+			import mx.charts.events.ChartItemEvent;
+			import mx.collections.ArrayCollection;
+			import mx.controls.AdvancedDataGrid;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.controls.listClasses.ListBase;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import org.un.cava.birdeye.ravis.graphLayout.data.IEdge;
+			import org.un.cava.birdeye.ravis.graphLayout.data.INode;
+			import org.un.cava.birdeye.ravis.graphLayout.data.Node;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.VisualNode;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.events.VisualEdgeEvent;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.events.VisualNodeEvent;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.listener.MTChartClickListener;
+			import smartx.flex.components.core.mtchart.utils.FilterParseUtil;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.print.SmartXPrintJob;
+			import smartx.flex.components.shortcut.ShortCutConst;
+			import smartx.flex.components.shortcut.ShortcutKeyUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.export.ChartExportUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			public var metadataTemplet:MetadataTemplet;
+			public var endpoint:String;
+			public var timer:Timer;
+			private var _dataProvider:ArrayCollection;
+			//刷新间隔(默认1秒)
+			private var _intervalTime:Number = 1000;
+			
+			public var isShowAlert:Boolean = true;
+			
+			public var isShowRightClickMenu:Boolean = true;
+			
+			public var chartId:String;
+			
+			public var mc:MTChart;
+			
+			public var selfDataValues:ArrayCollection;
+			
+			private var relatedMtCharts:ArrayCollection = new ArrayCollection();//所关联的图表对象
+			//是否自动刷新，默认是刷新
+			public var isAutoRefresh:Boolean = true;
+			[Bindable]
+			public var showMenuBtn:Boolean = true;
+			[Bindable]
+			public var showSetVarBtn:Boolean = true;
+			[Bindable]
+			public var title:String;//显示标题
+			public var originalTitle:String;//原始标题
+			public var backupOriginalTitle:String;//备用原始标题
+			public var rightClickMenu:Menu;//右键菜单
+			[Bindable]
+			public var rightClickMenuItems:ArrayCollection = new ArrayCollection();
+			
+			private var isAutoLoad:Boolean = true;			
+			protected var isHorizontalLegend:Boolean = false;
+			
+			public var isLoadComplete:Boolean = false;//是否加载完成
+			[Bindable]
+			public var isLoading:Boolean = false;//是否加载中
+			
+			public var dboCode:String;//仪表盘对象编码
+			
+			protected var contentXml:XML;
+			
+			private var formService:RemoteObject;			
+			protected var datasource:String;//数据源]
+			protected var realSql:String;//真正查询数据的SQL语句
+			private var sqlFilter:String;//sql语句where后面部分
+			public var accessFilter:String;//数据访问控制过滤
+			public var dbReadWriteAuth:String;//仪表盘对象读写权限
+			
+			public var isDBPriorVar:Boolean = false;//变量解析时，是否仪表盘变量优先	
+			protected var isDataParseError:Boolean = false;//变量是否正常解析
+			public var isIgnoreAccessParamError:Boolean = false;//是否忽略访问控制参数解析异常
+			public var isAccessFilterError:Boolean = false;
+			public var dashboardCode:String = "";
+			
+			private var arrListeners:Array = [];
+			
+			protected var exportObj:DisplayObject;
+			[Bindable]
+			protected var exportOptArray:ArrayCollection = new ArrayCollection();//导出选项
+			
+			public var chartClickListeners:Array = [];
+			
+			private var subjects:ArrayCollection = new ArrayCollection();//主联动图表
+			
+			protected var selectedItems:ArrayCollection;//联动数据
+			
+			//初始化
+			protected function preInit():void{
+				if(metadataTemplet.contentXML.length() > 0)
+					metadataTemplet.contentXML.isAutoLoad == "false"?isAutoLoad = false:isAutoLoad==true;
+				if(timer == null && isAutoRefresh){
+					timer = new Timer(_intervalTime);
+					timer.addEventListener(TimerEvent.TIMER,refresh);
+				}
+				
+				if(metadataTemplet == null)
+					throw new Error("元数据模板不能为空!");
+				contentXml = metadataTemplet.contentXML;
+				mc = MTChartUtil.parseMetadataTemplet(contentXml);
+				if(mc.datasource == null || mc.datasource == "")
+					mc.datasource = "datasource_default";
+				
+				isIgnoreAccessParamError =  contentXml.isIgnoreAccessParamError =="true"?true:false;
+				originalTitle = mc.chartName;
+				backupOriginalTitle = mc.backupChartName;
+				//title = originalTitle;
+				isHorizontalLegend = mc.isHorizontalLegend;
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getQueryViewSqlHandler);					
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取查询视图SQL错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					isLoading = false;
+				});
+				
+				exportOptArray.addItem(MTChartConst.EXPOPTION_CURDATA_CSV);
+				exportOptArray.addItem(MTChartConst.EXPOPTION_PNG);
+				exportOptArray.addItem(MTChartConst.EXPOPTION_ALLDATA_CSV);
+			}
+			
+			public function createCompleteHandler():void{
+				//this.addChildAt(toolBox,0);
+				this.addChild(mainBox);
+				this.addChild(menuBtn);
+				if(contentXml.variables.variable.length()>0)
+					this.addChild(setvarBtn);
+				this.addChild(loadingImage);
+				
+				exportObj = mainBox;
+				this.addEventListener(KeyboardEvent.KEY_UP, shortCutKeyHandler);//添加快捷键相应
+				
+				//添加右键菜单
+				
+				RightClickManager.regist();
+				this.addEventListener(RightClickManager.RIGHT_CLICK,onRightMouseClick);
+				if(isShowRightClickMenu){
+					rightClickMenuItems.addItem({label:"刷新(R)",keyname:MTChartConst.MTCHART_KEY_REFRESH,icon:AssetsFileLib.refreshIcon ,enabled:true });
+					rightClickMenuItems.addItem({label:"编辑(E)",keyname:MTChartConst.MTCHART_KEY_EDIT, icon:AssetsFileLib.editIcon ,enabled:true });
+					rightClickMenuItems.addItem({label:"详情(D)",keyname:MTChartConst.MTCHART_KEY_DETAIL, icon:AssetsFileLib.listviewIcon ,enabled:true });
+					rightClickMenuItems.addItem({label:"设置(S)",keyname:MTChartConst.MTCHART_KEY_SETVAR, icon:AssetsFileLib.setIcon ,enabled:true });
+					rightClickMenuItems.addItem({label:"启动(Q)",keyname:MTChartConst.MTCHART_KEY_START, icon:AssetsFileLib.startIcon ,enabled:true });
+					rightClickMenuItems.addItem({label:"停止(T)",keyname:MTChartConst.MTCHART_KEY_STOP, icon:AssetsFileLib.stopIcon ,enabled:true });
+				}
+				rightClickMenuItems.addItem({label:"导出(X)",keyname:MTChartConst.MTCHART_KEY_EXPORT, icon:AssetsFileLib.exportIcon ,enabled:true });
+				rightClickMenuItems.addItem({label:"打印(P)",keyname:MTChartConst.MTCHART_KEY_PRINT, icon:AssetsFileLib.printIcon ,enabled:true });
+				
+				
+				rightClickMenu = Menu.createMenu(this,rightClickMenuItems,true);
+				rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,handleRightMenuClicked);
+				rightClickMenu.setStyle("fontSize",12);
+				
+				
+				//标题为空则不显示
+				if((originalTitle == null || "" == originalTitle)
+					&& (backupOriginalTitle == null || "" == backupOriginalTitle))
+					mainBox.removeChild(titleLabel);
+				
+				if(dbReadWriteAuth != GlobalConst.DBAUTH_READWRITE)
+					setMenuItemIsEnable(MTChartConst.MTCHART_KEY_EDIT,false);
+				
+				setMenuItemIsEnable(MTChartConst.MTCHART_KEY_START,false);				
+				if(!isAutoRefresh )
+					setMenuItemIsEnable(MTChartConst.MTCHART_KEY_STOP,false);
+			}
+			
+			protected var shortcutCatalog:String = "dashboardObject";
+			protected function shortCutKeyHandler(e:KeyboardEvent):void {
+				var keyCmd:String = ShortcutKeyUtil.getInstance().getShortcutCmd(shortcutCatalog,e.keyCode,e.ctrlKey,e.altKey,e.shiftKey);
+				if(keyCmd != null){
+					if(keyCmd == ShortCutConst.CMD_REFRESH && isMenuItemEnable(MTChartConst.MTCHART_KEY_REFRESH) ){
+						refresh(null);
+					}else if(keyCmd == ShortCutConst.CMD_EDIT && isMenuItemEnable(MTChartConst.MTCHART_KEY_EDIT) ){
+						edit();
+					}else if(keyCmd == ShortCutConst.CMD_DETAIL && isMenuItemEnable(MTChartConst.MTCHART_KEY_DETAIL) ){
+						detail();
+					}else if(keyCmd == ShortCutConst.CMD_SETVAR && isMenuItemEnable(MTChartConst.MTCHART_KEY_SETVAR) ){
+						setVar();
+					}else if(keyCmd == ShortCutConst.CMD_START && isMenuItemEnable(MTChartConst.MTCHART_KEY_START) ){
+						start();
+					}else if(keyCmd == ShortCutConst.CMD_STOP && isMenuItemEnable(MTChartConst.MTCHART_KEY_STOP) ){
+						stop();
+					}else if(keyCmd == ShortCutConst.CMD_EXPORT && isMenuItemEnable(MTChartConst.MTCHART_KEY_EXPORT) ){
+						export();
+					}else if(keyCmd == ShortCutConst.CMD_PRINT && isMenuItemEnable(MTChartConst.MTCHART_KEY_PRINT) ){
+						print();
+					}
+				}
+				
+			}
+			
+			public function removeMenuItem(keyname:String):void{
+				for(var i:int=0;i<rightClickMenuItems.length;i++){
+					var menuItem:Object = rightClickMenuItems[i];
+					if(menuItem.keyname == keyname){
+						rightClickMenuItems.removeItemAt(i);
+						return;
+					}
+				}
+			}
+			
+			//设置菜单项是否可用
+			protected function setMenuItemIsEnable(keyname:String,isEnable:Boolean):void{
+				for(var i:int=0;i<rightClickMenuItems.length;i++){
+					var menuItem:Object = rightClickMenuItems[i];
+					if(menuItem.keyname == keyname){
+						menuItem["enabled"] = isEnable;
+						return;
+					}
+				}
+			}
+			
+			//判断菜单项是否可用
+			protected function isMenuItemEnable(keyname:String):Boolean{
+				var isEnable:Boolean = false;
+				for(var i:int=0;i<rightClickMenuItems.length;i++){
+					var menuItem:Object = rightClickMenuItems[i];
+					if(menuItem.keyname == keyname){
+						isEnable = menuItem["enabled"];
+						return isEnable;
+					}
+				}
+				return isEnable;
+			}
+			
+			public function hideChartButtonBox():void{
+				if(contains(menuBtn))
+					removeChild(menuBtn);
+			}
+			
+			public function showChartButtonBox():void{
+				if(!contains(menuBtn))
+					addChild(menuBtn);
+			}
+			
+			//刷新图表数据
+			public function refreshComplete():void{
+				isLoading = false;
+//				selectedEvent(_dataProvider);
+			}
+			
+			public function refresh(event:TimerEvent):void{
+				isLoading = true;
+				
+				dispatchEvent(new MTChartEvent(MTChartEvent.REFRESH_DATA,chartId,metadataTemplet.code,metadataTemplet.contentXML.mtcharttype,selfDataValues));
+			}
+			
+			//刷新数据，对于需要传入SQL,自己解析查询数据时使用，如MTListChartPanel,MTOLAPChartPanel
+			protected function selfRefreshData():void{
+				//				if(isDataParseError && !isIgnoreAccessParamError)
+				//					title = "";
+				//				else{
+				try{
+					//标题动态解析
+					title = MTChartUtil.parseVariable(chartId,originalTitle,selfDataValues,dashboardCode.concat("_").concat(chartId),isDBPriorVar );
+				}catch(e:Error){
+					trace(e.message);
+					if(backupOriginalTitle != null && backupOriginalTitle != ""){
+						try{
+							title = MTChartUtil.parseVariable(chartId,backupOriginalTitle,selfDataValues,dashboardCode.concat("_").concat(chartId),isDBPriorVar );
+						}
+						catch(e:Error){
+							trace(e.message);
+							title = "";
+						}
+					}
+					else
+						title = "";
+				}
+				//				}
+			}
+			
+			protected function export():void{
+				var fileName:String = "mtchart";
+				if("" != StringUtil.trim(title) )
+					fileName = title;
+				if(exportObj == null)
+					exportObj = mainBox;
+				
+				ChartExportUtil.exportChart(exportObj,fileName);
+			}
+			
+			//打印
+			protected function print():void{
+				var smartPrint:SmartXPrintJob = new SmartXPrintJob();
+				//smartPrint.container = this;
+				smartPrint.clearPrintObject();
+				smartPrint.addPrintObject(mainBox);
+				
+				smartPrint.preview();
+			}
+			
+			protected function exportConfirmHandler():void{
+				//使用导出选项后的处理
+			}
+			
+			//启动
+			public function start():void{
+				if(isAutoLoad){
+					refresh(null);//由于timer是在执行start()方法(intervalTime/1000)秒后调用第一次refreshData方法，所以这里开始先调用一次
+					isAutoLoad = false;
+				}
+				if(timer && !timer.running){
+					timer.start();
+					dispatchEvent(new MTChartEvent(MTChartEvent.START_SUCCESSFUL));
+				}
+				if(isAutoRefresh){
+					setMenuItemIsEnable(MTChartConst.MTCHART_KEY_START,false);
+					setMenuItemIsEnable(MTChartConst.MTCHART_KEY_STOP,true);
+					
+					if(isShowAlert)
+						SmartXMessage.show("成功启动图表["+title+"]!");
+				}
+			};
+			//停止
+			public function stop():void{
+				if(timer && timer.running){
+					timer.stop();
+					dispatchEvent(new MTChartEvent(MTChartEvent.STOP_SUCCESSFUL));
+				}
+				if(isAutoRefresh){
+					setMenuItemIsEnable(MTChartConst.MTCHART_KEY_START,true);
+					setMenuItemIsEnable(MTChartConst.MTCHART_KEY_STOP, false);
+					if(isShowAlert)
+						SmartXMessage.show("成功停止图表["+title+"]!");
+				}
+			};
+			//设置刷新间隔
+			public function set intervalTime(intervalTime:Number):void{
+				_intervalTime = intervalTime;
+			}
+			
+			public function get intervalTime():Number{
+				return _intervalTime;
+			}
+			//设置数据
+			public function set dataProvider(dataProvider:ArrayCollection):void{
+				_dataProvider = dataProvider;
+			}
+			
+			public function get dataProvider():ArrayCollection{
+				return _dataProvider;
+			}
+			//选中事件
+			public function selectedEvent():void{
+				if(relatedMtCharts){
+					for each(var mtchart:MTChartPanel in relatedMtCharts){
+						mtchart.selfDataValues = selectedItems;
+						mtchart.isLoading = true;//标记为加载中
+						mtchart.dispatchEvent(new MTChartEvent(MTChartEvent.REFRESH_DATA,mtchart.chartId
+							,mtchart.metadataTemplet.code,mtchart.metadataTemplet.contentXML.mtcharttype,selectedItems))
+					}
+				}
+			}
+			
+			public function addrelatedMtChart(item:Object):void{
+				relatedMtCharts.addItem(item);
+			}
+			
+			private function edit():void{
+				dispatchEvent(new MTChartEvent(MTChartEvent.EDIT,chartId,metadataTemplet.code,metadataTemplet.contentXML.mtcharttype,selfDataValues));
+			}
+			
+			private function detail():void{
+				dispatchEvent(new MTChartEvent(MTChartEvent.DETAIL,chartId,metadataTemplet.code,metadataTemplet.contentXML.mtcharttype,selfDataValues));
+			}
+			
+			private function setVar():void{
+				dispatchEvent(new MTChartEvent(MTChartEvent.SET_VARIABLE,chartId,metadataTemplet.code,metadataTemplet.contentXML.mtcharttype,selfDataValues));
+			}
+			
+			protected function vbox1_removedFromStageHandler(event:Event):void
+			{
+				if(loadingImage != null){
+					loadingImage.source = null;
+				}
+			}
+			
+			protected function vbox1_addedToStageHandler(event:Event):void
+			{
+				if(loadingImage != null){
+					loadingImage.source = AssetsFileLib.Red_glowIcon;
+				}
+			}
+			
+			public function destroy():void{
+				if(timer != null){
+					timer.stop();
+					timer.removeEventListener(TimerEvent.TIMER,refresh);
+					timer = null;
+					removeAllChildren();
+				}
+				removeAllEventListeners();
+			}
+			
+			override public function addEventListener(type:String, listener:Function, useCapture:Boolean=false, priority:int=0, useWeakReference:Boolean=false):void
+			{
+				super.addEventListener(type, listener, useCapture, priority, useWeakReference);
+				arrListeners.push({type:type, listener:listener});
+			}
+			
+			private function removeAllEventListeners():void
+			{
+				if(arrListeners == null)
+					return;
+				
+				for(var i:Number = 0; i<arrListeners.length; i++){
+					if(this.hasEventListener(arrListeners[i].type)){
+						this.removeEventListener(arrListeners[i].type, arrListeners[i].listener);
+					}
+				}
+				arrListeners = null;
+			}
+			
+			protected function setQueryDataSql():void{
+				var condition:String = "";
+				var orderby:String = "";
+				var groupby:String = "";
+				var groupByColumn:String = contentXml.groupbycolumn;
+				var rowsLimit:String = contentXml.rowsLimit;
+				var backupCondition:String = "";
+				
+				
+				if("" != StringUtil.trim(contentXml.filter))
+					condition = MTChartConst.WHERE_PREFIX + contentXml.filter;
+				if("" != StringUtil.trim(contentXml.backupFilter))
+					backupCondition = MTChartConst.WHERE_PREFIX + contentXml.backupFilter;	
+				if("" != StringUtil.trim(contentXml.orderby))
+					orderby = MTChartConst.ORDERBY_PREFIX + contentXml.orderby.toString().replace("order by","");	
+				if("" != StringUtil.trim(contentXml.groupby))
+					groupby = MTChartConst.GROUPBY_PREFIX + contentXml.groupby.toString().replace("group by","");	
+				
+				
+				sqlFilter = condition + groupby + orderby;
+				var isQueryViewType:Boolean = false;//判断是否是查询视图模式，查询视图模式需要等待异步返回
+				
+				//动态生成过滤条件
+				try{
+					accessFilter = MTChartUtil.parseFilterVariable(chartId,accessFilter,selfDataValues,dashboardCode.concat("_").concat(chartId),isDBPriorVar);
+					isAccessFilterError = false;
+					trace(accessFilter);
+				}catch(e:Error){
+					trace(e.message);
+					isAccessFilterError = true;
+				}
+				try{
+					sqlFilter = MTChartUtil.parseFilterVariable(chartId,sqlFilter,selfDataValues,dashboardCode.concat("_").concat(chartId),isDBPriorVar );
+					isDataParseError = false;
+					trace(accessFilter);
+				}catch(e:Error){
+					trace(e.message);
+					//使用备用filter
+					if(backupCondition != null && StringUtil.trim(backupCondition) != ""){
+						sqlFilter = backupCondition + groupby + orderby;
+						try{
+							sqlFilter = MTChartUtil.parseFilterVariable(chartId,sqlFilter,selfDataValues,dashboardCode.concat("_").concat(chartId),isDBPriorVar );
+						}
+						catch(e:Error){
+							trace(e.message);
+							isDataParseError = true;
+						}
+					}
+					else
+						isDataParseError = true;
+					
+				}
+				
+				var tempSql:String = "select "				
+				if(groupByColumn != null && StringUtil.trim(groupByColumn) != "" )
+					tempSql = tempSql + groupByColumn;
+				else
+					tempSql = tempSql + " * ";
+				
+				var tableName:String;
+				//原数据可能是关联表或自定义SQL、或查询视图
+				if("" == StringUtil.trim(contentXml.viewname) ){
+					datasource = contentXml.datasource;
+					
+					if("" != StringUtil.trim(contentXml.datasource.@tablename) )//关联表
+						tableName = contentXml.datasource.@tablename;
+					else if("" != StringUtil.trim(contentXml.datasource.@queryViewCode) ){//查询视图
+						isQueryViewType = true;
+						var viewCode:String = StringUtil.trim(contentXml.datasource.@queryViewCode);
+						var viewQrySql:String = "select sql from bam_queryview where code = '" + viewCode + "'";
+						formService.getSimpleHashVoArrayByDS(null,viewQrySql);//得到查询视图的真正SQL
+					}
+					else
+						tableName = "(" + contentXml.datasource.@sql + ")";//自定义SQL
+				}else{//业务视图
+					tableName = contentXml.viewname;
+					datasource = GlobalConst.CEP_DATASOURCE_PREFIX + GlobalConst.DEFAULTPROVIDERNAME_CEP;
+				}				
+				tempSql = tempSql + " from " + tableName + " " + sqlFilter;
+				//非业务视图加上数据量限制
+				if(rowsLimit != null && StringUtil.trim(rowsLimit) != "" && "" == StringUtil.trim(contentXml.viewname)){
+					tempSql = "select * from (" + tempSql + ") where rownum<=" + rowsLimit;
+				}
+				
+				if( accessFilter == null || StringUtil.trim(accessFilter) == "" || (isAccessFilterError && isIgnoreAccessParamError) )
+					realSql = tempSql;//设置查询数据的语句!!非常重要
+				else{
+					realSql = "select * from (" + tempSql + ") where " + accessFilter;
+				}
+				
+				realSql = convertFormulaMacPars(realSql);
+				
+				if( !isQueryViewType)//直接刷新数据
+					selfRefreshData();
+			}
+			
+			private function getQueryViewSqlHandler(event:ResultEvent):void{
+				var simpleVos:Array = event.result as Array;
+				if(simpleVos.length > 0){
+					var vo:SimpleHashVO = simpleVos[0];
+					var viewSql:String = vo.dataMap["sql"];
+					
+					var groupByColumn:String = contentXml.groupbycolumn;
+					var rowsLimit:String = contentXml.rowsLimit;
+					var tempSql:String = "select "				
+					if(groupByColumn != null && StringUtil.trim(groupByColumn) != "" )
+						tempSql = tempSql + groupByColumn;
+					else
+						tempSql = tempSql + " * ";
+					
+					tempSql = tempSql + " from (" + viewSql + ") " + sqlFilter;
+					//加上数据量限制
+					if(rowsLimit != null && StringUtil.trim(rowsLimit) != "" ){
+						tempSql = "select * from (" + tempSql + ") where rownum<=" + rowsLimit;
+					}
+					
+					if(accessFilter == null || StringUtil.trim(accessFilter) == "" || (isAccessFilterError && isIgnoreAccessParamError) )
+						realSql = tempSql;//设置查询数据的语句!!非常重要
+					else{
+						realSql = "select * from (" + tempSql + ") where " + accessFilter;
+					}
+					
+					realSql = convertFormulaMacPars(realSql);
+					
+					selfRefreshData();//真正刷新数据
+				}else{
+					SmartXMessage.show("查询视图为查到对应的视图SQL",SmartXMessage.MESSAGE_ERROR);
+					isLoading = false;
+				}
+			}
+			
+			private function convertFormulaMacPars(str_formula:String):String{
+				//Alert.show("convertFormulaMacPars");
+				var temp_str_fomula:String = str_formula;
+				var clientTemp:ClientEnviorment = ClientEnviorment.getInstance();
+				if(clientTemp == null){
+					return temp_str_fomula;
+				}
+				var map:Object = clientTemp.getVarMap();
+				if(map == null){
+					return temp_str_fomula;
+				}
+				var objInfo:Object = ObjectUtil.getClassInfo(map);
+				var fieldNameArray:Array = objInfo["properties"] as Array;
+				for each(var qName:QName in fieldNameArray){
+					var tempValue:Object = map[qName.localName];
+					if(tempValue==null){
+						temp_str_fomula = StringUtils.replaceAll(temp_str_fomula,"{"+qName.localName+"}","null");
+					}else{
+						if(tempValue is String){
+							temp_str_fomula = StringUtils.replaceAll(temp_str_fomula,"{"+qName.localName+"}","'"+tempValue.toString()+"'");
+						}
+					}
+					
+				}
+				
+				return temp_str_fomula;
+			}
+			
+			private function onRightMouseClick(event:MouseEvent):void{
+				if(rightClickMenu != null){
+					rightClickMenu.hide();
+					rightClickMenu.dataProvider = rightClickMenuItems;
+					var point:Point = new Point(mouseX,mouseY);
+					point = localToGlobal(point);  
+					var xx:Number = point.x;
+					var yy:Number = point.y;
+					if(xx + rightClickMenu.width > this.stage.width)
+						xx = this.stage.width - rightClickMenu.width - 1;
+					if(yy + rightClickMenu.height > this.stage.height)
+						yy = this.stage.height - rightClickMenu.height-1;
+					rightClickMenu.show(xx,yy); 
+				}
+			}
+			
+			private function handleRightMenuClicked(event:MenuEvent):void{
+				var item:Object = event.item;
+				if(item == null)
+					return;
+				
+				if(item.keyname == MTChartConst.MTCHART_KEY_REFRESH){
+					refresh(null);
+				}else if(item.keyname == MTChartConst.MTCHART_KEY_EDIT){
+					edit();
+				}else if(item.keyname == MTChartConst.MTCHART_KEY_DETAIL){
+					detail();
+				}else if(item.keyname == MTChartConst.MTCHART_KEY_SETVAR){
+					setVar();
+				}else if(item.keyname == MTChartConst.MTCHART_KEY_START){
+					start();
+				}else if(item.keyname == MTChartConst.MTCHART_KEY_STOP){
+					stop();
+				}else if(item.keyname == MTChartConst.MTCHART_KEY_EXPORT){
+					export();
+				}else if(item.keyname == MTChartConst.MTCHART_KEY_PRINT){
+					print();
+				}
+			}
+			
+			/**
+			 * 注册图表点击事件
+			 */ 
+			protected function registerChartClickListener(chart:ChartBase,mtchart:MTChartPanel):void{
+				if(chartClickListeners.length == 0)
+					return;
+				chart.addEventListener(ChartItemEvent.ITEM_CLICK,function(event:ChartItemEvent):void{
+					for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+						chartClickListener.itemClick(event,mtchart);
+					}
+				},false,0,false);
+				
+				chart.addEventListener(ChartEvent.CHART_CLICK,function(event:ChartEvent):void{
+					for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+						chartClickListener.click(event,mtchart);
+					}
+				},false,0,false);
+			};
+			
+			/**
+			 * 注册F系图表点击事件
+			 */ 
+			protected function registerFCChartClickListener(fusionChart:FusionChartsWrapper,mtchart:MTChartPanel):void{
+				if(chartClickListeners.length == 0)
+					return;
+				fusionChart.addEventListener(FCEvent.FCClickEvent,function(event:FCEvent):void{
+					for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+						chartClickListener.fcItemClick(event,mtchart);
+					}
+				},false,0,false);
+				
+				fusionChart.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+					for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+						chartClickListener.fcClick(event,mtchart);
+					}
+				},false,0,false);
+			}
+			
+			/**
+			 * 注册List ItemClick事件
+			 **/
+			protected function registerListItemClickListener(list:ListBase,mtchart:MTChartPanel):void{
+				if(chartClickListeners.length == 0)
+					return;
+				list.addEventListener(ListEvent.ITEM_CLICK,function(event:ListEvent):void{
+					for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+						chartClickListener.listItemClick(event,mtchart);
+					}
+				},false,0,false);
+			}
+			
+			public function addSubject(mtchart:MTChartPanel):void{
+				subjects.addItem(mtchart);
+			}
+			
+			public function getSubjects():ArrayCollection{
+				return subjects;
+			}
+			
+		]]>
+	</fx:Script>
+	
+</mx:Canvas>

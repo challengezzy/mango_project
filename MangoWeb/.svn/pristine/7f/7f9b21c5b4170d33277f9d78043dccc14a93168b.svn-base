@@ -1,0 +1,722 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns="smartx.flex.components.core.chart.*" 
+		 xmlns:mx="http://www.adobe.com/2006/mxml" 
+		 xmlns:containers="flexlib.containers.*" 
+		 xmlns:ext="smartx.flex.components.core.ext.*"
+		 horizontalScrollPolicy="off"
+		 verticalScrollPolicy="off"  width="100%" height="100%"
+		 initialize="init()" creationComplete="creationCompleteHandler()">
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			import com.siloon.plugin.rightClick.RightClickManager;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.TitleWindow;
+			import mx.controls.DataGrid;
+			import mx.controls.Menu;
+			import mx.controls.TextArea;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.MenuEvent;
+			import mx.events.ScrollEvent;
+			import mx.events.ScrollEventDirection;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.export.ListDataExportUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public static const SHOWDATA_FINISH:String = "showEntityDataFinished";
+			public static const DATAMODE_VALUE:int = 0;
+			public static const DATAMODE_SQL:int = 1;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			[Bindable]
+			public var minColumnWidth:int = 120;//默认最小列宽度
+			
+			[Bindable]
+			public var attributesXml:XML;
+			
+			[Bindable]
+			public var sharedObjectCode:String;
+			
+			[Bindable]
+			public var sharedObjectSpaceName:String;
+			
+			[Bindable]
+			public var isQueryAfterCompleted:Boolean = false;
+			
+			[Bindable]
+			public var isVisibleFilter:Boolean = true;
+			
+			[Bindable]
+			private var isVisible:Boolean = false;
+			
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			[Bindalbe]
+			public var dataSource:String;
+			
+			[Bindable]
+			private var _columns:Array = new Array();//列表头数据
+			public var queryColumns:Array = new Array();//查询字段列表
+			
+			[Bindable]
+			private var filterColumnsCol:ArrayCollection = new ArrayCollection();
+			
+			private var formService:RemoteObject;
+			private var _sql:String;//查询数据的SQL语句
+			private var realQuerySql:String;//真正的查询SQL
+			private var listData:ArrayCollection = new ArrayCollection();//展示的所有数据
+			private var initListData:ArrayCollection= new ArrayCollection();//原始的所有数据
+			
+			[Bindable]
+			private var curPageData:ArrayCollection = new ArrayCollection();//当前页显示的记录
+			
+			private var loadWindow:LoadingWindow = new LoadingWindow();
+			
+			public var dataMode:int;//数据提供方式,value或sql
+			
+			public var pageSize:int=20;//表示每页记录的条数,默认10条,可以由用户自行定义
+			public var curPage:int =1;//当前的页码
+			public var totalPage:int = 1;//一共的页数,页数从1开始，必须设置默认值
+			public var totalCount:int;//一共的记录条数
+			
+			private var expDataGrid:DataGrid = new DataGrid();//导出数据
+			public var expFileName:String = "exportFile";//导出文件名
+			private var fieldNameMap:Object = new Object();//字段映射，数据导出用
+			
+			private var filterInfo:SharedObject;
+			
+			[Bindable]
+			public var countSQL:String;
+			
+			public var isCreationComplete:Boolean = false;
+			
+			private var verticalScrollPositionNum:Number = 0;
+			private var horizontalScrollPositionNum:Number = 0;
+			
+			[Bindable]
+			public var operationList:ArrayCollection = new ArrayCollection();
+			
+			public var rightClickMenu:Menu;
+			
+			public var rightClickMenuItems:Array = [];
+			
+			private var _countSql:String;
+			
+			private function init():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				formService.getSimpleHashVOMapByPage.addEventListener(ResultEvent.RESULT,SimpleHashVOMapByPageHandler);					
+				formService.getSimpleHashVOMapByPage.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取分页列表数据错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(EntityModelListPanel.SHOWDATA_FINISH));
+					if(loadWindow.isPopUp)
+						PopUpManager.removePopUp(loadWindow);
+				});
+				formService.generateExportCSVFile.addEventListener(ResultEvent.RESULT,generateExportCSVFileHandler);					
+				formService.generateExportCSVFile.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取列表CSV文件错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					if(loadWindow.isPopUp)
+						PopUpManager.removePopUp(loadWindow);
+				});
+				
+				var exportCurDataBtn:Object = {label:"导出当前数据(CSV)",handler:exportCurData,icon:AssetsFileLib.exportIcon};
+				operationList.addItem(exportCurDataBtn);
+				rightClickMenuItems.push(exportCurDataBtn);
+				
+				var exportAllDataBtn:Object = {label:"导出全部数据(CSV)",handler:exportAllData,icon:AssetsFileLib.exportIcon};
+				operationList.addItem(exportAllDataBtn);
+				rightClickMenuItems.push(exportAllDataBtn);
+				
+				curPage = 1;
+				totalPage = 1;
+				loadWindow.text = "数据查询中……";
+			}
+			
+			private function creationCompleteHandler():void{
+				_countSql = countSQL;//建立COUNTSQL副本
+				filterInfo = SharedObject.getLocal(sharedObjectSpaceName);
+				if( filterInfo.data.filters == null ){
+					filterInfo.data.filters = new Object();
+				}
+				
+				initColumns(attributesXml);
+				
+				if(isQueryAfterCompleted){
+					simpleQuery(simpleQueryTextInput.text);
+				}
+				isCreationComplete = true;
+				
+				var operationMenu:Menu = operationButton.popUp as Menu;
+				operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+				
+				//添加右键
+				RightClickManager.regist();
+				dataListGrid.addEventListener(RightClickManager.RIGHT_CLICK,onRightMouseClick);
+				
+				rightClickMenu = Menu.createMenu(this,rightClickMenuItems,true);
+				rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,handleRightMenuClicked);
+				rightClickMenu.setStyle("fontSize",12);
+			}
+			
+			protected function operationButton_itemClickHandler(event:MenuEvent):void{
+				var item:* = event.item;
+				if(item.handler != null)
+					item.handler();
+			}
+			
+			private function handleRightMenuClicked(event:MenuEvent):void{
+				operationButton_itemClickHandler(event);
+			}
+			
+			private function onRightMouseClick(event:MouseEvent):void{
+				dataListGrid.selectItemByMouseEvent(event);
+				if(rightClickMenu != null){
+					rightClickMenu.hide();
+					rightClickMenu.dataProvider = rightClickMenuItems;
+					var point:Point = new Point(mouseX,mouseY);
+					point = localToGlobal(point);  
+					var xx:Number = point.x;
+					var yy:Number = point.y;
+					if(xx + rightClickMenu.width > this.stage.width)
+						xx = this.stage.width - rightClickMenu.width - 1;
+					if(yy + rightClickMenu.height > this.stage.height)
+						yy = this.stage.height - rightClickMenu.height-1;
+					rightClickMenu.show(xx,yy); 
+				}
+			}
+			
+			private function initColumns(xml:XML):void{
+				if(xml != null){
+					_columns = new Array();
+					queryColumns = new Array();
+					filterColumnsCol.removeAll();
+					var index:int = 0;
+					for each( var attributeItem:XML in xml.attribute){
+						var column:DataGridColumn = new DataGridColumn();
+						var name:String = String(attributeItem.@name);
+						var type:String = String(attributeItem.@type);
+						var label:String = String(attributeItem.@label);
+						var refDesc:String = String(attributeItem.@dictionaryRef);
+						var isQuery:String = String(attributeItem.@isQuickQuery);
+						column.headerText = label;
+						if(name != null ){
+							name = name.toLowerCase();
+						}
+						column.dataField = name;
+						column.editable = false;
+						column.width = 200;
+						_columns.push(column);
+						if(isQuery != null && isQuery.toLowerCase() == "true" && type.toLowerCase() == "varchar2"){
+							queryColumns.push(name);
+						}
+						
+						var tempObj:Object = new Object();
+						tempObj["fieldName"] = name;
+						tempObj["fieldType"] = type;
+						tempObj["fieldLabel"] = label;
+						tempObj["fieldDesc"] = refDesc;
+						
+						filterColumnsCol.addItem(tempObj);
+						
+						fieldNameMap[name.toUpperCase()] = label;
+					}
+				}
+				expDataGrid.columns = _columns;
+				dataListGrid.columns = _columns;
+			}
+			
+			//此列表可以由两种方式初始化数据，提供SQL或直接提供数据方式		
+			public function setPager(pageNum:int,showLoadWindow:Boolean=true):void
+			{
+				if(totalPage == 0)//总页数重新初始化
+					totalPage = 1;
+				
+				if(pageNum<1 || pageNum > totalPage) 
+					return;
+				
+				curPage = pageNum;
+				if(showLoadWindow && !loadWindow.isPopUp){
+					PopUpManager.addPopUp(loadWindow,this,true);
+					PopUpManager.centerPopUp(loadWindow);
+				}
+				
+				if( EntityModelListPanel.DATAMODE_VALUE == dataMode){
+					curPageData.removeAll();//移出变量中的数据,以便插入新数据,页面中显示的是这个变量中的数据					
+					if(listData.length>0 && null!=listData){
+						totalCount = listData.length;
+						totalPage = (totalCount + pageSize - 1) / pageSize;
+						inputpage.minimum=1;
+						inputpage.maximum=totalPage;
+						
+						var curNum:int = (curPage-1)*pageSize;//计算出要跳转到的页面种的第一条记录在所有的记录种是第几条记录
+						for(var i:int=0;curNum<listData.length&&i<pageSize;i++,curNum++){
+							//循环的次数既要小于所有的记录数,也要小于每个页面能显示的记录数;并且curNum变量中的值也要增加
+							curPageData.addItem(listData.getItemAt(curNum));//依次抽取记录
+						}
+						expDataGrid.dataProvider = curPageData;
+						
+						dataListGrid.invalidateList();						
+					}else{
+						totalCount = 0;
+						totalPage = 0;
+						curPage = 0;
+						inputpage.minimum = 0;
+						inputpage.maximum = 0;
+					}				
+					
+					pagedetail.text = "第"+curPage+"页/共"+totalPage+"页   共"+totalCount+"条记录";					
+					dispatchEvent(new Event(EntityModelListPanel.SHOWDATA_FINISH));
+					
+					if(loadWindow.isPopUp)
+						PopUpManager.removePopUp(loadWindow);
+					
+				}else if(EntityModelListPanel.DATAMODE_SQL == dataMode){
+					if(countSQL != null && countSQL != ""){
+						formService.getSimpleHashVOMapByPage(dataSource,countSQL,realQuerySql,curPage,pageSize);
+					}else{
+						formService.getSimpleHashVOMapByPage(dataSource,realQuerySql,curPage,pageSize);
+					}
+				}
+				
+			}
+			
+			private function SimpleHashVOMapByPageHandler(event:ResultEvent):void{
+				var dataMap:Object = event.result;
+				totalCount = dataMap[GlobalConst.DATA_ROWCOUNT] as int;
+				totalPage = (totalCount + pageSize - 1) / pageSize;
+				
+				var dataArr:Array = dataMap[GlobalConst.DATA_SIMPLEHASHVOARRAY] as Array;
+				curPageData.removeAll();
+				for (var i:int=0;i<dataArr.length;i++){
+					curPageData.addItem(dataArr[i][GlobalConst.DATA_DATAMAP]);
+				}
+				//解析同义词
+				curPageData = EntityUtil.parseEntitySynonyms(curPageData,attributesXml);
+				curPageData = EntityUtil.parseEntityDateAtt(curPageData,attributesXml);
+				expDataGrid.dataProvider = curPageData;
+				dataListGrid.invalidateList();
+				
+				dataListGrid.horizontalScrollPosition = horizontalScrollPositionNum;
+				dataListGrid.verticalScrollPosition = verticalScrollPositionNum;
+				
+				if(totalCount > 0){
+					inputpage.minimum=1;
+					inputpage.maximum=totalPage;
+					if(curPage > totalPage)
+						curPage = totalPage ;//对查询出的数据量变小的情况的显示处理
+				}else{
+					inputpage.minimum = 0;
+					inputpage.maximum = 0;
+					curPage = 0;
+				}
+				pagedetail.text = "第"+curPage+"页/共"+totalPage+"页   共"+totalCount+"条记录";
+				
+				dispatchEvent(new Event(EntityModelListPanel.SHOWDATA_FINISH));
+				if(loadWindow.isPopUp)
+					PopUpManager.removePopUp(loadWindow);
+			}
+			
+			public function clear():void{
+				dataListGrid.columns = [];
+				listData = new ArrayCollection();
+				curPageData.removeAll();
+			}
+			
+			public function refresh(isContainCondition:Boolean=false):void{
+				clear();
+				realQuerySql = _sql;
+				initColumns(attributesXml);
+				if(curPage < 1)
+					curPage = 1;
+				if(isContainCondition)
+					simpleQuery(simpleQueryTextInput.text);
+				else{
+					simpleQueryTextInput.text = "";
+					simpleQuery(null);
+				}
+//				setPager(curPage,false);
+			}
+			
+			public function set sql(value:String):void{
+				_sql = value;
+				realQuerySql = value;
+				dataMode = EntityModelListPanel.DATAMODE_SQL;
+			}
+			
+			public function set dataArray(value:ArrayCollection):void{
+				initListData = new ArrayCollection(value.toArray());
+				listData = new ArrayCollection(value.toArray());
+				dataMode = EntityModelListPanel.DATAMODE_VALUE;
+			}
+			
+			public function removeQueryPanel():void{
+				if(simpleQueryPanel != null && this.contains(simpleQueryPanel) ){
+					this.removeChild(simpleQueryPanel);
+				}
+			}
+			
+			private function filterListData(condition:String):void{
+				listData.removeAll();
+				for each(var temp:Object in initListData){
+					for each( var field2:String in queryColumns){//
+						var tempStr:String = temp[field2];
+						if(tempStr == null)
+							continue;
+						
+						//全文匹配和精确查询两种情况
+						if( isWholeWordCheckBox.selected){
+							if( condition == tempStr){
+								listData.addItem(temp);
+								continue;
+							}
+						}else{
+							if( tempStr.indexOf(condition) >= 0)
+							{
+								listData.addItem(temp);
+								continue;
+							}
+						}
+					}
+				}
+			}
+			
+			private function simpleQueryTextInput_enterHandler(event:FlexEvent):void
+			{
+				simpleQuery(simpleQueryTextInput.text);
+			}
+			
+			//快速查询
+			public function simpleQuery(text:String):void{
+				isVisible = false;
+				var filterCondition:String = getFilterSQL();
+				if(text == null || "" == text){//查询条件为空
+					if(filterCondition != null && filterCondition != ""){
+						if(StringUtil.beginsWith(filterCondition,"AND ")){
+							realQuerySql = "select * from (" + _sql + ") where 1=1 " + filterCondition;
+							if(countSQL != null && countSQL != ""){
+								countSQL = "select * from ("+_countSql+") where 1=1 "+filterCondition;
+							}
+							
+						}else{
+							realQuerySql = "select * from (" + _sql + ") where 1=2 " + filterCondition;
+							if(countSQL != null && countSQL != ""){
+								countSQL = "select * from ("+_countSql+") where 1=2 "+filterCondition;
+							}
+							
+						}
+						isVisible = true;
+					}else{
+						//重置
+						realQuerySql = _sql;
+						countSQL = _countSql;
+					}
+					listData = new ArrayCollection(initListData.toArray());
+				}else{
+					if(queryColumns != null && queryColumns.length > 0){
+						if(EntityModelListPanel.DATAMODE_SQL == dataMode){
+							var condition:String ="";
+							var queryColumnsCondition:String = "";//拼装查询条件
+							for each( var field:String in queryColumns){
+								//判断是否精确匹配
+								if( isWholeWordCheckBox.selected){
+									queryColumnsCondition = queryColumnsCondition.concat(" or " + field + "='" + text +  "'" );
+								}else{
+									queryColumnsCondition = queryColumnsCondition.concat(" or " + field + " like '%" + text +  "%'" );
+								}
+							}
+							
+							if(filterCondition != null && filterCondition != ""){
+								if(StringUtil.beginsWith(filterCondition,"AND ")){
+//									condition =  queryColumnsCondition;
+									realQuerySql = "select * from (select * from (" + _sql + ")" + " where 1=1 "
+												+filterCondition+") where 1=2 "+queryColumnsCondition;
+									if(countSQL != null && countSQL != ""){
+										countSQL = "select * from (select * from (" + _countSql + ")" + " where 1=1 "
+												+filterCondition+") where 1=2 "+queryColumnsCondition;
+									}
+									
+								}else{
+//									condition = " where 1=2 "+filterCondition + queryColumnsCondition;
+//									realQuerySql = "select * from (" + _sql + ")" + condition;
+									realQuerySql = "select * from (select * from (" + _sql + ")" + " where 1=2 "
+												+filterCondition+") where 1=2 "+queryColumnsCondition;
+									if(countSQL != null && countSQL != ""){
+										countSQL = "select * from (select * from (" + _countSql + ")" + " where 1=2 "
+												+filterCondition+") where 1=2 "+queryColumnsCondition;
+									}
+								}
+								isVisible = true;
+							}else{
+								condition = " where 1=2 "+queryColumnsCondition;
+								realQuerySql = "select * from (" + _sql + ")" + condition;
+								if(countSQL != null && countSQL != ""){
+									countSQL = "select * from (" + _countSql + ")" + condition;
+								}
+							}
+							
+						}else if(EntityModelListPanel.DATAMODE_VALUE == dataMode){//数据型，直接过滤数据
+							filterListData(text)
+						}
+					}else{//没有查询列的情况
+						if(filterCondition != null && filterCondition != ""){
+							if(StringUtil.beginsWith(filterCondition,"AND ")){
+								realQuerySql = "select * from (" + _sql + ") where 1=1 " + filterCondition;
+								if(countSQL != null && countSQL != ""){
+									countSQL = "select * from (" + _countSql + ") where 1=1 " + filterCondition;
+								}
+							}else{
+								realQuerySql = "select * from (" + _sql + ") where 1=2 " + filterCondition;
+								if(countSQL != null && countSQL != ""){
+									countSQL = "select * from (" + _countSql + ") where 1=2 " + filterCondition;
+								}
+							}
+							isVisible = true;
+						}else{
+							realQuerySql = "select * from (" + _sql + ") where 1=2 ";
+							if(countSQL != null && countSQL != ""){
+								countSQL = "select * from (" + _countSql + ") where 1=2 ";
+							}
+						}
+						listData = new ArrayCollection(initListData.toArray());
+					}
+				}
+				//刷新数据
+				setPager(1);
+				
+			}
+			
+			public function exportCurData():void{
+				
+				//只有在响应用户事件（例如，在鼠标单击或按键事件的事件处理函数中）时才能成功调用此方法
+				ListDataExportUtil.dataGridExport2CSV(expDataGrid,expFileName);
+			}
+			
+			/**
+			 * 导出所有数据
+			 * */
+			public function exportAllData():void{
+//				expFileName = fileName;
+				if(EntityModelListPanel.DATAMODE_SQL == dataMode){
+					//在服务端生成数据后再下载
+					formService.generateExportCSVFile(dataSource,realQuerySql,GlobalConst.TEMPDATAFOLDER, fieldNameMap,expFileName+".csv");
+					OperatingTipUtil.startOperat("正在生成CSV数据文件",this);
+					
+				}else if(EntityModelListPanel.DATAMODE_VALUE == dataMode){
+					expDataGrid.dataProvider = initListData;
+					ListDataExportUtil.dataGridExport2CSV(expDataGrid,expFileName);
+				}					
+			}
+			
+			private function generateExportCSVFileHandler(event:ResultEvent):void{
+				var fileUrl:String = event.result as String;				
+				navigateToURL(new URLRequest(fileUrl));
+				OperatingTipUtil.endOperat();
+			}
+			
+			public function set columns(columnArr:Array):void{
+				_columns = columnArr;
+				expDataGrid.columns = columnArr;
+				for each(var dgCol:DataGridColumn in _columns)
+				fieldNameMap[dgCol.dataField.toUpperCase()] = dgCol.headerText;
+			}
+			
+			public function get columns():Array{
+				return _columns;
+			}
+			
+			public function getSelectedRowValue():Object{
+				if(curPageData.length < 1 || dataListGrid.selectedIndex < 0)
+					return null;
+				return dataListGrid.selectedItem;
+			}
+			
+			public function getSelectedRowValues():Array{
+				if(curPageData.length < 1)
+					return null;
+				return dataListGrid.selectedItems;
+			}
+			
+			private function getFilterSQL():String{
+				
+				var tempSql:String = "";
+				var andSql:String = "";
+				var orSql:String = "";
+				
+				var filterObj:Object = filterInfo.data.filters[sharedObjectCode];;
+				if( filterObj != null && filterObj is XML){
+					for each(var item:XML in filterObj.filterInfo.item){
+						var isAdd:String = item.@isAdd;
+						if(isAdd != null && isAdd == "true"){
+							
+							var type:String = item.@type;
+							var column:String = item.@column;
+							var logicalOperator:String = item.@logicalOperator;
+							var relationalOperator:String = item.@relationalOperator;
+							var value:String = item.@value;
+							
+							var valueStr:String = dealValue(value,relationalOperator);
+							
+							if(logicalOperator == "AND"){
+								var andTemp:String ="";
+								andTemp = column+" "+relationalOperator+" "+valueStr;
+								if(type == "stringLength"){
+									andTemp = "length("+column+")"+" "+relationalOperator+" "+valueStr;
+								}
+								if(andSql == ""){
+									andSql = andTemp+"";
+								}else{
+									if(andTemp !="")
+										andSql = andSql + " AND "+andTemp;
+								}
+								
+							}else if(logicalOperator == "OR"){
+								var orTemp:String ="";
+								orTemp = column+" "+relationalOperator+" "+valueStr;
+								if(type == "stringLength"){
+									orTemp = "length("+column+")"+" "+relationalOperator+" "+valueStr;
+								}
+								if(orSql == ""){
+									orSql = orTemp+"";
+								}else{
+									if(orTemp !="")
+										orSql = orSql + " OR "+orTemp;
+								}
+							}
+							
+						}
+					}
+				}
+				if(andSql !="" && orSql != ""){
+					tempSql = "AND "+andSql+" OR "+orSql;
+				}else if(andSql =="" && orSql != ""){
+					tempSql = "OR "+orSql;
+				}else if(andSql !="" && orSql == ""){
+					tempSql = "AND "+andSql;
+				}
+				
+				return tempSql;
+			}
+			
+			private function dealValue(value:String,relationalOperator:String):String{
+				var realValue:String ="";
+				if(value != null && value != ""){
+					var valueArr:Array = value.split(",");
+					for each(var vl:String in valueArr){
+						if(realValue == ""){
+							realValue = "'"+vl+"'";
+						}else{
+							realValue = realValue+","+"'"+vl+"'";
+						}
+					}
+				}
+				
+				if(relationalOperator == "IN" || relationalOperator == "NOT IN"){
+					realValue = " ("+realValue+")";
+				}else if(relationalOperator =="LIKE"){
+					realValue = "'%"+value+"%'";
+				}else if(relationalOperator =="IS" || relationalOperator =="IS NOT"){
+					realValue = value;
+				}
+				return realValue;
+			}
+			
+			private function editFilter():void{
+				
+				var elfp:EntityListFilterPanel = new EntityListFilterPanel();
+				elfp.allFieldsCol = filterColumnsCol;
+				elfp.sharedObjectSpaceName = sharedObjectSpaceName;
+				elfp.sharedObjectCode = sharedObjectCode;
+				elfp.listPanel = this;
+				
+				if(desktop != null){
+					PopUpManager.addPopUp(elfp,desktop,true);
+				}else{
+					PopUpManager.addPopUp(elfp,this,true);
+				}
+				PopUpManager.centerPopUp(elfp);
+				
+			}
+			
+			private function showSql():void{
+				var sqlWindow:TitleWindow = new TitleWindow();
+				sqlWindow.title = "SQL语句";
+				sqlWindow.showCloseButton = true;
+				sqlWindow.width = 450;
+				sqlWindow.height = 400;
+				sqlWindow.addEventListener(CloseEvent.CLOSE,function():void{
+					PopUpManager.removePopUp(sqlWindow);
+				});
+				
+				var txtArea:TextArea = new TextArea();
+				txtArea.percentHeight = 100;
+				txtArea.percentWidth = 100;
+				txtArea.editable = false;
+				txtArea.text = realQuerySql;
+				
+				sqlWindow.addChild(txtArea);
+				
+				PopUpManager.addPopUp(sqlWindow,this,true);
+				PopUpManager.centerPopUp(sqlWindow);
+				
+			}
+			
+			protected function dataListGrid_scrollHandler(event:ScrollEvent):void
+			{
+				if(event.direction == ScrollEventDirection.HORIZONTAL){
+					horizontalScrollPositionNum = event.position;
+				}else if(event.direction == ScrollEventDirection.VERTICAL){
+					verticalScrollPositionNum = event.position;
+				}
+			}
+			
+			public function getSelectedItem():*{
+				return dataListGrid.selectedItem;
+			}
+			
+			public function getSelectedItems():Array{
+				return dataListGrid.selectedItems;
+			}
+			
+		]]>
+	</mx:Script>
+		<mx:HBox width="100%" paddingLeft="2" paddingRight="2" paddingBottom="2" paddingTop="3">
+			<mx:PopUpMenuButton label="操作" id="operationButton" dataProvider="{operationList}" openAlways="true" icon="{AssetsFileLib.operationIcon}"/>
+			<mx:HBox id="btnHbox" />
+			<mx:HBox width="100%" id="simpleQueryPanel" horizontalAlign="right" paddingRight="5" paddingBottom="5" horizontalGap="3" verticalAlign="middle">
+				<mx:Label text="正在使用过滤器查询" visible="{isVisible}" color="red" paddingRight="20" />
+				<mx:CheckBox id="isWholeWordCheckBox"/>
+				<mx:Label text="全文匹配" toolTip="勾选进行全文匹配查询" paddingRight="2"/>
+				<mx:TextInput id="simpleQueryTextInput" width="150" borderStyle="solid" enter="simpleQueryTextInput_enterHandler(event)"/>
+				<mx:LinkButton icon="{AssetsFileLib.quicQueryIcon}" toolTip="查询" width="20" height="20" click="simpleQuery(simpleQueryTextInput.text)"/>
+				<mx:LinkButton icon="{AssetsFileLib.filterIcon}" toolTip="编辑过滤器" width="20" height="20" click="editFilter()" visible="{isVisibleFilter}"/>
+				<mx:LinkButton icon="{AssetsFileLib.advancedqueryIcon}" toolTip="查看SQL" click="showSql()" visible="{debugMode}" />
+			</mx:HBox>
+		</mx:HBox>
+		<ext:DataGridWrapper id="dataListGrid" width="{this.width}"  scroll="dataListGrid_scrollHandler(event)" height="100%" dataProvider="{curPageData}" editable="false" verticalScrollPolicy="on" horizontalScrollPolicy="on"
+							 />
+		<mx:HBox width="100%" horizontalAlign="left" verticalAlign="middle">
+			<mx:Spacer width="100%" height="1"></mx:Spacer>
+			<mx:Label text="第0页/共0页"  id="pagedetail"/>
+			<mx:Image toolTip="首页"  source="{AssetsFileLib.pageFirstIcon}" click="setPager(1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+			<mx:Image toolTip="末页" source="{AssetsFileLib.pageLastIcon}" click="setPager(totalPage)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+			<mx:Image toolTip="上一页" source="{AssetsFileLib.pagePrevIcon}" click="setPager(curPage-1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+			<mx:Image toolTip="下一页" source="{AssetsFileLib.pageNextIcon}" click="setPager(curPage+1)" buttonMode="true" width="20" height="20" scaleContent="true"/> 
+			<mx:NumericStepper id="inputpage" stepSize="1" minimum="0" maximum="0" cornerRadius="0" height="20" width="60"/>
+			<mx:Image toolTip="跳转" source="{AssetsFileLib.pageJumpIcon}" click="setPager(inputpage.value)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		</mx:HBox>
+	</mx:VBox>

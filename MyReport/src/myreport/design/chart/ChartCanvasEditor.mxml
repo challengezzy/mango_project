@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Grid xmlns:mx="http://www.adobe.com/2006/mxml" verticalGap="1">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.chart.Canvas3DData;
+ 
+			private var _Data:Canvas3DData;
+			public function set Data(value:*):void
+			{
+				_Data = value;
+
+				CanvasWidth.text = _Data.CanvasWidth.toString();
+				CanvasHeight.text = _Data.CanvasHeight.toString();
+				CanvasBackgroundColor.selectedColor = _Data.CanvasBackgroundColor;
+				CanvasBackgroundAlpha.text = _Data.CanvasBackgroundAlpha.toString();
+				CanvasBarColor.selectedColor = _Data.CanvasBarColor;
+				CanvasBarAlpha.text = _Data.CanvasBarAlpha.toString();
+				CanvasLineThickness.text = _Data.CanvasLineThickness.toString();
+				CanvasLineColor.selectedColor = _Data.CanvasLineColor;
+				CanvasLineAlpha.text = _Data.CanvasLineAlpha.toString();
+				AxisNameTextColor.selectedColor = _Data.AxisNameTextColor;
+				AxisNameFontSize.text = _Data.AxisNameFontSize.toString();
+				AxisNameFontBold.selected = _Data.AxisNameFontBold;
+				XAxisName.text = _Data.XAxisName;
+				YAxisName.text = _Data.YAxisName;
+				AxisLabelTextColor.selectedColor = _Data.AxisLabelTextColor;
+				AxisLabelFontSize.text = _Data.AxisLabelFontSize.toString();
+				AxisLabelFontBold.selected = _Data.AxisLabelFontBold;
+
+			}
+			
+			public function SetValues():void
+			{
+				_Data.CanvasWidth = Number(CanvasWidth.text);
+				_Data.CanvasHeight = Number(CanvasHeight.text);
+				_Data.CanvasBackgroundColor = CanvasBackgroundColor.selectedColor;
+				_Data.CanvasBackgroundAlpha = Number(CanvasBackgroundAlpha.text);
+				_Data.CanvasBarColor = CanvasBarColor.selectedColor;
+				_Data.CanvasBarAlpha = Number(CanvasBarAlpha.text);
+				_Data.CanvasLineThickness = Number(CanvasLineThickness.text);
+				_Data.CanvasLineColor = CanvasLineColor.selectedColor;
+				_Data.CanvasLineAlpha = Number(CanvasLineAlpha.text);
+				_Data.AxisNameTextColor = AxisNameTextColor.selectedColor;
+				_Data.AxisNameFontSize = Number(AxisNameFontSize.text);
+				_Data.AxisNameFontBold = AxisNameFontBold.selected;
+				_Data.XAxisName = XAxisName.text;
+				_Data.YAxisName = YAxisName.text;
+				_Data.AxisLabelTextColor = AxisLabelTextColor.selectedColor;
+				_Data.AxisLabelFontSize = Number(AxisLabelFontSize.text);
+				_Data.AxisLabelFontBold = AxisLabelFontBold.selected;
+
+				
+			}
+		]]>
+	</mx:Script>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布宽度："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="CanvasWidth" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布高度："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="CanvasHeight" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布背景颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="CanvasBackgroundColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布背景透明度："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="CanvasBackgroundAlpha" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布底栏颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="CanvasBarColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布底栏透明度："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="CanvasBarAlpha" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布线条宽度："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="CanvasLineThickness" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布线条颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="CanvasLineColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="画布线条透明度："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="CanvasLineAlpha" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="轴名称文本颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="AxisNameTextColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="轴名称字体大小："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="AxisNameFontSize" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="AxisNameFontBold" label="轴名称字体加粗"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="X轴名称："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="XAxisName" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="Y轴名称："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="YAxisName" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="轴标签文本颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="AxisLabelTextColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="轴标签字体大小："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="AxisLabelFontSize" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="AxisLabelFontBold" label="轴标签字体加粗"/>
+		</mx:GridItem>
+	</mx:GridRow>
+
+
+</mx:Grid>

@@ -1,0 +1,100 @@
+/**************************************************************************
+ * $RCSfile: Pub_QueryTemplet_ItemVO.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:20 $
+ **************************************************************************/
+package smartx.framework.metadata.vo;
+
+import java.io.*;
+
+public class Pub_QueryTemplet_ItemVO implements Serializable {
+
+    private static final long serialVersionUID = -4450634920623950116L;
+
+    private String itemKey = null; //列名
+
+    private String itemName = null; //名称
+
+    private String itemType = null; //类型
+
+    //下拉框定义说明!!
+    private String comboxdesc; //下拉框对应的SQL
+
+    private ComBoxItemVO[] itemVOs = null;
+
+    //参照定义说明!!
+    private String refdesc; //参照对应的SQL!!
+
+    private String refdesc_type; //参照类型,包括"TABLE","TREE","CUST",即表型参照,树型参照,自定义参照!!!
+
+    public String getComboxdesc() {
+        return comboxdesc;
+    }
+
+    public void setComboxdesc(String comboxdesc) {
+        this.comboxdesc = comboxdesc;
+    }
+
+    public String getItemKey() {
+        return itemKey;
+    }
+
+    public void setItemKey(String itemKey) {
+        this.itemKey = itemKey;
+    }
+
+    public String getItemName() {
+        return itemName;
+    }
+
+    public void setItemName(String itemName) {
+        this.itemName = itemName;
+    }
+
+    public String getItemType() {
+        return itemType;
+    }
+
+    public void setItemType(String itemType) {
+        this.itemType = itemType;
+    }
+
+    public String getRefdesc() {
+        return refdesc;
+    }
+
+    public void setRefdesc(String refdesc) {
+        this.refdesc = refdesc;
+    }
+
+    public ComBoxItemVO[] getItemVOs() {
+        return itemVOs;
+    }
+
+    public void setItemVOs(ComBoxItemVO[] itemVOs) {
+        this.itemVOs = itemVOs;
+    }
+
+    public String getRefdesc_type() {
+        return refdesc_type;
+
+    }
+
+    public void setRefdesc_type(String str_type) {
+        refdesc_type = str_type;
+    }
+
+}
+/**************************************************************************
+ * $RCSfile: Pub_QueryTemplet_ItemVO.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:20 $
+ *
+ * $Log: Pub_QueryTemplet_ItemVO.java,v $
+ * Revision 1.2  2007/05/31 07:38:20  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:03:16  qilin
+ * no message
+ *
+ * Revision 1.2  2007/01/30 04:16:43  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

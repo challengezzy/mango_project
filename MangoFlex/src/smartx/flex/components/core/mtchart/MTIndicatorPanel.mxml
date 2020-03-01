@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:mtchart="smartx.flex.components.core.mtchart.*" width="100%" height="100%"
+					  initialize="preInit()" xmlns:components="com.fusionwidgets.components.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:NumberFormatter precision="2" id="formatter"/>
+		<mx:VBox width="100%" height="100%" id="contentBox" verticalAlign="middle" horizontalAlign="center"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.brightPoint.controls.DegrafaGauge;
+			import com.events.FCEvent;
+			import com.flexmonster.pivot.view.charts.ChartType;
+			import com.fusionwidgets.components.FusionWidgets;
+			
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.FusionWidgetsType;
+			import smartx.flex.components.core.mtchart.vo.MTChartType;
+			
+			private var dials:XMLList = new XMLList();
+			private var pointers:XMLList = new XMLList();
+			
+			private var fusionWidgets:FusionWidgetsWrapper;
+			private var degrafaGauge:DegrafaGauge;
+			private var charttype:String;
+			private var valueField:String;
+			
+			//fusion的swf文件位置
+			private static const FUSIONDIR:String = "charts/fusioncharts.com/fusionwidgets";
+			
+			override protected function preInit():void{
+				super.preInit();
+				var xml:XML = metadataTemplet.contentXML;
+				charttype = xml.extend.chartType;
+				if(charttype == null || charttype == "")
+					charttype = FusionWidgetsType.DEGRAFAGAUGE;
+				
+				if(charttype == FusionWidgetsType.DEGRAFAGAUGE){
+					degrafaGauge = new DegrafaGauge();
+					if(xml.extend.height.length() > 0)
+						degrafaGauge.height = Number(xml.extend.height);
+					else
+						degrafaGauge.percentHeight = 100;
+					if(xml.extend.width.length() > 0)
+						degrafaGauge.width = Number(xml.extend.width);
+					else
+						degrafaGauge.percentWidth = 100;
+					if(xml.extend.chartConfig.chart.@lowerLimit.length()>0)
+						degrafaGauge.minimum = Number(xml.extend.chartConfig.chart.@lowerLimit);
+					if(xml.extend.chartConfig.chart.@upperLimit.length()>0)
+						degrafaGauge.maximum = Number(xml.extend.chartConfig.chart.@upperLimit);
+					if(xml.extend.chartConfig.chart.@gaugeStartAngle.length()>0)
+						degrafaGauge.setStyle("startAngle",Number(xml.extend.chartConfig.chart.@gaugeStartAngle));
+					if(xml.extend.chartConfig.chart.@gaugeEndAngle.length()>0)
+						degrafaGauge.setStyle("endAngle",Number(xml.extend.chartConfig.chart.@gaugeEndAngle));
+					var values:Array = [];
+					var colors:Array = [];
+					var alphas:Array = [];
+					for each(var color:XML in xml.extend.chartConfig.chart.colorRange.color){
+						colors = colors.concat(handleColorCode(String(color.@code)));
+						alphas = alphas.concat(".7");
+						if(values.length == 0)
+							values = values.concat(String(color.@minValue));
+						values = values.concat(String(color.@maxValue));
+					}
+					if(xml.extend.diameter.length() >0)
+						degrafaGauge.diameter = xml.extend.diameter;
+					else
+						degrafaGauge.diameter = 100;
+					if(xml.extend.chartConfig.chart.@showValue == "0")
+						degrafaGauge.setStyle("showLabel","false");
+					if(xml.extend.chartConfig.skin == "dialSkin")
+						degrafaGauge.setStyle("styleName","dialSkin");
+					else
+						degrafaGauge.setStyle("styleName","gaugeSkin");
+					
+					degrafaGauge.labelFormatter = formatter;
+					
+					degrafaGauge.setStyle("gaugeLabel","gaugeLabel");
+					degrafaGauge.setStyle("alertValues",values);
+					degrafaGauge.setStyle("alertColors",colors);
+					degrafaGauge.setStyle("alertAlphas",alphas);
+					
+					if(xml.extend.chartConfig.backgroundColor.length() > 0){
+						degrafaGauge.setStyle("backgroundColor",handleColorCode(xml.extend.chartConfig.backgroundColor));
+					}
+					
+					valueField = xml.extend.valueField;
+					degrafaGauge.liveDragging = false;
+					contentBox.addChild(degrafaGauge);
+					
+				}
+				else{
+					fusionWidgets = new FusionWidgetsWrapper();
+					fusionWidgets.FCFolder = FUSIONDIR;
+					fusionWidgets.FCChartType = charttype;
+					xml.extend.chartConfig.chart.@showFCMenuItem = "0";
+					fusionWidgets.FCDataXML = xml.extend.chartConfig.chart.toXMLString();
+					valueField = xml.extend.valueField;
+	//				fusionWidgets.percentHeight = 100;
+	//				fusionWidgets.percentWidth = 100;
+					if(xml.extend.height.length() > 0)
+						fusionWidgets.height = Number(xml.extend.height);
+					else
+						fusionWidgets.height = 500;
+					if(xml.extend.width.length() > 0)
+						fusionWidgets.width = Number(xml.extend.width);
+					else
+						fusionWidgets.width = 500;
+					
+					dials = xml.extend.chartConfig.chart.dials.dial;
+					pointers = xml.extend.chartConfig.chart.pointers.pointer;
+					contentBox.addChild(fusionWidgets);
+					//wait for 5s, then notify parent to push data
+					var timer:Timer = new Timer(1000,1);
+					timer.addEventListener(TimerEvent.TIMER,function(e:TimerEvent):void{
+						dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+						var t:Timer = e.target as Timer;
+						if(t != null)
+							t.stop();
+					});
+					timer.start();
+				}
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				
+				mainBox.addChild(contentBox);
+				if(charttype == FusionWidgetsType.DEGRAFAGAUGE)
+					dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			private function handleColorCode(code:String):String{
+				//处理颜色编码，如果不是0x开头则补上0x
+				if(code.substr(0,2) == "0x")
+					return code;
+				else
+					return "0x"+code;
+			}
+			
+			override public function refreshComplete():void{
+				if(dataProvider.length > 0){
+					if(degrafaGauge != null){
+						degrafaGauge.value = Number(dataProvider.getItemAt(0)[valueField]);
+					}
+					else if(fusionWidgets != null){
+						var id:String;
+						var valueField2:String;
+						var value:Number;
+						if(dials.length() > 0 && (charttype == FusionWidgetsType.ANGULARGAUGE)){
+							for each(var dial:XML in dials){
+								id = dial.@id;
+								valueField2 = dial.@valueField;
+								value = Number(dataProvider.getItemAt(0)[valueField2]);
+								fusionWidgets.FCSetDataForId(id,value);
+							}
+						}
+						else{
+							value = Number(dataProvider.getItemAt(0)[valueField]);
+							fusionWidgets.FCSetData(value);
+						}
+						//失败了
+//						if(pointers.length() > 0 && (charttype == FusionWidgetsType.HLINEARGAUGE)){
+//							for each (var pointer:XML in pointers){
+//								id = pointer.@id;
+//								valueField = pointer.@valueField;
+//								value = Number(dataProvider.getItemAt(0)[valueField]);
+//								fusionWidgets.FCSetData(value);
+//							}
+//						}
+					}
+				}
+				super.refreshComplete();
+			}
+		
+			public override function destroy():void
+			{
+				if(fusionWidgets != null)
+					fusionWidgets.destroy();
+				fusionWidgets = null;
+				removeAllChildren();
+				super.destroy();
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Style>
+		.dialSkin {
+		faceSkin:		ClassReference("com.brightPoint.controls.gauge.DialSkin");
+		indicatorSkin:		ClassReference("com.brightPoint.controls.gauge.DialSkin");
+		indicatorCrownSkin:		ClassReference("com.brightPoint.controls.gauge.DialSkin");
+		highlightSkin:		ClassReference("com.brightPoint.controls.gauge.DialSkin");
+		}
+		
+		.gaugeSkin {
+		faceSkin:		ClassReference("com.brightPoint.controls.gauge.GaugeSkin");
+		indicatorSkin:		ClassReference("com.brightPoint.controls.gauge.GaugeSkin");
+		indicatorCrownSkin:		ClassReference("com.brightPoint.controls.gauge.GaugeSkin");
+		highlightSkin:		ClassReference("com.brightPoint.controls.gauge.GaugeSkin");
+		}
+		
+		.gaugeLabel {
+		fontSize:14pt;
+		color:#FFFFFF;	
+		}
+		
+	</fx:Style>
+	
+</mtchart:MTChartPanel>

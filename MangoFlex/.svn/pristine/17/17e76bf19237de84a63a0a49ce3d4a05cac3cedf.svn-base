@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<chart:AdvXYChart xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				  xmlns:s="library://ns.adobe.com/flex/spark" 
+				  xmlns:mx="library://ns.adobe.com/flex/mx" 
+				  xmlns:chart="smartx.flex.components.core.chart.*" initialize="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.charts.series.ColumnSeries;
+			import mx.collections.ArrayCollection;
+			import mx.graphics.SolidColor;
+			import mx.graphics.SolidColorStroke;
+			private function init():void{
+				initXYAxis(columnChart);
+			}
+			
+			public override function refreshData(_dataProvider:ArrayCollection):void{
+				axisDataProvider = _dataProvider;
+				
+				refreshUserDefindAxis(columnChart);
+				
+				dataProvider = loadRowData(_dataProvider);
+				
+				if(isShowLabels){
+					if(isHorizontalLegend)
+						legend.direction = "horizontal";
+					legend.dataProvider = columnChart;
+				}
+			}
+			
+			override protected function initRowDataSeries(typeFields:ArrayCollection):void{
+				var series:Array = new Array();
+				for(var i:int=0;i<typeFields.length;i++){
+					var columnSeries:ColumnSeries = new ColumnSeries();
+					columnSeries.yField = typeFields[i];
+					columnSeries.xField = xField;
+					if(seriesNames && seriesNames.length > i)
+						columnSeries.displayName = seriesNames[i];
+					else
+						columnSeries.displayName = typeFields[i];
+					if(colors && colors.length > i){
+						var colorStr:String = colors[i];
+						colorStr = "0x".concat(colorStr);
+						var sc:SolidColor = new SolidColor(parseInt(colorStr),0.6);
+						var s:SolidColorStroke = new SolidColorStroke(parseInt(colorStr),2);
+						columnSeries.setStyle("stroke",s);
+						columnSeries.setStyle("fill",sc);
+					}
+					series.push(columnSeries);
+				}
+				columnChart.series = series;
+				legend.dataProvider = columnChart;
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:VBox width="100%" height="100%">
+			<mx:ColumnChart id="columnChart" dataProvider="{dataProvider}" 
+						  height="100%" width="100%" paddingLeft="5" paddingRight="5" fontSize="12" showDataTips="true" />
+			<mx:Legend id ="legend" />
+		</mx:VBox>
+	</mx:VBox>
+</chart:AdvXYChart>

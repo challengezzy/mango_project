@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cep:AbstractStreamControlPropertyEditor xmlns:fx="http://ns.adobe.com/mxml/2009" 
+										 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:cep="smartx.flex.components.core.cep.*"
+										 width="100%"
+										 height="100%" paddingBottom="1" paddingLeft="2" paddingRight="2" paddingTop="1"
+										  creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<fx:Component id="typeEditor">  
+			<mx:ComboBox>  
+				<mx:dataProvider>  
+					<fx:String>String</fx:String>  
+					<fx:String>int</fx:String>  
+					<fx:String>double</fx:String>  
+					<fx:String>blob</fx:String>  
+					<fx:String>java.util.Date</fx:String>
+					<fx:String>boolean</fx:String>  
+				</mx:dataProvider>  
+			</mx:ComboBox>  
+		</fx:Component>  
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			[Bindable]
+			private var schemaXML:XMLList;
+			private var settingsXML:XMLList;
+			private function init():void{
+				refresh();
+			}
+			
+			public override function refresh():void{
+				settingsXML = streamInstance.defineXML.settings;
+				if(settingsXML.schema.length() == 0){
+					var temp:XML = <schema/>;
+					settingsXML.appendChild(temp);
+					triggerDataChangeEvent();
+				}
+				schemaXML = settingsXML.schema.field;
+				dataGrid.invalidateList();
+			}
+			
+			private function addField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				var temp:XML = 
+					<field>
+						<name/>
+						<type>String</type>
+						<description/>
+					</field>;
+				temp.name = getNewFieldName();
+				settingsXML.schema.insertChildAfter(null,temp);
+				schemaXML = settingsXML.schema.field;
+				triggerDataChangeEvent();
+				dataGrid.invalidateList();
+			}
+			
+			private function getNewFieldName():String{
+				var i:int=1;
+				while(true){
+					var name:String = "untitled"+i;
+					if(isFieldNameExists(name)){
+						i++;
+						continue;
+					}
+					return name;
+				}
+				return null;
+			}
+			
+			private function isFieldNameExists(name:String):Boolean{
+				for each(var field:XML in schemaXML){
+					if(field.name == name){
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			private function deleteField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				if(schemaXML!=null){
+					CEPUtils.xmlDeleteNode(schemaXML[selectedIndex]);
+				}
+				schemaXML = settingsXML.schema.field;
+				triggerDataChangeEvent();
+				dataGrid.invalidateList();
+			}
+			
+			private function triggerDataChangeEvent():void{
+				dispatchEvent(new FlexEvent(FlexEvent.DATA_CHANGE));
+			}
+
+			protected function dataGrid_itemFocusOutHandler(event:DataGridEvent):void
+			{
+				triggerDataChangeEvent(); 
+			}
+
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:HBox width="100%">
+			<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addField()"/>
+			<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteField()"/>
+		</mx:HBox>
+		<mx:DataGrid id="dataGrid" width="100%" height="100%" editable="true" dataProvider="{schemaXML}" itemFocusOut="dataGrid_itemFocusOutHandler(event)" >
+			<mx:columns>
+				<mx:DataGridColumn headerText="字段名" dataField="name"/>
+				<mx:DataGridColumn headerText="类型" dataField="type" itemEditor="{typeEditor}" editorDataField="value" />
+				<mx:DataGridColumn headerText="描述" dataField="description"/>
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+</cep:AbstractStreamControlPropertyEditor>

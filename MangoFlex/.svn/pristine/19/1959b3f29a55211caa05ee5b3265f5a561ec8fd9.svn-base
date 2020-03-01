@@ -1,0 +1,542 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PodContent xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns="smartx.flex.components.basic.portal.*" 
+		 width="100%"
+		 creationComplete="init()"
+		 verticalAlign="top" addedToStage="addedToStageHandler(event)" removedFromStage="removedFromStageHandler(event)">
+	<fx:Declarations>
+		<mx:VBox width="100%" id="newMessageHit" borderStyle="solid" borderColor="0xF9F2A7" backgroundColor="0xFEFFE5"
+				 horizontalAlign="center" verticalAlign="middle">
+			<mx:Label id="newMessageLabel" buttonMode="true" color="0xD4A639" click="refresh()"
+					  mouseOver="{newMessageLabel.setStyle('textDecoration','underline')}"
+					  mouseOut="{newMessageLabel.setStyle('textDecoration','none')}"/>
+		</mx:VBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.containers.Tile;
+			import mx.containers.TitleWindow;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.HRule;
+			import mx.controls.Image;
+			import mx.controls.Label;
+			import mx.controls.LinkButton;
+			import mx.controls.Text;
+			import mx.controls.TextArea;
+			import mx.core.FlexLoader;
+			import mx.events.CloseEvent;
+			import mx.formatters.DateFormatter;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			import mx.utils.StringUtil;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			private var formService:RemoteObject;
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			public var endpoint:String;
+			
+			[Bindable]
+			private var currentDP:Array = new Array();
+
+			[Bindable]
+			public var dispatchtype:String;
+
+			private var formatter:DateFormatter = new DateFormatter();
+			private var formatString:String = "YYYY-MM-DD JJ:NN:SS";
+			
+			private var countSql:String;
+			private var messageSql:String;
+			private var detectSql:String;
+			
+			private var page:int=1;
+			[Bindable]
+			public var pageSize:int=10;
+			[Bindable]
+			private var pageCount:int=1;
+			
+			private var messageBodyMap:Object = new Object();//以bodybox为value
+			private var messageImageMap:Object = new Object();//以imagebox为value
+			private var messageMap:Object = new Object();//以messageid为key,messagevo为value 的map
+			private var messageAttachmentMap:Object = new Object();//消息附件vo的array为value的map
+			
+			private var lastFetchDate:Date = new Date();
+			private var timer:Timer = new Timer(60000); 
+			
+			private var detailWindow:TitleWindow;
+
+			
+			private function init():void{
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getHashVoHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				formService.attachFileDownload.addEventListener(ResultEvent.RESULT,attachFileDownloadHandler);
+				formService.attachFileDownload.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				if(userId == null)
+					userId = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+				formatter.formatString = formatString;
+				
+				
+				
+				refresh();
+			}
+			
+
+			private function refresh(toPage:int=1):void{
+				if(toPage>pageCount)
+					page = pageCount;
+				else if(toPage<1)
+					page = 1;
+				else
+					page = toPage;
+				
+				trace("----------"+dispatchtype+"--------------")
+				if(dispatchtype=="" || dispatchtype==null )
+				{
+					countSql="select 'getMessageCount' flag,count(1) cou from v_messages_show where dispatchperson is null or dispatchperson="+userId;
+					messageSql="select 'getMessage' flag,sysdate lastdate,w.* from (select t.*,rownum r from (select * from v_messages_show where dispatchperson is null or dispatchperson="+userId+") t where rownum<="+pageSize+"*"+page+") w  where r>"+pageSize+"*("+page+"-1)";
+					detectSql="select 'detectNewMessage' flag,count(1) cou from v_messages_show where (dispatchperson is null or dispatchperson="+userId+") and createtime>to_date('"+formatter.format(lastFetchDate)+"','yyyy-mm-dd hh24:mi:ss')";
+					
+				}
+				else 
+				{
+					countSql="select 'getMessageCount' flag,count(1) cou from v_messages_show where dispatchtype="+dispatchtype+"and (dispatchperson is null or dispatchperson="+userId+")";
+					messageSql="select 'getMessage' flag,sysdate lastdate,w.* from (select t.*,rownum r from (select * from v_messages_show where dispatchtype ="+dispatchtype+" and (dispatchperson is null or dispatchperson="+userId+")) t where rownum<="+pageSize+"*"+page+") w  where r>"+pageSize+"*("+page+"-1)";
+					detectSql="select 'detectNewMessage' flag,count(1) cou from v_messages_show where dispatchtype ="+dispatchtype+" and (dispatchperson is null or dispatchperson="+userId+") and createtime>to_date('"+formatter.format(lastFetchDate)+"','yyyy-mm-dd hh24:mi:ss')";
+					
+				}
+				formService.getSimpleHashVoArrayByDS(null,countSql);
+				
+				formService.getSimpleHashVoArrayByDS(null,messageSql);
+			}
+			
+			private function detectNewMessage():void{
+				formService.getSimpleHashVoArrayByDS(null,detectSql);
+			}
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function getHashVoHandler(event:ResultEvent):void{
+				var result:Array = event.result as Array;
+				if(result != null && result.length>0){
+					var vo:SimpleHashVO = result[0] as SimpleHashVO;
+					var flag:String = vo.dataMap["flag"];
+					if(flag == "getMessage"){
+						currentDP = result;
+						getMessageHandler();
+					}
+					else if(flag == "detectNewMessage"){
+						detectNewMessageHandler(result);
+					}
+					else if(flag == "getMessageCount"){
+						getMessageCountHandler(result);
+					}
+					else if(flag == "fetchAttachments"){
+						fetchAttachmentsHandler(result);
+					}
+					else if(flag == "fetchImage"){
+						fetchImageHandler(result);
+					}
+				}
+			}
+			
+			private function fetchImageHandler(vos:Array):void{
+				if(vos != null && vos.length >0){
+					var vo:SimpleHashVO = vos[0];
+					var messageid:String = vo.dataMap["keyvalue"];
+					var box:HBox = messageImageMap[messageid];
+					if(box != null){
+						var image:Image = new Image();
+						image.source = vo.dataMap["content"];
+						box.addChild(image);
+						image.data = vo.dataMap["filename"];
+						image.maxHeight = 100;
+						image.maxWidth = 100;
+						image.toolTip="点击查看大图";
+						image.buttonMode = true;
+						image.addEventListener(MouseEvent.CLICK,showDetailImage);
+					}
+				}
+			}
+			
+			private function showDetailImage(e:MouseEvent):void{
+				var smallImage:Image = e.currentTarget as Image;
+				detailWindow = new TitleWindow();
+				detailWindow.title = "图片查看:"+smallImage.data;
+//				detailWindow.width = 800;
+//				detailWindow.height = 600;
+				var detailWindowBox:VBox = new VBox();
+				detailWindowBox.setStyle("paddingLeft",2);
+				detailWindowBox.setStyle("paddingRight",2);
+				detailWindowBox.setStyle("paddingTop",2);
+				detailWindowBox.setStyle("paddingBottom",2);
+				detailWindowBox.setStyle("horizontalAlign","center");
+				detailWindowBox.setStyle("verticalAlign","middle");
+				detailWindowBox.percentWidth =100;
+				detailWindowBox.percentHeight = 100;
+				detailWindow.addChild(detailWindowBox);
+				
+				var imageBox:VBox = new VBox();
+				imageBox.width =750;
+				imageBox.height = 500;
+				imageBox.setStyle("borderStyle","solid");
+				imageBox.setStyle("horizontalAlign","center");
+				imageBox.setStyle("verticalAlign","middle");
+				detailWindowBox.addChild(imageBox);
+				var detailImage:Image = new Image();
+				detailImage.maxWidth = 740;
+				detailImage.maxHeight = 490;
+				imageBox.addChild(detailImage);
+				var closeButtonBox:HBox = new HBox();
+				closeButtonBox.percentWidth = 100;
+				closeButtonBox.setStyle("horizontalAlign","center");
+				var closeButton:Button = new Button();
+				closeButton.label = "关闭";
+				closeButtonBox.addChild(closeButton);
+				detailWindowBox.addChild(closeButtonBox);
+				closeButton.addEventListener(MouseEvent.CLICK,function(e:MouseEvent):void{
+					PopUpManager.removePopUp(detailWindow);
+				});
+
+				detailImage.source = smallImage.source;
+				PopUpManager.addPopUp(detailWindow,this.root,true);
+				PopUpManager.centerPopUp(detailWindow);
+			}
+			
+			private function fetchAttachmentsHandler(vos:Array):void{
+				for each(var vo:SimpleHashVO in vos){
+					var messageid:String = vo.dataMap["keyvalue"];
+					var array:ArrayCollection = messageAttachmentMap[messageid];
+					if(array == null){
+						array = new ArrayCollection();
+					}
+					array.addItem(vo);
+					messageAttachmentMap[messageid] = array;
+					//对图片附件作预览处理
+					var filename:String = vo.dataMap["filename"];
+					if(filename != null && (filename.indexOf(".jpg")>0 || filename.indexOf(".png")>0
+						|| filename.indexOf(".bmp")>0 || filename.indexOf(".gif")>0
+						|| filename.indexOf(".JPG")>0 || filename.indexOf(".PNG")>0
+						|| filename.indexOf(".BMP")>0 || filename.indexOf(".GIF")>0)){
+						//以文件名判断是否可能是图片
+						formService.getSimpleHashVoArrayByDS(null,
+							"select 'fetchImage' flag,t.id,t.keyvalue,t.filename,t.content  " +
+							"from pub_filecontent t where id="+vo.dataMap["id"]);
+						
+					}
+				}
+			}
+			
+			private function getMessageCountHandler(vos:Array):void{
+				if(vos.length == 1){
+					var vo:SimpleHashVO = vos[0];
+					var count:Number = vo.dataMap["cou"];
+					if(count%pageSize == 0)
+						pageCount = count/pageSize;
+					else
+						pageCount = count/pageSize+1;
+					pagedetail.text = "第"+page+"页/共"+pageCount+"页";
+				}
+			}
+			
+			private function detectNewMessageHandler(vos:Array):void{
+				if(vos.length == 1){
+					var vo:SimpleHashVO = vos[0];
+					var count:Number = vo.dataMap["cou"];
+					if(count > 0){
+						this.addChildAt(newMessageHit,0);
+						newMessageLabel.text = "有"+count+"条新消息，点击查看";
+					}
+				}
+			}
+			
+			private function fetchAttachments(messageid:Number):void{
+				formService.getSimpleHashVoArrayByDS(null,
+					"select 'fetchAttachments' flag,t.id,t.keyvalue,t.filename,t.downloadtimes,length(content) filelength  from pub_filecontent t where tablename='PUB_MESSAGES' and keyvalue="+messageid);
+			}
+			
+			
+		
+			
+			private function getMessageHandler():void{
+				if(currentDP != null){
+					if(newMessageHit.parent == this){
+						this.removeChild(newMessageHit);
+					}
+					messageBox.removeAllChildren();
+					messageBodyMap = new Object();
+					messageMap = new Object();
+					messageImageMap = new Object();
+					messageAttachmentMap = new Object();
+					for each(var vo:SimpleHashVO in currentDP){
+						//先更新最后获取时间
+						lastFetchDate = vo.dataMap["lastdate"];
+						
+						var messageRowBox:VBox = new VBox();
+						messageRowBox.percentWidth = 100;
+						var messageid:Number = vo.dataMap["id"];
+						//对每条消息，获取其附件信息
+						fetchAttachments(messageid);
+						var textInput:Text = new Text();
+						textInput.percentWidth = 100;
+						var creator:String = vo.dataMap["creator"];
+						textInput.htmlText = "<font color=\"#0078B6\">"+creator+"</font>: ";
+						var title:String = vo.dataMap["title"];
+						textInput.htmlText += title;
+						messageRowBox.addChild(textInput);
+						//消息主体框
+						var messageBodyBox:VBox = new VBox();
+						messageBodyBox.setStyle("paddingLeft",2);
+						messageBodyBox.setStyle("paddingRight",2);
+						messageBodyBox.setStyle("horizontalAlign","center");
+						messageBodyBox.percentWidth = 100;
+						messageRowBox.addChild(messageBodyBox);
+						//消息图片栏
+						var messageImageBox:HBox = new HBox();
+						messageImageBox.setStyle("paddingLeft",2);
+						messageImageBox.setStyle("paddingRight",2);
+						messageImageBox.percentWidth = 100;
+						messageRowBox.addChild(messageImageBox);
+						messageImageMap[String(messageid)] = messageImageBox;
+						//消息底部工具栏
+						var messageBottomBox:HBox = new HBox();
+						messageBottomBox.setStyle("verticalAlign","middle");
+						messageBottomBox.percentWidth = 100;
+						//优先级
+						var pIcon:Image = new Image();
+						pIcon.width = 18;
+						pIcon.height = 18;
+						var degree:Number = vo.dataMap["degree"];
+						if(degree == 2){//高
+							pIcon.source = AssetsFileLib.highPriorityIcon;
+							pIcon.toolTip = "高优先级";
+						}
+						else if(degree == 0){
+							pIcon.source = AssetsFileLib.lowPriorityIcon;
+							pIcon.toolTip = "低优先级";
+						}
+						else{
+							pIcon.source = AssetsFileLib.normalPriorityIcon;
+							pIcon.toolTip = "中优先级";
+						}
+						messageBottomBox.addChild(pIcon);
+						//创建时间
+						var timeLabel:Label =new Label();
+						var createTime:String = formatter.format(vo.dataMap["createtime"]);
+						timeLabel.htmlText = "<font color=\"#7AA5B9\">"+createTime+"</font>";
+						messageBottomBox.addChild(timeLabel);
+						
+						//详情按钮工具栏
+						var btnBox:HBox = new HBox();
+						messageBottomBox.addChild(btnBox);
+						btnBox.percentWidth = 100;
+						btnBox.setStyle("horizontalAlign","right");
+						var detailBtn:LinkButton = new LinkButton();
+						detailBtn.label = "详情";
+						detailBtn.id = String(messageid);//以messageid作为button的id，并作为messageBodyMap的key
+						messageBodyMap[detailBtn.id] = messageBodyBox;
+						messageMap[detailBtn.id] = vo;
+						detailBtn.addEventListener(MouseEvent.CLICK,showMessageBody);
+						btnBox.addChild(detailBtn);
+						
+						
+						messageRowBox.addChild(messageBottomBox);
+						
+						messageBox.addChild(messageRowBox);
+						
+						
+						var hline:HRule = new HRule();
+						hline.percentWidth = 100;
+						messageBox.addChild(hline);
+					}
+				}
+			}
+			
+			private function showMessageBody(event:MouseEvent):void{
+				var btn:LinkButton = event.target as LinkButton;
+				var vo:SimpleHashVO = messageMap[btn.id];
+				detailWindow = new TitleWindow()
+				detailWindow.maxHeight = 580;
+				detailWindow.maxWidth = 800;
+				detailWindow.title = vo.dataMap["title"];
+				detailWindow.showCloseButton = true;
+				detailWindow.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					PopUpManager.removePopUp(detailWindow);
+				});
+				
+				var detailWindowBox:VBox = new VBox();
+				detailWindowBox.setStyle("paddingLeft",2);
+				detailWindowBox.setStyle("paddingRight",2);
+				detailWindowBox.setStyle("paddingTop",2);
+				detailWindowBox.setStyle("paddingBottom",2);
+				detailWindowBox.percentHeight = 100;
+				detailWindowBox.percentWidth = 100;
+				detailWindow.addChild(detailWindowBox);
+				
+				var detailTextArea:TextArea = new TextArea();
+				detailTextArea.height = 450;
+				detailTextArea.width = 750;
+				detailTextArea.editable = false;
+				
+				detailWindowBox.addChild(detailTextArea);
+				
+				//附件栏
+				var attachmentBox:HBox = new HBox();
+				attachmentBox.percentWidth = 100;
+				var attachmentArray:ArrayCollection = messageAttachmentMap[btn.id];
+				if(attachmentArray != null && attachmentArray.length>0){
+					detailWindowBox.addChild(attachmentBox);
+					for each(var filevo:SimpleHashVO in attachmentArray){
+						var attachmentButton:LinkButton = new LinkButton();
+						attachmentButton.setStyle("icon",AssetsFileLib.attachmentIcon);
+						var filelength:int = filevo.dataMap["filelength"]/1000;
+						attachmentButton.label = filevo.dataMap["filename"]+"("+filelength+"k)";
+						attachmentButton.toolTip = "点击下载";
+						var tmp:* = new Object();
+						tmp["fileid"] = filevo.dataMap["id"];
+						tmp["messageid"] = btn.id;
+						attachmentButton.data = tmp;
+						attachmentButton.addEventListener(MouseEvent.CLICK,downloadAttachment);
+						attachmentBox.addChild(attachmentButton);
+					}
+				}
+				
+				var closeButtonBox:HBox = new HBox();
+				closeButtonBox.percentWidth = 100;
+				closeButtonBox.setStyle("horizontalAlign","center");
+				var closeButton:Button = new Button();
+				closeButton.label = "关闭";
+				closeButton.setStyle("icon",AssetsFileLib.closeIcon);
+				closeButtonBox.addChild(closeButton);
+				detailWindowBox.addChild(closeButtonBox);
+				closeButton.addEventListener(MouseEvent.CLICK,function(e:MouseEvent):void{
+					PopUpManager.removePopUp(detailWindow);
+				});
+				//detailTextArea.text = vo.dataMap["content"];
+				detailTextArea.htmlText = vo.dataMap["content"];
+				PopUpManager.addPopUp(detailWindow,this.root,true);
+				PopUpManager.centerPopUp(detailWindow);
+				
+				
+				//btn.label = "收起"; 
+			}
+			
+			private function showDetailWindow(e:MouseEvent):void{
+				var text:Text = e.target as Text;
+				if(text != null){
+					detailWindow = new TitleWindow()
+					detailWindow.maxHeight = 600;
+					detailWindow.maxWidth = 800;
+					var detailWindowBox:VBox = new VBox();
+					detailWindowBox.setStyle("paddingLeft",2);
+					detailWindowBox.setStyle("paddingRight",2);
+					detailWindowBox.setStyle("paddingTop",2);
+					detailWindowBox.setStyle("paddingBottom",2);
+					detailWindowBox.percentHeight = 100;
+					detailWindowBox.percentWidth = 100;
+					detailWindow.addChild(detailWindowBox);
+					
+					var detailTextArea:TextArea = new TextArea();
+					detailTextArea.height = 500;
+					detailTextArea.width = 750;
+					detailTextArea.editable = false;
+					
+					detailWindowBox.addChild(detailTextArea);
+					var closeButtonBox:HBox = new HBox();
+					closeButtonBox.percentWidth = 100;
+					closeButtonBox.setStyle("horizontalAlign","center");
+					var closeButton:Button = new Button();
+					closeButton.label = "关闭";
+					closeButtonBox.addChild(closeButton);
+					detailWindowBox.addChild(closeButtonBox);
+					closeButton.addEventListener(MouseEvent.CLICK,function(e:MouseEvent):void{
+						PopUpManager.removePopUp(detailWindow);
+					});
+					detailTextArea.text = text.text;
+					PopUpManager.addPopUp(detailWindow,this.root,true);
+					PopUpManager.centerPopUp(detailWindow);
+					
+				}
+			}
+			
+			private function downloadAttachment(event:MouseEvent):void{
+				var attachmentButton:LinkButton = event.target as LinkButton;
+				if(attachmentButton != null){
+					var fileid:String = attachmentButton.data["fileid"];
+					var messageid:String = attachmentButton.data["messageid"];
+					var attachmentArray:ArrayCollection = messageAttachmentMap[messageid];
+					var dtf:Sprite = deskTopFrame as Sprite;
+					if(attachmentArray != null){
+						for each(var filevo:SimpleHashVO in attachmentArray){
+							if(filevo.dataMap["id"] == fileid){
+								//找到文件了
+								OperatingTipUtil.startOperat("正在下载附件......",dtf);
+								
+								formService.attachFileDownload(fileid,filevo.dataMap["filename"]);
+							}
+						}
+					}
+					
+				}
+			}
+			
+			private function attachFileDownloadHandler(event:ResultEvent):void{
+				var url:String = event.result as String;
+				navigateToURL(new URLRequest(encodeURI(url)), "_blank");
+				OperatingTipUtil.endOperat();
+			}
+			
+			protected function addedToStageHandler(event:Event):void
+			{
+				timer.addEventListener(TimerEvent.TIMER, timerTrigger); 
+				timer.start();
+			}
+			
+			
+			
+			protected function removedFromStageHandler(event:Event):void
+			{
+				timer.removeEventListener(TimerEvent.TIMER,timerTrigger);
+				timer.stop();
+			}
+			
+			private function timerTrigger(event:TimerEvent):void{
+				detectNewMessage();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" id="messageBox" paddingLeft="2" paddingRight="2"
+			 paddingTop="2" paddingBottom="2">
+		
+	</mx:VBox>
+	<mx:HBox width="100%" horizontalAlign="right">
+		<mx:LinkButton icon="{AssetsFileLib.refreshIcon}" click="refresh()" toolTip="刷新" width="20"/>
+		<mx:Label text="第0页/共0页"  id="pagedetail"/>
+		<!--
+		<mx:Image toolTip="首页"  source="{AssetsFileLib.pageFirstIcon}" click="refresh(1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		<mx:Image toolTip="末页" source="{AssetsFileLib.pageLastIcon}" click="refresh(pageCount)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		-->
+		<mx:Image toolTip="上一页" source="{AssetsFileLib.pagePrevIcon}" click="refresh(page-1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		<mx:Image toolTip="下一页" source="{AssetsFileLib.pageNextIcon}" click="refresh(page+1)" buttonMode="true" width="20" height="20" scaleContent="true"/> 
+		<mx:NumericStepper id="inputpage" stepSize="1" minimum="1" maximum="{pageCount}" cornerRadius="0" height="20" width="40"/>
+		<mx:Image toolTip="跳转" source="{AssetsFileLib.pageJumpIcon}" click="refresh(inputpage.value)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+	</mx:HBox>
+</PodContent>

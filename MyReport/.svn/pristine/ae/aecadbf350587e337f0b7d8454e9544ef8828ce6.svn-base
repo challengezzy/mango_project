@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				  xmlns:util="myreport.util.*"
+				  xmlns:chart="myreport.design.chart.*"
+				  width="480" height="506" creationComplete="Init()" fontSize="12" fontFamily="Simsun"
+				  title="柱状图3D(多序列)属性编辑器" close="Close()">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.chart.ChartData;
+			import myreport.data.chart.Column3DMSData;
+			import myreport.data.report.ReportSettings;
+			import myreport.design.DesignUtil;
+			import myreport.design.ExpressionEditor;
+			import myreport.res.Asset;
+ 
+			private static var g_Instance:Column3DMSEditor;
+			private var _Data:Column3DMSData;
+			private var _Settings:ReportSettings;
+			public static function get Instance():Column3DMSEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new Column3DMSEditor();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			
+			private var _Callback:Function;
+			private function Init():void
+			{
+
+			}
+			/**
+			 * @param callback: function(data:Column3DMSData):void
+			 */ 
+			public function Show(data:ChartData, settings:ReportSettings, callback:Function):void
+			{
+				_Data = data.Clone();
+				_Callback = callback;
+				_Settings = settings;
+				
+				PopUp();
+				
+				_Colors.Data = _Data;
+				_DataSource.Data = _Data.DataSource;
+				_Normal.Data = _Data;
+				_Canvas.Data = _Data;
+				
+				RefreshBindingValues();
+				RefreshChartLabelValues();
+				RefreshColumn3DValues();
+			}
+			private function Confirm():void
+			{
+				_Colors.SetValues();
+				_DataSource.SetValues();
+				_Normal.SetValues();
+				_Canvas.SetValues();
+				
+				SetBindingValues();
+				SetChartLabelValues();
+				SetColumn3DValues();
+				if (_Callback != null)
+				{
+					_Callback(_Data);
+				}
+				Close();
+			}
+			private function RefreshBindingValues():void
+			{
+				ColumnValueField.text = _Data.ColumnValueField;
+				ColumnLabelField.text = _Data.ColumnLabelField;
+				
+				LabelField.text = _Data.LabelField;
+				
+				Title.text = _Data.Title;
+				Subtitle.text = _Data.Subtitle;
+				
+				XAxisLabelField.text = _Data.XAxisLabelField;
+				YAxisLabelField.text = _Data.YAxisLabelField;
+ 
+			}
+			
+			private function SetBindingValues():void
+			{
+				_Data.ColumnValueField = ColumnValueField.text;
+				_Data.ColumnLabelField = ColumnLabelField.text;
+				
+				_Data.LabelField = LabelField.text;
+				
+				_Data.Title = Title.text;
+				_Data.Subtitle = Subtitle.text;
+				
+				_Data.XAxisLabelField = XAxisLabelField.text;
+				_Data.YAxisLabelField = YAxisLabelField.text;
+ 
+			}
+			
+			private function RefreshChartLabelValues():void
+			{
+				_Label.LabelVisible.selected = _Data.LabelVisible;
+				_Label.LabelTextColor.selectedColor = _Data.LabelTextColor;
+				_Label.LabelFontSize.text = _Data.LabelFontSize.toString();
+				_Label.LabelFontBold.selected = _Data.LabelFontBold;
+				_Label.LabelWidth.text = _Data.LabelWidth.toString();
+				_Label.LabelGap.text = _Data.LabelGap.toString();
+				_Label.LabelColumn.text = _Data.LabelColumn.toString();
+				
+			}
+			private function SetChartLabelValues():void
+			{
+				_Data.LabelVisible = _Label.LabelVisible.selected;
+				_Data.LabelTextColor = _Label.LabelTextColor.selectedColor;
+				_Data.LabelFontSize = Number(_Label.LabelFontSize.text);
+				_Data.LabelFontBold = _Label.LabelFontBold.selected;
+				_Data.LabelWidth= Number(_Label.LabelWidth.text);
+				_Data.LabelGap = Number(_Label.LabelGap.text);
+				_Data.LabelColumn = uint(_Label.LabelColumn.text);
+				
+			}
+			private function RefreshColumn3DValues():void
+			{
+
+				ColumnWidthScale.text = _Data.ColumnWidthScale.toString();
+				ColumnFillAlpha.text = _Data.ColumnFillAlpha.toString();
+				ColumnLabelVisible.selected = _Data.ColumnLabelVisible;
+				ColumnLabelTextColor.selectedColor = _Data.ColumnLabelTextColor;
+				ColumnLabelFontSize.text = _Data.ColumnLabelFontSize.toString();
+				ColumnLabelFontBold.selected = _Data.ColumnLabelFontBold;
+	 
+
+			}
+			private function SetColumn3DValues():void
+			{
+
+				_Data.ColumnWidthScale = Number(ColumnWidthScale.text);
+				_Data.ColumnFillAlpha = Number(ColumnFillAlpha.text);
+				_Data.ColumnLabelVisible = ColumnLabelVisible.selected;
+				_Data.ColumnLabelTextColor = ColumnLabelTextColor.selectedColor;
+				_Data.ColumnLabelFontSize = Number(ColumnLabelFontSize.text);
+				_Data.ColumnLabelFontBold = ColumnLabelFontBold.selected;
+
+
+			}
+			private function ShowExpressionEditor(input:TextInput):void
+			{
+				ExpressionEditor.Instance.Show(input.text, _Settings, function(value:String):void
+				{
+					input.text = value;
+				});
+			}
+		]]>
+	</mx:Script>
+ 
+	<mx:TabNavigator width="100%" height="100%" paddingBottom="3" paddingLeft="3" paddingRight="3"
+					 paddingTop="3" creationPolicy="all">
+		<mx:VBox width="100%" height="100%" label="数据源" horizontalAlign="center">
+			<chart:DataSourceEditor id="_DataSource"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="数据绑定" horizontalAlign="center">
+			<mx:Grid width="60%" verticalGap="1">
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="主标题："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="Title" width="160"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(Title)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="副标题："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="Subtitle" width="160"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(Subtitle)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="Y轴标签值："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="YAxisLabelField" width="160"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(YAxisLabelField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="X轴标签值："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="XAxisLabelField" width="160"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(XAxisLabelField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="分组(图例)值："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="LabelField" width="160"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(LabelField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="柱形值："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="ColumnValueField" width="160"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(ColumnValueField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem verticalAlign="middle">
+						<mx:Label text="柱形标签值："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="ColumnLabelField" width="160"/>
+						<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+										 click="ShowExpressionEditor(ColumnLabelField)"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				
+			</mx:Grid>	
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="柱形" horizontalAlign="center">
+			<mx:Grid verticalGap="1">
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="柱形宽度比："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="ColumnWidthScale" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="柱形填充透明度："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="ColumnFillAlpha" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+						<mx:CheckBox id="ColumnLabelVisible" label="显示柱形标签"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="柱形标签文本颜色："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:ColorPicker id="ColumnLabelTextColor"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:Label text="柱形标签字体大小："/>
+					</mx:GridItem>
+					<mx:GridItem width="100%" verticalAlign="middle">
+						<mx:TextInput id="ColumnLabelFontSize" width="100%"/>
+					</mx:GridItem>
+				</mx:GridRow>
+				<mx:GridRow width="100%">
+					<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+						<mx:CheckBox id="ColumnLabelFontBold" label="柱形标签字体加粗"/>
+					</mx:GridItem>
+				</mx:GridRow>
+			</mx:Grid>	
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="面板" horizontalAlign="center">
+			<chart:ChartCanvasEditor id="_Canvas"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="常规" horizontalAlign="center">
+			<chart:ChartNormalEditor id="_Normal"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="图例" horizontalAlign="center">
+			<chart:ChartLabelEditor id="_Label"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" label="颜色表" horizontalAlign="center">
+			<chart:ColorsEditor width="360" height="100%" id="_Colors"/>
+		</mx:VBox>
+	</mx:TabNavigator>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

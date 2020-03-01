@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	borderStyle="solid" removedFromStage="vbox1_removedFromStageHandler(event)"
+	addedToStage="vbox1_addedToStageHandler(event)">
+	<mx:Script>
+		<![CDATA[
+			[Bindable]
+			public var imageSource:*;
+			
+			protected function vbox1_removedFromStageHandler(event:Event):void
+			{
+				if(img != null)
+					img.source = null;
+			}
+			
+			protected function vbox1_addedToStageHandler(event:Event):void
+			{
+				if(img != null)
+					img.source = imageSource;
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Image id="img" source="{imageSource}" scaleContent="false" scaleX="0.5" scaleY="0.5"/>
+</mx:VBox>

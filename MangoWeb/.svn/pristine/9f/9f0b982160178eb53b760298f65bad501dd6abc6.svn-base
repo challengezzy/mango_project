@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:containers="net.brandonmeyer.containers.*"
+					   xmlns:ext="smartx.flex.components.core.ext.*" showCloseButton="true"
+					   width="880" height="500" close="PopUpManager.removePopUp(this)"
+					   creationComplete="init()" title="规则管理">
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.collections.HashMap;
+			
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityFilterItemPanel;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityFiltersTab;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			[Bindable]
+			public var modelCode:String;
+			
+			[Bindable]
+			public var entityCode:String;
+			
+			[Bindable]
+			public var ruleXml:XML; 
+			
+			[Bindable]
+			public var dataValue:Object;
+			
+			[Bindable]
+			private var modelContentXml:XML;
+			
+			private var currentEntityXml:XML;
+			
+			[Bindable]
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var formService:RemoteObject;
+
+			[Bindable]
+			private var entitiesCache:HashMap = new HashMap();//实体对象集合(key:实体CODE,value:实体XML)
+			[Bindable]
+			private var parentEntityCboDp:ArrayCollection = new ArrayCollection();//父实体集合
+			[Bindable]
+			private var allEntitiesCol:ArrayCollection = new ArrayCollection();
+			
+			private var entitiesArrCache:HashMap = new HashMap();
+			[Bindable]
+			private var entitiesArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var relationsArr:ArrayCollection = new ArrayCollection();
+			
+			private var queryDatagridWindow:QueryDatagridWindow = new QueryDatagridWindow();
+			
+			private var invokeMethodStartTimes:int = 0;
+			
+			private var invokeMethodEndTimes:int = 0;
+			
+			private var importFromRelation:ImportFromRelationDb = new ImportFromRelationDb();
+			//所有继承属性
+			private var allInheritAtt:ArrayCollection = new ArrayCollection();
+			//所有继承显示属性
+			private var allInheritDisplayAtt:ArrayCollection = new ArrayCollection();
+			//所有继承关系
+			private var allInheritRelation:ArrayCollection = new ArrayCollection();
+			
+			public var insertMode:Boolean;
+			
+			private var bamService:RemoteObject;
+			[Bindable]
+			private var allNotAbstractEntities:ArrayCollection = new ArrayCollection();//所有非抽象实体
+			
+			[Bindable]
+			private var allVirtualEntities:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var allAttributes:ArrayCollection = new ArrayCollection();//所有属性（包括继承属性）
+			
+			private var entityFiltersTab:EntityFiltersTab = new EntityFiltersTab();
+			
+			private var entitiesXml:XML;
+			
+			private var columnsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var attributesCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var datasource:String = null;
+			
+			private function init():void{
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+//				bamService.getMetadataTempletContent.addEventListener(ResultEvent.RESULT,getMetadataTempletContentHandler);
+//				bamService.getMetadataTempletContent.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+//					SmartXMessage.show("获取元数据时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+//				});
+		
+				var templete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet("MT_EM_"+this.modelCode);
+				if(templete != null){
+					this.modelContentXml = templete.contentXML;
+					if(modelContentXml != null ){
+						datasource = String(modelContentXml.datasource);
+						this.initModelData();
+						
+						if(ruleXml == null){
+							this.ruleXml = new XML("<rule />");
+						}else{
+							var tempEntityCode:String = String(ruleXml.@toEntityCode);
+							for each(var entityItem:XML in modelContentXml.entities.entity){
+								var entityCode:String = String(entityItem.@code);
+								if(tempEntityCode!=null && tempEntityCode != "" && tempEntityCode==entityCode){
+									ownerRuleEntityCob.selectedItem = entityItem;
+									break;
+								}
+							}
+						}
+						
+						ownerRuleEntityCob_changeHandler(null);
+					}
+				}
+			}
+			
+			private function initModelData():void{
+				entitiesCache.clear();
+				allEntitiesCol.removeAll();
+				entitiesArrCache.clear();
+				entitiesArr.removeAll();
+				relationsArr.removeAll();
+				allNotAbstractEntities.removeAll();
+				allVirtualEntities.removeAll();
+				
+				var entitiesTempArr:ArrayCollection = new ArrayCollection();
+				//先加载所有的实体类
+				for each(var entity:XML in modelContentXml.entities.entity){
+					allEntitiesCol.addItem(entity);
+					if(entity.@isAbstract == "false")
+						allNotAbstractEntities.addItem(entity);
+					var entityObj:Object = {name:entity.@name,code:entity.@code,content:entity,
+						type:entity.@type=="virtual"?"virtualEntity":(entity.@isAbstract=="true"?"abstractEntity":"entity")};
+					entitiesArrCache.put(String(entity.@code),entityObj);
+					entitiesTempArr.addItem(entityObj);
+					
+				}
+				//拼装树结构
+				for each(var entityData:Object in entitiesTempArr){
+					
+					//判断是否有父实体，如果有则加到父实体对象下
+					if(entitiesArrCache.containsKey(String(entityData.content.@parentEntityCode))){
+						var parentEntity:Object = entitiesArrCache.getValue(String(entityData.content.@parentEntityCode));
+						if(parentEntity.hasOwnProperty("children")){
+							ArrayCollection(parentEntity.children).addItem(entityData)
+						}else{
+							var tempArr:ArrayCollection = new ArrayCollection();
+							tempArr.addItem(entityData);
+							parentEntity.children = tempArr;
+						}
+					}else{
+						if(entityData.content.@type == "virtual")
+							allVirtualEntities.addItem(entityData);
+						else
+							entitiesArr.addItem(entityData);
+					}
+					
+				}
+				
+			}
+			
+//			private function getMetadataTempletContentHandler(event:ResultEvent):void{
+//				this.invokeMethodStartTimes++;
+//				var entityMt:MetadataTemplet = event.result as MetadataTemplet;
+//				if(entityMt){
+//					var code:String;
+//					for each(var entityXml:XML in modelContentXml.entities.entity){
+//						if(entityXml.@isAbstract == "true")
+//							continue;
+//						else if(entityXml.@mtcode == entityMt.code){
+//							code = entityXml.@code;
+//							break;
+//						}
+//					}
+//					entitiesCache.put(code,entityMt.contentXML);
+//					
+//					if(code == String(this.currentEntityXml.@code))
+//						this.currentEntityXml = entityMt.contentXML;
+//				}
+//				if(this.invokeMethodStartTimes == this.invokeMethodEndTimes){
+//					entitiesXml = getAssemblyEntitiesXml();
+//					this.initEntityInfo();
+//					this.initRuleData();
+//					OperatingTipUtil.endOperat();
+//				}
+//			}
+			
+			private function initEntityAttributeInfo():void{
+				allAttributes.removeAll();
+				//获取实体所有继承属性
+				allInheritAtt = EntityUtil.getInheritAttributes(this.currentEntityXml,entitiesXml);
+				allAttributes.addAll(allInheritAtt);
+				for each(var att:XML in currentEntityXml.attributes.attribute){
+					allAttributes.addItem(att);
+				}
+				//获取实体所有继承显示属性
+				allInheritDisplayAtt.removeAll();
+				allInheritDisplayAtt = EntityUtil.getInheritAttributes(currentEntityXml,entitiesXml,true);
+				//获取实体所有继承关系
+				allInheritRelation.removeAll();
+				allInheritRelation = EntityUtil.getAllInheritRelation(currentEntityXml,entitiesXml);
+			}
+			
+			private function getAssemblyEntitiesXml():XML{
+				var wrapContentXml:XML = <root><entities /></root>;
+				if(String(this.currentEntityXml.@type) == "virtual"){
+					var virtualEntityXml:XML = this.currentEntityXml;
+					for each(var joinEntity:XML in virtualEntityXml.joinEntities.joinEntity){
+						wrapContentXml.entities.appendChild(MetadataTempletUtil.getInstance().findMetadataTemplet(String(joinEntity.@mtcode)).contentXML);
+					}
+				}else{
+					for each(var key:String in entitiesCache.getKeys()){
+						wrapContentXml.entities.appendChild(entitiesCache.getValue(key));
+					}
+				}
+				return wrapContentXml;
+			}
+			
+			protected function ownerRuleEntityCob_changeHandler(event:ListEvent):void
+			{
+				allEntitiesCol.removeAll();
+				var tempItem:Object = ownerRuleEntityCob.selectedItem;
+				if(tempItem != null){
+					
+					currentEntityXml = tempItem as XML;
+					
+					if(this.ruleXml == null ){
+						this.ruleXml = new XML("<rule />");
+					}
+					this.ruleXml.@toEntityCode = String(currentEntityXml.@code);
+					
+					OperatingTipUtil.startOperat("正在加载实体...");
+					
+					var allInheritEntity:ArrayCollection = EntityUtil.getAllInheritEntity(currentEntityXml,this.modelContentXml);
+					allInheritEntity.addItem(currentEntityXml);
+					
+					entitiesCache.clear();
+					for each(var entity:XML in allInheritEntity){
+						
+						var entityMt:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(String(entity.@mtcode));
+						if(entityMt){
+							var code:String;
+							for each(var entityXml:XML in modelContentXml.entities.entity){
+								if(entityXml.@isAbstract == "true")
+									continue;
+								else if(entityXml.@mtcode == entityMt.code){
+									code = entityXml.@code;
+									break;
+								}
+							}
+							
+							entitiesCache.put(code,entityMt.contentXML);
+							
+							if(code == String(this.currentEntityXml.@code)){
+								this.currentEntityXml = entityMt.contentXML;
+							}
+								
+						}
+					}
+					
+					entitiesXml = getAssemblyEntitiesXml();
+					this.initEntityAttributeInfo();
+					this.initRuleItemInfo();
+					OperatingTipUtil.endOperat();
+					
+				}
+			}
+			
+			protected function groupColumnCbo_changeHandler(event:ListEvent):void
+			{
+				var item:Object = groupColumnCbo.selectedItem;
+				if(item != null){
+					ruleXml.@groupcolumn=item["name"];
+				}
+				
+			}
+			
+			private function addFilterItem():void{
+				if(this.ruleXml == null ){
+					this.ruleXml = new XML("<rule />");
+				}
+				
+				var tempColumn:String ="";
+				if(columnsCol.length > 0){
+					var obj:Object = columnsCol.getItemAt(0);
+					tempColumn = obj["columnName"] as String;
+				}
+				
+				var itemXml:XML = <item enabled="true" type="equalValue" column="" logicalOperator="AND" relationalOperator="=" value="" label="" />;
+				itemXml.@column = tempColumn;
+				
+				ruleXml.appendChild(itemXml);
+				
+				var efip:EntityFilterItemPanel = new EntityFilterItemPanel();
+				efip.itemXml = itemXml;
+				efip.modelCode = this.modelCode;
+				efip.datasource = this.datasource;
+				efip.allFieldsCol = columnsCol;
+				efip.itemsVBox = itemsVbox;
+//				efip.formService = this.formService;
+				efip.entitiesXml = this.entitiesXml;
+				itemsVbox.addChild(efip);
+			}
+			
+			private function initRuleItemInfo():void{
+				columnsCol.removeAll();
+				for each( var attributeItem:XML in currentEntityXml.attributes.attribute){
+					var name:String = String(attributeItem.@name);
+					var type:String = String(attributeItem.@type);
+					var label:String = String(attributeItem.@label);
+					var category:String = String(attributeItem.@category);
+					var columnItem:Object;
+					if(String(currentEntityXml.@type) == "virtual"){//如果是虚拟实体
+						columnItem = new Object();
+						columnItem["columnName"] = String(attributeItem.@expression);
+						columnItem["columnAlias"] = name;
+						columnItem["columnType"] = type;
+						columnItem["columnLabel"] = label;
+//						columnItem["columnRef"] = refDesc;
+						columnItem["category"] = category;
+						if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="dictionary"){
+							columnItem["dictionaryRefCode"] = String(attributeItem.@dictionaryRefCode);
+						}else if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="entity"){
+							columnItem["refEntity"] = String(attributeItem.@refEntity);
+							columnItem["refEntityAtt"] = String(attributeItem.@refEntityAtt);
+							columnItem["refEntityShowAtt"] = String(attributeItem.@refEntityShowAtt);
+							columnItem["modelCode"] = this.modelCode;
+							columnItem["datasource"] = datasource;
+						}
+						columnsCol.addItem(columnItem);
+					}else{
+						var mappingItems:XMLList = currentEntityXml.mappingInfo.attributeMapping.map.(@attributeName == attributeItem.@name);
+						var columnName:String = name;
+						if(mappingItems.length() > 0){
+							columnName = String(mappingItems[0].@columnName);
+						}
+						    
+							columnItem = new Object();
+							columnItem["columnName"] = columnName;
+							columnItem["columnAlias"] = name;
+							columnItem["columnType"] = type;
+							columnItem["columnLabel"] = label;
+//							columnItem["columnRef"] = refDesc;
+							columnItem["category"] = category;
+							if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="dictionary"){
+								columnItem["dictionaryRefCode"] = String(attributeItem.@dictionaryRefCode);
+							}else if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="entity"){
+								columnItem["refEntity"] = String(attributeItem.@refEntity);
+								columnItem["refEntityAtt"] = String(attributeItem.@refEntityAtt);
+								columnItem["refEntityShowAtt"] = String(attributeItem.@refEntityShowAtt);
+								columnItem["modelCode"] = this.modelCode;
+								columnItem["datasource"] = datasource;
+							}
+							columnsCol.addItem(columnItem);
+//						}
+					}
+				}
+				
+				for each(var parentAttXml:XML in allInheritAtt){
+					var parentAttName:String = String(parentAttXml.@name);
+					var parentAttType:String = String(parentAttXml.@type);
+					var parentAttLabel:String = String(parentAttXml.@label);
+//					var parentAttRefDesc:String = String(parentAttXml.@dictionaryRef);
+					var parentCategory:String = String(parentAttXml.@category);
+					var parenColumnItem:Object = new Object();
+					parenColumnItem["columnName"] = parentAttName;
+					parenColumnItem["columnAlias"] = parentAttName;
+					parenColumnItem["columnType"] = parentAttType;
+					parenColumnItem["columnLabel"] = parentAttLabel;
+//					parenColumnItem["columnRef"] = parentAttRefDesc;
+					parenColumnItem["category"] = parentCategory;
+					if(!BAMUtil.isEmpty(parentCategory)&&parentCategory.toLowerCase()=="dictionary"){
+						parenColumnItem["dictionaryRefCode"] = String(parentAttXml.@dictionaryRefCode);
+					}else if(!BAMUtil.isEmpty(parentCategory)&&parentCategory.toLowerCase()=="entity"){
+						parenColumnItem["refEntity"] = String(parentAttXml.@refEntity);
+						parenColumnItem["refEntityAtt"] = String(parentAttXml.@refEntityAtt);
+						parenColumnItem["refEntityShowAtt"] = String(parentAttXml.@refEntityShowAtt);
+						parenColumnItem["modelCode"] = this.modelCode;
+						parenColumnItem["datasource"] = datasource;
+					}
+					
+					
+					columnsCol.addItem(parenColumnItem);
+				}
+				
+				for each(var relationXml:XML in currentEntityXml.relations.relation){
+					var relationName:String = String(relationXml.@name);
+					var relationCode:String = String(relationXml.@code);
+					var toEntityCode:String = String(relationXml.@toEntityCode);
+					var entityObj:Object = null;
+					if(!BAMUtil.isEmpty(toEntityCode)){
+						var tempTemplete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(BAMConst.ENTITY_MT_PREFIX+this.modelCode+"_"+toEntityCode);
+						if(tempTemplete != null ){
+							entityObj = tempTemplete.contentXML;
+						}
+					}
+					
+					var relationItem:Object = new Object();
+					relationItem["columnName"] = relationCode;
+					relationItem["columnAlias"] = relationCode;
+					relationItem["columnType"] = "relationItem";
+					relationItem["columnLabel"] = relationName;
+//					relationItem["columnRef"] = "";
+					relationItem["category"] = "relation";
+					relationItem["toEntity"] = entityObj;
+					columnsCol.addItem(relationItem);
+				}
+				
+				for each(var parentRelation:XML in allInheritRelation){
+					
+					var parentRelationName:String = String(parentRelation.@name);
+					var parentRelationCode:String = String(parentRelation.@code);
+					var parentToEntityCode:String = String(parentRelation.@toEntityCode);
+					var tempEntityObj:Object = null;
+					if(entitiesCache != null ){
+						var tempTemplete2:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(BAMConst.ENTITY_MT_PREFIX+this.modelCode+"_"+parentToEntityCode);
+						if(tempTemplete2 != null ){
+							tempEntityObj = tempTemplete2.contentXML;
+						}
+					}
+					
+					var parentRelationItem:Object = new Object();
+					parentRelationItem["columnName"] = parentRelationCode;
+					parentRelationItem["columnAlias"] = parentRelationCode;
+					parentRelationItem["columnType"] = "relationItem";
+					parentRelationItem["columnLabel"] = parentRelationName;
+//					parentRelationItem["columnRef"] = "";
+					parentRelationItem["category"] = "relation";
+					parentRelationItem["toEntity"] = tempEntityObj;
+					columnsCol.addItem(parentRelationItem);
+				}
+				
+				attributesCol.removeAll();
+				var emptyObj:Object = new Object();
+				emptyObj["name"] = "";
+				attributesCol.addItem(emptyObj);
+				for each(var attXml:XML in currentEntityXml.groupAttributes.groupAttribute){
+					var item:Object = new Object();
+					var attName:String = attXml.@name;
+					item["name"] = attName;
+					attributesCol.addItem(item);
+				}
+				
+				var groupColumnName:String = String(ruleXml.@groupcolumn);
+				for each(var obj:Object in attributesCol){
+					var tempName:String = obj["name"];
+					if(!BAMUtil.isEmpty(groupColumnName)&&!BAMUtil.isEmpty(tempName)&&tempName==groupColumnName){
+						groupColumnCbo.selectedItem = obj;
+						break;
+					}
+				}
+				groupColumnCbo_changeHandler(null);
+				
+				itemsVbox.removeAllChildren();
+				for each( var ruleItem:XML in ruleXml.item){
+					var efip:EntityFilterItemPanel = new EntityFilterItemPanel();
+					efip.itemXml = ruleItem;
+					efip.modelCode = this.modelCode;
+					efip.datasource = this.datasource;
+					efip.allFieldsCol = columnsCol;
+					efip.itemsVBox = itemsVbox;
+					efip.entitiesXml = this.entitiesXml;
+					itemsVbox.addChild(efip);
+				}
+				
+			}
+			
+			protected function linkbutton1_clickHandler(event:MouseEvent):void
+			{
+				groupColumnCbo.selectedItem = null;
+				if(ruleXml!=null){
+					ruleXml.@groupcolumn = "";
+				}
+			}
+			
+			protected function okClickHandler(event:MouseEvent):void
+			{
+				this.dataValue["RULECONTENT"] = this.ruleXml.toXMLString();
+				this.dataValue["ENTITYCODE"] = String(this.ruleXml.@toEntityCode);
+				PopUpManager.removePopUp(this);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3" >
+		<mx:HBox width="100%" horizontalAlign="center" borderStyle="solid" >
+			<mx:Label width="25%" text="所属实体"/><mx:ComboBox id="ownerRuleEntityCob" width="50%" change="ownerRuleEntityCob_changeHandler(event)" dataProvider="{modelContentXml.entities.entity}" labelField="@name"/>
+			<mx:Spacer width="5" ></mx:Spacer>
+			<mx:Label width="25%" text="分组字段"/><mx:ComboBox id="groupColumnCbo" width="50%" change="groupColumnCbo_changeHandler(event)" dataProvider="{attributesCol}" labelField="name"/><mx:LinkButton toolTip="清除分组字段" click="linkbutton1_clickHandler(event)" icon="{AssetsFileLib.closeIcon}" />
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="left">
+			<mx:LinkButton width="20" height="20" click="addFilterItem()" icon="{AssetsFileLib.addIcon}" toolTip="增加规则项"/>
+		</mx:HBox>
+		<mx:HRule width="100%"/>
+		<mx:VBox id="itemsVbox" width="100%" height="100%"/>
+		<mx:HBox width="100%" horizontalAlign="center" >
+			<mx:Button label="确定" icon="{AssetsFileLib.okIcon}" click="okClickHandler(event)"/>
+			<mx:Button label="取消" click="PopUpManager.removePopUp(this);" icon="{AssetsFileLib.closeIcon}"/>
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

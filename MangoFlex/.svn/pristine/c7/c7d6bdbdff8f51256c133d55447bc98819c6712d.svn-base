@@ -1,0 +1,691 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" xmlns:ns1="smartx.flex.components.*" creationComplete="init()" xmlns:core="smartx.flex.components.core.*"
+		 preinitialize="preinit()">
+	<fx:Metadata>		       
+		[Event(name='itemChange',type='smartx.flex.components.event.StyleTemplateEvent')]
+	</fx:Metadata>
+	<fx:Declarations>
+		<mx:HBox width="100%" id="treeButtonBox">
+			<mx:PopUpMenuButton label="操作" icon="{AssetsFileLib.operationIcon}" id="operationButton" dataProvider="{operationList}" openAlways="true"/>
+			<mx:HBox width="100%"  horizontalAlign="right" paddingTop="3" horizontalGap="2" verticalAlign="middle" >
+				<mx:TextInput id="searchInfo" borderStyle="solid" maxWidth="100" width="85%" toolTip="输入要查询的内容" keyUp="searchInfo_keyUpHandler(event)" />
+				<mx:LinkButton id="searchBtn" icon="{AssetsFileLib.quicQueryIcon}" click="clickHandler()" toolTip="查询出结果后,按'F'键或'='键可至下一条查询结果" />
+			</mx:HBox>
+		</mx:HBox>
+		<fx:Object id="insertButton" label="新建" handler="{createButtonClicked}" icon="{AssetsFileLib.newIcon}" rightClick="true"/>
+		<fx:Object id="refreshButton" label="刷新" handler="{refresh}" icon="{AssetsFileLib.refreshIcon}" rightClick="true"/>
+		<fx:Object id="nextBtn" label="下一个" handler="{selectSearchItem}" icon="{AssetsFileLib.nextIcon}" rightClick="true"/>
+
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[			
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.controls.treeClasses.TreeItemRenderer;
+			import mx.core.Container;
+			import mx.core.UITextField;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.events.TreeEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletVO;
+			[Bindable]
+        	public var templetCode:String;
+			[Bindable]
+        	public var loadAll:Boolean = true;
+        	[Bindable]
+        	public var parentFieldName:String;
+        	[Bindable]
+        	public var seqFieldName:String;
+        	[Bindable]
+        	private var pkFieldName:String;
+        	[Bindable]
+        	public var labelFieldName:String = "NAME";
+        	private var formService:RemoteObject;
+        	[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			private var templetVO:TempletVO; 
+			[Bindable]
+			public var editable:Boolean = true;
+			[Bindable]
+			public var insertBfIncCard:String;
+			[Bindable]
+			public var insertAfIncCard:String;
+			[Bindable]
+			public var updateBfIncCard:String;
+			[Bindable]
+			public var updateAfIncCard:String;
+			[Bindable]
+			public var deleteBfIncCard:String;
+			[Bindable]
+			public var deleteAfIncCard:String;
+			[Bindable]
+			public var deleteBfInc:String;
+			[Bindable]
+			public var deleteAfInc:String;
+			
+			[Bindable]
+			public var clientInsertBfIncCard:String;
+			[Bindable]
+			public var clientInsertAfIncCard:String;
+			[Bindable]
+			public var clientUpdateBfIncCard:String;
+			[Bindable]
+			public var clientUpdateAfIncCard:String;
+			[Bindable]
+			public var clientDeleteBfIncCard:String;
+			[Bindable]
+			public var clientDeleteAfIncCard:String;
+			
+			//added 2011/04/06
+			[Binable]
+			public var typeTempletCodeMap:Hashtable = new Hashtable();
+			[Bindable]
+			public var typeFieldName:String = "TYPE";
+			[Bindable]
+			public var fkFieldName:String;//关联子模板的外键名称，默认为主模板的主键
+			[Bindable]
+			public var templetCodeParentFieldNameMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var cardPanelMap:Hashtable = new Hashtable();
+			
+			private var cardPanel:BillCardPanel;
+			
+			private var typeChooserWindow:ComboBoxWindow = new ComboBoxWindow();
+			
+			public var isEditMode:Boolean = true;
+			
+			private var selectedTypeText:String;
+			[Bindable]
+			public var typeLabelMap:Hashtable = new Hashtable();
+			
+			[Bindable]
+			public var operationList:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var resultArray:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var labelNameValue:String = null;
+			
+			public var isShowInsertBtn:Boolean = true;//是否显示新建按钮
+			
+			public var initQueryCondition:String;
+			
+			private function preinit():void{
+				//初始化操作按钮
+				if(editable){
+					isShowInsertBtn?operationList.addItem(insertButton):null;
+					operationList.addItem(refreshButton);
+				}
+			}
+			
+			private function init():void{
+				if(templetCode == null)
+		        	throw Error("元原模板编号不能为null");
+		        if(parentFieldName == null){
+        			throw new Error("parentFieldName不能为空");
+        		}
+				
+				treeBox.addChildAt(treeButtonBox,0);
+				
+        		formService = new RemoteObject(destination);
+		        if(endpoint!=null)
+		        	formService.endpoint = endpoint;
+		        formService.executeUpdateByDS.addEventListener(ResultEvent.RESULT,deleteHandler);
+		    	formService.executeUpdateByDS.addEventListener(FaultEvent.FAULT,deleteFaultHandler);
+        		formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+		        formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+		        formService.getTempletVO(templetCode);
+				
+				addEventListener(KeyboardEvent.KEY_UP,keyUpHander);
+				
+		        treePanel.tree.addEventListener(ItemClickEvent.ITEM_CLICK,itemClick);
+		        
+		        if(!editable)
+					insertVBox.removeChild(buttonBar);
+		        
+		        treePanel.tree.allowMultipleSelection = true;
+				
+				for each(var type2:String in typeTempletCodeMap.getKeySet()){
+					var templetcode:String = typeTempletCodeMap.find(type2);
+					formService.getTempletVO(templetcode);
+				}
+				
+				typeChooserWindow.title = "选择要新建的节点类型";
+				typeChooserWindow.confirmFunc = typeChooserConfirm;
+				typeChooserWindow.width = 300;
+				typeChooserWindow.height = 180;
+				var typeArray:ArrayCollection = new ArrayCollection();
+				
+				for each(var type:String in typeTempletCodeMap.getKeySet()){
+					var temp:Object = new Object();
+					var tempObj:* = typeLabelMap.find(type);
+					if(tempObj)
+						temp.name = String(tempObj);
+					else
+						temp.name = type;
+					temp.templetCode = typeTempletCodeMap.find(type);
+					typeArray.addItem(temp);
+				}
+				typeChooserWindow.dataProvider = typeArray;
+				
+				var operationMenu:Menu = operationButton.popUp as Menu;
+				operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+				//添加右键菜单
+				if(treePanel.rightClickMenu != null){
+					treePanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler,false,0,true);
+					for each(var obj:* in operationList){
+						if(obj.rightClick){
+							//需要添加到右键菜单
+							treePanel.rightClickMenuItems.push(obj);
+						}
+					}
+					treePanel.rightClickMenuItems.push(nextBtn);
+				}
+				//没有操作菜单是，去除操作按钮
+				if(operationList.length == 0){
+					if(operationButton && treeButtonBox.contains(operationButton) )
+						treeButtonBox.removeChild(operationButton);
+				}
+			}
+			
+			protected function operationButton_itemClickHandler(event:MenuEvent):void
+			{
+				var item:* = event.item;
+				if(item.handler != null)
+					item.handler();
+			}
+			
+			private function typeChooserConfirm():void{
+				var typeObject:* = typeChooserWindow.getSelectedItem();
+				if(typeObject != null){
+					selectedTypeText = String(typeObject.name);
+					var tempCardPanel:BillCardPanel = cardPanelMap.find(typeObject.templetCode) as BillCardPanel;
+					createItem(tempCardPanel);
+				}
+				PopUpManager.removePopUp(typeChooserWindow);
+			}
+			private function getTempletVOHandler(event:ResultEvent):void{
+		        var result:TempletVO = event.result as TempletVO;
+				if(result.templetcode == templetCode){
+					//main templet
+					templetVO = result;
+			        var tablename:String = templetVO.tablename;
+			        var datasource:String = templetVO.datasourcename;
+			        pkFieldName = templetVO.pkname;
+					if(fkFieldName == null)
+						fkFieldName = pkFieldName;
+			        treePanel.treeSql = "select * from "+tablename;
+					if(initQueryCondition != null){
+						var clause:String = StringUtils.parseVariable(initQueryCondition,ClientEnviorment.getInstance().getVarMap());
+						treePanel.treeSql +=" where "+clause;
+					}
+			        treePanel.datasource = datasource;
+			        treePanel.load();
+				}
+				//build cardpanel
+				var cp:BillCardPanel = new BillCardPanel();
+				cp.destination = destination;
+				cp.endpoint = endpoint;
+				cp.templetCode = result.templetcode;
+				cp.debugMode = debugMode;
+				cp.editable = editable;
+				cp.percentHeight = 100;
+				cp.percentWidth = 100;
+				cp.addEventListener(BillCardPanelEvent.INITCOMPLETE,cardPanelInited);
+				cp.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,onSaveSuccessful);
+				cp.isInitCompleted = false;
+				cp.insertBfInterceptor = insertBfIncCard;
+				cp.insertAfInterceptor = insertAfIncCard;
+				cp.updateBfInterceptor = updateBfIncCard;
+				cp.updateAfInterceptor = updateAfIncCard;
+				cp.clientInsertBfIncCard = clientInsertBfIncCard;
+				cp.clientInsertAfIncCard = clientInsertAfIncCard;
+				cp.clientUpdateBfIncCard = clientUpdateBfIncCard;
+				cp.clientUpdateAfIncCard = clientUpdateAfIncCard;
+				
+				cardPanelMap.add(cp.templetCode,cp);
+		    }
+			
+			private function cardPanelInited(event:BillCardPanelEvent):void{
+				var billcardpanel:BillCardPanel = event.target as BillCardPanel;
+				if(billcardpanel != null) {
+					if(isEditMode)
+						handleCardPanelByEditItem();
+					else
+						handleCardPanelByCreateItem();
+				}
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				SmartXMessage.show("Error",SmartXMessage.MESSAGE_ERROR,event.fault.faultString,this);
+			}
+			
+			private function deleteFaultHandler(event:FaultEvent):void{   
+				SmartXMessage.show("删除节点失败！",SmartXMessage.MESSAGE_ERROR ,event.fault.faultString, this);
+			}
+			
+			private function itemClick(event:ListEvent):void{
+				var item:Object = treePanel.tree.selectedItem;
+				var type:String = item[typeFieldName] as String;
+				var temp:* = typeLabelMap.find(type);
+				if(temp)
+					selectedTypeText = String(temp);
+				else
+					selectedTypeText = type;
+				var thisTempletCode:String = typeTempletCodeMap.find(type) as String;
+				if(thisTempletCode == null){
+					//no type found, use default card panel
+					thisTempletCode = templetCode;
+				}
+				var tempCardPanel:BillCardPanel = cardPanelMap.find(thisTempletCode) as BillCardPanel;
+				if(tempCardPanel != cardPanel){
+					cardPanelBox.removeAllChildren();
+					cardPanelBox.addChild(tempCardPanel);
+					cardPanel = tempCardPanel;
+				}
+				isEditMode = true;
+				if(cardPanel.isInitCompleted)
+					handleCardPanelByEditItem();
+			}
+			
+			private function save():void{
+				if(cardPanel.getDataValue() != null)
+					cardPanel.save();
+				
+				//insertVBox.visible = false;
+			}
+			
+			//add by zhangzz 20110318 begin
+			private function saveAndCreate():void{
+				if(cardPanel.getDataValue() != null)
+					cardPanel.save();
+				createItem(cardPanel);
+			}
+			//add by zhangzz 20110318 end
+			
+			private function deleteItems():void{
+				var items:Array = treePanel.tree.selectedItems;
+				if(items == null || items.length == 0){
+					SmartXMessage.show("请选择要删除的节点");
+					return;
+				}
+
+				var text:String="";
+				if(loadAll)
+					text = "是否确认直接删除当前选中的节点以及其所有子节点？";
+				else
+					text = "是否确认直接删除当前选中的节点？";
+				
+				SmartXMessage.show(text,SmartXMessage.MESSAGE_CONFIRM,null,this,function(event:CloseEvent):void{
+					if(event.detail == Alert.YES){
+						var allItems:ArrayCollection = new ArrayCollection();//遍历获取所有子节点
+						for each(var item:Object in items){
+							getAllItems(item,allItems,loadAll);//如果是全部加载的，则可以递归删除子节点，否则，只删除当前节点
+						}
+						if(allItems.length == 0)
+							return;
+						var isFirst:Boolean = true;
+						var itemsToDeleteStr:String = "";
+						for each(var itemToDelete:Object in allItems){
+							if(isFirst){
+								itemsToDeleteStr += itemToDelete[fkFieldName];
+								isFirst = false;
+							}
+							else
+								itemsToDeleteStr += ","+itemToDelete[fkFieldName];
+						}				
+						var sql:String = "delete from "+templetVO.savedtablename+" where "+templetVO.pkname+" in("+itemsToDeleteStr+")";
+						trace("delete sql:"+sql);
+						var values:Object = new Object();
+						values["menuids"] = itemsToDeleteStr;
+						values["flag"] = "delete";
+						values["datasource"] = templetVO.datasourcename;
+						formService.executeUpdateByDS(templetVO.datasourcename,sql,values,deleteBfInc,deleteAfInc);
+					}
+					else if(event.detail == Alert.NO){
+						return;
+					}
+				});
+			}
+			
+			private function getAllItems(root:Object,result:ArrayCollection,isRecursive:Boolean):void{
+				result.addItem(root);
+				if(isRecursive && root.children != null){
+					for each(var item:Object in root.children){
+						getAllItems(item,result,true);
+					}
+				}
+			}
+			
+			private function deleteHandler(event:ResultEvent):void{
+				SmartXMessage.show("删除节点成功!");
+				treePanel.load();
+				cardPanel.setDataValue(new Object());
+				if(insertVBox.visible == true)
+					insertVBox.visible = false;
+				clearExtendCanvasContent();
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.ITEMCHANGE));
+			}
+			
+			private function createItem(newCardPanel:BillCardPanel):void{
+				//modify by zhangzz 20110328
+				//Alert.show("请在右边窗口编辑新节点的内容，并点击保存");
+				
+				newCardPanel.insertBfInterceptor = insertBfIncCard;
+				newCardPanel.insertAfInterceptor = insertAfIncCard;
+				newCardPanel.updateBfInterceptor = updateBfIncCard;
+				newCardPanel.updateAfInterceptor = updateAfIncCard;
+				
+				newCardPanel.clientInsertBfIncCard = clientInsertBfIncCard;
+				newCardPanel.clientInsertAfIncCard = clientInsertAfIncCard;
+				newCardPanel.clientUpdateBfIncCard = clientUpdateBfIncCard;
+				newCardPanel.clientUpdateAfIncCard = clientUpdateAfIncCard;
+				
+				if(newCardPanel != cardPanel){
+					cardPanelBox.removeAllChildren();
+					cardPanelBox.addChild(newCardPanel);
+					cardPanel = newCardPanel;
+				}
+				isEditMode = false;
+				if(cardPanel.isInitCompleted){
+					handleCardPanelByCreateItem();
+				}
+				
+			}
+			
+			private function handleCardPanelByCreateItem():void{
+				insertVBox.visible = true;
+				if(selectedTypeText != null && selectedTypeText != "")
+					info.text = "新增记录("+selectedTypeText+")"
+				else
+					info.text = "新增记录";
+				var obj:Object = new Object();
+				cardPanel.setDataValue(obj);
+				var parent:Object = treePanel.tree.selectedItem;
+				if(parent != null){
+					var thisParentFieldName:String = templetCodeParentFieldNameMap.find(cardPanel.templetCode) as String;
+					if(thisParentFieldName == null)
+						thisParentFieldName = parentFieldName;//默认为主模板的父键ID
+					TempletDataUtil.setTempletValue(thisParentFieldName,parent[fkFieldName],obj,cardPanel.getTempletVO(),function():void{
+						cardPanel.setDataValue(obj);
+					},null,endpoint);
+				}
+				cardPanel.insertMode = true;
+				clearExtendCanvasContent();
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.ITEMCHANGE));
+			}
+			
+			private function handleCardPanelByEditItem():void{
+				if(selectedTypeText != null && selectedTypeText != "")
+					info.text = "编辑记录("+selectedTypeText+")"
+				else
+					info.text = "编辑记录";
+				if(insertVBox.visible == false)
+					insertVBox.visible = true;
+				var item:Object = treePanel.tree.selectedItem;
+				cardPanel.addEventListener(BillCardPanelEvent.SETDATAVALUE_COMPLETE,setDataValue_completeHandler);
+				cardPanel.initQueryCondition = cardPanel.getTempletVO().pkname+"='"+item[fkFieldName]+"'";
+				cardPanel.insertMode = false;
+				cardPanel.setDataValueByQuery();
+				clearExtendCanvasContent();
+			}
+			
+			private function setDataValue_completeHandler(event:BillCardPanelEvent):void{
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.ITEMCHANGE));
+				cardPanel.removeEventListener(BillCardPanelEvent.SETDATAVALUE_COMPLETE,setDataValue_completeHandler);
+			}
+			
+			private function createButtonClicked():void{
+				if(typeTempletCodeMap.size == 0){
+					var tempCardPanel:BillCardPanel = cardPanelMap.find(templetCode) as BillCardPanel;
+					createItem(tempCardPanel);
+				}
+				else{
+					//需要选择类型
+					PopUpManager.addPopUp(typeChooserWindow,this,true);
+					PopUpManager.centerPopUp(typeChooserWindow);
+				}
+			}
+			
+			private function onSaveSuccessful(event:BillCardPanelEvent):void{
+				cardPanel.insertMode = false;
+				if(selectedTypeText != null && selectedTypeText != "")
+					info.text = "编辑记录("+selectedTypeText+")"
+				else
+					info.text = "编辑记录";
+				isEditMode = true;
+				treePanel.load();
+			}
+			
+			public function setExtendCanvasContent(content:Container,percentHeight:int):void{
+				extendCanvas.removeAllChildren();
+				extendCanvas.percentHeight = percentHeight;
+				cardPanelBox.percentHeight = 100 - percentHeight;
+				extendCanvas.addChild(content);
+			}
+			
+			public function clearExtendCanvasContent():void{
+				extendCanvas.removeAllChildren();
+				extendCanvas.percentHeight = 0;
+				cardPanelBox.percentHeight = 100;
+			}
+			
+			private function refresh():void{
+				treePanel.load();
+				clearExtendCanvasContent();
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.ITEMCHANGE));
+			}
+			
+			//add by zhangzz 20110411 begin
+			private function deleteData():void{
+				SmartXMessage.show("是否确认直接删除当前记录？",SmartXMessage.MESSAGE_CONFIRM,null,this,function(event:CloseEvent):void{
+					if(event.detail == Alert.YES){
+						cardPanel.addEventListener(BillCardPanelEvent.DELETESUCCESSFUL,deleteSuccessful);
+						
+						cardPanel.deleteBfInterceptor = deleteBfIncCard;
+						cardPanel.deleteAfInterceptor = deleteAfIncCard;
+						
+						cardPanel.clientDeleteBfIncCard = clientDeleteBfIncCard;
+						cardPanel.clientDeleteAfIncCard = clientDeleteAfIncCard;
+						
+						cardPanel.deleteData();
+					}
+					else if(event.detail == Alert.NO){
+						return;
+					}
+				});
+			}
+			
+			private function deleteSuccessful(event:BillCardPanelEvent):void{
+				treePanel.load();
+				cardPanel.setDataValue(new Object());
+				if(insertVBox.visible == true)
+					insertVBox.visible = false;
+				clearExtendCanvasContent();
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.ITEMCHANGE));
+			}
+			//add by zhangzz 20110411 end
+			
+			protected function clickHandler():void
+			{
+				this.focusManager.setFocus(treePanel.tree);
+				labelNameValue = searchInfo.text;
+				resultArray.removeAll();
+				selectSearchItem();
+			}
+			
+			private function searchFatherItem(parentId:String,treeMap:Object):Object{
+				var fatherItem:Object = null;
+				if(parentId != null && parentId != ""){
+					var objInfo:Object = ObjectUtil.getClassInfo(treeMap);
+					var fieldNameArray:Array = objInfo["properties"] as Array;
+					for each(var qName:QName in fieldNameArray){
+						var itemObj:Object = treeMap[qName.localName];
+						var idValue:String = itemObj[pkFieldName] as String;
+						if(idValue == parentId){
+							fatherItem = itemObj;
+							break;
+						}
+					}
+				}
+				return fatherItem;
+			}
+			
+			private function selectSearchItem():void{
+				if(labelNameValue == null || StringUtil.trim(labelNameValue) == ""){
+					return;
+				}
+				 var selectItem:Object = findNextItem(labelNameValue,treePanel.getTreeData());
+				if(selectItem != null){
+					var event:ListEvent = new ListEvent(ListEvent.ITEM_CLICK);
+					openFatherItem(selectItem[parentFieldName],treePanel.getTreeMap(),event);
+					resultArray.addItem(selectItem);
+					
+					treePanel.tree.selectedItem = selectItem;
+					var index:int = treePanel.tree.selectedIndex;
+					treePanel.tree.scrollToIndex(index);
+					
+					
+					if(!treePanel.tree.isItemOpen(selectItem)){
+//						openFatherItem(selectItem[parentFieldName],treePanel.getTreeMap(),event);
+						treePanel.tree.expandItem(selectItem,true,false,true,event);
+					}
+					treePanel.tree.dispatchEvent(event);
+					
+					if(!loadAll){
+						if(!treePanel.tree.isItemOpen(selectItem)){
+							treePanel.tree.expandItem(selectItem,true,false,true,event);
+						}
+					}
+					
+				}
+			}
+			
+			private function openFatherItem(parentId:String,treeMap:Object,event:Event):void{
+			 	var obj:Object = searchFatherItem(parentId,treeMap);
+				if(obj != null ){
+					if(!treePanel.tree.isItemOpen(obj)){
+						treePanel.tree.expandItem(obj,true,false,true,event);
+					}
+					openFatherItem(obj[parentFieldName],treeMap,event);
+				}else{
+					return;
+				}
+				
+			}
+			
+			protected function keyUpHander(event:KeyboardEvent):void{
+				
+				if(event.keyCode == Keyboard.PAGE_DOWN || event.keyCode == Keyboard.EQUAL || event.keyCode == Keyboard.F){
+					selectSearchItem();
+				}
+				
+//				else if (event.keyCode == Keyboard.PAGE_UP || event.keyCode == Keyboard.MINUS){
+//					selectPreviousSearchItem();
+//				}
+				
+			}
+			
+//			private function getNextSearchItem(index:int):Object{
+//				
+//				if(resultArray.length <= 0){
+//					return null;
+//				}
+//				
+//				if(index >= resultArray.length){
+//					currentIndex = 0;
+//					return getNextSearchItem(currentIndex);
+//				}else{
+//					currentIndex = index+1;
+//					return resultArray.getItemAt(index) as Object;
+//				}
+//			}
+			
+			private function findNextItem(labelValue:String,dataProvider:ArrayCollection):Object{
+				var tempItem:Object = null;
+				for each(var obj:Object in dataProvider){
+					var tempLabelValue:String = obj[labelFieldName];
+					if( tempLabelValue != null && tempLabelValue.indexOf(labelValue)>=0  && !resultArray.contains(obj) ){
+						tempItem = obj;
+						break;
+					}
+					var childData:ArrayCollection = obj.children;
+					if(childData != null){
+						tempItem = findNextItem(labelValue,childData);
+						if( tempItem != null && !resultArray.contains(tempItem) ){
+							break;
+						}
+					}
+				}
+				return tempItem;
+			}
+			
+			protected function searchInfo_keyUpHandler(event:KeyboardEvent):void
+			{
+				var currentOjb:Object = event.currentTarget;
+				if(currentOjb is TextInput){
+					var textInput:TextInput = currentOjb as TextInput;
+					if(textInput.id == "searchInfo" && event.keyCode == Keyboard.ENTER){
+						clickHandler();
+					}
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:HDividedBox width="100%" height="100%" creationPolicy="all">
+		<mx:VBox width="20%" height="100%" id="treeBox">
+			<!--mx:HBox width="100%" borderStyle="solid" id="treeButtonBox">
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="createButtonClicked()" enabled="{editable}"/>
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteItems()" enabled="{editable}"/>
+				<mx:LinkButton icon="{AssetsFileLib.refreshIcon}" width="22" height="22" toolTip="刷新" click="refresh()"/>
+			</mx:HBox-->
+			<core:BillTreePanel id="treePanel" destination="{destination}" endpoint="{endpoint}" 
+			loadAll="{loadAll}" parentFieldName="{parentFieldName}" 
+			pkFieldName="{pkFieldName}" labelFieldName="{labelFieldName}" seqFieldName="{seqFieldName}" width="100%" height="100%"/>
+		</mx:VBox>
+		
+		<mx:VBox width="80%" height="100%" id="insertVBox" visible="false">
+			<mx:HBox width="100%" id="buttonBar">
+				<mx:Button label="保存" toolTip="保存当前信息"  click="save()" icon="{AssetsFileLib.saveIcon}"/>
+				<mx:Button id="deleteBtn" label="删除" toolTip="删除当前节点" click="deleteData()" icon="{AssetsFileLib.delete2Icon}"/>
+			</mx:HBox>
+			<mx:Label id="info"/>
+			<mx:VBox width="100%" height="100%" id="cardPanelBox">
+				
+			</mx:VBox>
+			<mx:Canvas width="100%" height="0" id="extendCanvas"/>
+		</mx:VBox>
+	</mx:HDividedBox>
+	
+</mx:VBox>

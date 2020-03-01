@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.utils.getDefinitionByName;
+			
+			import mx.containers.TitleWindow;
+			import mx.controls.Button;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.ext.DataValidator;
+			import smartx.flex.components.itemcomponent.ext.MTCardForRefPanel;
+			import smartx.flex.components.styletemplate.ext.DebugUtil;
+			import smartx.flex.components.styletemplate.ext.ListEmbedButtonGroupComponent;
+			import smartx.flex.components.styletemplate.ifc.CardButtonListener;
+			import smartx.flex.components.styletemplate.ifc.ListButtonListener;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			public var metadataTemplet:MetadataTemplet;
+			public var endpoint:String;
+			private var listenerMap:Hashtable = new Hashtable();
+			private var iconComponentArray:Array = [];
+			
+			private var firstAutoQuery:Boolean = false;
+
+			
+			private function init():void{
+				if(metadataTemplet == null)
+					throw new Error("元数据模板不能为空");
+				var xml:XML = metadataTemplet.contentXML;
+				var styletemplate:StyleTemplate02 = new StyleTemplate02();
+				if(xml.templetCode.length() == 0)
+					throw new Error("templetCode不能为空");
+				styletemplate.templetCode = xml.templetCode;
+				styletemplate.editable = false;
+				if(endpoint != null)
+					styletemplate.endpoint = endpoint;
+				if(xml.editable.length() > 0)
+					styletemplate.editable = xml.editable=="true"?true:false;
+				styletemplate.percentWidth = 100;
+				if(xml.percentWidth.length() > 0 && String(xml.percentWidth) != "")
+					styletemplate.percentWidth = xml.percentWidth;
+				styletemplate.percentHeight = 100;
+				if(xml.percentHeight.length() > 0 && String(xml.percentHeight) != "")
+					styletemplate.percentHeight = xml.percentHeight;
+				if(xml.endpoint.length() > 0)
+					styletemplate.endpoint = xml.endpoint;
+				if(xml.debugMode.length() > 0)
+					styletemplate.debugMode = xml.debugMode=="true"?true:false;
+				if(xml.width.length() > 0 && String(xml.width) != "")
+					styletemplate.width = xml.width;
+				if(xml.height.length() > 0 && String(xml.height) != "")
+					styletemplate.height = xml.height;
+				if(xml.firstAutoQuery.length() > 0)
+					styletemplate.showDataAfterInit = xml.firstAutoQuery =="true"?true:false;
+				if(xml.isShowAlert.length() > 0)
+					styletemplate.isShowAlert = xml.isShowAlert =="false"?false:true;
+				if(xml.allowMultipleSelection.length() > 0)
+					styletemplate.allowMultipleSelection = xml.allowMultipleSelection =="true"?true:false;
+					
+				if(xml.initQueryCondition.length() > 0 && String(xml.initQueryCondition) != "")
+					styletemplate.initQueryCondition = xml.initQueryCondition;
+				
+				if(xml.showOperationButtonType.length() > 0 && String(xml.showOperationButtonType) != "")
+					styletemplate.showOperationButtonType = xml.showOperationButtonType;
+				//add by xuzhilin 20121229
+				if(xml.disableEffect.length()>0)
+					styletemplate.disableEffect = xml.disableEffect=="true"?true:false;
+				//add by xuzhilin 20130129
+				if(xml.doubleClickHandler.length()>0 && String(xml.doubleClickHandler)!=""){
+					var classRef:Class = getDefinitionByName(String(xml.doubleClickHandler)) as Class;
+					var handler:ListButtonListener = new classRef();
+					styletemplate.doubleClickHandler = handler;
+				}
+				
+				//add by zhangzy 20120106 允许隐藏新增、删除按钮
+				if(xml.isShowInsertBtn.length() > 0)
+					styletemplate.isShowInsertBtn = xml.isShowInsertBtn=="false"?false:true;
+				
+				if(xml.isShowDelBtn.length() > 0)
+					styletemplate.isShowDelBtn = xml.isShowDelBtn=="false"?false:true;
+				
+				if(xml.cardLayoutType.length() > 0 && String(xml.cardLayoutType) != "")
+					styletemplate.cardLayoutType = xml.cardLayoutType;
+				
+				if(xml.itemLabelWidth.length() > 0 && String(xml.itemLabelWidth) != "")
+					styletemplate.itemLabelWidth = xml.itemLabelWidth;
+				
+				if(xml.perPageSize.length() > 0 && String(xml.perPageSize) != "")
+					styletemplate.pageSize = xml.perPageSize;
+				
+				//add by zhangzz 20110402 begin
+				if(xml.interceptors.length()>0){
+					if(xml.interceptors.insertBfIncCard.length() > 0)
+						styletemplate.insertbfIncCard = xml.interceptors.insertBfIncCard;
+					if(xml.interceptors.insertAfIncCard.length() > 0)
+						styletemplate.insertafIncCard = xml.interceptors.insertAfIncCard;
+					if(xml.interceptors.updateBfIncCard.length() > 0)
+						styletemplate.updatebfIncCard = xml.interceptors.updateBfIncCard;
+					if(xml.interceptors.updateAfIncCard.length() > 0)
+						styletemplate.updateafIncCard = xml.interceptors.updateAfIncCard;
+					if(xml.interceptors.bfIncList.length() > 0)
+						styletemplate.bfIncList = xml.interceptors.bfIncList;
+					if(xml.interceptors.afIncList.length() > 0)
+						styletemplate.afIncList = xml.interceptors.afIncList;
+					
+					if(xml.interceptors.clientInsertBfIncCard.length() > 0)
+						styletemplate.clientInsertBfIncCard = xml.interceptors.clientInsertBfIncCard;
+					if(xml.interceptors.clientInsertAfIncCard.length() > 0)
+						styletemplate.clientInsertAfIncCard = xml.interceptors.clientInsertAfIncCard;
+					if(xml.interceptors.clientUpdateBfIncCard.length() > 0)
+						styletemplate.clientUpdateBfIncCard = xml.interceptors.clientUpdateBfIncCard;
+					if(xml.interceptors.clientUpdateAfIncCard.length() > 0)
+						styletemplate.clientUpdateAfIncCard = xml.interceptors.clientUpdateAfIncCard;
+					if(xml.interceptors.clientBfIncList.length() > 0)
+						styletemplate.clientBfIncList = xml.interceptors.clientBfIncList;
+					if(xml.interceptors.clientAfIncList.length() > 0)
+						styletemplate.clientAfIncList = xml.interceptors.clientAfIncList;
+				}
+				//add by zhangzz 20110402 end
+				
+				if(xml.embedButton.length() > 0 && xml.embedButton.button.length() > 0){
+					//自定义操作按钮组
+					var listEmbedBtnGroupFactory:ClassFactory = new ClassFactory(ListEmbedButtonGroupComponent);
+					
+					
+					var embedBtnGroupDgc:DataGridColumn = new DataGridColumn("自定义操作");
+					embedBtnGroupDgc.editable = false;
+					embedBtnGroupDgc.itemRenderer = listEmbedBtnGroupFactory;
+					
+					styletemplate.customDefineDataGridColumns = [embedBtnGroupDgc];
+				}
+				
+				styletemplate.beforeInitFun = function ():void{
+					if(xml.embedButton.length() > 0 && xml.embedButton.button.length() > 0)
+						listEmbedBtnGroupFactory.properties = {contentXml:xml,billListPanel:styletemplate.listPanel};
+					
+					if(xml.customListButton.button.length()>0){
+						styletemplate.operationList.addItem({type:"separator"});
+					}
+					//自定义列表按钮
+					for each(var buttonXML:XML in xml.customListButton.button){
+						var obj:* = new Object();
+						obj.id = String(buttonXML.@id);
+						obj.label = String(buttonXML.@label);
+						obj.toolTip = String(buttonXML.@toolTip);
+						if(buttonXML.@rightClick=="false")
+							obj.rightClick = false;
+						else
+							obj.rightClick = true;
+						
+						var btn:Button = new Button();
+						btn.id = String(buttonXML.@id);
+						btn.label = String(buttonXML.@label);
+						btn.toolTip = String(buttonXML.@toolTip);
+						var iconUrl:String = buttonXML.@icon;
+						if(iconUrl != null && iconUrl != ""){
+							var icon:Class = IconUtility.getClass(btn,iconUrl,16,16);
+							btn.setStyle("icon",icon);
+							iconComponentArray.push(btn);
+						}
+						
+						var listeners:Array = [];
+						for each(var listener:XML in buttonXML.listeners.listener){
+							var classReference:Class = getDefinitionByName(listener) as Class;
+							var listenerClass:ListButtonListener = new classReference() as ListButtonListener;
+							listeners.push(listenerClass);
+						}
+						
+						listenerMap.add(obj.id,listeners);
+						
+						obj.handler = function():void{
+							var array:Array = listenerMap.find(this.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						};
+						styletemplate.operationList.addItem(obj);
+						
+						btn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var array:Array = listenerMap.find(event.target.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						});
+						styletemplate.operationList.addItem(btn);
+						
+					}
+					//自定义卡片按钮
+					for each(var cardButtonXML:XML in xml.customCardButton.button){
+						var cardButton:Button = new Button();
+						cardButton.id = cardButtonXML.@id;
+						cardButton.label = cardButtonXML.@label;
+						cardButton.toolTip = cardButtonXML.@toolTip;
+						var cardIconUrl:String = cardButtonXML.@icon;
+						if(cardIconUrl != null && cardIconUrl != ""){
+							var cardIcon:Class = IconUtility.getClass(cardButton,cardIconUrl,16,16);
+							cardButton.setStyle("icon",cardIcon);
+							iconComponentArray.push(cardButton);
+						}
+						var cardListeners:Array = [];
+						for each(var cardListener:XML in cardButtonXML.listeners.listener){
+							var cardClassReference:Class = getDefinitionByName(cardListener) as Class;
+							var cardListenerClass:CardButtonListener = new cardClassReference() as CardButtonListener;
+							cardListeners.push(cardListenerClass);
+						}
+						listenerMap.add(cardButton.id,cardListeners);
+						cardButton.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var array:Array = listenerMap.find(event.target.id) as Array;
+							if(array != null){
+								for each(var temp:CardButtonListener in array){
+									temp.buttonClick(styletemplate.cardPanel);
+								}
+							}	
+						});
+						styletemplate.cardButtonBox.addChild(cardButton);
+					}
+					
+					for each(var dataValidatorXML:XML in xml.cardDataValidators.dataValidator){
+						var classname:String = dataValidatorXML.@classname;
+						var validatorclassReference:Class = getDefinitionByName(classname) as Class;
+						var dataValidator:DataValidator = new validatorclassReference() as DataValidator;
+						if(dataValidator != null)
+							styletemplate.cardPanel.addDataValidator(dataValidator);
+					}
+					
+				}
+				
+				this.addChild(styletemplate);
+				
+				if(styletemplate.debugMode){
+					//如果调试模式，添加一个编辑元数据模板的按钮
+					DebugUtil.generateDebugButton(this,metadataTemplet.id);
+					
+				}
+				
+				
+				/* callLater(function():void{
+					if(xml.customListButton.button.length()>0){
+						styletemplate.operationList.addItem({type:"separator"});
+					}
+					//自定义列表按钮
+					for each(var buttonXML:XML in xml.customListButton.button){
+						var obj:* = new Object();
+						obj.id = String(buttonXML.@id);
+						obj.label = String(buttonXML.@label);
+						obj.toolTip = String(buttonXML.@toolTip);
+						if(buttonXML.@rightClick=="false")
+							obj.rightClick = false;
+						else
+							obj.rightClick = true;
+						
+						var btn:Button = new Button();
+						btn.id = String(buttonXML.@id);
+						btn.label = String(buttonXML.@label);
+						btn.toolTip = String(buttonXML.@toolTip);
+						var iconUrl:String = buttonXML.@icon;
+						if(iconUrl != null && iconUrl != ""){
+							var icon:Class = IconUtility.getClass(btn,iconUrl,16,16);
+							btn.setStyle("icon",icon);
+							iconComponentArray.push(btn);
+						}
+
+						var listeners:Array = [];
+						for each(var listener:XML in buttonXML.listeners.listener){
+							var classReference:Class = getDefinitionByName(listener) as Class;
+							var listenerClass:ListButtonListener = new classReference() as ListButtonListener;
+							listeners.push(listenerClass);
+						}
+						
+						listenerMap.add(obj.id,listeners);
+						
+						obj.handler = function():void{
+							var array:Array = listenerMap.find(this.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						};
+						styletemplate.operationList.addItem(obj);
+						
+						btn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var array:Array = listenerMap.find(event.target.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						});
+						styletemplate.operationList.addItem(btn);
+						
+					}
+					//自定义卡片按钮
+					for each(var cardButtonXML:XML in xml.customCardButton.button){
+						var cardButton:Button = new Button();
+						cardButton.id = cardButtonXML.@id;
+						cardButton.label = cardButtonXML.@label;
+						cardButton.toolTip = cardButtonXML.@toolTip;
+						var cardIconUrl:String = cardButtonXML.@icon;
+						if(cardIconUrl != null && cardIconUrl != ""){
+							var cardIcon:Class = IconUtility.getClass(cardButton,cardIconUrl,16,16);
+							cardButton.setStyle("icon",cardIcon);
+							iconComponentArray.push(cardButton);
+						}
+						var cardListeners:Array = [];
+						for each(var cardListener:XML in cardButtonXML.listeners.listener){
+							var cardClassReference:Class = getDefinitionByName(cardListener) as Class;
+							var cardListenerClass:CardButtonListener = new cardClassReference() as CardButtonListener;
+							cardListeners.push(cardListenerClass);
+						}
+						listenerMap.add(cardButton.id,cardListeners);
+						cardButton.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var array:Array = listenerMap.find(event.target.id) as Array;
+							if(array != null){
+								for each(var temp:CardButtonListener in array){
+									temp.buttonClick(styletemplate.cardPanel);
+								}
+							}	
+						});
+						styletemplate.cardButtonBox.addChild(cardButton);
+					}
+				}); */
+			}
+			
+
+//			public function destroy():void{
+//				for each (var obj:* in iconComponentArray){
+//					IconUtility.destroy(obj);
+//				}
+//				iconComponentArray = null;
+//				listenerMap.clear();
+//				removeAllChildren();
+//			}
+		]]>
+	</fx:Script>
+</mx:Canvas>

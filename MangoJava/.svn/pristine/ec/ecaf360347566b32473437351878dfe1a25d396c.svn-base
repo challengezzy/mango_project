@@ -1,0 +1,165 @@
+/***********************************************************************
+ * $RCSfile: LogWriter.java,v $  $Revision: 1.4.10.2 $  $Date: 2009/10/16 03:49:17 $
+ * $Log: LogWriter.java,v $
+ * Revision 1.4.10.2  2009/10/16 03:49:17  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4.10.1  2008/11/25 10:27:14  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/06/07 12:50:09  qilin
+ * no message
+ *
+ * Revision 1.3  2007/06/07 08:04:44  qilin
+ * no message
+ *
+ * Revision 1.2  2007/06/06 12:59:21  qilin
+ * no message
+ *
+ * Revision 1.1  2007/06/05 10:25:10  qilin
+ * no message
+ *
+*************************************************************************/
+package smartx.system.log.bs;
+
+import java.util.Date;
+import java.text.SimpleDateFormat;
+import java.net.*;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.bs.LogWriterIFC;
+import smartx.framework.common.bs.NovaSessionFactory;
+import smartx.framework.common.ui.NovaClientEnvironment;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.metadata.bs.NovaServerEnvironment;
+import smartx.system.common.sysexception.*;
+import smartx.system.log.vo.Log;
+
+public class LogWriter extends LogWriterIFC{
+    public LogWriter() {
+    }
+
+    private static CommDMO dmo;
+    private static CommDMO getDMO() {
+        if(dmo==null) {
+            dmo=new CommDMO(false);
+        }
+        return dmo;
+    }
+
+    public void writeLog(String sql) throws Exception {
+        writeLog(LogUtil.getSqlType(sql),sql);
+    }
+
+    public void writeLog(String operation, String sql) throws NovaException {
+        writeLog(operation, sql, null);
+    }
+
+    private void writeLog(String operation, String sql,
+                          String comments) throws NovaException {
+        String tableName=LogUtil.getTableNameBySql(sql);
+        //如果是日志表则跳过,否则死循环
+        if(tableName!=null && tableName.equals("PUB_LOG")) {
+            return;
+        }
+        String objType=LogUtil.getObjectType(tableName);
+        //sql语句不为空而且对象名称为空,说明配置文件中不需要写日志
+        if(sql!=null && objType==null) {
+            return;
+        }
+
+        NovaClientEnvironment clientEnv=NovaSessionFactory.getInstance().getClientEnv(Thread.currentThread());
+        String userName;
+        String clientIP="";
+        if(clientEnv!=null) {
+            userName = (String) clientEnv.get("SYS_LOGINUSER_LOGINNAME");
+            clientIP = (String) clientEnv.get("CLIENTIP");
+        } else {
+            userName = "System Server";
+            try {
+                clientIP = InetAddress.getLocalHost().getHostAddress();
+            } catch (UnknownHostException ex1) {
+            }
+        }
+        // 日志功能开关
+        if (!LogUtil.isLogEnabled())
+            return;
+
+        Log log = newLog(userName,clientIP, operation,objType, sql, comments, null, null, null);
+        try {
+            getDMO().executeUpdateByDS(null, getCreateLogSql(log));
+        } catch (Exception ex) {
+            throw NovaExceptionHandler.createNovaEx("日志写入错误："+ex.getMessage());
+        }
+   }
+
+    private static Log newLog(String user, String clientIP, String operation,String ObjType,
+                              String sql, String comments, String comments2, String comments3,
+                              String comments4) throws NovaException {
+        Log log = new Log();
+        log.setTime(new Date(System.currentTimeMillis())); //操作时间
+        log.setSource(user); //操作来源
+        log.setIpAddress(clientIP); //用户Ip
+        log.setAppmodule(StringUtil.joinArray2String(NovaServerEnvironment.getInstance().getAppModuleName())); //Application Module
+        log.setOperation(operation); //操作名称
+        log.setAffectedObjectType(ObjType); //操作对象类型
+        log.setSqlText(sql); //sql语句
+        log.setComments(comments); //描述
+        log.setComments2(comments2);
+        log.setComments3(comments3);
+        log.setComments4(comments4);
+        return log;
+    }
+
+    private static String getCreateLogSql(Log log) {
+        StringBuffer sql=new StringBuffer();
+        sql.append("INSERT INTO PUB_LOG(");
+
+        sql.append("ID,");
+        sql.append("TIME,");
+        sql.append("SOURCE,");
+        sql.append("IPADDRESS,");
+        sql.append("OPERATION,");
+        sql.append("AFFECTEDOBJECTTYPE,");
+        sql.append("AFFECTEDOBJECTNAME,");
+        sql.append("AFFECTEDOBJECTID,");
+        sql.append("APPMODULE,");
+        sql.append("SQLTEXT,");
+        sql.append("COMMENTS,");
+        sql.append("COMMENTS2,");
+        sql.append("COMMENTS3,");
+        sql.append("COMMENTS4,");
+        sql.append("SERVICEMODULE,");
+        sql.append("VERSION)");
+
+        sql.append(" VALUES(");
+
+        sql.append("S_PUB_LOG.NEXTVAL,");
+
+        sql.append("TO_DATE('");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String str_date = sdf.format(log.getTime());
+        sql.append(str_date);
+        sql.append("','YYYY-MM-DD HH24:MI:SS')");
+        sql.append(",");
+
+        sql.append("'"+(log.getSource()!=null?log.getSource():"")+"',");
+        sql.append("'"+(log.getIpAddress()!=null?log.getIpAddress():"")+"',");
+        sql.append("'"+(log.getOperation()!=null?log.getOperation():"")+"',");
+        sql.append("'"+(log.getAffectedObjectType()!=null?log.getAffectedObjectType():"")+"',");
+        sql.append("'"+(log.getAffectedObjectName()!=null?log.getAffectedObjectName():"")+"',");
+        sql.append("'"+log.getAffectedObjectId()+"',");
+        sql.append("'"+(log.getAppmodule()!=null?log.getAppmodule():"")+"',");
+        sql.append("'"+(log.getSqlText()!=null?log.getSqlText().replaceAll("'","''"):"")+"',");
+        sql.append("'"+(log.getComments()!=null?log.getComments():"")+"',");
+        sql.append("'"+(log.getComments2()!=null?log.getComments2():"")+"',");
+        sql.append("'"+(log.getComments3()!=null?log.getComments3():"")+"',");
+        sql.append("'"+(log.getComments4()!=null?log.getComments4():"")+"',");
+        sql.append(log.getServiceModule()+",");
+        sql.append("0)");
+
+        return sql.toString();
+    }
+
+
+}

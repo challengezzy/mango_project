@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="100%" height="100%" 
+	xmlns:components="smartx.flex.components.*"
+	creationComplete="init()" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import com.hurlant.eval.ast.Void;
+			
+			import mx.controls.Alert;
+			import mx.effects.Effect;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillTempletPanel;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.TextAreaWindow;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.modules.basic.system.templete.TempleteCopyPanel;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+		    private var formService:RemoteObject;
+			
+			private function init():void{
+				if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+					debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				formService = new RemoteObject(destination);
+	        	if(endpoint!=null)
+	        		formService.endpoint = endpoint;
+	            formService.importTemplet.addEventListener(ResultEvent.RESULT,importTempletHandler);
+    			formService.importTemplet.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.createTemplet.addEventListener(ResultEvent.RESULT,createTempletHandler);
+				formService.createTemplet.addEventListener(FaultEvent.FAULT,faultHandler);
+    			formService.executeBatchByDS.addEventListener(ResultEvent.RESULT,updateHandler);
+		        formService.executeBatchByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+		        formService.exportAllTempletScript.addEventListener(ResultEvent.RESULT,exportAllTempletScriptHandler);
+		        formService.exportAllTempletScript.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.generateTempletSqlFile.addEventListener(ResultEvent.RESULT,exportToSqlFileHandler);
+				formService.generateTempletSqlFile.addEventListener(FaultEvent.FAULT,faultHandler);
+			}
+			
+			private function onNew():void{
+				formService.createTemplet();
+			}
+			
+			private function createTempletHandler(event:ResultEvent):void{
+				var code:String = event.result as String;
+				var templetPanel:BillTempletPanel = new BillTempletPanel();
+				templetPanel.percentHeight = 100;
+				templetPanel.percentWidth = 100;
+				templetPanel.templetCode = code;
+				templetPanel.editable = true;
+				templetPanel.destination = destination;
+				templetPanel.endpoint = endpoint;
+				templetBox.removeAllChildren();
+				templetBox.addChild(templetPanel);
+				mainViewStack.selectedChild=cardBox;
+			}
+			
+			private function onCopy():void{
+				var selectItem:Object = listPanel.getSelectedRowValue();
+				if(selectItem != null ){
+					var code:String = selectItem["TEMPLETCODE"] as String;
+					var name:String = selectItem["TEMPLETNAME"] as String;
+					
+					var templeteCopyPanel:TempleteCopyPanel = new TempleteCopyPanel();
+					templeteCopyPanel.templeteCode = code;
+					templeteCopyPanel.templeteName = name;
+					templeteCopyPanel.listPanel = listPanel;
+					templeteCopyPanel.endpoint = endpoint;
+					
+					PopUpManager.addPopUp(templeteCopyPanel,this,true);
+					PopUpManager.centerPopUp(templeteCopyPanel);
+					
+				}else{
+					SmartXMessage.show("请选择一条记录!");
+				}
+			}
+			
+			private function onEdit():void{
+				if(listPanel.getSelectedRowValue() != null){
+				 	var row:Object = listPanel.getSelectedRowValue();
+				 	var templetPanel:BillTempletPanel = new BillTempletPanel();
+				 	templetPanel.percentHeight = 100;
+				 	templetPanel.percentWidth = 100;
+				 	templetPanel.templetCode = row["TEMPLETCODE"];
+				 	templetPanel.editable = true;
+				 	templetPanel.destination = destination;
+				 	templetPanel.endpoint = endpoint;
+				 	templetBox.removeAllChildren();
+				 	templetBox.addChild(templetPanel);
+				 	mainViewStack.selectedChild=cardBox;
+				}
+				else
+					Alert.show("请选择一条记录");
+			}
+			
+			private function onImport():void{
+				var window:ImportTempletWindow = new ImportTempletWindow();
+				window.destination = destination;
+				window.endpoint = endpoint;
+				window.confirmFunction = function():void{
+					if(window.tableName == null || window.tableName == ""){
+						Alert.show("请选择要导入的表");
+						return;
+					}
+					if(window.templetNameInput.text == null || window.templetNameInput.text == ""){
+						Alert.show("请输入模板名称");
+						return;
+					}
+					if(window.templetCodeInput.text == null || window.templetCodeInput.text == ""){
+						Alert.show("请输入模板编码");
+						return;
+					}
+					
+					//mainTemplate.mainTemplate.listPanel.initQueryCondition="templetcode='"+window.templetCodeInput.text+"'";
+					formService.importTemplet(window.datasouceInput.text,window.tableName,window.templetCodeInput.text,window.templetNameInput.text);
+					
+					PopUpManager.removePopUp(window);
+				};
+				PopUpManager.addPopUp(window,this);
+				PopUpManager.centerPopUp(window);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+		    
+		    private function importTempletHandler(event:ResultEvent):void{
+		    	Alert.show("导入模板成功!");
+		    	//mainTemplate.mainTemplate.listPanel.query();
+		    }
+		    
+		    private function updateHandler(event:ResultEvent):void{
+		    	Alert.show("删除成功！");
+		    	listPanel.query();
+		    }
+		    
+		    private function onDelete():void{
+		    	var sqlList:Array = [];
+				var sql:String;
+				var selectItems:Array = listPanel.getSelectedRowValues();
+				for each (var dataObject:* in selectItems){
+					var templetId:String = dataObject["PK_PUB_TEMPLET_1"] as String;
+					sql = "delete from PUB_TEMPLET_1_ITEM where PK_PUB_TEMPLET_1="+templetId;
+					sqlList = sqlList.concat(sql);
+					trace("updateSql:"+sql);
+					sql = "delete from PUB_TEMPLET_1_ITEM_GROUP where templetid="+templetId;
+					sqlList = sqlList.concat(sql);
+					trace("updateSql:"+sql);
+					sql = "delete from PUB_TEMPLET_1 where PK_PUB_TEMPLET_1="+templetId;
+					sqlList = sqlList.concat(sql);
+					trace("updateSql:"+sql);
+				}
+				if(sqlList.length > 0)
+					formService.executeBatchByDS(null,sqlList);
+		    }
+		    
+		    private function onExportAll():void{
+		    	formService.exportAllTempletScript();
+		    }
+			
+			private function exportToSqlFileHandler(event:ResultEvent):void{
+				var url:String = event.result as String;
+				navigateToURL(new URLRequest(url), "_blank");
+				OperatingTipUtil.endOperat();;
+			}
+			
+			private function onExport():void{					
+				var condition:String = listPanel.getQueryCondition();				
+				OperatingTipUtil.startOperat("正在导出元原模板数据......",listPanel);				
+				formService.generateTempletSqlFile(condition,"pub_templet.sql");
+			}
+		    
+		    private function exportAllTempletScriptHandler(event:ResultEvent):void{
+		    	var result:String = event.result as String;
+		    	var window:TextAreaWindow = new TextAreaWindow();
+				window.editable = false;
+				window.width = 800;
+				//modify by zhangzz 20110328
+				window.height = 350;
+				window.text = result;
+				window.title = "全部模板导出脚本";
+				PopUpManager.addPopUp(window,this);
+				PopUpManager.centerPopUp(window);		 
+		    }
+			
+			private function onReturn():void{
+				mainViewStack.selectedChild=listBox;
+				listPanel.returnQuery();
+			}
+		]]>
+	</mx:Script>
+	<mx:ViewStack width="100%" height="100%" id="mainViewStack">
+		<mx:VBox width="100%" height="100%" id="listBox">
+			<mx:HBox width="100%" id="listButtonBox">
+				<mx:Button label="新建" click="onNew()" icon="@Embed(source='../../assets/images/new.png')"/>
+				<mx:Button label="编辑" click="onEdit()" icon="@Embed(source='../../assets/images/view.png')"/>
+	    	    <mx:Button label="删除" click="onDelete()" icon="@Embed(source='../../assets/images/delete2.png')"/>
+				<mx:Button label="复制" click="onCopy()" icon="{AssetsFileLib.saveasIcon}"/>
+	    	    <mx:Button label="导入" click="onImport()" icon="@Embed(source='../../assets/images/import.png')"/>
+	    	    <mx:Button label="导出模板" click="onExport()" icon="@Embed(source='../../assets/images/export.png')"/>
+	    	</mx:HBox>
+	    	<core:BillListPanel destination="{destination}" endpoint="{endpoint}" templetCode="T_PUB_TEMPLET_1" doubleClick="onEdit()" id="listPanel" editable="false" width="100%" height="100%"  showEditBox="false" debugMode="{debugMode}"/>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" id="cardBox">
+			<mx:HBox width="100%" id="cardButtonBox">
+				<mx:Button label="返回" click="onReturn()" icon="@Embed(source='../../assets/images/return.png')"/>
+			</mx:HBox>
+			<mx:VBox width="100%" height="100%" id="templetBox">
+			</mx:VBox>
+		</mx:VBox>
+	</mx:ViewStack>
+	
+</mx:Module>

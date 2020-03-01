@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="ASCII"?>
+<cache:CacheIndex xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:cache="http://eclipse.org/dltk/cache_model" environment="org.eclipse.dltk.core.environment.localEnvironment">
+  <entries path="D:/workspace_mango/MangoWeb/bin-debug/history/history.js" timestamp="1410428991503" lastAccessTime="1410428992173"/>
+  <entries path="D:/workspace_mango/MangoWeb/bin-debug/swfobject.js" timestamp="1410428991503" lastAccessTime="1410428992298"/>
+  <entries path="D:/workspace_mango/MangoWeb/html-template/swfobject.js" timestamp="1410500981067" lastAccessTime="1410500982634"/>
+  <entries path="D:/workspace_mango/MangoWeb/html-template/history/history.js" timestamp="1410500981047" lastAccessTime="1410500982497"/>
+  <entries path="D:/workspace_mango/MangoWeb/WebRoot/history/history.js" timestamp="1422500742295" lastAccessTime="1422500743805"/>
+  <entries path="D:/workspace_mango/MangoWeb/WebRoot/swfobject.js" timestamp="1422500742302" lastAccessTime="1422500743921"/>
+  <entries path="D:/workspace/workspace_mango/MangoWeb/html-template/swfobject.js" timestamp="1410500981067" lastAccessTime="1537717195090"/>
+  <entries path="D:/workspace/workspace_mango/MangoWeb/html-template/history/history.js" timestamp="1410500981047" lastAccessTime="1537717195104"/>
+  <entries path="D:/workspace/workspace_mango/MangoWeb/WebRoot/history/history.js" timestamp="1537717256805" lastAccessTime="1537717257571"/>
+  <entries path="D:/workspace/workspace_mango/MangoWeb/WebRoot/swfobject.js" timestamp="1537717256808" lastAccessTime="1537717257680"/>
+</cache:CacheIndex>

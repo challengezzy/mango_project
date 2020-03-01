@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" minWidth="955" minHeight="600"
+			   creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.core.mtchart.MTCardChartPanel;
+			import smartx.flex.components.core.mtchart.MTChartPanel;
+			import smartx.flex.components.core.mtchart.MTGeoMapChartPanel;
+			import smartx.flex.components.core.mtchart.MTIndicatorPanel;
+			import smartx.flex.components.core.mtchart.MTListChartPanel;
+			import smartx.flex.components.core.mtchart.MTMultiSeriesChartPanel;
+			import smartx.flex.components.core.mtchart.MTOLAPChartPanel;
+			import smartx.flex.components.core.mtchart.MTProcessChartPanel;
+			import smartx.flex.components.core.mtchart.MTSingleSeriesPanel;
+			import smartx.flex.components.core.mtchart.MTTreeGridChartPanel;
+			import smartx.flex.components.core.mtchart.MTXYPlotChartPanel;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.core.mtchart.vo.MTChartType;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var endpoint:String;
+			private var code:String;//code of dashboard object
+			private var bamService:RemoteObject;
+			private var metadataTempletService:RemoteObject;
+			//private var contentXml:XML;
+			private var type:int;
+			private var loadingWindow:LoadingWindow;
+			private var isDataError:Boolean = false;
+			private var providerName:String = GlobalConst.DEFAULTPROVIDERNAME_CEP;
+			private const CHARTID:String = "dboViewer";
+			
+			private var chart:MTChartPanel;
+			
+			
+			private function init():void{
+				endpoint = FlexGlobals.topLevelApplication.parameters["endpoint"];
+				code =  FlexGlobals.topLevelApplication.parameters["code"];
+				if(code == null || code == ""){
+					Alert.show("对象编码不能为空");
+					return;
+				}
+				metadataTempletService = new RemoteObject(GlobalConst.SERVICE_METADATATEMPLET);
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint!=null){
+					metadataTempletService.endpoint = bamService.endpoint = endpoint;
+				}
+				bamService.getMtCodeByCode.addEventListener(ResultEvent.RESULT,doInfoLoaded);
+				bamService.getMtCodeByCode.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					Alert.show("无法加载对象信息");
+				});
+				
+				metadataTempletService.findMetadataTemplet.addEventListener(ResultEvent.RESULT,metadataTempletLoaded);
+				metadataTempletService.findMetadataTemplet.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					Alert.show("无法加载对象编码对应的配置信息");
+				});
+				
+				bamService.getChartData.addEventListener(ResultEvent.RESULT,getChartDataHandler);
+				bamService.getChartData.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					Alert.show("无法加载对象数据");
+				});
+				
+				loadingWindow = new LoadingWindow();
+				PopUpManager.addPopUp(loadingWindow,this,true);
+				PopUpManager.centerPopUp(loadingWindow);
+				
+				bamService.getMtCodeByCode(code,null);
+			}
+			
+			private function hideLoadingWindow():void{
+				if(loadingWindow != null){
+					PopUpManager.removePopUp(loadingWindow);
+				}
+			}
+			
+			private function doInfoLoaded(event:ResultEvent):void{
+				var dashboardObj:Object = event.result;
+				if(dashboardObj == null){
+					Alert.show("对象信息为空");
+					hideLoadingWindow();
+					return;
+				}
+				type = dashboardObj.type;
+				var mtcode:String = dashboardObj.mtcode;
+				metadataTempletService.findMetadataTemplet(mtcode);
+			}
+			
+			private function metadataTempletLoaded(event:ResultEvent):void{
+				var templet:MetadataTemplet = event.result as MetadataTemplet;
+				if(templet == null){
+					Alert.show("对象配置信息为空");
+					hideLoadingWindow();
+					return;
+				}
+				switch(type){
+					case MTChartType.SINGLESERIESCHART:
+						chart = new MTSingleSeriesPanel();
+						break;
+					case MTChartType.MULTISERIESCHART:
+						chart = new  MTMultiSeriesChartPanel();
+						break;
+					case MTChartType.XYPLOTCHART:
+						chart = new MTXYPlotChartPanel();
+						break;
+					case MTChartType.PIVOTCOMBINATIONCHART:
+						break;
+					case MTChartType.GEOGRAPHYCHART:
+						chart = new MTGeoMapChartPanel();
+						break;
+					case MTChartType.INDICATOR:
+						chart = new MTIndicatorPanel();
+						break;
+					case MTChartType.TABLE://列表图
+						chart = new MTListChartPanel();
+						break;
+					case MTChartType.TREELIST:
+						chart = new MTTreeGridChartPanel();
+						break;
+					case MTChartType.CARD:
+						chart = new MTCardChartPanel();
+						break;
+					case MTChartType.OLAP:
+						chart = new MTOLAPChartPanel();
+						break;
+					case MTChartType.PROCESSCHART:
+						chart = new MTProcessChartPanel();
+						break;
+				}
+				if(chart == null){
+					Alert.show("不支持的对象类型");
+					hideLoadingWindow();
+					return;
+				}
+				
+				chart.chartId = CHARTID;
+				chart.metadataTemplet = templet;
+				chart.endpoint = endpoint;
+				chart.percentHeight = 100;
+				chart.percentWidth = 100;
+				chart.dashboardCode = code;
+				chart.addEventListener(MTChartEvent.REFRESH_DATA,refreshChartData);
+				this.addElement(chart);
+
+				hideLoadingWindow();
+			}
+			
+			private function refreshChartData(event:MTChartEvent):void{
+				var mtchart:MTChartPanel = event.currentTarget as MTChartPanel;
+				var dboChartId:String = code.concat("_").concat(event.id);
+				try{
+					var accessFilter:String = MTChartUtil.parseFilterVariable(event.id,mtchart.accessFilter,event.dataValues,dboChartId);
+					var filter:String = MTChartUtil.parseFilter(event.id,event.dataValues,dboChartId,mtchart);
+					bamService.getChartData(event.mtcode,providerName,event.chartType,event.id,filter,accessFilter);
+				}
+				catch(e:Error){
+					mtchart.isLoading = false;
+				}	
+			}
+			
+			private function getChartDataHandler(event:ResultEvent):void{
+				if(chart == null)
+					return;
+				var chartDataMap:Object = event.result;
+				var mtchartPanel:MTChartPanel;
+				var chartDataArr:Array = chartDataMap[CHARTID] as Array;
+				if(chartDataArr != null){
+					chart.dataProvider=new ArrayCollection(chartDataArr);
+					chart.refreshComplete();
+
+				}
+			}
+
+		]]>
+	</fx:Script>
+</s:Application>

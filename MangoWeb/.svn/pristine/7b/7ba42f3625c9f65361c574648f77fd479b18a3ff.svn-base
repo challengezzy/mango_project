@@ -1,0 +1,282 @@
+<mapList>
+	<map url="maps/china.swf" label="中国">
+		<areas>
+			<mapArea instanceName="borders_inside" color="FFFFFF" mouseEnabled="false"/>
+			<mapArea instanceName="borders_outside" color="FFFFFF" mouseEnabled="false"/>
+			<mapArea instanceName="CN_AH" title="安徽"/>
+			<mapArea instanceName="CN_BJ" title="北京"/>
+			<mapArea instanceName="CN_CQ" title="重庆"/>
+			<mapArea instanceName="CN_FJ" title="福建"/>
+			<mapArea instanceName="CN_GS" title="甘肃"/>
+			<mapArea instanceName="CN_GD" title="广东"/>
+			<mapArea instanceName="CN_GX" title="广西壮族自治区"/>
+			<mapArea instanceName="CN_GZ" title="贵州"/>
+			<mapArea instanceName="CN_HA" title="海南"/>
+			<mapArea instanceName="CN_HB" title="河北"/>
+			<mapArea instanceName="CN_HL" title="黑龙江"/>
+			<mapArea instanceName="CN_HE" title="河南"/>
+			<mapArea instanceName="CN_HU" title="湖北"/>
+			<mapArea instanceName="CN_HN" title="湖南"/>
+			<mapArea instanceName="CN_NM" title="内蒙古"/>
+			<mapArea instanceName="CN_JS" title="江苏"/>
+			<mapArea instanceName="CN_JX" title="江西"/>
+			<mapArea instanceName="CN_JL" title="吉林"/>
+			<mapArea instanceName="CN_LN" title="辽宁"/>
+			<mapArea instanceName="CN_NX" title="宁夏回族自治区"/>
+			<mapArea instanceName="CN_QH" title="青海"/>
+			<mapArea instanceName="CN_SA" title="陕西"/>
+			<mapArea instanceName="CN_SD" title="山东"/>
+			<mapArea instanceName="CN_SH" title="上海"/>
+			<mapArea instanceName="CN_SX" title="山西"/>
+			<mapArea instanceName="CN_SC" title="四川"/>
+			<mapArea instanceName="CN_TJ" title="天津"/>
+			<mapArea instanceName="CN_XZ" title="西藏"/>
+			<mapArea instanceName="CN_XJ" title="新疆维吾尔自治区"/>
+			<mapArea instanceName="CN_YN" title="云南"/>
+			<mapArea instanceName="CN_ZJ" title="浙江"/>
+			<mapArea instanceName="TW" title="台湾"/>
+			<mapArea instanceName="HK" title="香港"/>
+			<mapArea instanceName="MO" title="澳门"/>
+		</areas>
+	</map>
+	<map url="maps/liaoning.swf" label="辽宁">
+		<areas>
+			<mapArea instanceName="borders" color="FFFFFF" mouseEnabled="false"/>
+			<mapArea instanceName="shenyang" title="沈阳"/>
+			<mapArea instanceName="liaoyang" title="辽阳"/>
+			<mapArea instanceName="dalian" title="大连"/>
+			<mapArea instanceName="tieling" title="铁岭"/>
+			<mapArea instanceName="chaoyang" title="朝阳"/>
+			<mapArea instanceName="dandong" title="丹东"/>
+			<mapArea instanceName="jinzhou" title="锦州"/>
+			<mapArea instanceName="xinfu" title="新阜"/>
+			<mapArea instanceName="fushun" title="抚顺"/>
+			<mapArea instanceName="huludao" title="葫芦岛"/>
+			<mapArea instanceName="panjin" title="盘锦"/>
+			<mapArea instanceName="anshan" title="鞍山"/>
+			<mapArea instanceName="yingkou" title="营口"/>
+			<mapArea instanceName="benxi" title="本溪"/>
+		</areas>
+	</map>
+	<map url="maps/world.swf" label="世界">
+		<areas>
+			<mapArea instanceName="borders" color="FFFFFF" mouseEnabled="false"/>
+			<mapArea instanceName="AF" title="AFGHANISTAN"/>
+			<mapArea instanceName="AX" title="ALAND ISLANDS"/>
+			<mapArea instanceName="AL" title="ALBANIA"/>
+			<mapArea instanceName="DZ" title="ALGERIA"/>
+			<mapArea instanceName="AD" title="ANDORRA"/>
+			<mapArea instanceName="AO" title="ANGOLA"/>
+			<mapArea instanceName="AI" title="ANGUILLA"/>
+			<mapArea instanceName="AG" title="ANTIGUA AND BARBUDA"/>
+			<mapArea instanceName="AR" title="ARGENTINA"/>
+			<mapArea instanceName="AM" title="ARMENIA"/>
+			<mapArea instanceName="AW" title="ARUBA"/>
+			<mapArea instanceName="AU" title="AUSTRALIA"/>
+			<mapArea instanceName="AT" title="AUSTRIA"/>
+			<mapArea instanceName="AZ" title="AZERBAIJAN"/>
+			<mapArea instanceName="BS" title="BAHAMAS"/>
+			<mapArea instanceName="BH" title="BAHRAIN"/>
+			<mapArea instanceName="BD" title="BANGLADESH"/>
+			<mapArea instanceName="BB" title="BARBADOS"/>
+			<mapArea instanceName="BY" title="BELARUS"/>
+			<mapArea instanceName="BE" title="BELGIUM"/>
+			<mapArea instanceName="BZ" title="BELIZE"/>
+			<mapArea instanceName="BJ" title="BENIN"/>
+			<mapArea instanceName="BM" title="BERMUDA"/>
+			<mapArea instanceName="BT" title="BHUTAN"/>
+			<mapArea instanceName="BO" title="BOLIVIA"/>
+			<mapArea instanceName="BA" title="BOSNIA AND HERZEGOVINA"/>
+			<mapArea instanceName="BW" title="BOTSWANA"/>
+			<mapArea instanceName="BR" title="BRAZIL"/>
+			<mapArea instanceName="BN" title="BRUNEI DARUSSALAM"/>
+			<mapArea instanceName="BG" title="BULGARIA"/>
+			<mapArea instanceName="BF" title="BURKINA FASO"/>
+			<mapArea instanceName="BI" title="BURUNDI"/>
+			<mapArea instanceName="KH" title="CAMBODIA"/>
+			<mapArea instanceName="CM" title="CAMEROON"/>
+			<mapArea instanceName="CA" title="CANADA"/>
+			<mapArea instanceName="CV" title="CAPE VERDE"/>
+			<mapArea instanceName="KY" title="CAYMAN ISLANDS"/>
+			<mapArea instanceName="CF" title="CENTRAL AFRICAN REPUBLIC"/>
+			<mapArea instanceName="TD" title="CHAD"/>
+			<mapArea instanceName="CL" title="CHILE"/>
+			<mapArea instanceName="CN" title="CHINA"/>
+			<mapArea instanceName="CO" title="COLOMBIA"/>
+			<mapArea instanceName="KM" title="COMOROS"/>
+			<mapArea instanceName="CG" title="REPUBLIC OF CONGO"/>
+			<mapArea instanceName="CD" title="THE DEMOCRATIC REPUBLIC OF THE CONGO"/>
+			<mapArea instanceName="CR" title="COSTA RICA"/>
+			<mapArea instanceName="CI" title="C0TE D'IVOIRE"/>
+			<mapArea instanceName="HR" title="CROATIA"/>
+			<mapArea instanceName="CU" title="CUBA"/>
+			<mapArea instanceName="CY" title="CYPRUS"/>
+			<mapArea instanceName="CZ" title="CZECH REPUBLIC"/>
+			<mapArea instanceName="DK" title="DENMARK"/>
+			<mapArea instanceName="DJ" title="DJIBOUTI"/>
+			<mapArea instanceName="DM" title="DOMINICA"/>
+			<mapArea instanceName="DO" title="DOMINICAN REPUBLIC"/>
+			<mapArea instanceName="EC" title="ECUADOR"/>
+			<mapArea instanceName="EG" title="EGYPT"/>
+			<mapArea instanceName="SV" title="EL SALVADOR"/>
+			<mapArea instanceName="GQ" title="EQUATORIAL GUINEA"/>
+			<mapArea instanceName="ER" title="ERITREA"/>
+			<mapArea instanceName="EE" title="ESTONIA"/>
+			<mapArea instanceName="ET" title="ETHIOPIA"/>
+			<mapArea instanceName="FO" title="FAEROE ISLANDS"/>
+			<mapArea instanceName="FK" title="FALKLAND ISLANDS"/>
+			<mapArea instanceName="FJ" title="FIJI"/>
+			<mapArea instanceName="FI" title="FINLAND"/>
+			<mapArea instanceName="FR" title="FRANCE"/>
+			<mapArea instanceName="GF" title="FRENCH GUIANA"/>
+			<mapArea instanceName="GA" title="GABON"/>
+			<mapArea instanceName="GM" title="GAMBIA, THE"/>
+			<mapArea instanceName="GE" title="GEORGIA"/>
+			<mapArea instanceName="DE" title="GERMANY"/>
+			<mapArea instanceName="GH" title="GHANA"/>
+			<mapArea instanceName="GR" title="GREECE"/>
+			<mapArea instanceName="GL" title="GREENLAND"/>
+			<mapArea instanceName="GD" title="GRENADA"/>
+			<mapArea instanceName="GP" title="GUADELOUPE"/>
+			<mapArea instanceName="GT" title="GUATEMALA"/>
+			<mapArea instanceName="GN" title="GUINEA"/>
+			<mapArea instanceName="GW" title="GUINEA-BISSAU"/>
+			<mapArea instanceName="GY" title="GUYANA"/>
+			<mapArea instanceName="HT" title="HAITI"/>
+			<mapArea instanceName="HN" title="HONDURAS"/>
+			<mapArea instanceName="HK" title="HONG KONG"/>
+			<mapArea instanceName="HU" title="HUNGARY"/>
+			<mapArea instanceName="IS" title="ICELAND"/>
+			<mapArea instanceName="IN" title="INDIA"/>
+			<mapArea instanceName="ID" title="INDONESIA"/>
+			<mapArea instanceName="IR" title="IRAN"/>
+			<mapArea instanceName="IQ" title="IRAQ"/>
+			<mapArea instanceName="IE" title="IRELAND"/>
+			<mapArea instanceName="IL" title="ISRAEL"/>
+			<mapArea instanceName="IT" title="ITALY"/>
+			<mapArea instanceName="JM" title="JAMAICA"/>
+			<mapArea instanceName="JP" title="JAPAN"/>
+			<mapArea instanceName="JO" title="JORDAN"/>
+			<mapArea instanceName="KZ" title="KAZAKHSTAN"/>
+			<mapArea instanceName="KE" title="KENYA"/>
+			<mapArea instanceName="NR" title="NAURU"/>
+			<mapArea instanceName="KP" title="NORTH KOREA"/>
+			<mapArea instanceName="KR" title="SOUTH KOREA"/>
+			<mapArea instanceName="KV" title="KOSOVO"/>
+			<mapArea instanceName="KW" title="KUWAIT"/>
+			<mapArea instanceName="KG" title="KYRGYZSTAN"/>
+			<mapArea instanceName="LA" title="LAO PEOPLE'S DEMOCRATIC REPUBLIC"/>
+			<mapArea instanceName="LV" title="LATVIA"/>
+			<mapArea instanceName="LB" title="LEBANON"/>
+			<mapArea instanceName="LS" title="LESOTHO"/>
+			<mapArea instanceName="LR" title="LIBERIA"/>
+			<mapArea instanceName="LY" title="LIBYA"/>
+			<mapArea instanceName="LI" title="LIECHTENSTEIN"/>
+			<mapArea instanceName="LT" title="LITHUANIA"/>
+			<mapArea instanceName="LU" title="LUXEMBOURG"/>
+			<mapArea instanceName="MK" title="MACEDONIA"/>
+			<mapArea instanceName="MG" title="MADAGASCAR"/>
+			<mapArea instanceName="MW" title="MALAWI"/>
+			<mapArea instanceName="MY" title="MALAYSIA"/>
+			<mapArea instanceName="ML" title="MALI"/>
+			<mapArea instanceName="MT" title="MALTA"/>
+			<mapArea instanceName="MQ" title="MARTINIQUE"/>
+			<mapArea instanceName="MR" title="MAURITANIA"/>
+			<mapArea instanceName="MU" title="MAURITIUS"/>
+			<mapArea instanceName="MX" title="MEXICO"/>
+			<mapArea instanceName="MD" title="MOLDOVA"/>
+			<mapArea instanceName="MN" title="MONGOLIA"/>
+			<mapArea instanceName="ME" title="MONTENEGRO"/>
+			<mapArea instanceName="MS" title="MONTSERRAT"/>
+			<mapArea instanceName="MA" title="MOROCCO"/>
+			<mapArea instanceName="MZ" title="MOZAMBIQUE"/>
+			<mapArea instanceName="MM" title="MYANMAR"/>
+			<mapArea instanceName="NA" title="NAMIBIA"/>
+			<mapArea instanceName="NR" title="NAURU"/>
+			<mapArea instanceName="NP" title="NEPAL"/>
+			<mapArea instanceName="NL" title="NETHERLANDS"/>
+			<mapArea instanceName="AN" title="NETHERLANDS ANTILLES"/>
+			<mapArea instanceName="NC" title="NEW CALEDONIA"/>
+			<mapArea instanceName="NZ" title="NEW ZEALAND"/>
+			<mapArea instanceName="NI" title="NICARAGUA"/>
+			<mapArea instanceName="NE" title="NIGER"/>
+			<mapArea instanceName="NG" title="NIGERIA"/>
+			<mapArea instanceName="NO" title="NORWAY"/>
+			<mapArea instanceName="OM" title="OMAN"/>
+			<mapArea instanceName="PK" title="PAKISTAN"/>
+			<mapArea instanceName="PW" title="PALAU"/>
+			<mapArea instanceName="PS" title="PALESTINIAN TERRITORIES"/>
+			<mapArea instanceName="PA" title="PANAMA"/>
+			<mapArea instanceName="PG" title="PAPUA NEW GUINEA"/>
+			<mapArea instanceName="PY" title="PARAGUAY"/>
+			<mapArea instanceName="PE" title="PERU"/>
+			<mapArea instanceName="PH" title="PHILIPPINES"/>
+			<mapArea instanceName="PL" title="POLAND"/>
+			<mapArea instanceName="PT" title="PORTUGAL"/>
+			<mapArea instanceName="PR" title="PUERTO RICO"/>
+			<mapArea instanceName="QA" title="QATAR"/>
+			<mapArea instanceName="RE" title="REUNION"/>
+			<mapArea instanceName="RO" title="ROMANIA"/>
+			<mapArea instanceName="RU" title="RUSSIAN FEDERATION"/>
+			<mapArea instanceName="RW" title="RWANDA"/>
+			<mapArea instanceName="KN" title="SAINT KITTS AND NEVIS"/>
+			<mapArea instanceName="LC" title="SAINT LUCIA"/>
+			<mapArea instanceName="MF" title="SAINT MARTIN"/>
+			<mapArea instanceName="VC" title="SAINT VINCENT AND THE GRENADINES"/>
+			<mapArea instanceName="WS" title="SAMOA"/>
+			<mapArea instanceName="ST" title="SAO TOME AND PRINCIPE"/>
+			<mapArea instanceName="SA" title="SAUDI ARABIA"/>
+			<mapArea instanceName="SN" title="SENEGAL"/>
+			<mapArea instanceName="RS" title="SERBIA"/>
+			<mapArea instanceName="SL" title="SIERRA LEONE"/>
+			<mapArea instanceName="SG" title="SINGAPORE"/>
+			<mapArea instanceName="SK" title="SLOVAKIA"/>
+			<mapArea instanceName="SI" title="SLOVENIA"/>
+			<mapArea instanceName="SB" title="SOLOMON ISLANDS"/>
+			<mapArea instanceName="SO" title="SOMALIA"/>
+			<mapArea instanceName="ZA" title="SOUTH AFRICA"/>
+			<mapArea instanceName="GS" title="SOUTH GEORGIA AND THE SOUTH SANDWICH ISLANDS"/>
+			<mapArea instanceName="ES" title="SPAIN"/>
+			<mapArea instanceName="LK" title="SRI LANKA"/>
+			<mapArea instanceName="SD" title="SUDAN"/>
+			<mapArea instanceName="SR" title="SURINAME"/>
+			<mapArea instanceName="SJ" title="SVALBARD AND JAN MAYEN"/>
+			<mapArea instanceName="SZ" title="SWAZILAND"/>
+			<mapArea instanceName="SE" title="SWEDEN"/>
+			<mapArea instanceName="CH" title="SWITZERLAND"/>
+			<mapArea instanceName="SY" title="SYRIAN ARAB REPUBLIC"/>
+			<mapArea instanceName="TW" title="TAIWAN"/>
+			<mapArea instanceName="TJ" title="TAJIKISTAN"/>
+			<mapArea instanceName="TZ" title="TANZANIA"/>
+			<mapArea instanceName="TH" title="THAILAND"/>
+			<mapArea instanceName="TL" title="TIMOR-LESTE"/>
+			<mapArea instanceName="TG" title="TOGO"/>
+			<mapArea instanceName="TO" title="TONGA"/>
+			<mapArea instanceName="TT" title="TRINIDAD AND TOBAGO"/>
+			<mapArea instanceName="TN" title="TUNISIA"/>
+			<mapArea instanceName="TR" title="TURKEY"/>
+			<mapArea instanceName="TM" title="TURKMENISTAN"/>
+			<mapArea instanceName="TC" title="TURKS AND CAICOS ISLANDS"/>
+			<mapArea instanceName="UG" title="UGANDA"/>
+			<mapArea instanceName="UA" title="UKRAINE"/>
+			<mapArea instanceName="AE" title="UNITED ARAB EMIRATES"/>
+			<mapArea instanceName="GB" title="UNITED KINGDOM"/>
+			<mapArea instanceName="US" title="UNITED STATES"/>
+			<mapArea instanceName="UY" title="URUGUAY"/>
+			<mapArea instanceName="UZ" title="UZBEKISTAN"/>
+			<mapArea instanceName="VU" title="VANUATU"/>
+			<mapArea instanceName="VE" title="VENEZUELA"/>
+			<mapArea instanceName="VN" title="VIET NAM"/>
+			<mapArea instanceName="VG" title="VIRGIN ISLANDS, BRITISH"/>
+			<mapArea instanceName="VI" title="VIRGIN ISLANDS, US"/>
+			<mapArea instanceName="EH" title="WESTERN SAHARA"/>
+			<mapArea instanceName="YE" title="YEMEN"/>
+			<mapArea instanceName="ZM" title="ZAMBIA"/>
+			<mapArea instanceName="ZW" title="ZIMBABWE"/>
+			<mapArea instanceName="GG" title="GUERNSEY"/>
+			<mapArea instanceName="JE" title="JERSEY"/>
+			<mapArea instanceName="IM" title="ISLE OF MAN"/>
+			<mapArea instanceName="MV" title="MALDIVES"/>
+		</areas>
+	</map>
+</mapList>

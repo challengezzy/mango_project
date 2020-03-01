@@ -1,0 +1,1661 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   xmlns:chart="smartx.flex.components.core.chart.*"
+		   xmlns:entity="smartx.bam.flex.modules.entitymodel.utils.*"
+		   xmlns:ext="smartx.flex.components.core.ext.*"
+		   xmlns:core="smartx.flex.components.core.*"
+		   width="100%" height="100%"
+		   creationComplete="init()"
+		   >
+	<fx:Declarations>
+		<!--<mx:HBox width="100%" id="listButtonBox" >
+		
+		</mx:HBox>
+		<fx:Object id="viewButton" label="查看记录" handler="{onView}" rightClick="true" />-->
+		
+		<mx:PopUpMenuButton label="操作" id="popUpMenuButton" dataProvider="{operationList}" openAlways="true" icon="{AssetsFileLib.operationIcon}"/>
+		
+		<mx:HBox width="100%" id="ruleListButtonBox" >
+			<mx:PopUpMenuButton label="操作" id="rulePopUpMenuButton" dataProvider="{ruleMenuArrayCol}" openAlways="true" icon="{AssetsFileLib.operationIcon}" />
+		</mx:HBox>
+		<fx:Object id="analyseBtn" label="实时分析" handler="{analyseBtn_clickHandler}" rightClick="true" />
+		<fx:Object id="hisAnalyseBtn" label="历史分析" handler="{hisAnalyseBtn_clickHandler}" rightClick="true" />
+		<fx:Object id="analyseOverviewBtn" label="分组总览" handler="{analyseOverviewBtn_clickHandler}" rightClick="true" />
+		
+		<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009"
+						xmlns:s="library://ns.adobe.com/flex/spark"
+						xmlns:mx="library://ns.adobe.com/flex/mx"
+						xmlns:containers="net.brandonmeyer.containers.*"
+						xmlns:ext="smartx.flex.components.core.ext.*" showCloseButton="true"
+						id = "dataChooserWindow"
+						width="450" height="150" close="PopUpManager.removePopUp(dataChooserWindow)"
+						title="选择日期">
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%">
+					<mx:Label text="开始日期" width="10%" /><mx:DateField width="90%" yearNavigationEnabled="true" id="startTimeDC" formatString="YYYY-MM-DD" selectedDate="{getDate()}" showToday="true" dayNames="{this.dayNames}" monthNames="{this.monthNames}" />
+					<mx:Label text="终止日期" width="10%"/><mx:DateField width="90%" yearNavigationEnabled="true" id="endTimeDC" formatString="YYYY-MM-DD" selectedDate="{getNextDate()}" showToday="true"  dayNames="{this.dayNames}" monthNames="{this.monthNames}" />
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="统计类型" width="10%" /><mx:ComboBox id="countTypeCob" labelField="name" dataProvider="{countTypeCol}" width="90" />
+					<mx:Label text="显示数量" width="10%" /><mx:NumericStepper id="countTxt" stepSize="1" value="5" minimum="1" maximum="{100}" cornerRadius="0" height="20" width="60"/>
+				</mx:HBox>
+				<mx:HRule width="100%" />
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="hisClickHandler(event)" />
+					<mx:Button label="取消" click="PopUpManager.removePopUp(dataChooserWindow)" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="chooseDatePanel" title="选择时间" showCloseButton="true" 
+						width="280" height="120" close="PopUpManager.removePopUp(chooseDatePanel)">
+			<mx:HBox width="100%" horizontalAlign="center" verticalAlign="middle" >
+				<mx:Label text="时间点:"/>
+				<mx:ComboBox id="createTimeCob" labelField="staticstime" dataProvider="{staticsTimeCol}" width="90%" />
+			</mx:HBox>
+			<mx:HRule width="100%" />
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="dateClickHandler(event)"  />
+				<mx:Button label="取消" click="PopUpManager.removePopUp(chooseDatePanel)" />
+			</mx:HBox>
+		</mx:TitleWindow>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.events.FCEvent;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.effects.Effect;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.formatters.DateFormatter;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Pixelate;
+			
+			import smartx.bam.flex.modules.common.variableControl.VariableControlBuilder;
+			import smartx.bam.flex.modules.common.variableControl.VariableControlComponent;
+			import smartx.bam.flex.modules.common.variableControl.VariableControlRefPanel;
+			import smartx.bam.flex.modules.common.variableControl.vo.VariableVo;
+			import smartx.bam.flex.modules.dqc.listener.AnalyseMTChartClickListener;
+			import smartx.bam.flex.modules.dqc.listener.GroupAnalyseMTChartClickListener;
+			import smartx.bam.flex.modules.dqc.listener.HisAnalyseMTChartClickListener;
+			import smartx.bam.flex.modules.entitymodel.QueryDatagridWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityModelListPanel;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.mtchart.MTMultiSeriesChartPanel;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.event.BillListPanelEvent;
+			import smartx.flex.components.styletemplate.MTStyleTemplate04;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			
+			//			private static const MODEL_CONTENT:String = "modelContent";
+			
+			[Bindable]
+			private var dayNames:Array = ["日","一","二","三","四","五","六"];
+			
+			[Bindable]
+			private var monthNames:Array =["一","二","三","四","五","六","七","八","九","十","十一","十二"];
+			
+			[Bindable]
+			private var columns:Array = new Array();
+			
+			[Bindable]
+			private var queryColumns:Array = new Array();
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			[Bindable]
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			public var initCondition:String = "";
+			
+			[Bindable]
+			private var debugMode:Boolean =  ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			
+			[Bindable]
+			public var switchEffect:Effect;
+			
+			//			[Bindable]
+			//			private var initQueryCondition:String = "";
+			
+			//			private var timeCondition:String = "";
+			
+			[Bindable]
+			private var menuArrayCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var ruleMenuArrayCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			//			private var selectedRuleCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var ruleAnalyseCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var ruleAnalyseQueryColumns:Array = new Array();
+			
+			[Bindable]
+			private var ruleAnalyseColumns:Array = new Array();
+			
+			[Bindable]
+			private var chartTypeCol:ArrayCollection = new ArrayCollection([
+				{label:"F系多组三维柱状图",data:"MSColumn3D"},
+				{label:"F系多组柱状图",data:"MSColumn2D"},
+				{label:"F系多组折线图",data:"MSLine"},
+				{label:"F系多组区域图",data:"MSArea"},
+				{label:"F系多组水平柱状图",data:"MSBar2D"},
+				{label:"F系多组三维水平柱状图",data:"MSBar3D"},
+				{label:"F系多组曲线图",data:"MSSpline"},
+				{label:"F系多组曲线区域图",data:"MSSplineArea"},
+				
+//				{label:"F系多组堆积柱状图",data:"StackedColumn2D"},
+//				{label:"F系多组三维堆积柱状图",data:"StackedColumn3D"},
+//				{label:"F系多组堆积水平柱状图",data:"StackedBar2D"},
+//				{label:"F系多组三维堆积水平柱状图",data:"StackedBar3D"},
+//				{label:"F系多组堆积区域图",data:"StackedArea2D"},
+//				
+//				{label:"F系多组滚动柱状图",data:"ScrollColumn2D"},
+//				{label:"F系多组滚动折线图",data:"ScrollLine2D"},
+//				{label:"F系多组滚动区域图",data:"ScrollArea2D"},
+//				{label:"F系多组滚动堆积柱状图",data:"ScrollStackedColumn2D"},
+//				{label:"F系多组滚动组合图",data:"ScrollCombi2D"},
+//				{label:"F系多组滚动组合图（双Y）",data:"ScrollCombiDY2D"},
+//				
+//				{label:"F系多组对数柱状图",data:"LogMSColumn2D"},
+//				{label:"F系多组对数折线图",data:"LogMSLine"},
+//				
+//				{label:"F系多组倒序Y轴柱状图",data:"InverseMSColumn2D"},
+//				{label:"F系多组倒序Y轴折线图",data:"InverseMSLine"},
+//				{label:"F系多组倒序Y轴区域图",data:"InverseMSArea"},
+//				
+//				{label:"F系雷达图",data:"Radar"},
+//				
+//				{label:"F系组合图",data:"MSCombi2D"},
+//				{label:"F系三维组合图",data:"MSCombi3D"},
+//				{label:"F系三维柱线组合图",data:"MSColumnLine3D"},
+//				{label:"F系组合图（双Y）",data:"MSCombiDY2D"},
+//				{label:"F系三维柱线组合图（双Y）",data:"MSColumn3DLineDY"},
+//				{label:"F系三维堆积柱线组合图（双Y）",data:"StackedColumn3DLineDY"}
+			]);
+			
+			[Bindable]
+			private var isVisible:Boolean = true;
+			
+			private var formService:RemoteObject;
+			private var bamService:RemoteObject;
+			
+			public var chart:MTMultiSeriesChartPanel;
+			
+			private var templet:MetadataTemplet;
+			
+			//0--实时分析,1--历史分析,2--总览
+			public var crrentAnalyseType:int= -1;
+			
+			//0--列表,1--任务
+			private var viewType:int = 0;
+			
+			private var paramsMap:Object = new Object();
+			
+			private var dateFormatter:DateFormatter = new DateFormatter();
+			
+			private var chooseRuleItem:Object;
+			
+			public var chartTitle:String = "";
+			
+			private var currentRuleXml:XML;
+			
+			[Bindable]
+			private var treeDataProvider:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var staticsTimeCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var countTypeCol:ArrayCollection = new ArrayCollection([
+				{name:"日",code:"DAY"},
+				{name:"月",code:"MONTH"},
+				{name:"年",code:"YEAR"}
+			]);
+			
+			private var rpc:RemoteObject;
+			
+			private var dataSql:String = "select be.name,be.code,pmt.content,pmt.owner from bam_entitymodel be,pub_metadata_templet pmt where be.mtcode = pmt.code";
+			
+			private var mtStyle04:MTStyleTemplate04;
+			
+			[Bindable]
+			public var isVisibleLabel:Boolean = false;
+			
+			[Bindable]
+			public var operationList:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				
+				dateFormatter.formatString = "YYYY-MM-DD";
+				
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "NAME";
+				dgColumn.headerText = "规则名称";
+				columns.push(dgColumn);
+				
+				queryColumns.push("NAME");
+				
+				rpc = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint)
+					rpc.endpoint = endpoint;
+				rpc.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				rpc.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("查询数据时出错!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				
+				if(switchEffect == null)
+					switchEffect = new Pixelate();
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getStaticsTimeHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("查询数据时出错!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.analyseEntityRule.addEventListener(ResultEvent.RESULT,analyseEntityRuleHandler);
+				bamService.analyseEntityRule.addEventListener(FaultEvent.FAULT,faultHander);
+				
+				bamService.analyseHisEntityRule.addEventListener(ResultEvent.RESULT,analyseHisEntityRuleHandler);
+				bamService.analyseHisEntityRule.addEventListener(FaultEvent.FAULT,faultHander);
+				
+				bamService.analyseEntity.addEventListener(ResultEvent.RESULT,analyseEntityHanlder);
+				bamService.analyseEntity.addEventListener(FaultEvent.FAULT,faultHander);
+				
+				bamService.generateDisplayEntitySqlContainConditionByMtCode.addEventListener(ResultEvent.RESULT,generateEntitySqlHandler);
+				bamService.generateDisplayEntitySqlContainConditionByMtCode.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("生成SQL错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				//				datasource = String(modelXml.datasource);
+				//				
+				//				paramsMap = this.getParamsMap(entityXml);
+				//				
+				//				this.entityName = String(entityXml.@name);
+				
+				initRulePopMenuButton();
+				
+				initExportButtons();
+				
+				refreshTree();
+				
+			}
+			
+			private function initExportButtons():void{
+				
+				operationList.removeAll();
+				
+				var exportCurDataBtn:Object = {label:"导出当前数据(CSV)",handler:exportCurData,icon:AssetsFileLib.exportIcon};
+				operationList.addItem(exportCurDataBtn);
+				
+				var exportAllDataBtn:Object = {label:"导出全部数据(CSV)",handler:exportAllData,icon:AssetsFileLib.exportIcon};
+				operationList.addItem(exportAllDataBtn);
+				
+				ruleAnalyseList.leftBtnBox.addChild(popUpMenuButton);
+				
+			}
+			
+			protected function operationButton_itemClickHandler(event:MenuEvent):void{
+				var item:* = event.item;
+				if(item.handler != null)
+					item.handler();
+			}
+			
+			private function exportCurData():void{
+				ruleAnalyseList.exportCurData(this.chartTitle);
+			}
+			
+			private function exportAllData():void{
+				ruleAnalyseList.exportAllData(this.chartTitle);
+			}
+			
+			override protected function createChildren():void{
+				super.createChildren();
+				dataListGrid.topArea.addChild(ruleListButtonBox);
+			}
+			
+			private function initRulePopMenuButton():void{
+				
+				ruleMenuArrayCol.removeAll();
+				ruleMenuArrayCol.addItem(analyseBtn);
+				ruleMenuArrayCol.addItem(hisAnalyseBtn);
+				ruleMenuArrayCol.addItem(analyseOverviewBtn);
+				
+				var menuPop:Menu = rulePopUpMenuButton.popUp as Menu;
+				menuPop.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler);
+				
+				if(dataListGrid.rightClickMenu != null){
+					dataListGrid.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler,false,0,true);
+					for each(var obj:* in ruleMenuArrayCol){
+						if(obj.rightClick){
+							dataListGrid.rightClickMenuItems.push(obj);
+						}
+					}
+				}
+				
+			}
+			
+			private function initPopMenuButton():void{
+				
+				menuArrayCol.removeAll();
+				//				menuArrayCol.addItem(viewButton);
+				//				
+				//				var menuPop:Menu = popUpMenuButton.popUp as Menu;
+				//				menuPop.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler);
+			}
+			
+			protected function popUpMenuButtonClickHandler(event:MenuEvent):void
+			{
+				var item:* = event.item;
+				if(item.handler != null)
+					item.handler();
+			}
+			
+			private function analyseEntityRuleHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var resultObj:Object  = event.result;
+				var resultArr:Array = resultObj["SIMPLEHASHVOARRAY"];
+				var dataProvider:ArrayCollection = new ArrayCollection();
+				dataProvider.removeAll();
+				ruleAnalyseCol.removeAll();
+				if(resultArr != null){
+					for each(var spm:SimpleHashVO in resultArr){
+						dataProvider.addItem(spm.dataMap);
+						ruleAnalyseCol.addItem(spm.dataMap);
+					}
+				}
+				
+				ruleAnalyseQueryColumns = new Array();
+				ruleAnalyseQueryColumns.push("rowname");
+				
+				ruleAnalyseColumns = new Array();
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "rowname";
+				dgColumn.headerText = "规则名称";
+				dgColumn.width = 255;
+				dgColumn.editable = false;
+				ruleAnalyseColumns.push(dgColumn);
+				
+				var dgColumn2:DataGridColumn = new DataGridColumn();
+				dgColumn2.dataField = "rowcount";
+				dgColumn2.headerText = "符合规则数量";
+				dgColumn2.width = 255;
+				dgColumn2.editable = false;
+				ruleAnalyseColumns.push(dgColumn2);
+				
+				var dgColumn3:DataGridColumn = new DataGridColumn();
+				dgColumn3.dataField = "totalcount";
+				dgColumn3.headerText = "总数量";
+				dgColumn3.width = 255;
+				dgColumn3.editable = false;
+				ruleAnalyseColumns.push(dgColumn3);
+				
+				ruleAnalyseList.queryColumns = ruleAnalyseQueryColumns;
+				ruleAnalyseList.columns=ruleAnalyseColumns;
+				ruleAnalyseList.dataArray = ruleAnalyseCol;
+				
+				ruleAnalyseList.refresh();
+				
+				var contentXml:XML = <chart>
+					   <charttype>MSColumn3D</charttype>
+					   <rowsLimit/>
+					   <datasource type="" sql="">datasource_dqc</datasource>
+					   <chartname/>
+					   <refreshinterval/>
+					   <orderby/>
+					   <filter/>
+					   <bindSynonymses/>
+					   <extend>
+						 <isShowLabel>true</isShowLabel>
+						 <xaxianame></xaxianame>
+						 <pyaxianame>记录数</pyaxianame>
+						 <subseriesnames></subseriesnames>
+						 <datamode>columnMode</datamode>
+						 <items>
+						   <item dataField="rowcount" labelField="rowname" seriesNameField="符合条件记录数" color="ffff00" linkField="info" type="Column"/>
+						   <item dataField="totalcount" labelField="rowname" seriesNameField="总记录数" linkField="info" color="ff0000" type="Column"/>
+						 </items>
+					   </extend>
+					 </chart>;
+				
+				templet = new MetadataTemplet();
+				templet.contentXML = contentXml;
+				
+				chart = new  MTMultiSeriesChartPanel();
+				chart.isShowRightClickMenu = false;
+				chart.chartId = "";
+				chart.metadataTemplet = templet;
+				chart.endpoint = endpoint;
+				chart.percentHeight = 100;
+				chart.percentWidth = 100;
+				chart.dashboardCode = "";
+				chart.isAutoRefresh = false;
+				chart.chartClickListeners = [new AnalyseMTChartClickListener()];
+				
+				this.chartTitle = "实时分析";
+				chart.title =  chartTitle;
+				titleLabel.text = chartTitle;
+				
+				chart.dataProvider= dataProvider;
+				try{
+					var childrenArr:Array = chartPanel.getChildren();
+					if(childrenArr != null && childrenArr.length >0 ){
+						chartPanel.removeAllChildren();
+					}
+				}catch(error:Error) {
+					
+				}
+				
+				chartPanel.addChild(chart);
+				
+				chart.addEventListener(MTChartEvent.INIT_COMPLETE,function(event:MTChartEvent):void{
+					chart.refreshComplete();
+					chart.hideChartButtonBox();
+				});
+				
+				crrentAnalyseType = 0;
+				
+				mainStack.selectedChild = chartBox;
+				
+			}
+			
+			private function analyseHisEntityRuleHandler(event:ResultEvent):void{
+				
+				OperatingTipUtil.endOperat();
+				
+				var resultObj:Object  = event.result;
+				var resultArr:Array = resultObj["SIMPLEHASHVOARRAY"];
+				var dataProvider:ArrayCollection = new ArrayCollection();
+				dataProvider.removeAll();
+				ruleAnalyseCol.removeAll();
+				for each(var spm:SimpleHashVO in resultArr){
+					dataProvider.addItem(spm.dataMap);
+					ruleAnalyseCol.addItem(spm.dataMap);
+				}
+				
+				var ruleName:String = "";
+				var item:Object = dataListGrid.getSelectedRowValue();
+				if(item != null){
+					var ruleXml:XML = new XML(item["RULECONTENT"]);
+					ruleName = item["NAME"];
+				}
+				
+				ruleAnalyseQueryColumns = new Array();
+				ruleAnalyseQueryColumns.push("rulename");
+				ruleAnalyseQueryColumns.push("batchno");
+				
+				ruleAnalyseColumns = new Array();
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "rulename";
+				dgColumn.headerText = "规则名称";
+				dgColumn.width = 255;
+				ruleAnalyseColumns.push(dgColumn);
+				
+				var dgColumn2:DataGridColumn = new DataGridColumn();
+				dgColumn2.dataField = "batchno";
+				dgColumn2.headerText = "批次号";
+				dgColumn2.width = 255;
+				ruleAnalyseColumns.push(dgColumn2);
+				
+				var dgColumn3:DataGridColumn = new DataGridColumn();
+				dgColumn3.dataField = "rowcount";
+				dgColumn3.headerText = "符合规则数量";
+				dgColumn3.width = 255;
+				ruleAnalyseColumns.push(dgColumn3);
+				
+				var dgColumn4:DataGridColumn = new DataGridColumn();
+				dgColumn4.dataField = "totalcount";
+				dgColumn4.headerText = "总数量";
+				dgColumn4.width = 255;
+				ruleAnalyseColumns.push(dgColumn4);
+				
+				ruleAnalyseList.queryColumns = ruleAnalyseQueryColumns;
+				ruleAnalyseList.columns=ruleAnalyseColumns;
+				ruleAnalyseList.dataArray = ruleAnalyseCol;
+				
+				ruleAnalyseList.refresh();
+				
+				var contentXml:XML = <chart>
+									  <bindSynonymses/>
+									  <charttype>MSSpline</charttype>
+									  <rowsLimit/>
+									  <datasource type="rdms" sql="">datasource_smartdq</datasource>
+									  <chartname/>
+									  <backupChartname/>
+									  <refreshinterval/>
+									  <orderby/>
+									  <filter/>
+									  <backupFilter/>
+									  <extend>
+										<isShowLabel>true</isShowLabel>
+										<xaxianame/>
+										<pyaxianame>记录数</pyaxianame>
+										<syaxianame/>
+										<subseriesnames/>
+										<height/>
+										<width/>
+										<datamode>rowMode</datamode>
+										<items>
+										  <item dataField="rowcount" labelField="version" xShowField="batchno" seriesNameField="" color="" linkField="info" nameField="rulename" type="Column"/>
+										</items>
+									  </extend>
+									</chart>;
+				
+				templet = new MetadataTemplet();
+				templet.contentXML = contentXml;
+				
+				chart = new  MTMultiSeriesChartPanel();
+				chart.isShowRightClickMenu = false;
+				chart.chartId = "";
+				chart.metadataTemplet = templet;
+				chart.endpoint = endpoint;
+				chart.percentHeight = 100;
+				chart.percentWidth = 100;
+				chart.dashboardCode = "";
+				chart.isAutoRefresh = false;
+				chart.chartClickListeners = [new HisAnalyseMTChartClickListener()];
+				
+				this.chartTitle = "历史分析";
+				chart.title =  chartTitle;
+				titleLabel.text = chartTitle;
+				
+				chart.dataProvider= dataProvider;
+				try{
+					var childrenArr:Array = chartPanel.getChildren();
+					if(childrenArr != null && childrenArr.length >0 ){
+						chartPanel.removeAllChildren();
+					}
+				}catch(error:Error) {
+					
+				}
+				
+				chartPanel.addChild(chart);
+				
+				chart.addEventListener(MTChartEvent.INIT_COMPLETE,function(event:MTChartEvent):void{
+					chart.refreshComplete();
+					chart.hideChartButtonBox();
+				});
+				
+				charTypeCob.selectedIndex = 6;
+				
+				crrentAnalyseType = 1;
+				mainStack.selectedChild = chartBox;
+				
+			}
+			
+			private function analyseEntityHanlder(event:ResultEvent):void{
+				
+				OperatingTipUtil.endOperat();
+				
+				var resultObj:Object  = event.result;
+				var resultArr:Array = resultObj["SIMPLEHASHVOARRAY"];
+				var dataProvider:ArrayCollection = new ArrayCollection();
+				dataProvider.removeAll();
+				ruleAnalyseCol.removeAll();
+				var pickItem:Object = null;
+				var maxValue:int = 0;
+				for each(var spm:SimpleHashVO in resultArr){
+					var item:Object = spm.dataMap;
+					var tempValue:int = parseInt(item["totalcount"]);
+					if(tempValue >= maxValue){
+						maxValue = tempValue;
+						pickItem = item;
+					}
+					dataProvider.addItem(spm.dataMap);
+					ruleAnalyseCol.addItem(spm.dataMap);
+				}
+				
+				ruleAnalyseQueryColumns = new Array();
+				ruleAnalyseQueryColumns.push("batchno");
+				ruleAnalyseQueryColumns.push("rulename");
+				ruleAnalyseQueryColumns.push("columnlabel");
+				
+				ruleAnalyseColumns = new Array();
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "rulename";
+				dgColumn.headerText = "规则名称";
+				dgColumn.width = 255;
+				ruleAnalyseColumns.push(dgColumn);
+				
+				var dgColumn2:DataGridColumn = new DataGridColumn();
+				dgColumn2.dataField = "batchno";
+				dgColumn2.headerText = "批次号";
+				dgColumn2.width = 255;
+				ruleAnalyseColumns.push(dgColumn2);
+				
+				var dgColumn4:DataGridColumn = new DataGridColumn();
+				dgColumn4.dataField = "columnlabel";
+				dgColumn4.headerText = "分组字段值";
+				dgColumn4.width = 255;
+				ruleAnalyseColumns.push(dgColumn4);
+				
+				var dgColumn3:DataGridColumn = new DataGridColumn();
+				dgColumn3.dataField = "rowcount";
+				dgColumn3.headerText = "数量";
+				dgColumn3.width = 255;
+				ruleAnalyseColumns.push(dgColumn3);
+				
+				ruleAnalyseList.queryColumns = ruleAnalyseQueryColumns;
+				ruleAnalyseList.columns=ruleAnalyseColumns;
+				ruleAnalyseList.dataArray = ruleAnalyseCol;
+				
+				ruleAnalyseList.refresh();
+				
+				var contentXml:XML = <chart>
+									  <charttype>MSColumn3D</charttype>
+									  <rowsLimit/>
+									  <datasource type="rdms" sql=""></datasource>
+									  <chartname/>
+									  <refreshinterval/>
+									  <orderby/>
+									  <filter/>
+									  <bindSynonymses/>
+									  <extend>
+										<isShowLabel>true</isShowLabel>
+										<xaxianame></xaxianame>
+										<pyaxianame>记录数</pyaxianame>
+										<syaxianame/>
+										<subseriesnames></subseriesnames>
+										<datamode>rowMode</datamode>
+										<items>
+										  <item dataField="rowcount" labelField="columnlabel" seriesNameField="" color="ffff00" linkField="info" nameField="rulename" type="Column"/>
+										</items>
+									  </extend>
+									</chart>;
+				
+				contentXml.datasource = null;
+				
+				templet = new MetadataTemplet();
+				templet.contentXML = contentXml;
+				
+				chart = new  MTMultiSeriesChartPanel();
+				chart.isShowRightClickMenu = false;
+				chart.chartId = "";
+				chart.metadataTemplet = templet;
+				chart.endpoint = endpoint;
+				chart.percentHeight = 100;
+				chart.percentWidth = 100;
+				chart.dashboardCode = "";
+				chart.isAutoRefresh = false;
+				chart.chartClickListeners = [new GroupAnalyseMTChartClickListener()];
+				
+				this.chartTitle = "分组总览";
+				chart.title =  chartTitle;
+				titleLabel.text = chartTitle;
+				
+				chart.dataProvider= dataProvider;
+				try{
+					var childrenArr:Array = chartPanel.getChildren();
+					if(childrenArr != null && childrenArr.length >0 ){
+						chartPanel.removeAllChildren();
+					}
+				}catch(error:Error) {
+					
+				}
+				
+				chartPanel.addChild(chart);
+				
+				chart.addEventListener(MTChartEvent.INIT_COMPLETE,function(event:MTChartEvent):void{
+					chart.refreshComplete();
+					chart.hideChartButtonBox();
+				});
+				
+				crrentAnalyseType = 2;
+				mainStack.selectedChild = chartBox;
+			}
+			
+			private function faultHander(event:FaultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("获取数据出错",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private function getFilter(entityXml:XML):String{
+				var filterStr:String = "";
+				var valueMap:Object = new Object();
+				if(entityXml != null ){
+					for each(var itemXml:XML in entityXml.groupAttributes.groupAttribute){
+						var name:String = String(itemXml.@name);
+						var parameter:String = String(itemXml.@parameter);
+						var parameterValue:String = "";
+						if(!BAMUtil.isEmpty(parameter)){
+							var tempValue:Object = ClientEnviorment.getInstance().getVar(parameter);
+							if(tempValue != null){
+								parameterValue = tempValue as String;
+							}
+						}
+						valueMap[name] = parameterValue;
+					}
+					
+					var objInfo:Object = ObjectUtil.getClassInfo(valueMap); 
+					var fieldName:Array = objInfo["properties"] as Array; 
+					for each(var q:QName in fieldName){ 
+						var key:String = q.localName;
+						var value:String = valueMap[key] as String;
+						if(BAMUtil.isEmpty(filterStr)){
+							filterStr = " AND "+key+"='"+value+"'";
+						}else{
+							filterStr = filterStr + " AND "+key+"='"+value+"'";
+						}
+					}
+					
+				}
+				return filterStr;
+			}
+			
+			//			public function refresh():void{
+			//				dataListGrid.refreshData();
+			//			}
+			//			
+			//			public function getSelectedRowValue():Object{
+			//				return dataListGrid.;
+			//			}
+			//			
+			//			public function getSelectedRowValues():Array{
+			//				return dataListGrid.selectedItems;
+			//			}
+			
+			
+			protected function analyseBtn_clickHandler():void
+			{
+				var selectedItems:Array = dataListGrid.getSelectedRowValues();
+				if(selectedItems != null && selectedItems.length >0){
+					var ruleArr:Array = new Array();
+					//					selectedRuleCol.removeAll();
+					for each(var ruleItem:Object in selectedItems){
+						//						selectedRuleCol.addItem(ruleItem);
+						var code:String = ruleItem["CODE"];
+						var name:String = ruleItem["NAME"];
+						var entityCode:String = ruleItem["ENTITYCODE"];
+						var modelCode:String = ruleItem["ENTITYMODELCODE"];
+						var ruleContent:String = ruleItem["RULECONTENT"];
+						
+						var entityMtCode:String = BAMConst.ENTITY_MT_PREFIX+modelCode+"_"+entityCode;
+						var entityTemplete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(entityMtCode);
+						if(entityTemplete!=null){
+							var tempEnityXml:XML = entityTemplete.contentXML;
+							paramsMap = this.getParamsMap(tempEnityXml);
+						}
+						
+						
+						var tempXml:XML = new XML(ruleContent);
+						var groupcolumn:String = String(tempXml.@groupcolumn);
+						var groupcolumnValue:String = this.paramsMap[groupcolumn];
+						
+						var datasource:String =  null;
+						var modelMtCode:String = BAMConst.ENTITY_MODEL_MT_PREFIX+modelCode;
+						var templete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(modelMtCode);
+						if(templete!=null){
+							var tempModelXml:XML = templete.contentXML;
+							datasource = String(tempModelXml.datasource);
+						}
+						
+						var ruleObj:Object = new Object();
+						ruleObj["ruleCode"] = code;
+						ruleObj["ruleName"] = name;
+						ruleObj["entityCode"] = entityCode;
+						ruleObj["modelCode"] = modelCode;
+						ruleObj["groupColumnName"] = groupcolumn;
+						ruleObj["groupColumnValue"] = groupcolumnValue;
+						ruleObj["datasource"] = datasource;
+						
+						ruleArr.push(ruleObj);
+						
+					}
+					
+					isVisible = true;
+					
+					OperatingTipUtil.startOperat("正在分析....");
+					bamService.analyseEntityRule(ruleArr);
+					
+				}else{
+					SmartXMessage.show("请先选择一条或多条记录",SmartXMessage.MESSAGE_WARN);
+				}
+				
+			}
+			
+			protected function hisAnalyseBtn_clickHandler():void
+			{
+				
+				PopUpManager.addPopUp(dataChooserWindow,this.root,true);
+				PopUpManager.centerPopUp(dataChooserWindow);
+				
+			}
+			
+			protected function analyseOverviewBtn_clickHandler():void
+			{
+				
+				var selectedItems:Array = dataListGrid.getSelectedRowValues();
+				var ruleCodeStr:String ="";
+				if(selectedItems != null && selectedItems.length >0){
+					var flag:Boolean = true;
+					for each(var ruleItem:Object in selectedItems){
+						
+						//						selectedRuleCol.addItem(ruleItem);
+						
+						var code:String = ruleItem["CODE"];
+						var name:String = ruleItem["NAME"];
+						var entityCode:String = ruleItem["ENTITYCODE"];
+						var modelCode:String = ruleItem["ENTITYMODELCODE"];
+						var ruleContent:String = ruleItem["RULECONTENT"];
+						
+						if(BAMUtil.isEmpty(ruleCodeStr)){
+							ruleCodeStr = "'"+code+"'";
+						}else{
+							ruleCodeStr = ruleCodeStr+",'"+code+"'";
+						}
+						
+						var entityMtCode:String = BAMConst.ENTITY_MT_PREFIX+modelCode+"_"+entityCode;
+						var entityTemplete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(entityMtCode);
+						if(entityTemplete!=null){
+							var tempEnityXml:XML = entityTemplete.contentXML;
+							paramsMap = this.getParamsMap(tempEnityXml);
+						}
+						var tempXml:XML = new XML(ruleContent);
+						var groupcolumn:String = String(tempXml.@groupcolumn);
+						var groupcolumnValue:String = this.paramsMap[groupcolumn];
+						
+						if(groupcolumnValue == VariableVo.IGNORE_VALUE  || groupcolumnValue == null || groupcolumnValue == "" || groupcolumnValue == VariableVo.IGNORE_VALUE|| groupcolumnValue == "ALL" || groupcolumnValue == "全部"|| groupcolumnValue == "-1"){
+							continue;
+						}else{
+							SmartXMessage.show("无权限查看:["+name+"]的分组总览情况!");
+							flag = false;
+							break;
+						}
+						
+					}
+				}else{
+					SmartXMessage.show("请先选择一条或多条记录",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(!flag){
+					return;
+				}
+				
+				OperatingTipUtil.startOperat("正在查询....");
+				formService.getSimpleHashVoArrayByDS(BAMConst.DATASOURCE_SMARTDQ,"select to_char(createtime,'YYYY-MM-DD hh24:MI:SS') staticstime from (select distinct t.createtime from dq_entity_statistics t where t.rulecode in ("+ruleCodeStr+")  order by t.createtime desc) where rownum<=31");
+				
+			}
+			
+			protected function returnBtn_clickHandler(event:MouseEvent):void
+			{
+				crrentAnalyseType = -1;
+				charTypeCob.selectedIndex =0;
+				if(viewType == 0){
+					isVisibleLabel = false;
+					mainStack.selectedChild = listBox;
+				}else{
+					isVisibleLabel = true;
+					mainStack.selectedChild = taskListVbox;
+				}
+				
+			}
+			
+			private function return_instantAnalyseChart():void{
+				mainStack.selectedChild = chartBox;
+			}
+			
+			//			protected function detailBtn_clickHandler(event:MouseEvent):void
+			//			{
+			//				
+			//				if(selectedRuleCol.length ==1 ){
+			//					chooseRuleItem = selectedRuleCol.getItemAt(0);
+			////					showDetailHandler();
+			//				}else{
+			//					PopUpManager.addPopUp(chooseRulePanel,this.root,true);
+			//					PopUpManager.centerPopUp(chooseRulePanel);
+			//					chooseRuleList.dataArray = this.selectedRuleCol;
+			//					chooseRuleList.refresh();
+			//				}
+			//				
+			//			}
+			
+			protected function charTypeCob_changeHandler(event:ListEvent):void
+			{
+				var item:Object = charTypeCob.selectedItem;
+				if(item != null ){
+					var chartType:String = item["data"] as String;
+					if(chart != null ){
+						
+						templet = chart.metadataTemplet;
+						var tempXml:XML = templet.contentXML;
+						tempXml.charttype = chartType;
+						
+						templet.contentXML = tempXml;
+						
+						var tempDataProvider:ArrayCollection = chart.dataProvider;
+						
+						var tempChart:MTMultiSeriesChartPanel = new  MTMultiSeriesChartPanel();
+						tempChart.isShowRightClickMenu = false;
+						tempChart.chartId = "";
+						tempChart.metadataTemplet = templet;
+						tempChart.endpoint = endpoint;
+						tempChart.percentHeight = 100;
+						tempChart.percentWidth = 100;
+						tempChart.dashboardCode = "";
+						tempChart.isAutoRefresh = false;
+						
+						chart.title =  chartTitle;
+						titleLabel.text = chartTitle;
+						
+						if(crrentAnalyseType == 0 ){
+							tempChart.chartClickListeners = [new AnalyseMTChartClickListener()];
+						}else if(crrentAnalyseType == 1){
+							tempChart.chartClickListeners = [new HisAnalyseMTChartClickListener()];
+						}else if(crrentAnalyseType == 2){
+							tempChart.chartClickListeners = [new GroupAnalyseMTChartClickListener()]
+						}
+						
+						tempChart.dataProvider= tempDataProvider;
+						try{
+							var childrenArr:Array = chartPanel.getChildren();
+							if(childrenArr != null && childrenArr.length >0 ){
+								chartPanel.removeAllChildren();
+							}
+						}catch(error:Error) {
+							
+						}
+						
+						chartPanel.addChild(tempChart);
+						
+						tempChart.addEventListener(MTChartEvent.INIT_COMPLETE,function(event:MTChartEvent):void{
+							tempChart.refreshComplete();
+							tempChart.hideChartButtonBox();
+						});
+						
+						chart = null;
+						
+						chart = tempChart;
+						
+					}
+				}
+			}
+			
+			private function generateEntitySqlHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				
+				var sql:String = event.result as String;
+				
+				//				var groupcolumn:String = String(this.currentRuleXml.@groupcolumn);
+				//				if(groupcolumn != null && groupcolumn != ""){
+				//					var groupcolumnValue:String = this.paramsMap[groupcolumn];
+				//					if(groupcolumnValue != null && groupcolumnValue != "" && groupcolumnValue != "-1" && groupcolumnValue != VariableVo.IGNORE_VALUE){
+				//						sql = "select * from ("+sql+") where "+groupcolumn+"='"+groupcolumnValue+"'";
+				//					}
+				//				}
+				
+				var ruleCode:String = chooseRuleItem["CODE"];
+				var ruleName:String = chooseRuleItem["NAME"];
+				var entityCode:String = chooseRuleItem["ENTITYCODE"];
+				var modelCode:String = chooseRuleItem["ENTITYMODELCODE"];
+				var ruleContent:String = chooseRuleItem["RULECONTENT"];
+				
+				var entityMtCode:String = BAMConst.ENTITY_MT_PREFIX+modelCode+"_"+entityCode;
+				var entityTemplete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(entityMtCode);
+				var tempEnityXml:XML = null;
+				if(entityTemplete!=null){
+					tempEnityXml = entityTemplete.contentXML;
+				}
+				
+				var modelMtCode:String = BAMConst.ENTITY_MODEL_MT_PREFIX+modelCode;
+				var templete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(modelMtCode);
+				var tempModelXml:XML = null;
+				var datasource:String = null;
+				if(templete!=null){
+					tempModelXml = templete.contentXML;
+					datasource = String(tempModelXml.datasource);
+				}
+				
+				var entityModelListPanel:EntityModelListPanel = new EntityModelListPanel;
+				entityModelListPanel.sharedObjectSpaceName = modelCode.concat("_").concat(entityCode);
+				entityModelListPanel.sharedObjectCode = ruleCode;
+				entityModelListPanel.debugMode = debugMode;
+				entityModelListPanel.attributesXml = tempEnityXml.@type=="virtual"?tempEnityXml.attributes[0]:EntityUtil.displayAttributeWrap(tempEnityXml,tempModelXml);EntityUtil.displayAttributeWrap(tempEnityXml,tempModelXml);
+				entityModelListPanel.isQueryAfterCompleted = true;
+				entityModelListPanel.sql = sql;
+				entityModelListPanel.pageSize = 33;
+				entityModelListPanel.dataSource = datasource;
+				
+				//				var arr:Array = modelListVbox.getChildren();
+				//				if(arr != null && arr.length >0){
+				//					modelListVbox.removeAllChildren();
+				//				}
+				//				
+				//				modelListVbox.addChild(entityModelListPanel);
+				//				
+				//				mainStack.selectedChild = instantAnalyseDetailVbox;
+			}
+			
+			
+			//			private function onView():void{
+			//				
+			//				var selectedItem:Object = hisListPanel.getSelectedRowValue();
+			//				if(selectedItem != null ){
+			//					var statisticsId:String = selectedItem["ESID"] as String;
+			//					var detailTableName:String = selectedItem["DETAILTABLENAME"] as String;
+			//					var mtContent:String = selectedItem["MTCONTENT"] as String;
+			//					var modelCode:String = selectedItem["ENTITYMODELCODE"] as String;
+			//					var entityCode:String = selectedItem["ENTITYCODE"] as String;
+			//					var ruleCode:String = selectedItem["RULECODE"] as String;
+			//					
+			//					var groupcolumn:String = String(currentRuleXml.@groupcolumn);
+			//					var groupcolumnValue:String = this.paramsMap[groupcolumn];
+			//					
+			//					var attrXml:XML =  new XML(mtContent);
+			//					var sql:String = "select * from "+detailTableName+" where STATISTICSID='"+statisticsId+"'";
+			//					
+			//					if(crrentAnalyseType !=2 && !BAMUtil.isEmpty(groupcolumn) && (!BAMUtil.isEmpty(groupcolumnValue) && groupcolumnValue != '全部' && groupcolumnValue != 'ALL')&&groupcolumnValue != VariableVo.IGNORE_VALUE){
+			//						sql = sql + " AND "+groupcolumn+"='"+groupcolumnValue+"'";
+			//					}
+			//					
+			//					
+			//					var queryDatagridWindow:QueryDatagridWindow = new QueryDatagridWindow(); 
+			//					queryDatagridWindow.attributesXml = attrXml;
+			//					queryDatagridWindow.sharedObjectCode = detailTableName;
+			//					queryDatagridWindow.sharedObjectSpaceName = "HIS_"+BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_FILTERINFO;
+			//					queryDatagridWindow.sql = sql;
+			//					queryDatagridWindow.dataSource = BAMConst.DATASOURCE_SMARTDQ;
+			//					queryDatagridWindow.debugMode = debugMode;
+			//					
+			//					if(desktop != null){
+			//						PopUpManager.addPopUp(queryDatagridWindow,desktop,true);
+			//					}else{
+			//						PopUpManager.addPopUp(queryDatagridWindow,this,true);
+			//					}
+			//					
+			//					PopUpManager.centerPopUp(queryDatagridWindow);
+			//					
+			//					queryDatagridWindow.refresh();
+			//				}
+			//			}
+			
+			protected function hisAnalyseDetailVbox_showHandler(event:FlexEvent):void
+			{
+				initPopMenuButton();
+				
+				//				if(hisListPanel.rightClickMenu != null){
+				//					hisListPanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,popUpMenuButtonClickHandler,false,0,true);
+				//					for each(var obj:* in menuArrayCol){
+				//						if(obj.rightClick){
+				//							hisListPanel.rightClickMenuItems.push(obj);
+				//						}
+				//					}
+				//				}
+				//				
+				//				hisListPanel.query(false,true,true);
+				
+			}
+			
+			protected function dataListGrid_queryEndHandler(event:BillListPanelEvent):void
+			{
+				this.initCondition = "";
+			}
+			
+			private function getParamsMap(entityXml:XML):Object{
+				var paramsMap:Object = new Object();
+				if(entityXml != null ){
+					for each(var itemXml:XML in entityXml.groupAttributes.groupAttribute){
+						var name:String = String(itemXml.@name);
+						var parameter:String = String(itemXml.@parameter);
+						var parameterValue:String = "";
+						if(!BAMUtil.isEmpty(parameter)){
+							var tempValue:Object = ClientEnviorment.getInstance().getVar(parameter);
+							if(tempValue != null){
+								parameterValue = tempValue as String;
+							}
+						}
+						paramsMap[name] = parameterValue;
+					}
+					
+				}
+				return paramsMap;
+			}
+			
+			//			private function chooseRuleList_doubleClickHandler():void{
+			//				PopUpManager.removePopUp(chooseRulePanel)
+			//				chooseRuleItem = chooseRuleList.getSelectedRowValue();
+			////				showDetailHandler();
+			//			}
+			
+			//			protected function showDetailHandler():void
+			//			{
+			//				if(chooseRuleItem == null ){
+			//					return;
+			//				}
+			//				var code:String = chooseRuleItem["CODE"];
+			//				var name:String = chooseRuleItem["NAME"];
+			//				var entityCode:String = chooseRuleItem["ENTITYCODE"];
+			//				var modelCode:String = chooseRuleItem["ENTITYMODELCODE"];
+			//				var ruleContent:String = chooseRuleItem["RULECONTENT"];
+			//				if(crrentAnalyseType == 0){
+			//					currentRuleXml= new XML(ruleContent);
+			//					if(currentRuleXml != null ){
+			//						
+			//						var column:String = String(this.currentRuleXml.@groupcolumn);
+			//						var value:String = "";
+			//						var conditionStr:String ="";
+			//						if(column != null && column != ""){
+			//							
+			//							value = this.paramsMap[column];
+			//							
+			//							if(value != null && value != "" && value != "-1" && value != VariableVo.IGNORE_VALUE){
+			//								
+			//								conditionStr = " where "+column+"='"+value+"'";
+			//								
+			//							}
+			//						}
+			//						
+			//						OperatingTipUtil.startOperat("正在分析....");
+			//						bamService.generateDisplayEntitySqlContainConditionByMtCode(BAMConst.ENTITY_MT_PREFIX+modelCode+"_"+entityCode,BAMConst.ENTITY_MODEL_MT_PREFIX+modelCode,BAMConst.ENTITY_MT_RULE_PREFEX+code,conditionStr,null);
+			//					}
+			//					
+			//				}else if(crrentAnalyseType == 1){
+			//					currentRuleXml = new XML(chooseRuleItem["RULECONTENT"]);
+			//					var groupcolumn:String = String(currentRuleXml.@groupcolumn);
+			//					var groupcolumnValue:String = this.paramsMap[groupcolumn];
+			//					var sql:String = "select distinct t.id from dq_entity_statistics t, dq_entity_statistics_group g where t.entitymodelcode = '"+chooseRuleItem["ENTITYMODELCODE"]+"' and t.entitycode = '"+chooseRuleItem["ENTITYCODE"]+"' and t.rulecode = '"+chooseRuleItem["CODE"]+"' and t.id = g.statisticsid";
+			//					if(!BAMUtil.isEmpty(groupcolumn) && (!BAMUtil.isEmpty(groupcolumnValue) && groupcolumnValue != '全部' && groupcolumnValue != 'ALL')&& groupcolumnValue != VariableVo.IGNORE_VALUE){
+			//						sql = sql + " and g.groupcolumn = '"+groupcolumn+"' and g.columnvalue = '"+groupcolumnValue+"'";
+			//					}
+			//					initQueryCondition = timeCondition+" AND ESID in("+sql+")";
+			////					mainStack.selectedChild = hisAnalyseDetailVbox;
+			//				}else if(crrentAnalyseType == 2){
+			//					currentRuleXml = new XML(chooseRuleItem["RULECONTENT"]);
+			//					var _sql:String = "select distinct t.id from dq_entity_statistics t, dq_entity_statistics_group g where t.entitymodelcode = '"+chooseRuleItem["ENTITYMODELCODE"]+"' and t.entitycode = '"+chooseRuleItem["ENTITYCODE"]+"' and t.rulecode = '"+chooseRuleItem["CODE"]+"' and t.id = g.statisticsid";
+			//					initQueryCondition = timeCondition+" AND ESID in("+_sql+")";
+			////					mainStack.selectedChild = hisAnalyseDetailVbox;
+			//				}
+			//			}
+			
+			protected function hisClickHandler(event:MouseEvent):void
+			{
+				var selectedItems:Array = dataListGrid.getSelectedRowValues();
+				if(selectedItems != null && selectedItems.length >0){
+					
+					var startTime:String = startTimeDC.text;
+					var endTime:String  = endTimeDC.text;
+					var limitCount:Number = countTxt.value;
+					
+					var item:Object = countTypeCob.selectedItem; 
+					if(item == null ){
+						SmartXMessage.show("统计维度不能为空!");
+						return;
+					}
+					var countType:String = item["code"] as String;
+					
+					if(limitCount==0){
+						SmartXMessage.show("数量不能为0!");
+						return;
+					}
+					
+					PopUpManager.removePopUp(dataChooserWindow);
+					
+					var rulesInfoArr:Array = new Array();
+					//					selectedRuleCol.removeAll();
+					for each(var ruleItem:Object in selectedItems){
+						
+						//						selectedRuleCol.addItem(ruleItem);
+						
+						var code:String = ruleItem["CODE"];
+						var name:String = ruleItem["NAME"];
+						var entityCode:String = ruleItem["ENTITYCODE"];
+						var modelCode:String = ruleItem["ENTITYMODELCODE"];
+						var ruleContent:String = ruleItem["RULECONTENT"];
+						
+						var entityMtCode:String = BAMConst.ENTITY_MT_PREFIX+modelCode+"_"+entityCode;
+						var entityTemplete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(entityMtCode);
+						if(entityTemplete!=null){
+							var tempEnityXml:XML = entityTemplete.contentXML;
+							paramsMap = this.getParamsMap(tempEnityXml);
+						}
+						
+						
+						var tempXml:XML = new XML(ruleContent);
+						var groupcolumn:String = String(tempXml.@groupcolumn);
+						var groupcolumnValue:String = this.paramsMap[groupcolumn];
+						
+						var datasource:String =  null;
+						var modelMtCode:String = BAMConst.ENTITY_MODEL_MT_PREFIX+modelCode;
+						var templete:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(modelMtCode);
+						if(templete!=null){
+							var tempModelXml:XML = templete.contentXML;
+							datasource = String(tempModelXml.datasource);
+						}
+						
+						var ruleObj:Object = new Object();
+						ruleObj["ruleCode"] = code;
+						ruleObj["ruleName"] = name;
+						ruleObj["entityCode"] = entityCode;
+						ruleObj["modelCode"] = modelCode;
+						ruleObj["groupColumnName"] = groupcolumn;
+						ruleObj["groupColumnValue"] = groupcolumnValue;
+						ruleObj["startTime"] = startTime;
+						ruleObj["endTime"] = endTime;
+						ruleObj["type"] = countType;
+						ruleObj["limitCount"] = limitCount;
+						
+						rulesInfoArr.push(ruleObj);
+						
+					}
+					
+					//					timeCondition =" CREATETIME>=to_date('"+startTime+"','yyyy-MM-DD') and CREATETIME<to_date('"+endTime+"','yyyy-MM-DD') ";
+					
+					isVisible = true;
+					
+					OperatingTipUtil.startOperat("正在分析....");
+					bamService.analyseHisEntityRule(rulesInfoArr);
+					
+				}else{
+					SmartXMessage.show("请先选择一条或多条记录",SmartXMessage.MESSAGE_WARN);
+				}
+				
+			}
+			
+			private function getDate():Date{
+				var nowTime:Date = new Date();
+				var now_millisecond:Number = nowTime.getTime();
+				var twenty_four_hour:Number = 24*60*60*1000*5;
+				var yesterday_millisecond:Number = now_millisecond-twenty_four_hour;
+				var yesterdayTime:Date = new Date(yesterday_millisecond);
+				return yesterdayTime;
+			}
+			
+			private function getNextDate():Date{
+				var nowTime:Date = new Date();
+				var now_millisecond:Number = nowTime.getTime();
+				var twenty_four_hour:Number = 24*60*60*1000;
+				var yesterday_millisecond:Number = now_millisecond+twenty_four_hour;
+				var tomorrowTime:Date = new Date(yesterday_millisecond);
+				return tomorrowTime;
+			}
+			
+			protected function dateClickHandler(event:MouseEvent):void
+			{
+				var selectedItems:Array = dataListGrid.getSelectedRowValues();
+				if(selectedItems != null && selectedItems.length >0){
+					
+					crrentAnalyseType = 2;
+					isVisible = false;
+					
+					var item:Object = createTimeCob.selectedItem;
+					if(item == null ){
+						SmartXMessage.show("统计时间不能为空!");
+						return;
+					}
+					
+					var staticsTime:String = item["staticstime"];
+					
+					PopUpManager.removePopUp(chooseDatePanel)
+					
+					var rulesInfoArr:Array = new Array();
+					var tempXml:XML = null;
+					//					selectedRuleCol.removeAll();
+					for each(var ruleItem:Object in selectedItems){
+						
+						//						selectedRuleCol.addItem(ruleItem);
+						
+						var code:String = ruleItem["CODE"];
+						var name:String = ruleItem["NAME"];
+						var entityCode:String = ruleItem["ENTITYCODE"];
+						var modelCode:String = ruleItem["ENTITYMODELCODE"];
+						var ruleContent:String = ruleItem["RULECONTENT"];
+						
+						var ruleObj:Object = new Object();
+						ruleObj["ruleCode"] = code;
+						ruleObj["ruleName"] = name;
+						ruleObj["entityCode"] = entityCode;
+						ruleObj["modelCode"] = modelCode;
+						ruleObj["staticsTime"] = staticsTime;
+						
+						rulesInfoArr.push(ruleObj);
+						
+					}
+					
+					//					timeCondition =" CREATETIME=to_date('"+staticsTime+"','yyyy-MM-DD hh24:mi:ss') ";
+					
+					OperatingTipUtil.startOperat("正在分析....");
+					bamService.analyseEntity(rulesInfoArr);
+				}
+				
+			}
+			
+			private function iconFunction(item:Object):*{
+				switch(item.type){
+					case "entity":
+						return AssetsFileLib.listviewIcon;
+					case "abstractEntity":
+						return AssetsFileLib.listviewIcon;
+				}
+			}
+			
+			private function refreshTree():void{
+				rpc.getSimpleHashVoArrayByDS(null,dataSql);
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				treeDataProvider.removeAll();
+				var result:Array = event.result as Array;
+				for each(var obj:Object in result){
+					var shv:SimpleHashVO = obj as SimpleHashVO;
+					treeDataProvider.addItem(assembledEntityModelTree(shv.dataMap));
+				}
+				expandAll();
+				//				if(editEntityCode && editEntityModelCode){//判断是否编辑一个领域实体
+				//					setEntityTreeSelectedItem();
+				//					mainBox.removeChild(treeBox);
+				//				}
+				//				dispatchEvent(new Event(ENTITYMODELTREE_LOAD_COMPLETE));
+			}
+			
+			private function getStaticsTimeHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				staticsTimeCol.removeAll();
+				var result:Array = event.result as Array;
+				for each(var obj:Object in result){
+					var shv:SimpleHashVO = obj as SimpleHashVO;
+					staticsTimeCol.addItem(shv.dataMap);
+				}
+				
+				PopUpManager.addPopUp(chooseDatePanel,this.root,true);
+				PopUpManager.centerPopUp(chooseDatePanel);
+			}
+			
+			//拼装一个领域实体模型的树结构
+			private function assembledEntityModelTree(data:Object):Object{
+				var entitiesArr:ArrayCollection = new ArrayCollection();
+				var entityModel:Object = {name:data["name"],code:data["code"],children:entitiesArr,type:"entityModel"};
+				var contentXml:XML = XML(data["content"]);
+				var entitiesTempArr:ArrayCollection = new ArrayCollection();
+				var entitiesArrCache:Hashtable = new Hashtable();
+				//先加载所有的实体类
+				for each(var entity:XML in contentXml.entities.entity){
+					var entityObj:Object = {name:entity.@name,code:entity.@code,content:entity,
+						type:entity.@isAbstract=="true"?"abstractEntity":"entity",entireContent:contentXml};
+					entitiesArrCache.add(String(entity.@code),entityObj);
+					entitiesTempArr.addItem(entityObj);
+				}
+				//拼装树结构
+				for each(var entityData:Object in entitiesTempArr){
+					if(entitiesArrCache.containsKey(String(entityData.content.@parentEntityCode))){//判断是否有父实体，如果有则加到父实体对象下
+						var parentEntity:Object = entitiesArrCache.find(String(entityData.content.@parentEntityCode));
+						if(parentEntity.hasOwnProperty("children")){
+							parentEntity.children.addItem(entityData)
+						}else{
+							parentEntity.children = new ArrayCollection();
+							parentEntity.children.addItem(entityData);
+						}
+					}else
+						entitiesArr.addItem(entityData);
+				}
+				
+				return entityModel;
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in treeDataProvider){
+					entityModelTree.expandChildrenOf(item,true);
+				}
+			}
+			
+			protected function entityModelTree_itemClickHandler(event:ListEvent):void
+			{
+				var item:Object = entityModelTree.selectedItem;
+				if(item != null ){
+					var entityCodeStr:String = "";
+					var type:String = item["type"];
+					var childrenCol:ArrayCollection = item["children"];
+					if(!BAMUtil.isEmpty(type) && type == "entityModel"){
+						if(childrenCol != null){
+							entityCodeStr = getAllEntityCode(childrenCol,entityCodeStr);
+						}
+					}else if(!BAMUtil.isEmpty(type) && type == "entity"){
+						var code:String = String(item["code"]);
+						entityCodeStr = "'"+code+"'";
+						if(childrenCol != null){
+							entityCodeStr = getAllEntityCode(childrenCol,entityCodeStr);
+						}
+					}
+					if(!BAMUtil.isEmpty(entityCodeStr)){
+						initCondition = " ENTITYCODE in("+entityCodeStr+")";
+					}else{
+						initCondition = " ENTITYCODE in('')";
+					}
+					dataListGrid.query();
+					var deskTopFrame:DeskTopFrame = getDeskTopFrame(this) as DeskTopFrame;
+					if(deskTopFrame != null ){
+						deskTopFrame.verticalScrollPosition = 0;
+					}
+				}else{
+					initCondition = "";
+				}
+				
+			}
+			
+			private function getAllEntityCode(entityChildrenCol:ArrayCollection,entityCodeStr:String):String{
+				if(entityChildrenCol != null){
+					for each(var item:Object in entityChildrenCol){
+						var childrenCol:ArrayCollection = item["children"];
+						var code:String = String(item["code"]);
+						if(BAMUtil.isEmpty(entityCodeStr)){
+							entityCodeStr = "'"+code+"'";
+						}else{
+							entityCodeStr = entityCodeStr+",'"+code+"'";
+						}
+						if(childrenCol != null && childrenCol.length >0){
+							entityCodeStr = getAllEntityCode(childrenCol,entityCodeStr);
+						}
+					}
+				}
+				return entityCodeStr;
+			}
+			
+			private function getDeskTopFrame(currentContener:DisplayObject):DisplayObject{
+				var display:DisplayObject = null;
+				var tempDisplay:DisplayObject = currentContener.parent;
+				if(tempDisplay is DeskTopFrame){
+					display = tempDisplay;
+				}else{
+					display = getDeskTopFrame(tempDisplay);
+				}
+				return  display;
+			}
+			
+			protected function ruleAnalyseList_doubleClickHandler(event:MouseEvent):void
+			{
+				var item:Object = ruleAnalyseList.getSelectedRowValue();
+				if(item != null ){
+					var info:String = item["info"];
+					var tempEvent:FCEvent = new FCEvent("",info);
+					if(this.crrentAnalyseType == 0){
+						var analyse:AnalyseMTChartClickListener = new AnalyseMTChartClickListener();
+						analyse.fcItemClick(tempEvent,null);
+					}else if(this.crrentAnalyseType == 1){
+						var hisAnalyse:HisAnalyseMTChartClickListener = new HisAnalyseMTChartClickListener();
+						hisAnalyse.fcItemClick(tempEvent,null);
+					}else if(this.crrentAnalyseType == 2){
+						var groupAnalyse:GroupAnalyseMTChartClickListener = new GroupAnalyseMTChartClickListener();
+						groupAnalyse.fcItemClick(tempEvent,null);
+					}
+				}
+				
+			}
+			
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				
+				mtStyle04 = new MTStyleTemplate04();
+				mtStyle04.endpoint = endpoint;
+				mtStyle04.metadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet("MT_V_DQ_ENTITY_STATISTICS");
+				mtStyle04.percentHeight = 100;
+				mtStyle04.percentWidth = 100;
+				
+				if(taskList.getChildren().length>0){
+					taskList.removeAllChildren();
+				}
+				
+				taskList.addChild(mtStyle04);
+				
+				mainStack.selectedChild = taskListVbox;
+				
+			}
+			
+			protected function button2_clickHandler(event:MouseEvent):void
+			{
+				mainStack.selectedChild = listBox;
+			}
+			
+			private function changeView(event:ItemClickEvent):void{
+				var indexInt:int = event.index;
+				if(indexInt == 0){
+					isVisibleLabel = false;
+					mainStack.selectedChild = listBox;
+					viewType = 0;
+				}else if(indexInt == 1){
+					isVisibleLabel = true;
+					mtStyle04 = new MTStyleTemplate04();
+					mtStyle04.endpoint = endpoint;
+					mtStyle04.metadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet("MT_V_DQ_ENTITY_STATISTICS");
+					mtStyle04.percentHeight = 100;
+					mtStyle04.percentWidth = 100;
+					
+					if(taskList.getChildren().length>0){
+						taskList.removeAllChildren();
+					}
+					
+					taskList.addChild(mtStyle04);
+					
+					mainStack.selectedChild = taskListVbox;
+					viewType = 1;
+				}
+			}
+			
+			protected function chartBox_showHandler(event:FlexEvent):void
+			{
+				var operationMenu:Menu = popUpMenuButton.popUp as Menu;
+				operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+			}
+			
+			protected function dataListGrid_doubleClickHandler(event:MouseEvent):void
+			{
+				SmartXMessage.show("确定进行实时分析?",SmartXMessage.MESSAGE_CONFIRM,"点击确定将对此规则进行实进分析",this,function(event:CloseEvent):void{
+					if(event.detail == Alert.YES || event.detail == Alert.OK){
+						analyseBtn_clickHandler();
+					}
+				});
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" >
+		<mx:HBox width="100%" horizontalAlign="right" >
+			<mx:VBox width="100%" horizontalAlign="center" >
+				<mx:Label text="分析记录" fontWeight="bold" visible="{isVisibleLabel}" />
+			</mx:VBox>
+			<mx:ToggleButtonBar id="toggleButtonBar" width="200" itemClick="changeView(event)">
+				<mx:dataProvider>
+					<fx:Array>
+						<fx:Object label="规则视图" icon="{AssetsFileLib.listviewIcon}"/>
+						<fx:Object label="任务视图" icon="{AssetsFileLib.clientenvIcon}"/> 
+					</fx:Array>
+				</mx:dataProvider>
+			</mx:ToggleButtonBar>
+		</mx:HBox>
+		
+		<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all" >
+			
+			<mx:VBox width="100%" height="100%" id="listBox" verticalScrollPolicy="off" horizontalScrollPolicy="off" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+				<mx:HDividedBox width="100%" height="100%" >
+					
+					<mx:VBox id="treeBox" width="25%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+							 paddingTop="5">
+						<!--<mx:HBox  id="treeButtonBox" width="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+						paddingTop="5">
+						<mx:LinkButton toolTip="刷新" click="refreshTree()" icon="{AssetsFileLib.refreshIcon}" />
+						</mx:HBox>-->
+						
+						<ext:TreeWrapper  allowMultipleSelection="false" width="100%" height="100%" id="entityModelTree" itemClick="entityModelTree_itemClickHandler(event)" 
+										  labelField="name" iconFunction="iconFunction" dataProvider="{treeDataProvider}"/>
+					</mx:VBox>
+					
+					<mx:VBox width="100%" height="100%" >
+						<!--<mx:HBox width="100%" horizontalAlign="right" >
+						<mx:Button label="浏览模式" click="button1_clickHandler(event)" />
+						</mx:HBox>-->
+						<core:BillListPanel id="dataListGrid" width="100%" height="100%" allowMultipleSelection="true"
+											doubleClick="dataListGrid_doubleClickHandler(event)"
+											destination="{GlobalConst.SERVICE_FORM}" rowCountPerPage="{33}"
+											endpoint="{endpoint}" templetCode="T_DQ_ENTITY_RULE_CHECK"
+											editable="false" showEditBox="false" debugMode="{debugMode}"
+											initQueryCondition="{initCondition}" showDataAfterInit="{true}"
+											queryEnd="dataListGrid_queryEndHandler(event)"
+											/>
+					</mx:VBox>
+				</mx:HDividedBox>
+			</mx:VBox>
+			
+			<mx:VBox width="100%" height="100%" id="chartBox" showEffect="{switchEffect}" hideEffect="{switchEffect}" show="chartBox_showHandler(event)">
+				<mx:HBox width="100%" >
+					<mx:HBox width="100%" horizontalAlign="right" >
+					</mx:HBox>
+					<mx:HBox width="100%" horizontalAlign="center" >
+						<mx:Label id="titleLabel" fontWeight="bold" fontSize="15" />
+					</mx:HBox>
+					<mx:HBox width="100%" horizontalAlign="right" paddingRight="3">
+						<!--<mx:Button id="detailBtn" label="查看详情" click="detailBtn_clickHandler(event)" />-->
+						<mx:ComboBox id="charTypeCob" width="153" labelField="label" dataProvider="{chartTypeCol}" change="charTypeCob_changeHandler(event)" toolTip="图表类型" />
+						<mx:Button id="returnBtn" label="返回" click="returnBtn_clickHandler(event)" />
+					</mx:HBox>
+				</mx:HBox>
+				<mx:VBox id ="chartPanel" width="100%" height="400"  />
+				<chart:AdvListChart id="ruleAnalyseList"  doubleClickEnabled="true" minHeight="300"
+									doubleClick="ruleAnalyseList_doubleClickHandler(event)"/>
+			</mx:VBox>
+			
+			<mx:VBox id="taskListVbox" width="100%" height="100%" showEffect="{switchEffect}" hideEffect="{switchEffect}" >
+				<mx:VBox id="taskList" width="100%" height="100%" />
+			</mx:VBox>
+			
+		</mx:ViewStack>
+		
+	</mx:VBox>
+</mx:VBox>

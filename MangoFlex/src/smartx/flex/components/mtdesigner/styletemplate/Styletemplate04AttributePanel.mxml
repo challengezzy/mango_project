@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseAttr:BaseAttributePanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+							 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:baseAttr="smartx.flex.components.mtdesigner.styletemplate.*"
+							 creationComplete="init()" label="{titleName}" >
+	
+	
+	<fx:Declarations>
+		<mx:TitleWindow title="选择字段" id="fieldWindow" width="500" height="400" showCloseButton="true" close="PopUpManager.removePopUp(fieldWindow)" >
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingTop="5" paddingLeft="5" paddingRight="5">
+				<mx:DataGrid width="100%" height="100%" id="fieldsDatagrid" doubleClickEnabled="true" doubleClick="button1_clickHandler()" editable="true" allowMultipleSelection="false" dataProvider="{allFieldsCol}" >
+					<mx:columns>
+						<mx:DataGridColumn headerText="字段" editable="false" dataField="name" />
+					</mx:columns>
+				</mx:DataGrid>
+				<mx:HBox width="100%" horizontalAlign="center" >
+					<mx:Button label="确定" click="button1_clickHandler()" />
+					<mx:Button label="取消" click="PopUpManager.removePopUp(fieldWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridItemRenderer;
+			import mx.controls.listClasses.IListItemRenderer;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			import spark.components.supportClasses.ItemRenderer;
+			
+			[Bindable]
+			private var buttonXML:XML;
+			
+			private var templetVO:TempletVO;
+			private var formService:RemoteObject;
+			
+			private var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			[Bindable]
+			private var allFieldsCol:ArrayCollection = new ArrayCollection();
+			
+			//0--主标题,1--副标题,2--内容字段
+			private var currentField:int = -1;
+			
+			private function init():void{
+				
+				//				if(sourceXML != null ){
+				//					if(sourceXML.customListButton.length() <= 0){
+				//						var customListButtonXML:XML = new XML("<customListButton />");
+				//						sourceXML.appendChild(customListButtonXML);
+				//					}
+				//				}
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+				formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				var templetCode:String = String(sourceXML.templetCode);
+				if(templetCode != null && templetCode != ""){
+					templetVO = TempletDataUtil.findTempletVO(templetCode);
+					if(templetVO == null)//还没缓存过
+						formService.getTempletVO(templetCode,new Object());
+					else
+						getAllFields();
+				}
+
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				SmartXMessage.show("执行操作时发生错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString, this);
+			}
+			
+			private function getTempletVOHandler(event:ResultEvent):void{
+				templetVO = event.result as TempletVO;
+				TempletDataUtil.putTempletVO(templetVO);
+				getAllFields();
+			}
+			
+			private function getAllFields():void{
+				if(templetVO != null){
+					allFieldsCol.removeAll();
+					for each(var itemVO:TempletItemVO in templetVO.itemVos){
+						allFieldsCol.addItem({"name":itemVO.itemkey});
+					}
+				}
+			}
+			
+			override protected function getXMLString():String{
+				return sourceXML.toString();
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void
+			{
+				var tempBtnXml:XML = <button id="在此填写按钮ID" label="在此填写按钮名称" toolTip="在此填写按钮提示信息" icon="在此填写按钮图标" listener="在此填写监听器全路径" ></button>;
+				if( sourceXML.customListButton.length()<= 0 ){
+					var customListButtonXML:XML = new XML("<customListButton />");
+					sourceXML.appendChild(customListButtonXML);
+				}
+				
+				sourceXML.customListButton.appendChild(tempBtnXml);
+				
+				btnsDatagrid.invalidateList();
+				
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = btnsDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+					buttonXML = null;
+				}
+			}
+			
+			protected function textinput1_changeHandler(event:Event):void
+			{
+				this.sourceXML.titleField=titleTxt.text;
+				
+			}
+			
+			protected function textinput2_changeHandler(event:Event):void
+			{
+				this.sourceXML.subTitleField=subTitleTxt.text;
+				
+			}
+			
+			protected function textinput3_changeHandler(event:Event):void
+			{
+				this.sourceXML.contentField=contentTxt.text;
+				
+			}
+			
+			protected function textinput4_changeHandler(event:Event):void
+			{
+				this.sourceXML.iconField=iconTxt.text;
+				
+			}
+			
+			protected function linkbutton1_clickHandler(event:MouseEvent):void
+			{
+				this.currentField = 0;
+				PopUpManager.addPopUp(fieldWindow,this.root,true);
+				PopUpManager.centerPopUp(fieldWindow);
+			}
+			
+			protected function linkbutton2_clickHandler(event:MouseEvent):void
+			{
+				this.currentField = 1;
+				PopUpManager.addPopUp(fieldWindow,this.root,true);
+				PopUpManager.centerPopUp(fieldWindow);
+			}
+			
+			protected function linkbutton3_clickHandler(event:MouseEvent):void
+			{
+				this.currentField = 2;
+				PopUpManager.addPopUp(fieldWindow,this.root,true);
+				PopUpManager.centerPopUp(fieldWindow);
+			}
+			
+			protected function linkbutton4_clickHandler(event:MouseEvent):void
+			{
+				this.currentField = 3;
+				PopUpManager.addPopUp(fieldWindow,this.root,true);
+				PopUpManager.centerPopUp(fieldWindow);
+			}
+			
+			protected function button1_clickHandler():void
+			{
+				var item:Object = fieldsDatagrid.selectedItem;
+				if(item != null){
+					var name:String = item["name"];
+					if(this.currentField == 0){
+						titleTxt.text = name;
+						textinput1_changeHandler(null);
+					}else if(this.currentField == 1){
+						subTitleTxt.text = name;
+						textinput2_changeHandler(null);
+					}else if(this.currentField == 2){
+						contentTxt.text = name;
+						textinput3_changeHandler(null);
+					}else if(this.currentField == 3){
+						iconTxt.text = name;
+						textinput4_changeHandler(null);
+					}
+					
+					PopUpManager.removePopUp(fieldWindow);
+				}
+			}
+			
+			protected function showCloseBtnCB_changeHandler(event:Event):void
+			{
+				sourceXML.showDeleteButton = showDeleteBtnCB.selected?"true":"false";
+				
+			}
+			
+			protected function imgUrlTxt_changeHandler(event:Event):void
+			{
+				sourceXML.imgUrl = imgUrlTxt.text;
+				
+			}
+			
+			protected function pageSizeTxt_changeHandler(event:Event):void
+			{
+				sourceXML.pageSize = pageSizeTxt.text;
+				
+			}
+			
+			protected function bfIncListTxt_changeHandler(event:Event):void
+			{
+				var temp:String = bfIncListTxt.text;
+				sourceXML.interceptors.bfIncList = temp;
+			}
+			
+			protected function afIncListTxt_changeHandler(event:Event):void
+			{
+				var temp:String = afIncListTxt.text;
+				sourceXML.interceptors.afIncList = temp;
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+		
+		<mx:HBox width="100%" >
+			<mx:CheckBox id="showDeleteBtnCB" change="showCloseBtnCB_changeHandler(event)" label="是否显示删除按钮" selected="{sourceXML.showDeleteButton=='true'}" toolTip="是否显示删除按钮" />
+		</mx:HBox>
+		
+		<mx:HBox width="100%" >
+			<mx:Label width="120" text="服务端前置拦截器:" /><mx:TextInput id="bfIncListTxt" text="{sourceXML.interceptors.bfIncList}" change="bfIncListTxt_changeHandler(event)" toolTip="服务端前置拦截器实现类" />
+			<mx:Label width="120" text="服务端后置拦截器:" /><mx:TextInput id="afIncListTxt" text="{sourceXML.interceptors.afIncList}" change="afIncListTxt_changeHandler(event)" toolTip="服务端后置拦截器实现类" />
+		</mx:HBox>
+		
+		<mx:HBox width="100%" >
+			<mx:Label text="左侧图片:" width="120" />
+			<mx:TextInput id="imgUrlTxt" width="90%" text="{sourceXML.imgUrl}" change="imgUrlTxt_changeHandler(event)" toolTip="左侧图片路径"  />
+			<mx:Label text="单页显示条数:" width="120" />
+			<mx:TextInput id="pageSizeTxt" width="90%" restrict="0-9" text="{sourceXML.pageSize}" change="pageSizeTxt_changeHandler(event)"  />
+		</mx:HBox>
+		
+		<mx:HBox width="100%" >
+			<mx:Label text="主标题字段:" width="120" />
+			<mx:TextInput id="titleTxt" width="90%" text="{sourceXML.titleField}" change="textinput1_changeHandler(event)"  />
+			<mx:LinkButton icon="{AssetsFileLib.refsearchIcon}" width="22" height="22" toolTip="选择字段" click="linkbutton1_clickHandler(event)"/>
+		</mx:HBox>
+		
+		<mx:HBox width="100%">
+			<mx:Label text="副标题字段:" width="120" />
+			<mx:TextInput id="subTitleTxt" width="90%" text="{sourceXML.subTitleField}" change="textinput2_changeHandler(event)"  />
+			<mx:LinkButton icon="{AssetsFileLib.refsearchIcon}" width="22" height="22" toolTip="选择字段" click="linkbutton2_clickHandler(event)"/>
+		</mx:HBox>
+		
+		<mx:HBox width="100%">
+			<mx:Label text="内容字段:" width="120" />
+			<mx:TextInput id="contentTxt" width="90%" text="{sourceXML.contentField}" change="textinput3_changeHandler(event)"  />
+			<mx:LinkButton icon="{AssetsFileLib.refsearchIcon}" width="22" height="22" toolTip="选择字段" click="linkbutton3_clickHandler(event)"/>
+		</mx:HBox>
+		
+		<mx:HBox width="100%">
+			<mx:Label text="图标字段:" width="120" />
+			<mx:TextInput id="iconTxt" width="90%" text="{sourceXML.iconField}" change="textinput4_changeHandler(event)"  />
+			<mx:LinkButton icon="{AssetsFileLib.refsearchIcon}" width="22" height="22" toolTip="选择字段" click="linkbutton4_clickHandler(event)"/>
+		</mx:HBox>
+		
+		<mx:HBox width="100%" horizontalAlign="left" >
+			<mx:Label text="按钮:" />
+			<mx:LinkButton id="addBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加按钮" click="addBtn_clickHandler(event)"/>
+			<mx:LinkButton id="musBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除按钮" click="musBtn_clickHandler(event)"/>
+		</mx:HBox>
+		<mx:DataGrid width="100%" height="100%" id="btnsDatagrid" editable="true" allowMultipleSelection="false" 
+					 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true"
+					 dataProvider="{sourceXML.customListButton.button}" >
+			<mx:columns>
+				<mx:DataGridColumn headerText="ID" editable="true" dataField="@id" />
+				<mx:DataGridColumn headerText="名称" editable="true" dataField="@label" />
+				<mx:DataGridColumn headerText="提示信息" editable="true" dataField="@toolTip" />
+				<mx:DataGridColumn headerText="图片路径" editable="true" dataField="@icon" />
+				<mx:DataGridColumn headerText="监听器" editable="true" dataField="@listener" />
+			</mx:columns>
+		</mx:DataGrid>
+		
+	</mx:VBox>
+</baseAttr:BaseAttributePanel>

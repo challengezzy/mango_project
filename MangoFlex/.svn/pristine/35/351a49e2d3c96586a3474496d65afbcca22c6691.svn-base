@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:degrafa="http://www.degrafa.com/2007" left="0" right="3"  
+	implements="mx.controls.listClasses.IDropInListItemRenderer"
+	 creationComplete="initListener()">
+	
+	<mx:Script>
+		<![CDATA[
+			
+			private function initListener():void{
+				addEventListener(FlexEvent.DATA_CHANGE,initChange);
+			}
+			
+			private function initChange(event:FlexEvent):void{
+				dataValue = data[dataField];
+				capacity = data.capacity;
+				this.toolTip = String(dataValue);
+				if(anim1.isPlaying){anim1.stop();}
+				
+				anim1.play();
+			} 
+			
+			override public function set width(value:Number):void{
+				super.width = value;
+				
+				if(anim1.isPlaying){anim1.stop();}
+				anim1.play();
+				
+			}
+			
+			import mx.controls.listClasses.BaseListData;
+			import mx.events.FlexEvent;
+			    		
+    		[Bindable]
+    		private var dataValue:Number;
+			
+			[Bindable]
+    		private var capacity:Number;
+    		
+			//Data is set after listData so we need to reset the value.
+			override public function set data(value:Object):void{
+				//dataValue = value[dataField];
+				//capacity = value.capacity;
+				super.data = value;
+			}
+			    		
+    		[Bindable]
+    		private var dataField:String;
+    					
+			private var _listData:BaseListData;
+    		
+		    [Bindable("dataChange")]
+		    public function get listData():BaseListData{
+		      return _listData;
+		    }
+		    public function set listData(value:BaseListData):void{
+		      _listData = value;
+		      dataField =_listData["dataField"];
+		    }
+											
+		]]>
+	</mx:Script>
+	
+	<mx:filters>
+		<mx:DropShadowFilter alpha=".5" distance="2" />
+	</mx:filters>
+	
+	<mx:AnimateProperty id="anim1" target="{bar1}" property="width"
+	 fromValue="0" toValue="{width * (dataValue / capacity)}" 
+	 />
+	
+				        	   
+    <degrafa:RoundedRectangle y="1" cornerRadius="2" id="bar1" graphicsTarget="{[this]}"  
+    	height="{ height-2 }">
+        <degrafa:fill>
+        	<degrafa:LinearGradientFill angle="90">
+        	    <degrafa:GradientStop alpha="1"  color="{(dataField=='used')? 0xFF0000:0x00FF00}"/>
+	        	<degrafa:GradientStop alpha="1" color="#333333"/>
+	        </degrafa:LinearGradientFill>
+        </degrafa:fill>
+    	
+    	<degrafa:RoundedRectangle x="2" y="2" id="wash"	width="{bar1.width-2}" height="{bar1.height/2}">
+			<degrafa:fill>
+            	<degrafa:LinearGradientFill height="{wash.height}" 
+            		width="{wash.width}" angle="90">
+            	    <degrafa:GradientStop alpha="1" color="#FFF"/>
+		        	<degrafa:GradientStop alpha="0" color="#FFF"/>
+		        </degrafa:LinearGradientFill>
+            </degrafa:fill>
+		</degrafa:RoundedRectangle>
+    	
+	</degrafa:RoundedRectangle>	
+	
+	
+</mx:Canvas>

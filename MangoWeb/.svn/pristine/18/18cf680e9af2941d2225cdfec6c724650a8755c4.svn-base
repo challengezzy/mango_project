@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   layout="vertical" width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.utils.getDefinitionByName;
+			
+			import smartx.bam.flex.modules.entitymodel.listener.EmTreeItemClickListener;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.chart.AdvColumnChart;
+			import smartx.flex.components.core.chart.AdvPieChart;
+			import smartx.flex.components.core.mtchart.MTMultiSeriesChartPanel;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var entityModelTemplet:EntityModelTemplet;
+			
+			private var advColumnChart:AdvColumnChart;
+			
+			private var advPieChart:AdvPieChart;
+			
+			private var mTMultiSeriesChartPanel:MTMultiSeriesChartPanel;
+			
+			private function init():void{
+				var url:String = this.loaderInfo.url;
+				var parameters:Object = StringUtils.parseUrlParameters(url);
+				var mtcode:String = parameters.mtcode;
+				if(mtcode == null){
+					SmartXMessage.show("必须指定元数据模板编码(mtcode)");
+					return;
+				}
+				entityModelTemplet = new EntityModelTemplet();
+				if(parameters.hasOwnProperty("entityModelCode") && parameters.hasOwnProperty("entityCode")){
+					entityModelTemplet.editEntityModelCode = parameters["entityModelCode"];
+					entityModelTemplet.editEntityCode = parameters["entityCode"];
+				}
+				var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+				var contentXml:XML = metadataTemplet.contentXML;
+				if(contentXml.treeItemClickListener.length() > 0){
+					var emTreeItemClickListenerClass:Class = getDefinitionByName(contentXml.treeItemClickListener) as Class;
+					var emTreeItemClickListener:EmTreeItemClickListener = new emTreeItemClickListenerClass() as EmTreeItemClickListener;
+					entityModelTemplet.emTreeItemClickListener = emTreeItemClickListener;
+				}
+				entityModelTemplet.dataFilter = contentXml.dataFilter;
+				
+				var customTreeMetadata:String = contentXml.customTreeMetadata;
+				if(customTreeMetadata != null && customTreeMetadata != ""){
+					entityModelTemplet.customTreeMetadata = MetadataTempletUtil.getInstance().findMetadataTemplet(customTreeMetadata);
+				}
+				
+				this.addChild(entityModelTemplet);
+			}
+		]]>
+	</fx:Script>
+</mx:Module>

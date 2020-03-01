@@ -1,0 +1,200 @@
+<ReportSettings version="1.1">
+  <PageWidth>18.4</PageWidth>
+  <PageHeight>26</PageHeight>
+  <LeftMargin>1</LeftMargin>
+  <RightMargin>1</RightMargin>
+  <TopMargin>1.5</TopMargin>
+  <BottomMargin>1.5</BottomMargin>
+  <TableHeaderRepeat>true</TableHeaderRepeat>
+  <ShowPageNumber>true</ShowPageNumber>
+  <PageNumberFormat>【第{0}页 共{1}页】</PageNumberFormat>
+  <PageFooterShowAtEnd>true</PageFooterShowAtEnd>
+  <PageHeaderSettings>
+    <ItemSetting type="CaptionRowSetting">
+      <CaptionCellSettings>
+        <ItemSetting type="CaptionCellSetting">
+          <BindingValue>主标题</BindingValue>
+          <Width>16.2</Width>
+          <Style>
+            <TextAlign>center</TextAlign>
+            <FontSize>18</FontSize>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+      </CaptionCellSettings>
+    </ItemSetting>
+    <ItemSetting type="CaptionRowSetting">
+      <CaptionCellSettings>
+        <ItemSetting type="CaptionCellSetting">
+          <Value>单据编号：</Value>
+          <Width>2.4</Width>
+        </ItemSetting>
+        <ItemSetting type="CaptionCellSetting">
+          <BindingValue>单据编号</BindingValue>
+          <Width>5.2</Width>
+        </ItemSetting>
+        <ItemSetting type="CaptionCellSetting">
+          <Value>经手人：</Value>
+          <Width>2.2</Width>
+        </ItemSetting>
+        <ItemSetting type="CaptionCellSetting">
+          <BindingValue>经手人</BindingValue>
+          <Width>3.8</Width>
+        </ItemSetting>
+      </CaptionCellSettings>
+    </ItemSetting>
+    <ItemSetting type="CaptionRowSetting">
+      <CaptionCellSettings>
+        <ItemSetting type="CaptionCellSetting">
+          <Value>公司名称：</Value>
+          <Width>2.5</Width>
+        </ItemSetting>
+        <ItemSetting type="CaptionCellSetting">
+          <BindingValue>公司名称</BindingValue>
+          <Width>4.9</Width>
+        </ItemSetting>
+        <ItemSetting type="CaptionCellSetting">
+          <Value>公司地址：</Value>
+          <Width>2.4</Width>
+        </ItemSetting>
+        <ItemSetting type="CaptionCellSetting">
+          <BindingValue>公司地址</BindingValue>
+          <Width>5.9</Width>
+        </ItemSetting>
+      </CaptionCellSettings>
+    </ItemSetting>
+  </PageHeaderSettings>
+  <PageFooterSettings>
+    <ItemSetting type="CaptionRowSetting">
+      <CaptionCellSettings>
+        <ItemSetting type="CaptionCellSetting">
+          <Value>表尾：XXX公司</Value>
+          <Width>16.2</Width>
+          <Style>
+            <TextAlign>right</TextAlign>
+          </Style>
+        </ItemSetting>
+      </CaptionCellSettings>
+    </ItemSetting>
+  </PageFooterSettings>
+  <TableColumnSettings>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3</Width>
+    </ItemSetting>
+  </TableColumnSettings>
+  <TableHeaderSettings>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <Value>ID</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>名称</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>数量</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>金额</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>日期</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+      </TableCellSettings>
+    </ItemSetting>
+  </TableHeaderSettings>
+  <TableDetailSettings>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>ID</BindingColumn>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>名称</BindingColumn>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>数量</BindingColumn>
+          <Format>0.##</Format>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>金额</BindingColumn>
+          <Format>C2</Format>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>日期</BindingColumn>
+          <Format>yyyy-MM-dd</Format>
+        </ItemSetting>
+      </TableCellSettings>
+    </ItemSetting>
+  </TableDetailSettings>
+  <TableFooterSettings>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <Value>合计：</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting">
+          <Value>=SUM(Fields!数量.Value)</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+          <Format>0.##</Format>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>=SUM(Fields!金额.Value)</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+          <Format>C2</Format>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting"/>
+      </TableCellSettings>
+    </ItemSetting>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <Value>备注：</Value>
+          <ColSpan>5</ColSpan>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting"/>
+      </TableCellSettings>
+    </ItemSetting>
+  </TableFooterSettings>
+  <TableGroupSettings>
+    <ItemSetting type="TableGroupSetting"/>
+  </TableGroupSettings>
+</ReportSettings>

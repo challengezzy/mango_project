@@ -1,0 +1,55 @@
+package smartx.publics.styletemplet.ui.templet11;
+
+public class DefaultMainFrame extends AbstractTempletFrame11 {
+
+	/**
+     * 构造方法
+     */
+    public DefaultMainFrame(){
+    	
+    }
+	
+    public String get1TreeParentkey() {
+        return "parentregionid";
+    }
+
+    public String get1TreePrimarykey() {
+        return "id";
+    }
+
+    public String get1TreeSQL() {
+        return "select id,namecn,namepy,type,parentregionid from region ";
+    }
+
+    public String get1TreeTempeltCode() {
+        return "REGION_CODE1";
+    }
+
+    public String get2TreeParentkey() {
+        return "PARENTPRODUCTCATALOGID";
+    }
+
+    public String get2TreePrimarykey() {
+        return "ID";
+    }
+
+    public String get2TreeSQL() {
+        return "select id,name,no,PARENTPRODUCTCATALOGID,regionid from V_PRODUCTCATALOG";
+    }
+
+    public String get2TreeTempeltCode() {
+        return "V_PRODUCTCATALOG_CODE1";
+    }
+
+    public String get2Tree_1TreeField() {
+        return "regionid";
+    }
+
+    public String get2Treetitle() {
+        return "产品目录";
+    }
+
+    public String get1Treetitle() {
+        return "北方九省";
+    }
+}

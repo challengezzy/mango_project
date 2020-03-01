@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Grid xmlns:mx="http://www.adobe.com/2006/mxml" verticalGap="1">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			
+		]]>
+	</mx:Script>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="LabelVisible" label="显示图例"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="图例文本颜色："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:ColorPicker id="LabelTextColor"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="图例字体大小："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="LabelFontSize" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" colSpan="2" verticalAlign="middle">
+			<mx:CheckBox id="LabelFontBold" label="图例字体加粗"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="图例宽度："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="LabelWidth" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="图例间隔："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="LabelGap" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%">
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:Label text="图例列数："/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" verticalAlign="middle">
+			<mx:TextInput id="LabelColumn" width="100%"/>
+		</mx:GridItem>
+	</mx:GridRow>
+</mx:Grid>

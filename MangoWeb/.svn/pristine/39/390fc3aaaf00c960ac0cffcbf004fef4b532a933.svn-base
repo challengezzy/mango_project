@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   width="100%" height="100%" creationComplete="creationCompleteHandler()"
+		   xmlns:ext="smartx.flex.components.core.ext.*">
+	<fx:Declarations>
+		<mx:HBox  id="treeButtonBox" width="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+				  paddingTop="5" horizontalAlign="right">
+			<mx:CheckBox id="isShowEntireEntityChk" label="是否显示所有实体" labelPlacement="right" 
+						 change="isShowEntireEntityChk_changeHandler(event)" />
+		</mx:HBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.modules.entitymodel.listener.EmTreeItemClickListener;
+			import smartx.bam.flex.modules.entitymodel.listener.EmTreeLoadCompleteListener;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			[Bindable]
+			private var treeDataProvider:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var customTreeDataProvider:XMLList;
+			
+			public var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			
+			private var rpc:RemoteObject;
+			
+			private var dataSql:String = "select be.name,be.code,pmt.content,pmt.owner " +
+										"from bam_entitymodel be,pub_metadata_templet pmt where be.mtcode = pmt.code";
+			
+			public var emTreeItemClickListener:EmTreeItemClickListener;
+			
+			public var dataFilter:String;//过滤条件 
+			
+			public var editEntityModelCode:String;//需要编辑的实体领域模型编码
+			
+			public var editEntityCode:String;//需要编辑的领域实体编码
+			
+			private const ENTITYMODELTREE_LOAD_COMPLETE:String = "entityModelTreeLoadComplete";//领域实体树数据加载完成事件
+			
+			public var emTreeLoadCompleteListener:EmTreeLoadCompleteListener;
+			
+			public var customTreeMetadata:MetadataTemplet;//自定义实体浏览树元数据
+			
+			private function creationCompleteHandler():void{
+				if(debugMode){
+					if(!treeBox.contains(treeButtonBox))
+						treeBox.addChildAt(treeButtonBox,0);
+				}else{
+					if(treeBox.contains(treeButtonBox))
+						treeBox.removeChild(treeButtonBox);
+				}
+				if(customTreeMetadata){
+					customTreeDataProvider = customTreeMetadata.contentXML.children();
+					decorationCustomTree(customTreeDataProvider);
+				}
+				
+				rpc = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint)
+					rpc.endpoint = endpoint;
+				rpc.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				rpc.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("查询数据时出错!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				if(dataFilter != null && StringUtil.trim(dataFilter) != "")
+					dataSql = "select * from ("+dataSql+") where "+dataFilter;
+				refreshTree();
+				entityModelTree.addEventListener(ListEvent.ITEM_CLICK,treeItemClickHandler);
+				addEventListener(ENTITYMODELTREE_LOAD_COMPLETE,emTreeLoadCompleteHandler);
+				if(editEntityCode && editEntityModelCode)
+					treeBox.width = 0;
+			}
+			
+			private function setEntityTreeSelectedItem():void{
+				for each(var data:Object in entityModelTree.dataProvider){
+					if(data.type == "entityModel" && data.code == editEntityModelCode){
+						recurseEntityTree(data.children);
+//						entityModelTree.selectedIndex = entityModelTree.getItemIndex(data.children[0]);
+//						if(entityModelTree.selectedItem)
+//							entityModelTree.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK));
+						break;
+					}
+				}
+			}
+			
+			private function recurseEntityTree(treeData:ArrayCollection):void{
+				for each(var entity:Object in treeData){
+					if(entity.code == editEntityCode){
+						entityModelTree.selectedItem = entity;
+						if(entityModelTree.selectedItem)
+							entityModelTree.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK));
+						break;
+					}else
+						recurseEntityTree(entity.children);
+				}
+			}
+			
+			private function treeItemClickHandler(event:ListEvent):void{
+				if(emTreeItemClickListener)
+					emTreeItemClickListener.itemClick(entityModelTree.selectedItem,childBox);
+			}
+			
+			private function emTreeLoadCompleteHandler(event:Event):void{
+				if(emTreeLoadCompleteListener)
+					emTreeLoadCompleteListener.handler(childBox);
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				treeDataProvider.removeAll();
+				var result:Array = event.result as Array;
+				for each(var obj:Object in result){
+					var shv:SimpleHashVO = obj as SimpleHashVO;
+					treeDataProvider.addItem(assembledEntityModelTree(shv.dataMap));
+				}
+//				expandAll();
+				if(editEntityCode && editEntityModelCode){//判断是否编辑一个领域实体
+					setEntityTreeSelectedItem();
+					mainBox.removeChild(treeBox);
+				}
+				dispatchEvent(new Event(ENTITYMODELTREE_LOAD_COMPLETE));
+			}
+			//拼装一个领域实体模型的树结构
+			private function assembledEntityModelTree(data:Object):Object{
+				var entitiesArr:ArrayCollection = new ArrayCollection();
+				var entityModel:Object = {name:data["name"],code:data["code"],children:entitiesArr,type:"entityModel"};
+				var contentXml:XML = XML(data["content"]);
+				var entitiesTempArr:ArrayCollection = new ArrayCollection();
+				var entitiesArrCache:Hashtable = new Hashtable();
+				//先加载所有的实体类
+				for each(var entity:XML in contentXml.entities.entity){
+					var entityObj:Object = {name:entity.@name,code:entity.@code,content:entity,
+						type:entity.@isAbstract=="true"?"abstractEntity":"entity",entireContent:contentXml};
+					entitiesArrCache.add(String(entity.@code),entityObj);
+					entitiesTempArr.addItem(entityObj);
+				}
+				//拼装树结构
+				for each(var entityData:Object in entitiesTempArr){
+					if(entitiesArrCache.containsKey(String(entityData.content.@parentEntityCode))){//判断是否有父实体，如果有则加到父实体对象下
+						var parentEntity:Object = entitiesArrCache.find(String(entityData.content.@parentEntityCode));
+						if(parentEntity.hasOwnProperty("children")){
+							parentEntity.children.addItem(entityData)
+						}else{
+							parentEntity.children = new ArrayCollection();
+							parentEntity.children.addItem(entityData);
+						}
+					}else
+						entitiesArr.addItem(entityData);
+				}
+				
+				return entityModel;
+			}
+			
+			private function refreshTree():void{
+				rpc.getSimpleHashVoArrayByDS(null,dataSql);
+			}
+			
+			private function refreshCustomTree():void{
+				
+			}
+			
+			/**
+			 * 装饰自定义树数据，将元数据功能加入树节点中
+			 **/ 
+			private function decorationCustomTree(dataProvider:XMLList):void{
+				for each(var entity:XML in dataProvider){
+					if(String(entity.@type) == "entity"){
+						var entityModelCode:String = entity.@entityModelCode;
+						entity.@entityModelMtCode = BAMConst.ENTITY_MODEL_MT_PREFIX.concat(entityModelCode);
+						entity.@mtcode = BAMConst.ENTITY_MT_PREFIX.concat(entityModelCode).concat("_").concat(entity.@code);
+					}else
+						decorationCustomTree(entity.children());
+				}
+				
+			}
+			
+			private function iconFunction(item:Object):*{
+				switch(item.type){
+					case "entity":
+						return AssetsFileLib.listviewIcon;
+					case "abstractEntity":
+						return AssetsFileLib.folderIcon;
+				}
+			}
+			
+			private function iconFunctionForCustom(item:Object):*{
+				switch(String(item.@type)){
+					case "entity":
+						return AssetsFileLib.listviewIcon;
+					case "folder":
+						return AssetsFileLib.folderIcon;
+				}
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in treeDataProvider){
+					entityModelTree.expandChildrenOf(item,true);
+				}
+			}
+			
+			private function isShowEntireEntityChk_changeHandler(event:Event):void{
+				if(isShowEntireEntityChk.selected)
+					currentState = "normal";
+				else
+					currentState = "custom";
+				
+				childBox.removeAllChildren();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:states>
+		<s:State name="custom" />
+		<s:State name="normal" />
+	</mx:states>
+	<mx:HDividedBox width="100%" height="100%" id="mainBox">
+		<mx:VBox id="treeBox" width="25%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+				 paddingTop="5">
+			<!--<mx:HBox  id="treeButtonBox" width="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					  paddingTop="5">
+				<mx:LinkButton toolTip="刷新" click="refreshTree()" icon="{AssetsFileLib.refreshIcon}" />
+			</mx:HBox>-->
+			<ext:TreeWrapper allowMultipleSelection="false" width="100%" height="100%" id="entityModelTree" 
+							 labelField.custom="@name" labelField.normal="name" iconFunction.normal="iconFunction" 
+							 iconFunction.custom="iconFunctionForCustom"
+							 dataProvider.custom="{customTreeDataProvider}" dataProvider.normal="{treeDataProvider}"/>
+		</mx:VBox>
+		<mx:VBox id="childBox" width="75%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+				 paddingTop="5">
+			
+		</mx:VBox>
+	</mx:HDividedBox>
+</mx:Canvas>

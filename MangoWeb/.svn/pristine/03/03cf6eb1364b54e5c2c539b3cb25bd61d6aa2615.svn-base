@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009"
+						 xmlns:s="library://ns.adobe.com/flex/spark"
+						 xmlns:mx="library://ns.adobe.com/flex/mx"
+						 xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*"
+						 width="100%" height="100%" label="关系"
+						 creationComplete="creationCompleteHandler()">
+	<fx:Declarations>
+		<mx:TitleWindow id="inheritWindow" title="继承关系" showCloseButton="true" close="PopUpManager.removePopUp(inheritWindow)">
+			<mx:DataGrid width="100%" height="100%" 
+						 dataProvider="{allInheritRelation}">
+				<mx:columns>
+					<mx:DataGridColumn dataField="@name" headerText="名称"/>
+					<mx:DataGridColumn dataField="@code" headerText="编码"/>
+					<mx:DataGridColumn dataField="@toEntityCode" headerText="目的实体"/>
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="relationEditWindow" width="450" height="100%" title="实体关系"
+						showCloseButton="true" close="PopUpManager.removePopUp(relationEditWindow)">
+			<mx:VBox id="mainCard" width="100%" height="100%" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%">
+					<mx:Label text="名称" width="25%" color="blue"/>
+					<mx:TextInput id="relationNameTxt" width="50%" text="{selectedRelation.@name}" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="编码" width="25%" color="blue"/>
+					<mx:TextInput id="relationCodeTxt" editable="{!isEdit}" width="50%" text="{selectedRelation.@code}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="描述" width="25%" />
+					<mx:TextArea id="relationDescTxt" width="50%" height="100" text="{selectedRelation.@desc}" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="所属实体" width="25%" />
+					<mx:TextInput text="{selectedItem.content.@name}" width="50%" editable="false" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="目标实体" width="25%" color="blue"/>
+					<mx:ComboBox id="goalEntityCob" width="50%" labelField="@name" dataProvider="{allEntitiesCol}" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="读取语句" width="25%" color="blue"/>
+					<mx:TextArea id="inputSqlTxt" width="50%" height="150" text="{selectedRelation.fetchSQL}" 
+								 toolTip="例:select aid fromid,bid toid from dual  第一个字段应该为fromid,第二个字段应该为toid"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确认" click="onSave()" />
+					<mx:Button label="取消" click="PopUpManager.removePopUp(relationEditWindow)" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.effects.Effect;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			public var refreshFun:Function;
+			[Bindable]
+			public var allEntitiesCol:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var selectedRelation:Object;
+			[Bindable]
+			private var isEdit:Boolean = true;
+			
+			[Bindable]
+			public var allInheritRelation:ArrayCollection = new ArrayCollection();
+			
+			private var rpc:RemoteObject;
+			
+			private var loadingWindow:LoadingWindow = new LoadingWindow();
+			[Bindable]
+			private var relationsDp:XMLListCollection = new XMLListCollection();
+			
+			private function creationCompleteHandler():void{
+				rpc = new RemoteObject(GlobalConst.SERVICE_FORM);
+				rpc.endpoint = endpoint;
+				rpc.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				rpc.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取表结构错误！",SmartXMessage.MESSAGE_ERROR,"错误："+event.fault.faultString);
+					loadingWindow.stopOper();
+				});
+			}
+			
+			private function addRelation():void{
+				isEdit = false;
+				selectedRelation = <relation />;
+				
+				PopUpManager.addPopUp(relationEditWindow,desktop,true);
+				PopUpManager.centerPopUp(relationEditWindow);
+			}
+			
+			private function delRelation():void{
+				if(relationDg.selectedIndex < 0)
+					return;
+				CEPUtils.xmlDeleteNode(XML(relationDg.selectedItem));
+				refreshRelationDg();
+			}
+			
+			private function viewInheritRelation():void{
+				if(allInheritRelation.length > 0){
+					if(inheritWindow && inheritWindow.isPopUp)
+						return;
+					else{
+						PopUpManager.addPopUp(inheritWindow,desktop,false);
+						PopUpManager.centerPopUp(inheritWindow);
+					}
+				}else
+					SmartXMessage.show("没有继承关系!");
+			}
+			
+			private function validateData():void{
+				if(StringUtil.trim(relationNameTxt.text) == ""){
+					SmartXMessage.show("关系名称不能为空！");
+					return;
+				}
+				if(StringUtil.trim(relationCodeTxt.text) == ""){
+					SmartXMessage.show("关系编码不能为空！");
+					return;
+				}
+				if(StringUtil.trim(inputSqlTxt.text) == ""){
+					SmartXMessage.show("读取语句不能为空！");
+					return;
+				}
+				if(goalEntityCob.selectedItem == null){
+					SmartXMessage.show("目标实体不能为空！");
+					return;
+				}
+				
+				var relation:XML;
+				if(!isEdit){
+					for each(relation in selectedItem.content.relations.relation){
+						if(String(relation.@code).toLowerCase() == relationCodeTxt.text.toLowerCase()){
+							SmartXMessage.show("关系编码不能重复！");
+							return;
+						}
+					}
+				}
+				for each(relation in allInheritRelation){
+					if(String(relation.@code).toLowerCase() == relationCodeTxt.text.toLowerCase()){
+						SmartXMessage.show("父类已经存在该关系编码！");
+						return;
+					}
+				}
+				loadingWindow.startOper("保存中...",desktop);
+				rpc.getTableDataStructByDS(String(contentXml.datasource),"select * from ("+inputSqlTxt.text+") where 1=2");
+			}
+			
+			private function onSave():void{
+				validateData();
+			}
+			
+			private function save():void{
+				selectedRelation.@name = relationNameTxt.text;
+				selectedRelation.@code = relationCodeTxt.text;
+				selectedRelation.@desc = relationDescTxt.text;
+				selectedRelation.@toEntityCode = goalEntityCob.selectedItem.@code;
+				var mtcode:String = contentXml.entities.entity.(@code==String(goalEntityCob.selectedItem.@code))[0].@mtcode;
+				var entityMtContent:XML;
+				if(mtcode != null && mtcode != ""){
+					var entityMt:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+					entityMtContent = entityMt?entityMt.contentXML:null;
+				}
+				selectedRelation.@toEntityIdAttributeName = entityMtContent==null
+									?contentXml.entities.entity.(@code==String(goalEntityCob.selectedItem.@code))[0].@idAttributeName
+									:entityMtContent.@idAttributeName;
+				selectedRelation.fetchSQL = inputSqlTxt.text;
+				
+				if(!isEdit){
+//					selectedItem.content.relations.appendChild(selectedRelation);
+//					refreshFun();
+					relationsDp.addItem(selectedRelation);
+				}
+				refreshRelationDg();
+				loadingWindow.stopOper();
+				PopUpManager.removePopUp(relationEditWindow);
+			}
+			
+			private function refreshRelationDg():void{
+//				relationDg.dataProvider = selectedItem.content.relations.relation;
+				relationDg.invalidateList();
+			}
+			
+			private function editRelation():void{
+				if(relationDg.selectedIndex < 0){
+					SmartXMessage.show("请选择一个关系！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				isEdit = true;
+				
+				PopUpManager.addPopUp(relationEditWindow,desktop,true);
+				PopUpManager.centerPopUp(relationEditWindow);
+				
+				relationEditWindow.callLater(function():void{
+					selectedRelation = relationDg.selectedItem;
+					initRelation();
+				});
+				
+			}
+			
+			private function initRelation():void{
+				for each(var entity:XML in allEntitiesCol){
+					if(entity.@code == String(relationDg.selectedItem.@toEntityCode)){
+						goalEntityCob.selectedItem = entity;
+						break;
+					}else
+						goalEntityCob.selectedItem = null;
+				}
+			}
+			
+			public function showHandler():void{
+				if(selectedItem.content.relations.length() == 0)
+					selectedItem.content.appendChild(<relations />);
+				relationsDp.source = selectedItem.content.relations.relation;
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				if(tableDataStruct.table_header.length < 2){
+					loadingWindow.stopOper();
+					SmartXMessage.show("字段数量不能小于两个!");
+					return;
+				}
+				if(tableDataStruct.table_header[0].toString().toLowerCase() != 'fromid' 
+					|| tableDataStruct.table_header[1].toString().toLowerCase() != "toid"){
+					loadingWindow.stopOper();
+					SmartXMessage.show("字段别名不正确，第一个字段应该为fromid,第二个字段应该为toid！");
+					return;
+				}
+				save();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox id="mainList" width="100%" height="100%" paddingBottom="5"
+			 paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%">
+			<mx:Button width="22" height="22" click="addRelation()" icon="{AssetsFileLib.addIcon}" toolTip="新建关系"/>
+			<mx:Button width="22" height="22" click="delRelation()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除关系"/>
+			<mx:Button width="22" height="22" click="editRelation()" icon="{AssetsFileLib.editIcon}" toolTip="编辑关系"/>
+			<mx:Button icon="{AssetsFileLib.viewIcon}" width="22" height="22" toolTip="查看继承关系" click="viewInheritRelation()"/>
+		</mx:HBox>
+		<mx:DataGrid id="relationDg" width="100%" height="80%" allowMultipleSelection="false"
+					 dataProvider="{relationsDp}" doubleClickEnabled="true" 
+					 itemDoubleClick="editRelation()">
+			<mx:columns>
+				<mx:DataGridColumn dataField="@name" headerText="名称"/>
+				<mx:DataGridColumn dataField="@code" headerText="编码"/>
+				<mx:DataGridColumn dataField="@toEntityCode" headerText="目的实体"/>
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+</entitymodel:AbstractTab>

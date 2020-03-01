@@ -1,0 +1,30 @@
+package smartx.system.service;
+
+
+import org.jdom.*;
+import org.jdom.output.*;
+import org.jdom.input.*;
+
+import smartx.framework.common.ui.NovaRemoteCallServiceIfc;
+
+import java.util.ArrayList;
+
+public interface SysJarLibsServiceIFC extends NovaRemoteCallServiceIfc {
+
+	
+	/**
+	 * 读取本地应用下的WEB-INF/lib目录下的所有jar包
+	 * @return ArrayList jar信息序列 [jarname,size]
+	 * @throws Exception
+	 */
+	public ArrayList getSysLibs()throws Exception;
+	
+	/**
+	 * 读取本地应用下的WEB-INF/lib目录下的指定jar包
+	 * @param f String[]=[jarname,path,size]
+	 * @return ArrayList jar信息序列 [jarname,size,block1,block2,...]每100k作为一段 
+	 * @throws Exception
+	 */
+	public ArrayList getSysLib(String[] f)throws Exception;
+	
+}

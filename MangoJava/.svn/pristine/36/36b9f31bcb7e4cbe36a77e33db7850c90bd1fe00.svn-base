@@ -1,0 +1,1209 @@
+package smartx.publics.form.bs.utils;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.sql.Types;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
+
+import org.dom4j.Attribute;
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+import org.dom4j.Element;
+import org.dom4j.io.DOMReader;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.utils.FileUtil;
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.publics.file.FileConstant;
+import smartx.publics.form.vo.XMLExportObject;
+
+public class XMLHandleUtil {
+	
+	public static String RootPath = (String) Sys.getInfo("NOVA2_SYS_ROOTPATH");
+
+	/**
+	 * 将数据库中的一部分数据导出xml
+	 * 
+	 * @param exportObject
+	 */
+	public static org.w3c.dom.Document exportXML(XMLExportObject[] exportObjects)
+			throws Exception {
+		if (exportObjects == null)
+			throw new IllegalArgumentException("exportObjects不能为null");
+		CommDMO dmo = new CommDMO();
+		try {
+			Document doc = DocumentHelper.createDocument();
+			Element root = doc.addElement("root");
+			for (XMLExportObject object : exportObjects) {
+				Element exportObjectXml = root.addElement("xmlExportObject");
+				exportObjectXml
+						.addAttribute("tableName", object.getTableName())
+						.addAttribute("pkName", object.getPkName())
+						.addAttribute("visiblePkName",
+								object.getVisiblePkName());
+				// 获取数据
+				String sql;
+				if(object.getFetchSql() != null)
+					sql = "select * from (" + object.getFetchSql() + ") where "
+					+ object.getVisiblePkName() + " in " + "(select "
+					+ object.getVisiblePkName() + " from " + object.getTableName()
+					+ " where " + object.getFkName() + " is null)";
+				else
+					sql = object.getFetchSql();
+				HashVO[] vos = dmo.getHashVoArrayByDS(object.getDatasource(),
+						sql);
+				for (HashVO vo : vos) {
+					Element data = exportObjectXml.addElement("data");
+					String[] keys = vo.getKeys();
+					for (String key : keys) {
+						data.addAttribute(key, vo.getStringValue(key));
+					}
+					if (object.getChildObject() != null) {
+						exportChildXMLObject(object.getChildObject(), data,
+								object);
+					}
+				}
+
+			}
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("打印导出的XML["+doc.asXML()+"]");
+			return w3cDocumentParse(doc);
+		} finally {
+			dmo.releaseContext();
+		}
+	}
+
+	private static void exportChildXMLObject(XMLExportObject object,
+			Element parentData, XMLExportObject parentObject) throws Exception {
+		CommDMO dmo = new CommDMO();
+		Element exportObjectXml = DocumentHelper.createElement("xmlExportObject");
+		exportObjectXml.addAttribute("tableName", object.getTableName())
+				.addAttribute("pkName", object.getPkName()).addAttribute(
+						"visiblePkName", object.getVisiblePkName());
+		if (object.getFkName() == null)
+			throw new Exception("子对象必须指定外键引用字段[" + object.getTableName() + "]");
+		exportObjectXml.addAttribute("fkName", object.getFkName().toLowerCase());
+		// 获取数据库中的真正父主键值（比如name-》id）
+		String sql = "select " + parentObject.getPkName() + " from "
+				+ parentObject.getTableName() + " where "
+				+ parentObject.getVisiblePkName() + "='"
+				+ parentData.attributeValue(parentObject.getVisiblePkName())
+				+ "'";
+		HashVO[] vos = dmo
+				.getHashVoArrayByDS(parentObject.getDatasource(), sql);
+		if (vos.length != 1)
+			throw new Exception("获取父对象主键失败[" + object.getTableName() + "]");
+		String parentPkValue = vos[0].getStringValue(0);
+		sql = "select * from (" + object.getFetchSql() + ") where "
+				+ object.getVisiblePkName() + " in " + "(select "
+				+ object.getVisiblePkName() + " from " + object.getTableName()
+				+ " where " + object.getFkName() + "='" + parentPkValue + "')";
+		vos = dmo.getHashVoArrayByDS(object.getDatasource(), sql);
+		//有子对象数据则继续，否则直接返回
+		if(vos.length > 0)
+			parentData.add(exportObjectXml);
+		else
+			return;
+		for (HashVO vo : vos) {
+			Element data = exportObjectXml.addElement("data");
+			String[] keys = vo.getKeys();
+			for (String key : keys) {
+				data.addAttribute(key, vo.getStringValue(key));
+			}
+			if (object.getChildObject() != null) {
+				exportChildXMLObject(object.getChildObject(), data, object);
+			}
+		}
+	}
+	
+	public static void importXML(org.w3c.dom.Document xml,String datasource) throws Exception{
+		//转换成dom4j便于解析
+		DOMReader domReader = new DOMReader();
+		org.dom4j.Document doc = domReader.read(xml);
+		Element rootElement = doc.getRootElement();
+		CommDMO dmo = new CommDMO();
+		try{
+			importByRootXML(rootElement,datasource);
+			dmo.commit(null);
+		}
+		catch(Exception e){
+			dmo.rollback(null);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext();
+		}
+	}
+	
+	private static void importByRootXML(Element rootElement,String datasource) throws Exception{
+		CommDMO dmo = new CommDMO();
+		for (Iterator<?> i = rootElement.elementIterator(); i.hasNext();) {
+			Element xmlObjectElement =  (Element) i.next();
+			String tableName = xmlObjectElement.attributeValue("tableName");
+			String pkName = xmlObjectElement.attributeValue("pkName");
+			String visiblePkName = xmlObjectElement.attributeValue("visiblePkName");
+			if(tableName == null || "".equals(tableName)
+					|| pkName == null || "".equals(pkName)
+					|| visiblePkName == null || "".equals(visiblePkName)
+					)
+				throw new Exception("非法的XML格式，缺少必填项\n"+xmlObjectElement);
+			
+			String fkName = xmlObjectElement.attributeValue("fkName");
+			
+			for (Iterator<?> j = xmlObjectElement.elementIterator(); j.hasNext();) {
+				Element dataElement = (Element) j.next();
+				String visiblePkValue = dataElement.attributeValue(visiblePkName);
+				String sql = "select count(1) from "+tableName+" where "+visiblePkName+"=?";
+				HashVO[] vos = dmo.getHashVoArrayByDS(datasource, sql, visiblePkValue);
+				String parentIdSql = null;
+				boolean isChild = (fkName != null && !"root".equalsIgnoreCase(rootElement.getName()));
+				if(isChild){
+					//rootElement是data节点
+					Element parentXmlObjectElement = rootElement.getParent();//父对象的描述节点
+					String parentTableName = parentXmlObjectElement.attributeValue("tableName");
+					String parentPkName = parentXmlObjectElement.attributeValue("pkName");
+					String parentVisiblePkName = parentXmlObjectElement.attributeValue("visiblePkName");
+					String parentVisiblePkValue = rootElement.attributeValue(parentVisiblePkName);
+					parentIdSql = "(select "+parentPkName+" from "+parentTableName+" where "+parentVisiblePkName+"="+StringUtil.strToSQLValue(parentVisiblePkValue)+")";
+				}
+				HashVO vo = vos[0];
+				int count = vo.getIntegerValue(0);
+				if(count == 0){
+					//不存在，insert
+					if(!pkName.equalsIgnoreCase(visiblePkName)){
+						sql = "insert into "+tableName+"(" +
+								pkName;//主键
+						for(Object o:dataElement.attributes()){
+							Attribute attr = (Attribute)o;
+							sql += ","+attr.getName();//各字段值
+						}
+						//最后补上外键
+						if(isChild)
+							sql += ","+fkName;
+						
+						sql += 	")" +
+								"values(" +
+								"s_"+tableName+".nextval";
+						for(Object o:dataElement.attributes()){
+							Attribute attr = (Attribute)o;
+							sql += ","+StringUtil.strToSQLValue(attr.getValue());//各字段值
+						}
+						if(isChild)
+							sql += ","+parentIdSql;
+						sql += ")";
+					}
+					else{
+						sql = "insert into " + tableName + "(";
+						boolean isFirst = true;
+						for (Object o : dataElement.attributes()) {
+							Attribute attr = (Attribute) o;
+							if(isFirst){
+								sql += attr.getName();
+								isFirst = false;
+							}
+							else
+								sql += "," + attr.getName();// 各字段值
+						}
+						// 最后补上外键
+						if (isChild)
+							sql += "," + fkName;
+
+						sql += ")" + "values(";
+						isFirst = true;
+						for (Object o : dataElement.attributes()) {
+							Attribute attr = (Attribute) o;
+							if(isFirst){
+								sql += StringUtil.strToSQLValue(attr.getValue());
+								isFirst = false;
+							}
+							else
+								sql += ","
+									+ StringUtil.strToSQLValue(attr.getValue());// 各字段值
+						}
+						if (isChild)
+							sql += "," + parentIdSql;
+						sql += ")";
+					}
+					NovaLogger.getLogger(XMLHandleUtil.class).debug("执行导入XMLSQL["+sql+"]");
+					dmo.executeUpdateByDS(datasource, sql);
+				}
+				else{
+					//已存在，update
+					if(!isChild && dataElement.attributeCount() == 0)//没有需要update的字段
+						continue;
+					sql = "update "+tableName+" set ";
+					boolean isFirst = true;
+					for(Object o:dataElement.attributes()){
+						Attribute attr = (Attribute)o;
+						if(isFirst){
+							sql += attr.getName()+"="+StringUtil.strToSQLValue(attr.getValue());
+							isFirst = false;
+						}
+						else
+							sql += ","+attr.getName()+"="+StringUtil.strToSQLValue(attr.getValue());
+					}
+					if(isChild){
+						if(isFirst){
+							sql += fkName+"="+parentIdSql;
+							isFirst = false;
+						}
+						else
+							sql += ","+fkName+"="+parentIdSql;
+					}
+					sql += " where "+visiblePkName+"="+StringUtil.strToSQLValue(dataElement.attributeValue(visiblePkName));
+					NovaLogger.getLogger(XMLHandleUtil.class).debug("执行导入菜单SQL["+sql+"]");
+					dmo.executeUpdateByDS(datasource, sql);
+				}
+				importByRootXML(dataElement, datasource);
+			}
+		}
+	}
+	
+	
+
+	/**
+	 * org.dom4j.Document -> org.w3c.dom.Document
+	 * 
+	 * @param doc
+	 *            Document(org.dom4j.Document)
+	 * @throws Exception
+	 * @return Document
+	 */
+	public static org.w3c.dom.Document w3cDocumentParse(Document doc) throws Exception {
+		if (doc == null) {
+			return (null);
+		}
+		java.io.StringReader reader = new java.io.StringReader(doc.asXML());
+		org.xml.sax.InputSource source = new org.xml.sax.InputSource(reader);
+		javax.xml.parsers.DocumentBuilderFactory documentBuilderFactory = javax.xml.parsers.DocumentBuilderFactory
+				.newInstance();
+		javax.xml.parsers.DocumentBuilder documentBuilder = documentBuilderFactory
+				.newDocumentBuilder();
+		return (documentBuilder.parse(source));
+	}
+	
+	//add by caohenghui --start
+	
+	public static void importXMLFromMDFile(String unZipDIR,String datasource) throws Exception{
+		
+		org.dom4j.Document doc = DocumentHelper.parseText(readContent(unZipDIR+"/metadata.meta"));
+		
+		Element rootElement = doc.getRootElement();
+		CommDMO dmo = new CommDMO();
+		try{
+			importByRootXML(rootElement,datasource,unZipDIR,null);
+			dmo.commit(null);
+			
+			File file = new File(unZipDIR);
+			deleteFielOrDir(file);
+			
+		}
+		catch(Exception e){
+			dmo.rollback(null);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext();
+		}
+	}
+	
+	private static void importByRootXML(Element rootElement,String datasource,String unZipDIR,String pidSql) throws Exception{
+		CommDMO dmo = new CommDMO();
+		for (Iterator<?> i = rootElement.elementIterator(); i.hasNext();) {
+			Element xmlObjectElement =  (Element) i.next();
+			if((xmlObjectElement == null || xmlObjectElement.getName().trim().equalsIgnoreCase("clobColumns"))||
+			   (xmlObjectElement == null || xmlObjectElement.getName().trim().equalsIgnoreCase("dateColumns"))){
+				continue;
+			}
+			String tableName = xmlObjectElement.attributeValue("tableName");
+			String pkName = xmlObjectElement.attributeValue("pkName");
+			String visiblePkName = xmlObjectElement.attributeValue("visiblePkName");
+			if(tableName == null || "".equals(tableName)
+					|| pkName == null || "".equals(pkName)
+					|| visiblePkName == null || "".equals(visiblePkName)
+					)
+				throw new Exception("非法的XML格式，缺少必填项\n"+xmlObjectElement);
+			
+			String fkType = xmlObjectElement.attributeValue("fkType");
+			String fkName = xmlObjectElement.attributeValue("fkName");
+			String fkTable = xmlObjectElement.attributeValue("fkTable");
+			String idToParent = xmlObjectElement.attributeValue("idToParent");
+			String idToChild = xmlObjectElement.attributeValue("idToChild");
+			
+			String[] visiblePkNames = visiblePkName.toLowerCase().split(",");
+			
+			for (Iterator<?> j = xmlObjectElement.elementIterator(); j.hasNext();) {
+				Element dataElement = (Element) j.next();
+//				String visiblePkValue = dataElement.attributeValue(visiblePkName);
+				String parentIdSql = pidSql;
+				String childIdSql = null;
+				boolean isChild = (fkName != null && !"root".equalsIgnoreCase(rootElement.getName()));
+				if(!isEmpty(fkType)&& fkType.trim().equalsIgnoreCase("RefTable")){
+					isChild = (fkTable != null && !"root".equalsIgnoreCase(rootElement.getName()));
+				}
+				if(isChild){
+					//rootElement是data节点
+					Element parentXmlObjectElement = rootElement.getParent();//父对象的描述节点
+					String parentTableName = parentXmlObjectElement.attributeValue("tableName");
+					String parentPkName = parentXmlObjectElement.attributeValue("pkName");
+					String parentVisiblePkName = parentXmlObjectElement.attributeValue("visiblePkName");
+//					String parentVisiblePkValue = rootElement.attributeValue(parentVisiblePkName);
+					parentIdSql = "(select "+parentPkName+" from "+parentTableName+" where 1=1 "+createCondition(rootElement,parentVisiblePkName.toLowerCase().split(","),parentIdSql)+")";
+					if(!isEmpty(fkType)&&fkType.trim().equalsIgnoreCase("RefTable")){
+						childIdSql ="(select "+pkName+" from "+tableName+" where 1=1 "+createCondition(dataElement,visiblePkNames,parentIdSql)+")";
+					}
+				}
+				
+				String sql = "select count(1) from "+tableName+" where 1=1 "+createCondition(dataElement,visiblePkNames,parentIdSql);
+				HashVO[] vos = dmo.getHashVoArrayByDS(datasource, sql);
+				HashVO vo = vos[0];
+				
+				int count = vo.getIntegerValue(0);
+				if(count == 0){
+					//不存在，insert
+//					if(!pkName.equalsIgnoreCase(visiblePkName)){
+					if(!isContain(visiblePkNames,pkName)){
+						sql = "insert into "+tableName+"(" +
+								pkName;//主键
+						for(Object o:dataElement.attributes()){
+							Attribute attr = (Attribute)o;
+							sql += ","+attr.getName();//各字段值
+						}
+						
+						//add by caohenghui --start
+						Element cLobColumns = dataElement.element("clobColumns");
+						List list = null;
+						if(cLobColumns != null){
+							list = cLobColumns.elements();
+						}
+						if(list != null){
+							for(Object obj : list){
+								Element cLobColumn = (Element)obj;
+								sql+=","+cLobColumn.attributeValue("name");
+							}
+						}
+						
+						Element dateColumns = dataElement.element("dateColumns");
+						List datelist = null;
+						if(dateColumns != null){
+							datelist = dateColumns.elements();
+						}
+						if(datelist != null){
+							for(Object obj : datelist){
+								Element dateColumn = (Element)obj;
+								sql+=","+dateColumn.attributeValue("name");
+							}
+						}
+						//add by caohenghui --end
+						
+						//最后补上外键
+						if(isChild)
+							sql += ","+fkName;
+						
+						sql += 	")" +
+								"values(" +
+								"s_"+tableName+".nextval";
+						for(Object o:dataElement.attributes()){
+							Attribute attr = (Attribute)o;
+							sql += ","+StringUtil.strToSQLValue(attr.getValue());//各字段值
+						}
+						
+						//add by caohenghui --start
+						if(list != null){
+							for(Object obj : list){
+								Element cLobColumn = (Element)obj;
+								sql += ",empty_clob()";
+							}
+						}
+						
+						if(datelist != null){
+							for(Object obj : datelist){
+								Element dateColumn = (Element)obj;
+								String value = isEmpty(dateColumn.getText().trim())?"null":"'"+dateColumn.getText()+"'";
+								String temp = ",to_date("+value+",'YYYY-MM-dd hh24:mi:ss')";
+								sql+= (isEmpty(value)?"null":temp);
+							}
+						}
+						//add by caohenghui --end
+						
+						if(isChild && (isEmpty(fkType)||fkType.trim().equalsIgnoreCase("RefField"))){
+							sql += ","+parentIdSql;
+						}
+						sql += ")";
+					}
+					else{
+						sql = "insert into " + tableName + "(";
+						boolean isFirst = true;
+						for (Object o : dataElement.attributes()) {
+							Attribute attr = (Attribute) o;
+							if(isFirst){
+								sql += attr.getName();
+								isFirst = false;
+							}
+							else
+								sql += "," + attr.getName();// 各字段值
+						}
+						
+						//add by caohenghui --start
+						Element cLobColumns = dataElement.element("clobColumns");
+						List list = null;
+						if(cLobColumns != null){
+							list = cLobColumns.elements();
+						}
+						if(list != null){
+							for(Object obj : list){
+								Element cLobColumn = (Element)obj;
+								sql+=","+cLobColumn.attributeValue("name");
+							}
+						}
+						
+						Element dateColumns = dataElement.element("dateColumns");
+						List datelist = null;
+						if(dateColumns != null){
+							datelist = dateColumns.elements();
+						}
+						if(datelist != null){
+							for(Object obj : datelist){
+								Element dateColumn = (Element)obj;
+								sql+=","+dateColumn.attributeValue("name");
+							}
+						}
+						
+						//add by caohenghui --end
+						
+						// 最后补上外键
+						if (isChild && (isEmpty(fkType)||fkType.trim().equalsIgnoreCase("RefField"))){
+							sql += "," + fkName;
+						}
+
+						sql += ")" + "values(";
+						isFirst = true;
+						for (Object o : dataElement.attributes()) {
+							Attribute attr = (Attribute) o;
+							if(isFirst){
+								sql += StringUtil.strToSQLValue(attr.getValue());
+								isFirst = false;
+							}
+							else
+								sql += ","
+									+ StringUtil.strToSQLValue(attr.getValue());// 各字段值
+						}
+						
+						//add by caohenghui --start
+						if(list !=null){
+							for(Object obj : list){
+								Element cLobColumn = (Element)obj;
+								sql += ",empty_clob()";
+							}
+						}
+						
+						if(datelist != null){
+							for(Object obj : datelist){
+								Element dateColumn = (Element)obj;
+								String value = isEmpty(dateColumn.getText().trim())?"null":"'"+dateColumn.getText()+"'";
+								String temp = ",to_date("+value+",'YYYY-MM-dd hh24:mi:ss')";
+								sql += (isEmpty(value)?"null":temp);
+							}
+						}
+						//add by caohenghui --end
+						
+						if (isChild && (isEmpty(fkType)||fkType.trim().equalsIgnoreCase("RefField"))){
+							sql += "," + parentIdSql;
+						}
+						sql += ")";
+					}
+					
+					NovaLogger.getLogger(XMLHandleUtil.class).debug("执行导入XMLSQL["+sql+"]");
+					
+					dmo.executeUpdateByDS(datasource, sql);
+					
+					//add by caohenghui --start 更新clob字段
+					
+					Element cLobColumns = dataElement.element("clobColumns");
+					List list = null;
+					if(cLobColumns != null){
+						list = cLobColumns.elements();
+					}
+					if(list != null){
+						for(Object obj : list){
+							Element cLobColumn = (Element)obj;
+							String columnName = cLobColumn.attributeValue("name");
+							String content = randomAccessFile(unZipDIR,"clobcontent.clob", cLobColumn.getText().split(";"));
+							if(!isEmpty(content)){
+								dmo.executeUpdateClobByDS( datasource, columnName, tableName, " 1=1 "+createCondition(dataElement,visiblePkNames,parentIdSql),content);
+							}
+						}
+					}
+					
+					//add by caohenghui --end 更新clob字段
+					
+					
+				}
+				else{
+					//已存在，update
+					if(!isChild && dataElement.attributeCount() == 0)//没有需要update的字段
+						continue;
+					sql = "update "+tableName+" set ";
+					boolean isFirst = true;
+					for(Object o:dataElement.attributes()){
+						Attribute attr = (Attribute)o;
+						if(isFirst){
+							sql += attr.getName()+"="+StringUtil.strToSQLValue(attr.getValue());
+							isFirst = false;
+						}
+						else
+							sql += ","+attr.getName()+"="+StringUtil.strToSQLValue(attr.getValue());
+					}
+					
+					//add by caohenghui --start
+					Element cLobColumns = dataElement.element("clobColumns");
+					List list = null;
+					if(cLobColumns != null){
+						list = cLobColumns.elements();
+					}
+					if(list !=null ){
+						for(Object obj : list){
+							Element cLobColumn = (Element)obj;
+							sql+=","+cLobColumn.attributeValue("name")+"=empty_clob()";
+						}
+					}
+					
+					Element dateColumns = dataElement.element("dateColumns");
+					List datelist = null;
+					if(dateColumns != null){
+						datelist = dateColumns.elements();
+					}
+					if(datelist !=null ){
+						for(Object obj : datelist){
+							Element dateColumn = (Element)obj;
+							String value = isEmpty(dateColumn.getText().trim())?"null":"'"+dateColumn.getText()+"'";
+							String temp = "to_date("+value+",'YYYY-MM-dd hh24:mi:ss')";
+							sql+=","+dateColumn.attributeValue("name")+"="+(isEmpty(value)?"null":temp);
+						}
+					}
+					//add by caohenghui --end
+					
+					if(isChild && (isEmpty(fkType)||fkType.trim().equalsIgnoreCase("RefField"))){
+						if(isFirst){
+							sql += fkName+"="+parentIdSql;
+							isFirst = false;
+						}else{
+							sql += ","+fkName+"="+parentIdSql;
+						}
+						
+					}
+					
+					sql += " where 1=1 "+createCondition(dataElement,visiblePkNames,parentIdSql);
+					
+					NovaLogger.getLogger(XMLHandleUtil.class).debug("执行导入SQL["+sql+"]");
+					
+					dmo.executeUpdateByDS(datasource, sql);
+					
+					//add by caohenghui --start 更新clob字段
+					
+					Element cLobColumnsUP = dataElement.element("clobColumns");
+					List listUP = null;
+					if(cLobColumnsUP != null){
+						listUP = cLobColumnsUP.elements();
+					}
+					if(listUP != null){
+						for(Object obj : listUP){
+							Element cLobColumn = (Element)obj;
+							String columnName = cLobColumn.attributeValue("name");
+							String content = randomAccessFile(unZipDIR,"clobcontent.clob", cLobColumn.getText().split(";"));
+							if(!isEmpty(content)){
+								dmo.executeUpdateClobByDS( datasource, columnName, tableName, " 1=1 "+createCondition(dataElement,visiblePkNames,parentIdSql),content);
+							}
+						}
+					}
+					
+					//add by caohenghui --end 更新clob字段
+				}
+				
+				//add by caohenghui --start 更新关联关系表
+				try{
+					
+					if(isChild && (!isEmpty(fkType)&&fkType.trim().equalsIgnoreCase("RefTable"))){
+						String deleteSQL ="delete from "+fkTable+" where "+idToParent+" = "+parentIdSql+" and "+idToChild+" = "+childIdSql;
+						String insertSQL ="insert into "+fkTable+"(ID,"+idToParent+","+idToChild+") values(s_"+fkTable+".nextval,"+parentIdSql+","+childIdSql+")";
+						dmo.executeBatchByDS(datasource, new String[]{deleteSQL,insertSQL});
+					}
+					dmo.commit(datasource);
+					
+				}catch(Exception e){
+					NovaLogger.getLogger(ImportInitMetaData.class).debug("", e);
+				}
+				//add by caohenghui --end 更新关联关系表
+				
+				importByRootXML(dataElement, datasource,unZipDIR,parentIdSql);
+			}
+		}
+	}
+	
+	
+	
+	private static void exportChildXMLObject(XMLExportObject object,
+			Element parentData, XMLExportObject parentObject,String clobFile) throws Exception {
+		CommDMO dmo = new CommDMO();
+		Element exportObjectXml = DocumentHelper.createElement("xmlExportObject");
+		exportObjectXml.addAttribute("tableName", object.getTableName())
+				.addAttribute("pkName", object.getPkName()).addAttribute(
+						"visiblePkName", object.getVisiblePkName());
+		String fkType = object.getFkType();
+		if(isEmpty(fkType)||fkType.trim().equalsIgnoreCase("RefField")){
+			if (object.getFkName() == null)
+				throw new Exception("子对象必须指定外键引用字段[" + object.getTableName() + "]");
+			exportObjectXml.addAttribute("fkName", object.getFkName());
+			exportObjectXml.addAttribute("fkType", "RefField");
+			
+		}else{
+			
+			exportObjectXml.addAttribute("fkType", "RefTable");
+			
+			if (object.getFkTable() == null)
+				throw new Exception("子对象必须指定表引用名称[" + object.getFkTable() + "]");
+			exportObjectXml.addAttribute("fkTable",object.getFkTable());
+			
+			if (object.getIdToParent() == null)
+				throw new Exception("子对象必须指定父节点引用字段[" + object.getIdToParent() + "]");
+			exportObjectXml.addAttribute("idToParent",object.getIdToParent());
+			
+			if (object.getIdToChild() == null)
+				throw new Exception("子对象必须指定子节点引用字段[" + object.getIdToChild() + "]");
+			exportObjectXml.addAttribute("idToChild",object.getIdToChild());
+			
+		}
+		// 获取数据库中的真正父主键值（比如name-》id）
+		
+		
+		String a = getParentIdSQL(parentObject,parentData);
+		String b = parentObject.getFetchSql();
+
+//		String sql = "select a.* from ("+"select " + parentObject.getPkName() +querySQL[0]+ " from "
+//		+ parentObject.getTableName() + " where "
+//		+ parentObject.getVisiblePkName() + "='"
+//		+ parentData.attributeValue(parentObject.getVisiblePkName())
+//		+ "'";
+		Map<String,String> refVisiblePkMap = new HashMap<String,String>();
+		
+		String[] sqls = getVisibleQuerySQL(parentObject.getVisiblePkName(),null);
+		String sql = "select a."+parentObject.getPkName()+" from ("+a+") a,("+b+") b where 1=1 "+sqls[1];
+		HashVO[] vos = dmo
+				.getHashVoArrayByDS(parentObject.getDatasource(), sql);
+		if (vos.length != 1)
+			throw new Exception("获取父对象主键失败[" + object.getTableName() + "]");
+		String parentPkValue = vos[0].getStringValue(0);
+
+//		sql = "select * from (" + object.getFetchSql() + ") where "
+//				+ object.getVisiblePkName() + " in " + "(select "
+//				+ object.getVisiblePkName() + " from " + object.getTableName()
+//				+ " where " + object.getFkName() + "='" + parentPkValue + "')";
+		String[] sqls2 = getVisibleQuerySQL(object.getVisiblePkName(),refVisiblePkMap);
+		sql = "select a.* from (" + object.getFetchSql() + ") a, "
+		+ "(select t."+object.getPkName()+sqls2[0]+ " from "
+		+ object.getTableName() + " t where t."
+		+object.getFkName() + " = '"+parentPkValue+"') b where 1=1 "+sqls2[1];
+		
+		if(!isEmpty(fkType)&&fkType.trim().equalsIgnoreCase("RefTable")){
+			
+			sql = "select a.* from (" + object.getFetchSql() + ") a, "
+			+ "(select t."+object.getPkName()+sqls2[0]+ " from "
+			+ object.getTableName() + " t,"+object.getFkTable()+" f where t."+object.getPkName()+" = f."+object.getIdToChild()+" and f."
+			+object.getIdToParent() + " = '"+parentPkValue+"') b where 1=1 "+sqls2[1];
+			
+		}
+		
+		vos = dmo.getHashVoArrayByDS(object.getDatasource(), sql);
+		//有子对象数据则继续，否则直接返回
+		if(vos.length > 0)
+			parentData.add(exportObjectXml);
+		else
+			return;
+		for (HashVO vo : vos) {
+			Element data = exportObjectXml.addElement("data");
+			String[] keys = vo.getKeys();
+			for (String key : keys) {
+				if(!refVisiblePkMap.containsKey(key)){
+				
+					if(vo.getColumnType(key)==Types.CLOB){
+						Element cLobColumns = data.element("clobColumns");
+						if(cLobColumns == null){
+							cLobColumns = data.addElement("clobColumns");
+						}
+						Element cLobColumn = cLobColumns.addElement("clobColumn");
+						cLobColumn.addAttribute("name", key.toLowerCase());
+						cLobColumn.addText(writeClobToFile(vo.getStringValue(key), clobFile).trim());
+						
+					}else if(vo.getColumnType(key) == Types.DATE || vo.getColumnType(key) == Types.TIMESTAMP){
+						Element dateColumns = data.element("dateColumns");
+						if (dateColumns == null) {
+							dateColumns = data.addElement("dateColumns");
+						}
+						Element dateColumn = dateColumns.addElement("dateColumn");
+						dateColumn.addAttribute("name", key.toLowerCase());
+						dateColumn.addText(isEmpty(vo.getStringValue(key))?"":vo.getStringValue(key).trim());
+					}else{
+						data.addAttribute(key.toLowerCase(), vo.getStringValue(key));
+					}
+					
+				}
+				
+			}
+			if (object.getChildObjects() != null) {
+				for(XMLExportObject childObjec : object.getChildObjects()){
+					exportChildXMLObject(childObjec, data,
+							object, clobFile);
+				}
+			}
+		}
+	}
+	
+	private static String writeClobToFile(String content,String fileName){
+		
+		String contentIndex = null;
+		
+		try {
+			String contentTemp = isEmpty(content)?"":content;
+			File file = new File(RootPath + FileConstant.DOWNLOAD_DIR + "/" + fileName);
+			long startIndex = file.length();
+			
+			FileWriter fw = new FileWriter(file,true);
+			fw.write(contentTemp+"\n");
+			fw.close();
+			
+			long contentLength = file.length()-startIndex;
+			
+			contentIndex = startIndex+";"+contentLength;
+			
+		} catch (Exception e) {
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		
+		return contentIndex;
+	}
+	
+	private static void writeContentToFile(String content,String fileName){
+		
+		try{
+			
+			File file = new File(RootPath + FileConstant.DOWNLOAD_DIR + "/" + fileName);
+			
+	        FileWriter fw = new FileWriter(file);
+	        fw.write(content);
+	        fw.close();
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		
+	}
+	
+	private static String createNewFile(String suffix) {
+		
+		String newFileName = null;
+		try {
+			newFileName = UUID.randomUUID().toString();
+			File file = new File(RootPath + FileConstant.DOWNLOAD_DIR + "/" + newFileName+"."+suffix);
+			if (file.exists()) {
+				createNewFile(suffix);
+			} else {
+				file.createNewFile();
+			}
+		} catch (Exception e) {
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return newFileName+"."+suffix;
+		
+	}
+	
+	private static String putZipEntry(List<String> fileNames){
+		
+		String zipFileName = null;
+		try{
+			
+			String parentPath = RootPath + FileConstant.DOWNLOAD_DIR + "/";
+			
+			zipFileName = createZipFile();
+			
+			FileOutputStream  fos = new FileOutputStream (parentPath+zipFileName);
+			
+			ZipOutputStream zos = new ZipOutputStream(fos);
+			
+			for(String fileName : fileNames){
+				
+				File file = new File(parentPath+fileName);
+				FileInputStream fis = new FileInputStream(file);
+				zos.putNextEntry(new ZipEntry(fileName));
+//				byte[] buffer = new byte[1024];
+				int i = -1;
+				while ( (i = fis.read()) != -1){
+					zos.write(i);
+				}
+				zos.flush();
+				zos.closeEntry();
+				fis.close();
+				
+				file.delete();
+				
+			}
+			
+			zos.close();
+			fos.close();
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return zipFileName;
+	}
+	
+	private static String createZipFile(){
+		
+		String newZipFileName = null;
+		try {
+			newZipFileName = UUID.randomUUID().toString();
+			File file = new File(RootPath + FileConstant.DOWNLOAD_DIR + "/" + newZipFileName+".zip");
+			if (file.exists()) {
+				createZipFile();
+			} else {
+				file.createNewFile();
+			}
+		} catch (Exception e) {
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return newZipFileName+".zip";
+		
+	}
+	
+	public static String createUpLoadFile(byte[] content){
+		
+		String newUpLoadFile = null;
+		
+		try{
+			
+			File dir = new File(RootPath + FileConstant.UPLOAD_DIR);
+			if(!dir.exists()){
+				dir.mkdir();
+			}
+			
+			if (dir.listFiles().length >= 20) {
+				deleteFile(dir);
+			}
+			
+			newUpLoadFile = UUID.randomUUID().toString();
+			File file = new File(RootPath + FileConstant.UPLOAD_DIR + "/" + newUpLoadFile+".zip");
+			if (file.exists()) {
+				createUpLoadFile(content);
+			} else {
+				file.createNewFile();
+			}
+			
+			FileOutputStream fos = new FileOutputStream(file);
+			
+			fos.write(content);
+			
+			fos.close();
+			
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return newUpLoadFile;
+	}
+	
+	public static String unZipFile(String UpLoadFileName){
+		
+		String unZipDir = null;
+		
+		try{
+			unZipDir = RootPath + FileConstant.UPLOAD_DIR + "/" + UpLoadFileName;
+			File dir = new File(unZipDir);
+			dir.mkdir();
+			
+			ZipFile zipFile = new ZipFile(new File(RootPath + FileConstant.UPLOAD_DIR + "/" + UpLoadFileName+".zip"));
+			
+            Enumeration<? extends ZipEntry> eu = zipFile.entries();
+            
+            while (eu.hasMoreElements()) {
+            	
+            	ZipEntry ze = (ZipEntry)eu.nextElement();
+            	String zeName = ze.getName();
+            	
+            	if(zeName.endsWith(".meta")){
+            		
+            		File file = new File(unZipDir+"/metadata.meta");
+            		if(!file.exists()){
+            			file.createNewFile();
+            		}
+            		
+            		FileOutputStream fos = new FileOutputStream(file);
+            		InputStream is = zipFile.getInputStream(ze);
+            		
+                    int n = 0;   
+                    while ((n = is.read()) > 0){
+                    	fos.write(n);
+                    }
+                    fos.flush();
+                    fos.close(); 
+                    is.close();
+            		
+            	}else if(zeName.endsWith(".clob")){
+            		
+            		File file = new File(unZipDir+"/clobcontent.clob");
+            		if(!file.exists()){
+            			file.createNewFile();
+            		}
+            		
+            		FileOutputStream fos = new FileOutputStream(file);
+            		InputStream is = zipFile.getInputStream(ze);
+            		
+                    int n = 0;   
+                    while ((n = is.read()) > 0){
+                    	fos.write(n);
+                    }
+                    fos.flush();
+                    fos.close(); 
+                    is.close();
+            		
+            	}else if(zeName.endsWith(".key")){
+            		
+            		File file = new File(unZipDir+"/flag.key");
+            		if(!file.exists()){
+            			file.createNewFile();
+            		}
+            		
+            		FileOutputStream fos = new FileOutputStream(file);
+            		InputStream is = zipFile.getInputStream(ze);
+            		
+                    int n = 0;   
+                    while ((n = is.read()) > 0){
+                    	fos.write(n);
+                    }
+                    fos.flush();
+                    fos.close(); 
+                    is.close();
+            	}
+            	
+            }
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return unZipDir;
+	}
+	
+	private static String readContent(String filePath){
+		StringBuffer content = new StringBuffer();
+		try{
+			
+			String contentTemp = FileUtil.readFileContent(filePath, "UTF-8");
+			content.append(contentTemp);
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return content.toString();
+	}
+	
+	private static String randomAccessFile(String filePath,String fileName,String[] index){
+		StringBuffer content = new StringBuffer();
+		try{
+			
+			RandomAccessFile raf = new RandomAccessFile(filePath+"/"+fileName,"rw");
+			
+			byte[] buffer = new byte[Integer.parseInt(index[1].trim())];
+			
+			raf.seek(Long.parseLong(index[0].trim()));
+			
+			raf.read(buffer,0,Integer.parseInt(index[1].trim()));
+			
+			content.append(new String(buffer,"UTF-8"));
+			
+			raf.close();
+			
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return content.toString();
+	}
+	
+	public static void deleteFielOrDir(File oldPath) {
+		if (oldPath.isDirectory()) {
+			File[] files = oldPath.listFiles();
+			if (files != null) {
+				for (File file : files) {
+					if (file.isFile()) {
+						file.delete();
+					} else {
+						deleteFielOrDir(file);
+						file.delete();
+					}
+				}
+			}
+		}
+		oldPath.delete();
+	}
+	
+	public static void deleteFile(File oldPath){
+
+		if (oldPath.isDirectory()) {
+			File[] files = oldPath.listFiles();
+			if (files != null) {
+				for (File file : files) {
+					if (file.isFile()) {
+						file.delete();
+					} else {
+						deleteFile(file);
+					}
+				}
+			}
+		}else{
+			oldPath.delete();
+		}
+		
+	}
+	
+	public static boolean isValidFile(String unZipDir,String flagName){
+		
+		boolean flag = false;
+		
+		try{
+			
+			String filePath = unZipDir+"/flag.key";
+			
+			String flagInFile = readContent(filePath);
+			
+			if(flagInFile.trim().equalsIgnoreCase(flagName.trim())){
+				flag = true;
+			}
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+			flag = false;
+		}
+		
+		return flag;
+	}
+	
+	private static String[] getVisibleQuerySQL(String visiblePkName,Map<String,String> map){
+		StringBuffer querySQL = new StringBuffer();
+		StringBuffer conditionSQL = new StringBuffer();
+		try{
+			
+			String[] columnNames = visiblePkName.split(",");
+			
+			for(int i=0; i<columnNames.length ; i++){
+				String columnName = columnNames[i];
+				if(columnName.indexOf("{")==0 && columnName.indexOf("}")==columnName.length()-1){
+					if(map != null ){
+						columnName=columnName.replaceAll("\\{","");
+						columnName=columnName.replaceAll("\\}","");
+						map.put(columnName.toLowerCase(),columnName.toLowerCase());
+					}
+				}
+				columnName=columnName.replaceAll("\\{","");
+				columnName=columnName.replaceAll("\\}","");
+				querySQL.append(",t."+columnName);
+				conditionSQL.append(" and a."+columnName+" = b."+columnName);
+				
+			}
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return new String[]{querySQL.toString(),conditionSQL.toString()};
+	}
+	
+	private static String getParentIdSQL(XMLExportObject parentObject,Element parentData){
+		StringBuffer columns = new StringBuffer();
+		StringBuffer condition = new StringBuffer();
+		try{
+			
+			String[] columnNames = parentObject.getVisiblePkName().split(",");
+			for(int i=0; i<columnNames.length ; i++){
+				columns.append(","+columnNames[i]);
+				condition.append(" and "+columnNames[i]+" = "+StringUtil.strToSQLValue(parentData.attributeValue(columnNames[i])));
+			}
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		String sql = "select " + parentObject.getPkName()+columns.toString()+ " from "+ parentObject.getTableName() + " where 1=1 "+condition.toString();
+		
+		return sql;
+	}
+	
+	private static String createCondition(Element dataElement,String[] visiblePkNames,String parentIdSql){
+		StringBuffer condition = new StringBuffer();
+		try{
+
+			for(int i=0; i<visiblePkNames.length ; i++){
+				String tempPkName = visiblePkNames[i].toLowerCase();
+				if(tempPkName.indexOf("{")==0 && tempPkName.indexOf("}")==tempPkName.length()-1){
+					if(!isEmpty(parentIdSql)){
+						tempPkName = tempPkName.replaceAll("\\{","");
+						tempPkName = tempPkName.replaceAll("\\}","");
+						condition.append(" and "+tempPkName+" = "+parentIdSql);
+					}
+				}else{
+					condition.append(" and "+tempPkName+" = "+StringUtil.strToSQLValue(dataElement.attributeValue(tempPkName)));
+				}
+				
+			}
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return condition.toString();
+	}
+	
+	private static boolean isContain(String[] visiblePkNames ,String pkName){
+		boolean flag = false;
+		try{
+			if(visiblePkNames != null ){
+				for(String vp : visiblePkNames){
+					if(pkName != null){
+						if(vp.trim().equalsIgnoreCase(pkName.trim())){
+							flag = true;
+							break;
+						}else{
+							flag = false;
+						}
+					}
+				}
+			}
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+		}
+		return flag;
+	}
+	
+	private static boolean isEmpty(String str){
+		boolean flag = false;
+		try{
+			if(str == null || str.trim().equals("") || str.trim().equalsIgnoreCase("null")){
+				flag = true;
+			}
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+			flag = true;
+		}
+		return flag;
+	}
+	
+	
+	//add by caohenghui --end
+}

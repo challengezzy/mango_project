@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" fontSize="12" 
+		   xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+		   xmlns:ns2="smartx.flex.components.styletemplate.*" 
+		   xmlns:code="http://code.google.com/p/flexlib/" 
+		   xmlns:core="smartx.flex.components.core.*"
+		   xmlns:alert="smartx.bam.flex.modules.businessscenario.*">
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.core.BillListPanel;
+			import smartx.flex.components.core.BillTreePanel;
+			import smartx.flex.components.core.ext.DataValidator;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			public var editable:Boolean = true;
+			[Bindable]
+			public var debugMode:Boolean;
+			public var childTemplates:Array;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var scenarioId:String;
+			
+			private var formService:RemoteObject;
+			private var returnAfterSave:Boolean = false;
+			
+			private function init():void{
+				
+			}
+			
+			
+		]]>
+	</mx:Script>
+		<mx:VBox width="100%" height="100%">
+			<mx:VBox width="100%" height="100%">
+				<mx:TabNavigator id="childrenNavigator" width="100%" height="100%">
+					<alert:AlertRuleManager scenarioId="{scenarioId}" initQueryCondition="{'BUSINESSSCENARIOID='+scenarioId}" label="告警规则" destination="{destination}" endpoint="{endpoint}"  id="mainTemplate" width="100%" height="90%" templetCode="T_BAM_RULE" debugMode="{debugMode}" editable="{editable}" showSystemButton="false"/>
+					<alert:AlertTypeManager scenarioId="{scenarioId}" initQueryCondition="{'BUSINESSSCENARIOID='+scenarioId}" label="告警类型" destination="{destination}" endpoint="{endpoint}"  id="mainTemplate2" width="100%" height="90%" templetCode="T_BAM_ALERT" debugMode="{debugMode}" editable="{editable}" showSystemButton="false"/>
+					<alert:AlertRuleTempleteList scenarioId="{scenarioId}" initQueryCondition="{'BUSINESSSCENARIOID='+scenarioId}" label="告警规则模板" destination="{destination}" endpoint="{endpoint}"  id="ruleTemplete" width="100%" height="90%" templetCode="T_BAM_RULETEMPLATE" debugMode="{debugMode}" editable="{editable}" showSystemButton="false"/>
+				</mx:TabNavigator>
+			</mx:VBox>
+		</mx:VBox>
+</mx:Canvas>

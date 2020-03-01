@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:mtchart="smartx.flex.components.core.mtchart.*" 
+					  width="100%" height="100%" initialize="preInit()" >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.flexmonster.pivot.view.ViewType;
+			import com.flexmonster.pivot.view.charts.ChartType;
+			
+			import flash.utils.getDefinitionByName;
+			
+			import mx.charts.ChartItem;
+			import mx.charts.Legend;
+			import mx.charts.chartClasses.Series;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.un.cava.birdeye.ravis.graphLayout.data.IEdge;
+			import org.un.cava.birdeye.ravis.graphLayout.data.INode;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.events.VisualEdgeEvent;
+			import org.un.cava.birdeye.ravis.graphLayout.visual.events.VisualNodeEvent;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillProcessChartPanel;
+			import smartx.flex.components.core.chart.AdvPlotChart;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.event.MTProcessDataEvent;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.core.mtchart.vo.ProcessChartConst;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			private var processChart:BillProcessChartPanel;//流程图控件
+			// root node to start with
+			public var startNodeId:String = ProcessChartConst.STARTNODE;
+			
+			public var xmlData:XML;
+			private var layoutMode:String; //布局方式，层次、发散。。
+			private var orientation:String;//层次布局方向
+			private var nodeSpacing:Number; //节点间距
+			private var nodeSytles:String; //节点风格
+			private var edgeStyles:String; //连线风格
+			private var edgeLabel:String; //连线图标
+			private var toggleEdgeLabel:Boolean; //连线图标显示开关
+			private var toggleSiblingSpread:Boolean;//层次布局
+			private var toggleNodeInterleaving:Boolean;//层次布局
+			private var toggleHonorNodeSize:Boolean;//层次布局
+			
+			private var linkLength:Number;//连线长度
+			private var toggleAnimation:Boolean;//渲染开关
+			private var toggleAutoFit:Boolean;//是否自动适应大小
+			
+			private var dataColumn:String;
+			private var keyColumn:String;
+			private var mtSql:String;
+			
+			private var isCustomView:Boolean = false;//是否个性化显示
+			private var dataConvertClass:String; //数据转换实现类
+			private var dataConvert:ProcessXmlDataConvert;
+			private var processParas:Hashtable = new Hashtable();//流程参数
+			private var periodDay:String ;//数据统计时段
+			
+			override protected function preInit():void{
+				super.preInit();
+							
+				var xml:XML = metadataTemplet.contentXML;				
+				var controls:XML = xml.extend.Controls[0];
+				
+				title = xml.chartname;
+				datasource = xml.datasource;				
+				dataColumn = controls.ChartDataColumn;
+				keyColumn = controls.ChartKeyColumn;
+				mtSql = controls.sql;
+				
+				layoutMode = controls.Layout.LayoutMode;
+				nodeSytles = controls.NodeSytles;
+				edgeStyles = controls.EdgeStyles;
+				edgeLabel = controls.EdgeLabelStyles.EdgeLabel;
+				toggleEdgeLabel = controls.EdgeLabelStyles.ToggleEdgeLabel=="true" ? true : false;
+				linkLength = new Number(controls.CommonLayoutControl.LinkLength.toString());
+				toggleAnimation = controls.CommonLayoutControl.ToggleAnimation == "true" ?true :false;
+				toggleAutoFit = controls.CommonLayoutControl.ToggleAutoFit == "true" ?true :false;
+				orientation = controls.HierarchicalLayout.Orientation;
+				nodeSpacing = new Number(controls.HierarchicalLayout.NodeSpacing.toString());
+				toggleSiblingSpread = controls.HierarchicalLayout.ToggleSiblingSpread == "true" ?true :false;
+				toggleNodeInterleaving = controls.HierarchicalLayout.ToggleNodeInterleaving == "true" ?true :false;
+				toggleHonorNodeSize = controls.HierarchicalLayout.ToggleHonorNodeSize == "true" ?true :false;
+				
+				//是否自定义显示
+				isCustomView = controls.CustomConfig.IsCustomConfig == "true" ? true : false;
+				if( isCustomView){
+					periodDay = controls.CustomConfig.PeriodDay;
+					dataConvertClass = controls.CustomConfig.DataConvertClass.toString();
+					processParas.add("MAXTIMELIMIT",controls.CustomConfig.MaxTimeLimit.toString());
+					processParas.add("MINTIMELIMIT",controls.CustomConfig.MinTimeLimit.toString());
+					processParas.add("PERIODDAY",periodDay);
+					//反射根据实现类进行数据转换
+					var classRefrence:Class = getDefinitionByName(dataConvertClass) as Class;
+					dataConvert = new classRefrence() as ProcessXmlDataConvert;
+					dataConvert.addEventListener(MTProcessDataEvent.PROCESSDATACONVERT_OK,processDataConvertOkHandler);
+					
+				}
+				
+				processChart = new BillProcessChartPanel();
+				processChart.addEventListener(VisualNodeEvent.CLICK,function(event:VisualNodeEvent):void{
+					var node:INode = event.node;
+					selectedItems = new ArrayCollection([node]);
+					selectedEvent();
+				}
+				);
+				
+				processChart.addEventListener(VisualEdgeEvent.CLICK,function(event:VisualEdgeEvent):void{
+					var edge:IEdge = event.edge.edge;//get the IEdge
+					selectedItems = new ArrayCollection([edge]);
+					selectedEvent();
+				}
+				);
+
+				processChart.layoutMode = layoutMode;
+				processChart.nodeSytles = nodeSytles;
+				processChart.edgeStyles = edgeStyles;
+				processChart.edgeLabel = edgeLabel;
+				processChart.toggleEdgeLabel = toggleEdgeLabel;
+				processChart.linkLength = linkLength;
+				processChart.toggleAnimation = toggleAnimation;
+				processChart.toggleAutoFit = toggleAutoFit;
+				processChart.orientation = orientation;
+				processChart.nodeSpacing = nodeSpacing;
+				processChart.toggleSiblingSpread = toggleSiblingSpread;
+				processChart.toggleNodeInterleaving = toggleNodeInterleaving;
+				processChart.toggleHonorNodeSize = toggleHonorNodeSize;
+				//processChart.xmldata = xmlData;
+				processChart.showControlPanel = false;
+				
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				mainBox.addChild(processChart);
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+						
+			override public function refreshComplete():void{
+				if(dataProvider.length > 0){
+					var xmlStr:String = String(dataProvider.getItemAt(0)[dataColumn.toLowerCase()]);
+					var keyId:String = String(dataProvider.getItemAt(0)[keyColumn.toLowerCase()]);
+					if( isCustomView ){
+						processParas.add("PROCESSID",keyId);
+						//dataConvert
+						dataConvert.convertXmlData(processParas,xmlStr);
+					}else{
+						xmlData = new XML(xmlStr);
+						processChart.xmldata = xmlData;
+						processChart.refreshGraph();
+						super.refreshComplete();
+					}
+				}
+			}
+			
+			private function processDataConvertOkHandler(event:MTProcessDataEvent):void{
+				xmlData = event.xmlData;
+				processChart.xmldata = xmlData;
+				processChart.refreshGraph();
+				super.refreshComplete();
+			}
+			
+		]]>
+	</fx:Script>
+</mtchart:MTChartPanel>

@@ -1,0 +1,403 @@
+/**************************************************************************
+ * $RCSfile: Pub_Templet_1VO.java,v $  $Revision: 1.2 $  $Date: 2010/05/15 10:36:03 $
+ **************************************************************************/
+package smartx.framework.metadata.vo;
+
+import java.io.*;
+import java.util.*;
+
+public class Pub_Templet_1VO implements Serializable {
+    private static final long serialVersionUID = -5952061193950956426L;
+    private String templetcode;                            //模板编码
+    private String templetname;                            //模板名称
+    private String tablename;                              //取数的表名
+    private String datasourcename;                         //数据源名称,如果为空,则从默认数据源取数!!
+    private String dataconstraint;                         //数据过滤条件
+    private String pkname;                                 //主键名称
+    private String pksequencename;                         //序列对应列名
+    private String ordersetting;                           //默认检索排序设置
+    private String savedtablename;                         //保存数据的表名
+    private String cardcustpanel;                          //卡片的自定义面板
+    private String listcustpanel;                          //列表的自定义面板
+    private String[] itemKeys;                             //
+    private String[] realViewColumns;                      //真正的视图的列名,如果它匹配上itemKeys中的一项,就给itemKeys这项赋值
+    private String[] realSavedTableColumns;                //真正的保存数据库的列名,它肯定是realViewColumns的子集
+    private String[] realSavedTableHaveColumns;            //
+    private Pub_Templet_1_ItemVO[] itemVos;
+    //add by xuzhilin for flex
+    private List<Pub_Templet_1_ItemGroupVO> itemGroups = new ArrayList<Pub_Templet_1_ItemGroupVO>();
+    private List<Pub_Templet_1_ItemVO> directItemVOs = new ArrayList<Pub_Templet_1_ItemVO>();
+    private String id;
+   
+
+
+
+
+	public String getId() {
+		return id;
+	}
+
+
+
+
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
+
+
+
+
+	public List<Pub_Templet_1_ItemGroupVO> getItemGroups() {
+		return itemGroups;
+	}
+
+
+
+
+
+	public void setItemGroups(List<Pub_Templet_1_ItemGroupVO> itemGroups) {
+		this.itemGroups = itemGroups;
+	}
+
+
+
+
+
+	public List<Pub_Templet_1_ItemVO> getDirectItemVOs() {
+		return directItemVOs;
+	}
+
+
+
+
+
+	public void setDirectItemVOs(List<Pub_Templet_1_ItemVO> directItemVOs) {
+		this.directItemVOs = directItemVOs;
+	}
+
+
+
+
+
+	public Pub_Templet_1VO() {
+    }
+
+    
+    
+    
+    
+    //以下是属性读取和设置
+    
+    public String getTablename() {
+        return tablename;
+    }
+    public void setTablename(String tablename) {
+        this.tablename = tablename;
+    }
+
+    public String getTempletcode() {
+        return templetcode;
+    }
+    public void setTempletcode(String templetcode) {
+        this.templetcode = templetcode;
+    }
+
+    public String getTempletname() {
+        return templetname;
+    }
+    public void setTempletname(String templetname) {
+        this.templetname = templetname;
+    }
+
+    public Pub_Templet_1_ItemVO[] getItemVos() {
+        return itemVos;
+    }
+    public void setItemVos(Pub_Templet_1_ItemVO[] itemVos) {
+        this.itemVos = itemVos;
+    }
+
+    public String[] getItemKeys() {
+        //return this.itemKeys;
+        if(this.itemKeys!=null){
+        	return this.itemKeys;
+        }
+    	Pub_Templet_1_ItemVO[] vos = getItemVos();
+        this.itemKeys = new String[vos.length];
+        for (int i = 0; i < this.itemKeys.length; i++) {
+        	this.itemKeys[i] = vos[i].getItemkey();
+        }
+        return this.itemKeys;        
+    }
+    /**
+     * 设置ItemKey
+     * @param itemKeys
+     * @deprecated 本方法不建议使用，通过this.itemVos可以获得
+     */
+    public void setItemKeys(String[] itemKeys) {
+        this.itemKeys = itemKeys;        
+    }
+    public String[] getItemTypes() {
+        String[] types = new String[this.itemVos.length];
+        for (int i = 0; i < types.length; i++) {
+            types[i] = this.itemVos[i].getItemtype();
+        }
+        return types;
+    }
+    /**
+     * 返回指定的字段的数据类型
+     * @param field
+     * @return
+     */
+    public String getItemType(String field){
+    	for (int i = 0; i < this.itemVos.length; i++) {
+    		if(this.itemVos[i].getItemkey().equalsIgnoreCase(field)){
+    			return this.itemVos[i].getItemtype();
+    		}
+        }
+        return null;
+    }
+    /**
+     * 返回指定的字段的数据库类型
+     * @param field
+     * @return
+     */
+    public String getItemDBType(String field){
+    	for (int i = 0; i < this.itemVos.length; i++) {
+    		if(this.itemVos[i].getItemkey().equalsIgnoreCase(field)){
+    			return this.itemVos[i].getSavedcolumndatatype();
+    		}
+        }
+        return null;
+    }
+    
+    
+    public String[] getItemNames() {
+        Pub_Templet_1_ItemVO[] vos = getItemVos();
+        String[] names = new String[vos.length];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = vos[i].getItemname();
+        }
+        return names;
+    }
+
+    public boolean[] getItemIsMustInputs() {
+        Pub_Templet_1_ItemVO[] vos = getItemVos();
+        boolean[] bo_isMustInput = new boolean[vos.length];
+        for (int i = 0; i < bo_isMustInput.length; i++) {
+            bo_isMustInput[i] = vos[i].isMustInput();
+        }
+        return bo_isMustInput;
+    }
+
+    public Pub_Templet_1_ItemVO getItemVo(String _itemkey) {
+        for (int i = 0; i < this.getItemVos().length; i++) {
+            if (this.getItemVos()[i].getItemkey().equalsIgnoreCase(_itemkey)) {
+                return this.getItemVos()[i];
+            }
+        }
+        return null;
+    }
+
+    public String getPkname() {
+        return pkname;
+    }
+    public void setPkname(String pkname) {
+        this.pkname = pkname;
+    }
+
+    public String getPksequencename() {
+        return pksequencename;
+    }
+    public void setPksequencename(String pksequencename) {
+        this.pksequencename = pksequencename;
+    }
+    
+    
+    /**
+     * 获得模板排序设置
+     * @return
+     */
+    public String getOrdersetting() {
+        return ordersetting;
+    }
+    /**
+     * 设置模板排序设置
+     * @param order
+     */
+    public void setOrdersetting(String order) {
+        this.ordersetting = order;
+    }
+
+    public String getSavedtablename() {
+        return savedtablename;
+    }
+    public void setSavedtablename(String savedtablename) {
+        this.savedtablename = savedtablename;
+    }
+
+    public String[] getRealViewColumns() {
+        return realViewColumns;
+    }
+    
+    /**
+     * 获得展示列
+     * @return
+     */
+    public Pub_Templet_1_ItemVO[] getRealViewItemVOs() {
+        String[] str_views = getRealViewColumns();
+        if (str_views == null) {
+            return null;
+        }
+        HashMap map=new HashMap();
+        for(int i=0;i<str_views.length;i++){
+        	map.put(str_views[i].toLowerCase(), str_views[i]);
+        }
+        
+        Vector v_tmp = new Vector();
+        Pub_Templet_1_ItemVO[] itemvos=getItemVos();
+        for (int j = 0; j < itemvos.length; j++) {
+        	if(map.containsKey(itemvos[j].getItemkey().toLowerCase())){
+        		v_tmp.add(itemvos[j]);
+        	}	
+        }
+        return (Pub_Templet_1_ItemVO[]) v_tmp.toArray(new Pub_Templet_1_ItemVO[0]); //
+    }
+
+    
+    public void setRealViewColumns(String[] realViewColumns) {
+        this.realViewColumns = realViewColumns;
+    }
+    public String[] getRealSavedTableColumns() {
+        return realSavedTableColumns;
+    }
+
+    public Pub_Templet_1_ItemVO[] getRealSavedTableItemVOs() {
+        String[] str_saves = getRealSavedTableColumns();
+        
+        HashMap map=new HashMap();
+        for(int i=0;i<str_saves.length;i++){
+        	map.put(str_saves[i].toLowerCase(), str_saves[i]);
+        }
+        
+        Vector v_tmp = new Vector();
+        Pub_Templet_1_ItemVO[] itemvos=getItemVos();
+        for (int j = 0; j < itemvos.length; j++) {
+        	if(map.containsKey(itemvos[j].getItemkey().toLowerCase())){
+        		v_tmp.add(itemvos[j]);
+        	}	
+        }
+        
+        return (Pub_Templet_1_ItemVO[]) v_tmp.toArray(new Pub_Templet_1_ItemVO[0]); //
+    }
+
+    public void setRealSavedTableColumns(String[] realSavedTableColumns) {
+        this.realSavedTableColumns = realSavedTableColumns;
+    }
+    public String[] getRealSavedTableHaveColumns() {
+        return realSavedTableHaveColumns;
+    }
+
+    public void setRealSavedTableHaveColumns(String[] realSavedTableHaveColumns) {
+        this.realSavedTableHaveColumns = realSavedTableHaveColumns;
+    }
+    
+    public String getCardcustpanel() {
+        return cardcustpanel;
+    }
+    public void setCardcustpanel(String cardcustpanel) {
+        this.cardcustpanel = cardcustpanel;
+    }
+
+    public String getListcustpanel() {
+        return listcustpanel;
+    }
+    public void setListcustpanel(String listcustpanel) {
+        this.listcustpanel = listcustpanel;
+    }
+
+    public String getDatasourcename() {
+        return datasourcename;
+    }
+    public void setDatasourcename(String datasourcename) {
+        this.datasourcename = datasourcename;
+    }
+
+    public String getDataconstraint() {
+        return dataconstraint;
+    }
+    public void setDataconstraint(String dataconstraint) {
+        this.dataconstraint = dataconstraint;
+    }
+
+    public boolean containsItemKey(String _itemKey) {
+        String[] keys = this.getItemKeys();
+        for (int i = 0; i < keys.length; i++) {
+            if (keys[i].equalsIgnoreCase(_itemKey)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+/**************************************************************************
+ * $RCSfile: Pub_Templet_1VO.java,v $  $Revision: 1.2 $  $Date: 2010/05/15 10:36:03 $
+ *
+ * $Log: Pub_Templet_1VO.java,v $
+ * Revision 1.2  2010/05/15 10:36:03  xuzhil
+ * *** empty log message ***
+ *
+ * Revision 1.1  2010/05/07 01:20:39  xuzhil
+ * *** empty log message ***
+ *
+ * Revision 1.2.8.4  2009/05/22 02:39:06  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2.8.3  2009/02/02 16:12:54  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2.8.2  2008/09/16 06:13:05  wangqi
+ * patch   : 20080916
+ * file    : nova_20080128_20080916.jar
+ * content : 处理 MR nova20-87,nova20-30；
+ * 另外，改写了快速查询面板的处理。
+ *
+ * Revision 1.1  2008/09/01 07:38:12  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.6  2008/04/20 13:33:49  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.5  2008/04/09 05:26:50  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4  2008/03/31 00:37:00  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.3  2008/03/28 08:59:30  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/05/31 07:38:20  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:03:16  qilin
+ * no message
+ *
+ * Revision 1.6  2007/03/29 05:29:53  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/03/28 09:22:08  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/03/28 05:44:06  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/03/15 06:30:03  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 04:16:43  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

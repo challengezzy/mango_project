@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<chart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:adv="smartx.flex.components.core.chart.*"
+		   xmlns:chart="smartx.flex.components.core.mtchart.*"
+		   width="100%" height="100%" initialize="preInit()" xmlns:olap="smartx.flex.components.core.olap.*">
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			import com.flexmonster.pivot.view.ViewType;
+			import com.flexmonster.pivot.view.charts.ChartType;
+			
+			import mx.charts.ChartItem;
+			import mx.charts.Legend;
+			import mx.charts.chartClasses.Series;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+			import mx.managers.PopUpManager;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.chart.AdvPlotChart;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.utils.FilterParseUtil;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.core.olap.BillPivotComponent;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var pivot:BillPivotComponent;//OLAP图控件
+
+			private var viewTypeStr:String = ViewType.GRID;
+			private var chartTypeStr:String = ChartType.BAR;
+			private var showConfigButtonStr:String = "false";
+			private var showToolBarStr:String = "false";
+			private var showFieldListStr:String = "false";
+			
+			private var rows: ArrayCollection = new ArrayCollection();
+			private var columns: ArrayCollection = new ArrayCollection();
+			private var measures: ArrayCollection = new ArrayCollection();
+			private var filterArr: ArrayCollection = new ArrayCollection();
+			
+			public var fieldMapObj:Object = new Object();//字段名称映射
+			public var cvsTitleMapObj:Object = new Object();//生成CVS文件列标题映射，前面可能会加+,-,d+等
+			
+			private var loadWindow:LoadingWindow = new LoadingWindow();
+			
+			override protected function preInit():void{
+				super.preInit();
+				var olapConfigXml:XML = contentXml.extend.olapConfig[0];
+				
+				loadWindow.text = "OLAP数据初始化中……";
+				title = contentXml.chartname;
+				datasource = contentXml.datasource;
+				viewTypeStr = olapConfigXml.viewType;
+				chartTypeStr = olapConfigXml.chartType;
+				showConfigButtonStr = olapConfigXml.showConfigButton;
+				showToolBarStr = olapConfigXml.showToolBar;
+				showFieldListStr = olapConfigXml.showFieldList;
+				
+				var temp:XML;
+				//处理字段映射
+				var fieldName:String;
+				var displayName:String;
+				var csvTitleName:String;
+				for each(temp in olapConfigXml.fieldMaps.fieldNameMap){
+					fieldName = temp.fieldName;
+					displayName = temp.displayName;
+					csvTitleName = temp.csvTitleName;
+					
+					if(displayName != null && displayName != ""){
+						//空的字符映射可能是输入错误，过滤
+						fieldMapObj[fieldName.toUpperCase()] = displayName;
+						cvsTitleMapObj[fieldName.toUpperCase()] = displayName;//此处写法兼容之前没有配置csvTitleName的情况，取displayName
+					}
+					
+					if(csvTitleName != null && csvTitleName != ""){
+						cvsTitleMapObj[fieldName.toUpperCase()] = csvTitleName;
+					}
+					
+				}
+				
+				
+				for each(temp in olapConfigXml.rows.item){
+					if( MTChartConst.OLAP_MEASURE_FLAG_COLUMN  == temp.toString() )
+						rows.addItem({uniqueName: "[Measures]"});
+					else
+						rows.addItem({uniqueName: "["+ findMappedName(temp.toString()) +"].[" + findMappedName(temp.toString()) +"]"});
+				}
+				for each(temp in olapConfigXml.columns.item){
+					if( MTChartConst.OLAP_MEASURE_FLAG_COLUMN  == temp.toString() )
+						columns.addItem({uniqueName: "[Measures]"});
+					else
+						columns.addItem({uniqueName: "["+findMappedName(temp.toString())+"].[" + findMappedName(temp.toString()) +"]"});
+				}
+				for each(temp in olapConfigXml.filters.item){
+					filterArr.addItem({uniqueName: "["+findMappedName(temp.toString())+"].[" + findMappedName(temp.toString()) +"]"});
+				}
+				
+				for each(temp in olapConfigXml.measures.field){
+					if( "true" == temp.isMeasureField )
+					    measures.addItem( {uniqueName:"[Measures].[" + findMappedName(temp.columnField.toString()) + "]",aggregation: temp.measureTypeField.toString() } );
+				}
+				
+				pivot = new BillPivotComponent();
+				pivot.addEventListener(BillPivotComponent.BUILDPIVOTCOMPONENT_FINISH,buildPivotFinish);
+				
+				pivot.fieldNameMap = cvsTitleMapObj;
+				pivot.percentHeight = 98;
+				pivot.percentWidth = 100;
+				pivot.datasource = datasource;
+				//pivot.sql = getQueryDataSql();
+				pivot.rows = rows.toArray();
+				pivot.columns = columns.toArray();
+				pivot.measures = measures.toArray();
+				pivot.pages = filterArr.toArray();
+				pivot.viewType = viewTypeStr;
+				pivot.chartType = chartTypeStr;
+				pivot.configuratorButton = "true"==showConfigButtonStr ? true : false;
+				pivot.showToolBar = "true"== showToolBarStr ? true : false;
+				pivot.showFieldList = "true"== showFieldListStr ? true : false;
+				pivot.styleSheetName = "styles/cherry.css" ;
+				pivot.endpoint = endpoint;
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				//不提供详情信息查看，详情按钮去除
+				setMenuItemIsEnable(MTChartConst.MTCHART_KEY_DETAIL,false);				
+				mainBox.addChild(pivot);
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}			
+			
+			private function findMappedName(field:String):String{
+				var mappedName:String = fieldMapObj[field.toUpperCase()];
+				
+				if(mappedName == null)
+					mappedName = field.toUpperCase();
+				
+				return mappedName;				
+			}
+			
+			override protected function selfRefreshData():void{
+				super.selfRefreshData();
+				
+				if(!isDataParseError && ( !isAccessFilterError || isIgnoreAccessParamError) ){
+					pivot.datasource = datasource;
+					pivot.sql = realSql;
+					pivot.refreshData();
+				
+					if(!loadWindow.isPopUp){
+						PopUpManager.addPopUp(loadWindow,this,true);
+						PopUpManager.centerPopUp(loadWindow);
+					}
+				}else{
+					isLoading = false;
+					SmartXMessage.show("仪表盘或仪表盘对象参数解析失败！")
+				}
+			}
+			
+			private function buildPivotFinish(event:Event):void{
+				//表示pivot组件加载完成，通知结束
+				isLoading = false;
+				if(loadWindow.isPopUp)
+					PopUpManager.removePopUp(loadWindow);
+			}
+			
+			override public function refresh(event:TimerEvent):void{
+				//本控件数据量比较大，属于统计数据，不需要刷新数据
+				//dispatchEvent(new MTChartEvent(MTChartEvent.REFRESH_DATA,chartId,metadataTemplet.code,metadataTemplet.contentXML.mtcharttype,selfDataValues));
+				isLoading = true;
+				setQueryDataSql();//重新生成查询语句
+								
+			}
+			
+			//调用自己的刷新处理方式
+			override public function refreshComplete():void{
+				this.refresh(null);
+			}
+			
+			override public function destroy():void{
+				pivot.destroy();
+				pivot = null;
+				
+				super.destroy();
+			}
+			
+		]]>
+	</fx:Script>
+</chart:MTChartPanel>

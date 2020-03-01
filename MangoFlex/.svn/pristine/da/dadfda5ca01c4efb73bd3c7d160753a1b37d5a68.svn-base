@@ -1,0 +1,131 @@
+package smartx.flex.components.itemcomponent
+{
+	import flash.events.Event;
+	import flash.events.MouseEvent;
+	
+	import mx.collections.ArrayCollection;
+	import mx.controls.DataGrid;
+	import mx.events.FlexEvent;
+	import mx.utils.ObjectUtil;
+	
+	import smartx.flex.components.event.UIComponentEvent;
+	import smartx.flex.components.itemcomponent.ext.AdvTextInput;
+	import smartx.flex.components.util.CompareUtil;
+	import smartx.flex.components.vo.ItemVO;
+	import smartx.flex.components.vo.TempletItemVO;
+
+	public class ItemTextField extends ItemUIComponent
+	{
+	
+		//private var textInput:TextInput = new TextInput();
+		private var textInput:AdvTextInput = new AdvTextInput();
+		public var _enableDetailEdit:Boolean = true;//是否显示详情修改按钮
+		
+		public function ItemTextField(templetItemVO:TempletItemVO,showLabel:Boolean=true,formulaMode:Boolean=false)
+		{
+			super(templetItemVO,textInput,showLabel);
+			//textInput.setStyle("borderStyle","solid");
+			textInput.formulaMode = formulaMode;
+			textInput.realTextInput.addEventListener(Event.CHANGE,dataChange);
+			textInput.realTextInput.addEventListener(FlexEvent.ENTER,function(event:FlexEvent):void{
+				dispatchEvent(event);
+			});
+		}
+		
+		public function set enableDetailEdit(value:Boolean):void{
+			if(_enableDetailEdit && !value)
+				textInput.removeChild(textInput.editButton);
+			else if(!_enableDetailEdit && value)
+				textInput.addChild(textInput.editButton);
+			_enableDetailEdit = value;
+		}
+		
+		public function get enableDetailEdit():Boolean{
+			return _enableDetailEdit;
+		}
+		
+		public override function getQueryConditon(isPreciseQuery:Boolean=false):String{
+			if(textInput.text != null && textInput.text != ""){
+				if(isPreciseQuery)
+					return " and ("+templetItemVO.itemkey+" = '"+textInput.text+"') ";
+				else
+					return " and ("+templetItemVO.itemkey+" like '%"+textInput.text+"%') ";
+			}
+			return "";
+		}
+		
+		public override function get realValue():Object{
+			if(textInput.text != "")
+				return textInput.text;
+			return null;
+		}
+		
+		public override function get stringValue():String{
+			return textInput.text;
+		}
+		
+		protected override function clearContent(event:MouseEvent):void{
+			textInput.text = null;
+		}
+		
+		public override function set editable(editable:Boolean):void{
+			this._editable = editable;
+			textInput.editable =_editable;
+		}
+		
+		public override function set data(value:Object):void {
+        	super.data = value;
+        	if(value!=null)
+        		textInput.text = value[templetItemVO.itemkey];
+        	else
+        		textInput.text = null;
+        }
+        
+        private function dataChange(event:Event):void{
+        	/*
+				todo by xuzhilin
+				以下是为了满足billlistpanel的列表编辑功能所采取的恶心写法
+				由于参照采用popup弹出窗口的方式进行数据编辑，在popup窗口弹出后，会失去对本Panel的焦点，从而触发datagrid的itemeditend事件。
+				那么无论在popup中选择了什么数据，都无法自动传回datagird。（因为datagird只在itemeditend时调用getRealValue）
+				该问题从目前网上的资料看，无解。
+				以下代码是一种变通，即如果父窗体是datagrid的话，popup确认后主动去更新datagrid的dataprovider。
+				这显然是不合理的写法，儿子还能去操作老爹的数据？认错老爹就更惨了！（是datagrid就是亲爹？）
+			*/
+			if(owner is DataGrid){
+				var dataGrid:DataGrid = owner as DataGrid;
+				var dataarray:ArrayCollection = dataGrid.dataProvider as ArrayCollection;
+				dataarray.getItemAt(dataGrid.selectedIndex)[templetItemVO.itemkey] = textInput.text;
+				dataGrid.invalidateList();
+			}
+			dispatchEvent(new UIComponentEvent(UIComponentEvent.REAL_VALUE_CHANGE));
+		}
+		
+		public override function getSortFunction(fieldName:String):Function{
+			return function(obj1:Object,obj2:Object):int{
+				if(obj1[fieldName] != null && obj2[fieldName] == null)
+					return -1;
+				if(obj1[fieldName] == null && obj2[fieldName] != null)
+					return 1;
+				if(obj1[fieldName] && obj2[fieldName]){
+					if(CompareUtil.hashTotalColumn(obj1)){
+						if(column){
+							return (column.sortDescending?-1:1)*1;
+						}else{
+							return 1;
+						}
+					}else if(CompareUtil.hashTotalColumn(obj2)){
+						if(column){
+							return (column.sortDescending?-1:1)*-1;
+						}else{
+							return -1;
+						}
+					}else{
+						return ObjectUtil.stringCompare(CompareUtil.getFirstPinYin(String(obj1[fieldName])),CompareUtil.getFirstPinYin(String(obj2[fieldName])),true);
+					}
+				}
+				return 0;
+			}
+		}
+		
+	}
+}

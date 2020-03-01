@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   xmlns:mx="library://ns.adobe.com/flex/mx"  fontSize="12" creationComplete="init()" xmlns:components="smartx.flex.components.*" xmlns:core="smartx.flex.components.core.*"
+		   preinitialize="preinit()">
+	<fx:Declarations>
+		<mx:HBox width="100%" id="listButtonBox">
+			<mx:PopUpMenuButton label="操作" id="operationButton" dataProvider="{operationList}" openAlways="true"
+								itemClick="operationButton_itemClickHandler(event)"
+								icon="{AssetsFileLib.operationIcon}"/>
+		</mx:HBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Button;
+			import mx.controls.Menu;
+			import mx.events.MenuEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var editable:Boolean = true;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			
+			[Bindable]
+			public var initQueryCondition:String;
+			
+			//add by caohenghui 2011/07/05 --start
+			[Bindable]
+			public var bfIncList:String;
+			[Bindable]
+			public var afIncList:String;
+			//add by caohenghui 2011/07/05
+			
+			[Bindable]
+			public var clientBfIncList:String;
+			[Bindable]
+			public var clientAfIncList:String;
+			
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var operationList:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			public var isShowAlert:Boolean = true;
+			[Bindable]
+			public var showDataAfterInit:Boolean = false;
+			[Bindable]
+			public var allowMultipleSelection:Boolean;
+			//显示操作按钮的方式（默认为MENU）
+			public var showOperationButtonType:String;
+			[Bindable]
+			public var buttonCol:Array = new Array();
+			[Bindable]
+			public var titleField:String;
+			[Bindable]
+			public var subTitleField:String;
+			[Bindable]
+			public var contentField:String;
+			[Bindable]
+			public var iconField:String;
+			[Bindable]
+			public var imgUrl:String = "images/Report.png";
+			[Bindable]
+			public var showDeleteButton:Boolean;
+			
+			[Bindable]
+			public var pageSize:int;
+			
+			private function preinit():void{
+				if(showOperationButtonType == null ||showOperationButtonType == "")
+					showOperationButtonType = GlobalConst.STYLETEMPLATE_OPERATION_MENU;
+				//初始化操作按钮
+				if(editable){
+				}
+			}
+			
+			private function init():void{
+				if(templetCode == null)
+					throw Error("元原模板编号不能为null");
+				if(showSystemButton){
+					if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_BUTTON){
+						if(operationButton && listButtonBox.contains(operationButton) )
+							listButtonBox.removeChild(operationButton);
+						for each(var operation:* in operationList){
+							if(operation is Button)
+								listButtonBox.addChild(operation);
+						}
+					}else if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_MENU){
+//						var operationMenu:Menu = operationButton.popUp as Menu;
+//						operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+					}
+					
+					//添加右键菜单
+					if(listPanel.rightClickMenu != null){
+						listPanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler,false,0,true);
+						for each(var obj:* in operationList){
+							if(obj.rightClick){
+								//需要添加到右键菜单
+								listPanel.rightClickMenuItems.push(obj);
+							}
+						}
+					}
+				}
+				//没有操作菜单是，去除操作按钮
+				if(operationList.length == 0){
+					if(operationButton && listButtonBox.contains(operationButton) )
+						listButtonBox.removeChild(operationButton);
+				}
+				
+			}
+			
+			protected function operationButton_itemClickHandler(event:MenuEvent):void
+			{
+				var item:* = event.item;
+				if(item.handler != null)
+					item.handler();
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox verticalScrollPolicy="auto" horizontalScrollPolicy="auto" width="100%" height="100%" id="listBox">
+		<core:BillListItemPanel destination="{destination}" endpoint="{endpoint}" templetCode="{templetCode}" id="listPanel" 
+							editable="{editable}" width="100%" height="100%"  
+							showEditBox="false" debugMode="{debugMode}" 
+							isShowAlert ="{isShowAlert}"
+							buttonCol = "{buttonCol}"
+							titleField = "{titleField}"
+							subTitleField = "{subTitleField}"
+							contentField = "{contentField}"
+							iconField = "{iconField}"
+							imgUrl = "{imgUrl}"
+							showDeleteButton="{showDeleteButton}"
+							rowCountPerPage = "{pageSize}"
+							bfInterceptor="{bfIncList}"
+							afInterceptor="{afIncList}"
+							initQueryCondition="{initQueryCondition}"
+							showDataAfterInit ="{showDataAfterInit}" />
+	</mx:VBox>
+</mx:Canvas>

@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="net.brandonmeyer.containers.*" 
+					   layout="vertical" width="900" height="580"
+					   allowClose="true" allowDrag="true" allowResize="true"
+					   title="从关系存储模型导入" close="PopUpManager.removePopUp(this)" creationComplete="creationCompleteHandler()" 
+					   xmlns:ext="smartx.flex.components.core.ext.*" xmlns:synonyms="smartx.bam.flex.modules.synonyms.*">
+	<fx:Declarations>
+		<mx:TitleWindow id="contentXmlTw" title="元数据" showCloseButton="true" width="450" height="400" close="PopUpManager.removePopUp(contentXmlTw)">
+			<mx:TextArea id="contentXmlText" width="100%" height="100%" editable="false" />
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.DatasourceDriverConst;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			[Bindable]
+			public var confirmFun:Function;
+			[Bindable]
+			public var parentEntityCboDp:ArrayCollection = new ArrayCollection();
+			
+			private var rpc:RemoteObject;
+			
+			public var endpoint:String;
+			
+			public var dataSourceName:String;
+			[Bindable]  
+			public var treeDp:ArrayCollection = new ArrayCollection();
+			
+			//private var index:Number = 0;
+			[Bindable]
+			private var selectedItem:Object;
+			[Bindable]
+			private var selectedField:Object;
+			
+			private var allDatasourceConfig:Object;
+			[Bindable]
+			public var debugMode:Boolean;
+			//所选择父实体的所有属性
+			private var allInheritAtt:ArrayCollection = new ArrayCollection();
+			
+			private function creationCompleteHandler():void{
+				rpc = new RemoteObject(GlobalConst.SERVICE_FORM);
+				rpc.endpoint = endpoint;
+				rpc.queryAllRelationDsConfig.addEventListener(ResultEvent.RESULT,queryAllRelationDsConfigHandler);
+				rpc.queryAllRelationDsConfig.addEventListener(FaultEvent.FAULT,queryAllRelationDsConfigFaultHandler);
+				rpc.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				rpc.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,getTableDataStructByDSFaultHandler);
+				rpc.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				rpc.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,getSimpleHashVoArrayByDSFaultHandler);
+				rpc.queryAllRelationDsConfig();
+				
+			}
+			
+			public function showHandler():void{
+				parentEntityCboDp.addItem(<entity name='' />);
+				setParentEntityCbo();
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				if(currentState == "datasource"){
+					var children:ArrayCollection = new ArrayCollection();
+					for each(var strRow:Array in tableDataStruct.table_body){
+						children.addItem({name:strRow[0],entityName:strRow[0],entityCode:strRow[0],code:strRow[0],
+							ds:dataSourceName,selected:false,fields:new ArrayCollection(),type:"table"});
+					}
+					treeDp.addItem({name:dataSourceName,children:children,type:"datasource"});
+				}
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var simpleHashVos:Array = event.result as Array;
+				for each(var simpleHashVo:SimpleHashVO in simpleHashVos){
+					ArrayCollection(selectedItem.fields).addItem({isSelected:"Y",name:simpleHashVo.dataMap["column_name"],type:simpleHashVo.dataMap["data_type"],
+								length:simpleHashVo.dataMap["data_type"]=='NUMBER'?simpleHashVo.dataMap["data_precision"]:simpleHashVo.dataMap["data_length"],
+								isNullable:simpleHashVo.dataMap["nullable"]=="Y"?"true":"false",isPk:simpleHashVo.dataMap["pkcolumn_name"]==simpleHashVo.dataMap["column_name"]?"Y":"N",
+								isRename:"N",alias:simpleHashVo.dataMap["comments"]==null?simpleHashVo.dataMap["column_name"]:simpleHashVo.dataMap["comments"]});
+				}
+			}
+			
+			private function queryAllRelationDsConfigHandler(event:ResultEvent):void{
+				allDatasourceConfig = event.result;
+				refreshTreeData();
+			}
+			
+			private function getTableDataStructByDSFaultHandler(event:FaultEvent):void{
+				SmartXMessage.show("获取表结构错误!",SmartXMessage.MESSAGE_ERROR,"错误:/n"+event.fault.faultString);
+			}
+			
+			private function getSimpleHashVoArrayByDSFaultHandler(event:FaultEvent):void{
+				SmartXMessage.show("查询错误!",SmartXMessage.MESSAGE_ERROR,"错误:/n"+event.fault.faultString);
+			}
+			
+			private function queryAllRelationDsConfigFaultHandler(event:FaultEvent):void{
+				SmartXMessage.show("查询所有数据源配置信息错误!",SmartXMessage.MESSAGE_ERROR,"错误:/n"+event.fault.faultString);
+			}
+			
+			private function refreshTreeData():void{
+				treeDp.removeAll();
+				loadTreeData();
+			}
+			
+			private function loadTreeData():void{
+				var sql:String;
+				if(getDatasourceDriver(dataSourceName) == DatasourceDriverConst.ORACLE)
+					sql = "select table_name from user_tables union select view_name from user_views";
+				if(sql)
+					rpc.getTableDataStructByDS(dataSourceName,sql);
+				
+			}
+			
+			private function relationTableTree_itemClickHandler(event:ListEvent):void{
+				selectedItem = relationTableTree.selectedItem;
+				if(selectedItem){
+					currentState = selectedItem.type;
+					if(selectedItem.selected)
+						selectedItem.selected = false;
+					else
+						selectedItem.selected = true;
+					relationTableTree.invalidateList();
+					if(currentState == "table"){
+						if(ArrayCollection(selectedItem.fields).length == 0)
+							queryTableStructByDs(getDatasourceDriver(selectedItem.ds));
+						setParentEntityCbo();
+					}
+				}
+			}
+			//根据不同的数据库类型查询表结构
+			private function queryTableStructByDs(driver:String):void{
+				var sql:String;
+				switch(driver){
+					case DatasourceDriverConst.ORACLE:
+						rpc.getSimpleHashVoArrayByDS(selectedItem.ds,generateOracleQueryTableDataStructSql(selectedItem.name));
+						break;
+				}
+			}
+			
+			//根据数据源名称获得驱动名称
+			private function getDatasourceDriver(ds:String):String{
+				if(allDatasourceConfig.hasOwnProperty(ds))
+					return allDatasourceConfig[ds].driver;
+				else
+					return "";
+			}
+			
+			//生成ORACLE获得表结构的语句（字段名、字段类型、长度、整位数、允许空值、备注、主键列名）
+			private function generateOracleQueryTableDataStructSql(tableName:String):String{
+				return "SELECT UTC.COLUMN_NAME,UTC.DATA_TYPE,UTC.DATA_LENGTH,UTC.DATA_PRECISION,UTC.NULLABLE,UCC.COMMENTS," +
+					"(SELECT CU.COLUMN_NAME FROM USER_CONS_COLUMNS CU, USER_CONSTRAINTS AU WHERE CU.CONSTRAINT_NAME = AU.CONSTRAINT_NAME" +
+					" AND AU.CONSTRAINT_TYPE = 'P' AND AU.TABLE_NAME = UTC.TABLE_NAME AND CU.TABLE_NAME = UTC.TABLE_NAME) PKCOLUMN_NAME" +
+					" FROM USER_TAB_COLUMNS UTC,USER_COL_COMMENTS UCC WHERE UTC.TABLE_NAME = '"+tableName+"' AND UTC.TABLE_NAME = UCC.TABLE_NAME" +
+					" AND UTC.COLUMN_NAME = UCC.COLUMN_NAME";
+			}
+			
+			
+			protected function renameTxt_changeHandler(event:Event):void{
+				selectedField.rename = renameTxt.text;				
+			}
+			
+			protected function aliasTxt_changeHandler(event:Event):void{
+				selectedField.alias = aliasTxt.text;	
+			}
+			
+			protected function fieldDg_itemClickHandler(event:ListEvent):void{
+				currentState = "field";
+				selectedField = fieldDg.selectedItem;
+				var refItemVo:SimpleRefItemVO = new SimpleRefItemVO();
+				refItemVo.name = selectedField.dictionaryRefName;
+				refItemVo.code = selectedField.dictionaryRefCode;
+				sysRefInput.value = refItemVo;
+			}
+			
+			private function setParentEntityCbo():void{
+				if(selectedItem){
+					for each(var parentEntity:XML in parentEntityCboDp){
+						if(String(parentEntity.@code) == selectedItem.parentEntityCode){
+							parentEntityCbo.selectedItem = parentEntity;
+							break;
+						}else
+							parentEntityCbo.selectedIndex = parentEntityCboDp.length;
+					}
+				}
+			}
+			
+			protected function isRenameChk_changeHandler(event:Event):void{
+				isRenameChk.selected?selectedField.isRename="Y":selectedField.isRename="N";
+				renameTxt.editable = isRenameChk.selected;
+			}
+			
+			protected function parentEntityCbo_changeHandler(event:ListEvent):void{
+				selectedItem.parentEntityCode = String(parentEntityCbo.selectedItem.@code);
+				if(String(parentEntityCbo.selectedItem.@isAbstract) == "false")
+					setAllInheritAttribute(String(parentEntityCbo.selectedItem.@code));
+				compareToImportField();
+			}
+			
+			protected function sysRefInput_realValueChangeHandler(event:UIComponentEvent):void{
+				selectedField.dictionaryRefName = sysRefInput.value==null?"":sysRefInput.value.name;
+				selectedField.dictionaryRefCode = sysRefInput.value==null?"":sysRefInput.value.code;
+			}
+			
+			private function showImportXml():String{
+				return getImportXml().toXMLString();
+			}
+			
+			public function getImportXml():XML{
+				var result:XML = <root />;
+				for each(var datasourceObj:Object in treeDp){
+					for each(var table:Object in datasourceObj.children){
+						if(table.selected){
+							var tableName:String = StringUtil.replace(table.code,table.ds+"_","");
+							var entity:XML = <entity isAbstract="false" name={table.entityName} code={table.entityCode} 
+							parentEntityCode={table.parentEntityCode?table.parentEntityCode:""} idAttributeName=""	desc="">
+												<attributes ><displayAttributes /></attributes>
+												<mappingInfo type="table">
+													<datasource>{table.ds}</datasource>
+													<tableName>{tableName}</tableName>
+													<attributeMapping />
+												</mappingInfo>
+												<relations />
+												<groupAttributes />
+											</entity>;
+							for each(var att:Object in table.fields){
+								if(att.isSelected == "Y"){
+									if(att.isPk == 'Y')
+										entity.@idAttributeName = att.isRename=='Y'?att.rename:att.name;
+									var attXml:XML = <attribute name={att.isRename=='Y'?att.rename:att.name} type={att.type} label={att.alias} 
+													isNullable={att.isNullable} category={att.dictionaryRefName?"dictionary":"normal"}
+													dictionaryRefName={att.dictionaryRefName==undefined?"":att.dictionaryRefName} 
+													dictionaryRefCode={att.dictionaryRefCode==undefined?"":att.dictionaryRefCode} />;
+									entity.attributes.appendChild(attXml);
+									var mapXml:XML  = <map attributeName={att.isRename=='Y'?att.rename:att.name} columnName={att.name} />;
+									entity.mappingInfo.attributeMapping.appendChild(mapXml);
+								}
+							}
+							result.appendChild(entity.copy());
+						}
+					}
+				}
+				return result;
+			}
+			
+			private function isNullableLabelFun(item:Object,column:DataGridColumn):String{
+				if(item.isNullable == "true")
+					return "是";
+				else
+					return "否";
+			}
+			
+			private function showXml():void{
+				PopUpManager.addPopUp(contentXmlTw,this,true);
+				PopUpManager.centerPopUp(contentXmlTw);
+				contentXmlText.text = showImportXml();
+			}
+			
+			private function setAllInheritAttribute(parentEntityCode:String):void{
+				allInheritAtt.removeAll();
+				recursiveAllInheritAttribute(parentEntityCode);
+			}
+			
+			private function recursiveAllInheritAttribute(parentEntityCode:String):void{
+				if(parentEntityCboDp.length > 0){
+					for each(var entity:XML in parentEntityCboDp){
+						if(String(entity.@isAbstract) == "false" 
+							&& String(entity.@code) == parentEntityCode){
+							for each(var att:XML in entity.attributes.attribute){
+								allInheritAtt.addItem(String(att.@name));
+							}
+							if(String(entity.@parentEntityCode) != "")
+								recursiveAllInheritAttribute(String(entity.@parentEntityCode));
+							break;
+						}
+					}
+				}
+			}
+			//比对导入的字段是否和父实体字段有重复，有的话则重命名
+			private function compareToImportField():void{
+				if(allInheritAtt.length > 0){
+					for each(var field:Object in selectedItem.fields){
+						if(allInheritAtt.contains(field.name)){
+							field.isRename = "Y";
+							field.rename = String(field.name).concat("_1");
+						}
+					}
+				}
+			}
+			
+			protected function entityName_changeHandler(event:Event):void{
+				selectedItem.entityName = entityName.text;
+			}
+			
+			protected function entityCode_changeHandler(event:Event):void{
+				selectedItem.entityCode = entityCode.text;
+			}
+			
+			private function refreshDataSource():void{
+				currentState = "datasource";
+				rpc.queryAllRelationDsConfig();
+			}
+			
+			private function fieldSelectAllBtn_clickHandler(event:MouseEvent):void{
+				var dataProvider:ArrayCollection = fieldDg.dataProvider as ArrayCollection;
+				for each(var data:Object in dataProvider){
+					if(data.isSelected == "N")
+						data.isSelected = "Y";
+				}
+				fieldDg.dataProvider = dataProvider;
+				fieldDg.invalidateList();
+			}
+			
+			private function fieldExceptSelectBtn_clickHandler(event:MouseEvent):void{
+				var dataProvider:ArrayCollection = fieldDg.dataProvider as ArrayCollection;
+				for each(var data:Object in dataProvider){
+					if(data.isSelected == "N")
+						data.isSelected = "Y";
+					else
+						data.isSelected = "N";
+				}
+				fieldDg.dataProvider = dataProvider;
+				fieldDg.invalidateList();
+			}
+			
+			 private function searchInfo_keyUpHandler(event:KeyboardEvent):void{
+				var currentOjb:Object = event.currentTarget;
+				if(currentOjb is TextInput){
+					var textInput:TextInput = currentOjb as TextInput;
+					if(textInput.id == "searchInfo" && event.keyCode == Keyboard.ENTER)
+						clickHandler();
+				}
+			}
+			
+			private var resultArray:ArrayCollection = new ArrayCollection();
+			
+			private function clickHandler():void{
+				this.focusManager.setFocus(relationTableTree);
+				resultArray.removeAll();
+				selectSearchItem(searchInfo.text);
+			}
+			
+			private function selectSearchItem(labelNameValue:String):void{
+				if(labelNameValue == null || StringUtil.trim(labelNameValue) == "")
+					return;
+				
+				var selectedItem:Object = findNextItem(labelNameValue,relationTableTree.dataProvider as ArrayCollection);
+				if(selectedItem != null){
+//					openFatherItem(selectItem[parentFieldName],treePanel.getTreeMap(),event);
+					expandAll();
+					resultArray.addItem(selectedItem);
+					
+					relationTableTree.selectedItem = selectedItem;
+					var index:int = relationTableTree.selectedIndex;
+					relationTableTree.scrollToIndex(index);
+					
+				}
+			}
+			
+			private function findNextItem(labelValue:String,dataProvider:ArrayCollection):Object{
+				var tempItem:Object = null;
+				for each(var obj:Object in dataProvider){
+					var tempLabelValue:String = obj["name"];
+					if( tempLabelValue != null && tempLabelValue.indexOf(labelValue)>=0  && !resultArray.contains(obj) ){
+						tempItem = obj;
+						break;
+					}
+					var childData:ArrayCollection = obj.children;
+					if(childData != null){
+						tempItem = findNextItem(labelValue,childData);
+						if( tempItem != null && !resultArray.contains(tempItem) ){
+							break;
+						}
+					}
+				}
+				return tempItem;
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in relationTableTree.dataProvider){
+					relationTableTree.expandChildrenOf(item,true);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<containers:states>
+		<s:State name="datasource" />
+		<s:State name="table" />
+		<s:State name="field" />
+	</containers:states>
+	<mx:VBox width="100%" height="100%">
+		<mx:HDividedBox width="100%" height="100%">
+			<mx:VBox width="30%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					 paddingTop="5">
+				<mx:HBox id="buttonBox" width="100%">
+					<mx:LinkButton toolTip="刷新" icon="{AssetsFileLib.refreshIcon}" click="refreshDataSource()" />
+					<mx:HBox width="100%"  horizontalAlign="right" paddingTop="3" horizontalGap="2" verticalAlign="middle" >
+						<mx:TextInput id="searchInfo" borderStyle="solid" maxWidth="100" width="85%" 
+									  toolTip="输入要查询的内容" keyUp="searchInfo_keyUpHandler(event)" />
+						<mx:LinkButton id="searchBtn" icon="{AssetsFileLib.quicQueryIcon}" click="clickHandler()" 
+									   toolTip="查询出结果后,按'F'键或'='键可至下一条查询结果" />
+					</mx:HBox>
+				</mx:HBox>
+				<ext:TreeWrapper id="relationTableTree" labelField="name" itemClick="relationTableTree_itemClickHandler(event)"
+								 itemRenderer="smartx.bam.flex.modules.entitymodel.renderer.TreeCheckBoxRenderer" 
+								 width="100%" height="100%" dataProvider="{treeDp}" />
+			</mx:VBox>
+			<mx:VBox width="70%" height="100%">
+				<mx:TabNavigator id="mainTab" width="100%" height="100%" paddingTop="3" creationPolicy="all" includeIn="table,field">
+					<mx:VBox label="映射信息" width="100%" height="100%"
+							 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+						<mx:HBox width="100%" horizontalAlign="center">
+							<mx:Label text="实体名" width="25%" />
+							<mx:TextInput id="entityName" width="50%" text="{selectedItem.entityName}" change="entityName_changeHandler(event)"/>
+						</mx:HBox>
+						<mx:HBox width="100%" horizontalAlign="center">
+							<mx:Label text="实体编码" width="25%" />
+							<mx:TextInput id="entityCode" width="50%" text="{selectedItem.entityCode}" change="entityCode_changeHandler(event)"/>
+						</mx:HBox>
+						<mx:HBox width="100%" horizontalAlign="center">
+							<mx:Label text="父实体" width="25%"/>
+							<mx:ComboBox id="parentEntityCbo" labelField="@name" dataProvider="{parentEntityCboDp}" 
+										 width="50%" change="parentEntityCbo_changeHandler(event)"/>
+						</mx:HBox>
+						<mx:Label text="字段信息" color="blue" />
+						<mx:HBox width="100%">
+							<mx:Button id="fieldSelectAllBtn" label="全选" click="fieldSelectAllBtn_clickHandler(event)" />
+							<mx:Button id="fieldExceptSelectBtn" label="反选" click="fieldExceptSelectBtn_clickHandler(event)" />
+						</mx:HBox>
+						<mx:DataGrid id="fieldDg" width="100%" height="40%" itemClick="fieldDg_itemClickHandler(event)" 
+									 editable="true" dataProvider="{selectedItem.fields}">
+							<mx:columns>
+								<mx:DataGridColumn editable="true" headerText="是否导入" dataField="isSelected" editorDataField="value" rendererIsEditor="true">
+									<mx:itemRenderer>
+										<fx:Component>
+											<mx:HBox horizontalAlign="center" width="100%" 
+													 horizontalScrollPolicy="off" verticalScrollPolicy="off">
+												<fx:Script>
+													<![CDATA[
+														public function get value():String{
+															return String( data.isSelected );
+														}
+														
+														private function isSelectedCheckBox_changeHandler():void{
+															data.isSelected=isSelectedCheckBox.selected?'Y':'N';
+														}
+													]]>
+												</fx:Script>
+												<mx:CheckBox id="isSelectedCheckBox" selected="{data.isSelected=='Y'||data.isSelected=='y'}"
+															 change="isSelectedCheckBox_changeHandler()"/>
+											</mx:HBox>
+										</fx:Component>
+									</mx:itemRenderer>
+								</mx:DataGridColumn>
+								<mx:DataGridColumn dataField="name" headerText="字段名" editable="false"/>
+								<mx:DataGridColumn dataField="type" headerText="字段类型" editable="false"/>
+								<mx:DataGridColumn dataField="length" headerText="字段长度" editable="false"/>
+								<mx:DataGridColumn dataField="isNullable" headerText="是否允许为空" editable="false" labelFunction="isNullableLabelFun"/>
+								<mx:DataGridColumn dataField="alias" headerText="显示名称" editable="false" />
+							</mx:columns>
+						</mx:DataGrid>
+						<mx:VBox width="100%" height="40%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" includeIn="field">
+							<mx:Label text="字段详情" color="blue" />
+							<mx:HBox width="100%">
+								<mx:CheckBox label="是否主键" enabled="false" labelPlacement="right" selected="{selectedField.isPk=='Y'?true:false}"/>
+							</mx:HBox>
+							<mx:HBox width="100%">
+								<mx:CheckBox id="isRenameChk" width="20%" label="是否重命名" change="isRenameChk_changeHandler(event)" labelPlacement="right" selected="{selectedField.isRename=='Y'?true:false}"/>
+								<mx:TextInput id="renameTxt" text="{selectedField.rename}" change="renameTxt_changeHandler(event)" editable="{selectedField.isRename=='Y'?true:false}"/>
+							</mx:HBox>
+							<mx:HBox width="100%">
+								<mx:Label text="显示名称" width="20%" />
+								<mx:TextInput id="aliasTxt" text="{selectedField.alias}" change="aliasTxt_changeHandler(event)"/>
+							</mx:HBox>
+							<mx:HBox width="100%">
+								<mx:Label text="字典引用" width="20%" />
+								<synonyms:SynonymsRefInput id="sysRefInput" realValueChange="sysRefInput_realValueChangeHandler(event)" width="200"/>
+							</mx:HBox>
+						</mx:VBox>
+					</mx:VBox>
+				</mx:TabNavigator>
+			</mx:VBox>
+		</mx:HDividedBox>
+		<mx:HBox width="100%" horizontalAlign="right" paddingRight="5" paddingBottom="5" paddingTop="5" paddingLeft="5">
+			<mx:Button label="显示导入XML" visible="{debugMode}" click="showXml()" />
+			<mx:Button label="确定" click="confirmFun()" />
+			<mx:Button label="取消" click="PopUpManager.removePopUp(this);" />
+		</mx:HBox>
+	</mx:VBox>
+</containers:SuperPanel>

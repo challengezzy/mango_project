@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%" xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+		   initialize="module1_initializeHandler(event)">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			private var metadata:XML = GlobalConst.STYLETEMPLATE_EDIT_METADATAXML;               
+			[Bindable]
+			private var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+				
+				
+			[Bindable]
+			private var metadataTemplet:MetadataTemplet;
+				
+				
+				
+				
+
+
+			protected function module1_initializeHandler(event:FlexEvent):void
+			{
+				metadataTemplet = new MetadataTemplet();
+				metadataTemplet.contentXML = metadata;
+			}
+
+		]]>
+	</fx:Script>
+	<styletemplate:MTStyleTemplate02 endpoint="{endpoint}" metadataTemplet="{metadataTemplet}"
+									 width="100%" height="100%"/>
+</mx:Module>

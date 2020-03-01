@@ -1,0 +1,149 @@
+/**************************************************************************
+ * $RCSfile: DebugApplet.java,v $  $Revision: 1.11.2.3 $  $Date: 2009/03/16 07:24:41 $
+ **************************************************************************/
+package smartx.framework.metadata.ui;
+
+import java.awt.*;
+import java.io.File;
+
+import javax.swing.*;
+
+import smartx.framework.common.ui.*;
+
+
+public class DebugApplet extends JApplet {
+	private static final long serialVersionUID = 1L;
+
+	String str_appletLoaderClass = "smartx.system.login.ui.LoginAppletLoader";
+
+	public void init() {
+		//System.setProperty("java.awt.im.style","on-the-spot");
+		
+		String str_url = getParameter("url");
+		if (str_url == null || str_url.equals("")) {
+			System.out.println("请为此Applet配置一个启动参数url,值为[http://127.0.0.1:8888/nova]的样子!!");
+			System.exit(0);
+		}
+
+		//远程服务调用接口
+		String str_serverCallServletURL = str_url + "/RemoteCallServlet"; //
+		System.setProperty("RemoteCallServletURL", str_serverCallServletURL); //
+		System.out.println("RemoteCallServletURL:" + str_serverCallServletURL);
+		//远程传输接口
+		System.setProperty("UploadFileServletURL", str_url + "/UPLoadFileServlet"); //
+		
+		//运行模式设置
+		System.setProperty("RUNMODE", "DEVELOPE"); //运行模板,是开发模式!!!!!在开发模式下,为了提高开发效率,模板数据VO不做缓存处理!!!
+
+		//		
+		String str_codecache_dir = System.getProperty("user.home").replace('\\', '/') + "/" + "NOVA_CODECACHE_DEVELOPE"; //开发环境的缓存目录
+		File file_codeCache = new File(str_codecache_dir);
+		if (!file_codeCache.exists()) {
+			file_codeCache.mkdirs();  //如果不存在,则创建之
+		}
+		System.setProperty("ClientCodeCache", str_codecache_dir); //开发环境的缓存目录
+		
+		/*
+		try {
+			UIManager.setLookAndFeel("smartx.framework.common.ui.NovaLookAndFeel"); //
+			//UIManager.setLookAndFeel("org.jvnet.substance.SubstanceLookAndFeel"); 
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceBusinessLookAndFeel");
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceBusinessBlueSteelLookAndFeel");
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceBusinessBlackSteelLookAndFeel"); 
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceCremeLookAndFeel"); 
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceSaharaLookAndFeel"); 
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceModerateLookAndFeel");
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceOfficeSilver2007LookAndFeel"); 
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceRavenGraphiteLookAndFeel"); 
+            //UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceMagmaLookAndFeel"); 
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceOfficeBlue2007LookAndFeel");
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceMangoLookAndFeel");
+			//UIManager.setLookAndFeel("org.jvnet.substance.skin.SubstanceFieldOfWheatLookAndFeel");
+			javax.swing.SwingUtilities.updateComponentTreeUI(this.getContentPane());
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		*/
+
+		this.getContentPane().setLayout(new BorderLayout());
+		JPanel mainPanel = new JPanel();
+		mainPanel.setName("mainPanel"); //
+		mainPanel.setLayout(new BorderLayout());
+		mainPanel.setOpaque(false);
+		mainPanel.setBackground(java.awt.Color.WHITE);
+		this.getContentPane().add(mainPanel, BorderLayout.CENTER);
+
+		
+		//TODO 系统启动实现部分，未来可以对应的在此做一些配置工作
+		try {
+			INovaAppletLoader load = (INovaAppletLoader) Class.forName(str_appletLoaderClass).newInstance();
+			
+			//这两个模式设置应该放到load.loadApplet前面，内部有判断
+			System.setProperty("RUNMODE", "DEVELOPE"); //运行模板,是开发模式!!!!!在开发模式下,为了提高开发效率,模板数据VO不做缓存处理!!!
+			System.setProperty("WORKMODE", "DEVELOPE"); //设置运行模式
+			
+			load.loadApplet(this, mainPanel, null, str_serverCallServletURL);
+			
+			
+		} catch (InstantiationException e) {
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+}
+/**************************************************************************
+ * $RCSfile: DebugApplet.java,v $  $Revision: 1.11.2.3 $  $Date: 2009/03/16 07:24:41 $
+ *
+ * $Log: DebugApplet.java,v $
+ * Revision 1.11.2.3  2009/03/16 07:24:41  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.11.2.2  2008/09/01 02:30:40  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.11.2.1  2008/02/28 09:13:40  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.11  2008/01/03 10:17:32  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.10  2008/01/03 10:14:13  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.9  2008/01/03 08:03:53  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.8  2007/09/24 07:23:55  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.7  2007/09/19 08:38:52  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.6  2007/09/15 10:24:18  wangqi
+ * 增加简单的界面处理
+ *
+ * Revision 1.5  2007/07/16 09:52:06  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/07/16 09:45:17  shxch
+ * 加入开发环境时的客户端代码缓存目录
+ *
+ * Revision 1.3  2007/07/16 09:44:22  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/05/31 07:38:15  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:01:37  qilin
+ * no message
+ *
+ * Revision 1.2  2007/01/30 04:56:14  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PodContent xmlns="smartx.flex.components.basic.portal.*" xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%"
+	 creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import de.polygonal.ds.HashTable;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ItemResponder;
+			import mx.controls.Alert;
+			import mx.controls.Image;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			import mx.formatters.DateFormatter;
+			import mx.managers.HistoryManager;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.basic.vo.UserHistoryRecordVO;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			
+			private var formService:RemoteObject;
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			public var endpoint:String;
+			
+			[Bindable]
+			private var currentDP:ArrayCollection = new ArrayCollection();
+			private var historyRecordVOs:ArrayCollection;
+			
+			private var formatter:DateFormatter = new DateFormatter();
+			private var formatString:String = "YYYY-MM-DD JJ:NN:SS";
+			
+			public var maxRows:int = 1000;
+			
+			[Bindable]
+			public static var listIcon:Class = AssetsFileLib.redpointIcon;
+			
+			private var previewImage:ThumbImage = new ThumbImage();
+			private var localUserInfo:SharedObject = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_USERINFO);
+			
+			private function init():void{
+				formService = new RemoteObject(destination);
+	        	if(endpoint!=null)
+	        		formService.endpoint = endpoint;
+	        		
+	        	formService.getHistoryRecordVOByUser.addEventListener(ResultEvent.RESULT,getHistoryRecordVOByUserHandler);
+	    		formService.getHistoryRecordVOByUser.addEventListener(FaultEvent.FAULT,faultHandler);
+	    		
+	    		if(userId == null)
+	    			userId = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+	    		formatter.formatString = formatString;
+	    		formService.getHistoryRecordVOByUser(userId);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				 Alert.show(event.fault.faultString, 'Error');
+	       	}
+	       
+	       	private function getHistoryRecordVOByUserHandler(event:ResultEvent):void{
+	       		historyRecordVOs = event.result as ArrayCollection;
+	       		if(historyRecordVOs == null)
+	       			return;
+	       		currentDP.removeAll();
+	       		var i:int=0;
+	       		for each(var historyRecordVO:UserHistoryRecordVO in historyRecordVOs){
+	       			var temp:Object = new Object();
+					var dtf:DeskTopFrame = deskTopFrame;
+	       			var menu:Object = dtf.getMenuIndexMap()[historyRecordVO.menuId];
+	       			if(menu == null)
+	       				continue;
+	       			temp["menuid"] = historyRecordVO.menuId;
+	       			temp["text"] = menu["name"] + "  ["+formatter.format(historyRecordVO.lastVisitTime)+"]";
+	       			//temp["imageurl"] = "historyrecord/"+historyRecordVO.imageUrl;
+	       			temp["icon"] = listIcon;
+	       			currentDP.addItem(temp);
+	       			if(i++>=(maxRows-1))//最多显示5个
+	       				break;
+	       		}
+	       	}
+	       	
+	       	private function itemClick(event:ListEvent):void{
+	       		var temp:Object = currentDP.getItemAt(event.rowIndex);
+	       		if(temp != null && temp["menuid"] != null){
+	       			this.deskTopFrame.openMenuFrame(temp["menuid"]);
+	       		}
+	       	}
+	       	
+	       	private function itemRollOver(event:ListEvent):void{
+	       		var temp:Object = currentDP.getItemAt(event.rowIndex);
+	       		//var imageurl:String = temp["imageurl"];
+				var menuId:String = temp["menuid"];
+	       		PopUpManager.removePopUp(previewImage);
+				//var imageDataWidth:int = localUserInfo.data["vhr_"+menuId+"_width"] as int;
+				//var imageDataHeight:int = localUserInfo.data["vhr_"+menuId+"_height"] as int;
+				var imageBytes:ByteArray = localUserInfo.data["vhr_"+menuId+"_pixels"] as ByteArray;
+				if(imageBytes == null)
+					return;
+				var loader:Loader = new Loader();
+				loader.loadBytes(imageBytes);
+				loader.contentLoaderInfo.addEventListener(Event.COMPLETE,function(event:Event):void{
+					var loader:LoaderInfo = event.target as LoaderInfo;
+					var bmp:Bitmap = Bitmap(loader.content);
+					previewImage.imageSource = bmp;
+				}
+				);
+//				var bitmapData:BitmapData = new BitmapData(imageDataWidth,imageDataHeight);
+//				imageDataPixels.position = 0;
+//				bitmapData.setPixels(bitmapData.rect,imageDataPixels);
+	       		//var bitmap:Bitmap = new Bitmap(bitmapData);
+	       		//previewImage.imageSource = bitmap; 
+	  
+	       		var pt:Point = new Point(list.mouseX,list.mouseY);
+	       		pt = list.localToGlobal(pt);
+	       		previewImage.x = pt.x
+	       		previewImage.y = pt.y;
+	       		PopUpManager.addPopUp(previewImage,this);
+				//PopUpManager.centerPopUp(previewImage);
+	       	}
+	       	
+	       	private function itemRollOut(event:ListEvent):void{
+	       		PopUpManager.removePopUp(previewImage);
+	       	}
+		]]>
+	</mx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:List id="list" width="100%" height="100%" dataProvider="{currentDP}" labelField="text" iconField="icon" 
+			itemClick="itemClick(event)"/>
+	</mx:VBox>
+</PodContent>

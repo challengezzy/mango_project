@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" 
+	xmlns:components="smartx.flex.components.*"
+	creationComplete="init()" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import com.hurlant.eval.ast.ContinueStmt;
+			
+			import mx.collections.ArrayCollection;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			public var datasource:String;
+			[Bindable]
+			public var ownerId:String;
+			[Bindable]
+			public var ownerTable:String;
+			[Bindable]
+			public var ownerTablePkField:String="ID";
+			[Bindable]
+			public var authorizationTable:String;
+			[Bindable]
+			public var authorizationTablePkField:String="ID";//查询是使用
+			[Bindable]
+			public var authTabkeUpdatePkField:String="ID";//更新关联表时用
+			[Bindable]
+			public var isFolderField:String="ISFOLDER";//是否是文件夹(目录)，用来判断是否需要保存到关联表
+			
+			[Bindable]
+			public var authorizationTableParentFkField:String;
+			[Bindable]
+			public var authorizationTableSeqField:String;
+			[Bindable]
+			public var relationTable:String;
+			[Bindable]
+			public var relationTablePkField:String;
+			[Bindable]
+			public var relationOwnerFkField:String;
+			[Bindable]
+			public var relationAuthorizationFkField:String;
+			[Bindable]
+			public var relationTableSequenceName:String;
+			[Bindable]
+			public var labelFieldName:String = "NAME";
+			
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+		    public var endpoint:String;
+		    private var formService:RemoteObject;
+			
+			private function init():void{
+				relationTableSequenceName = "s_"+relationTable;
+				formService = new RemoteObject(destination);
+		        if(endpoint!=null)
+		        	formService.endpoint = endpoint;
+        		formService.executeBatchByDS.addEventListener(ResultEvent.RESULT,updateHandler);
+				formService.executeBatchByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+			}
+			
+			public function refresh():void{
+				var toAssignAuthPkSql:String = "select "+authorizationTablePkField+" from "+authorizationTable+" m " +
+						"start with m."+ authTabkeUpdatePkField +" in " + 
+						"(select "+relationAuthorizationFkField+" from "+relationTable+" where "+relationOwnerFkField+"="+ownerId+") " +
+						"connect by m."+authorizationTablePkField+"=prior m."+authorizationTableParentFkField + "" ;
+				
+				var toAssignSql:String = "select * from "+authorizationTable+" start with "+authorizationTablePkField+
+						" not in (" +toAssignAuthPkSql+ ") connect by " + authorizationTablePkField + " =prior " + authorizationTableParentFkField; 
+				toAssignAuthTree.treeSql = toAssignSql;
+				toAssignAuthTree.tree.allowMultipleSelection=true;
+				
+				var assignedPkSql:String = "SELECT "+authorizationTablePkField+" FROM "+authorizationTable+" WHERE "+authTabkeUpdatePkField+" IN " +
+						"(select "+relationAuthorizationFkField+" from "+relationTable+" where "+relationOwnerFkField+"="+ownerId+") "+
+						" AND "+ isFolderField +" = 'N'";
+				var assignedSql:String = "select * from " +authorizationTable+ " start with "+authorizationTablePkField +
+						" in ( " + assignedPkSql + ") CONNECT BY "+ authorizationTablePkField +" = PRIOR "+authorizationTableParentFkField;
+				assignedAuthTree.treeSql = assignedSql;
+				assignedAuthTree.tree.allowMultipleSelection=true;		
+				
+				toAssignAuthTree.load();
+				assignedAuthTree.load();
+			}
+			
+			private function assignSelectedAuth():void{
+				var selectedAuthObjs:Array = toAssignAuthTree.tree.selectedItems;
+				var selectLeafOjbc:Array = [];//找出选中节点及其所有子节点
+				for each(var authObj:* in selectedAuthObjs){
+					for each (var tmp:* in getLeafAuths(authObj))
+					selectLeafOjbc = selectLeafOjbc.concat(tmp);
+				}				
+				assignAuths(selectLeafOjbc);
+			}
+						
+			private function assignAllAuth():void{
+				//递归获取左树的所有叶节点，然后全部赋权即可
+				var allAuthObjs:ArrayCollection = toAssignAuthTree.getTreeData();
+				var leafAuths:Array = [];
+				for each(var authObj:* in allAuthObjs){
+					for each (var tmp:* in getLeafAuths(authObj))
+						leafAuths=leafAuths.concat(tmp);
+				}
+				assignAuths(leafAuths);
+			}
+			
+			//递归查询所有子节点
+			private function getLeafAuths(authObj:*):ArrayCollection{
+				var result:ArrayCollection = new ArrayCollection();
+				if(authObj.children == null){
+					result.addItem(authObj);
+					return result;
+				}
+				else{
+					for each(var obj:* in authObj.children){
+						for each (var tmp:* in getLeafAuths(obj))
+							result.addItem(tmp);
+					}
+					return result;
+				}
+			}
+			
+			private function assignAuths(authObjs:Array):void{
+				var needToAssignAuthObjs:ArrayCollection = new ArrayCollection();//真正需要添加的权限
+				var toAssignAuthMap:* = toAssignAuthTree.getTreeMap();
+				var assignedAuthMap:* = assignedAuthTree.getTreeMap();
+				for each(var authObj:* in authObjs){
+					var pk:String = authObj[authTabkeUpdatePkField];
+					if(assignedAuthMap[pk]==null && !needToAssignAuthObjs.contains(authObj)){//确实没赋过这个权限
+						needToAssignAuthObjs.addItem(authObj);
+					}
+					//还要检查祖先节点是否都赋过权限
+					while(authObj[authorizationTableParentFkField]!=null
+							&&authObj[authorizationTableParentFkField]!=""){
+						//获取父节点
+						authObj = toAssignAuthMap[authObj[authorizationTableParentFkField]];
+						pk = authObj[authorizationTablePkField];
+						if(assignedAuthMap[pk]==null && !needToAssignAuthObjs.contains(authObj)){//确实没赋过这个权限
+							needToAssignAuthObjs.addItem(authObj);
+						}			
+					}
+				}
+				var sqlList:Array = [];
+				for each(var toAssignAuthObj:* in needToAssignAuthObjs){
+					//判断是否需要保存到关联表
+					if( toAssignAuthObj[isFolderField] && toAssignAuthObj[isFolderField] == "Y"){
+						trace("当前选项为目录数据，不需要保存!");
+						continue;
+					}
+					
+					var sql:String = "insert into "+relationTable+"("+relationTablePkField+","+relationOwnerFkField
+									+","+relationAuthorizationFkField+") values ("+relationTableSequenceName+".nextval" + 
+											","+ownerId+","+ toAssignAuthObj[authTabkeUpdatePkField] +")";
+					trace("update sql:"+sql);
+					sqlList = sqlList.concat(sql);
+				}
+				formService.executeBatchByDS(datasource,sqlList);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				SmartXMessage.show("保存权限信息错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString,this);
+		    }
+		    
+		    private function updateHandler(event:ResultEvent):void{
+		    	refresh();
+		    }
+		    
+		    private function removeAuths(authObjs:Array):void{
+		    	var sqlList:Array = [];
+		    	for each(var authObj:* in authObjs){
+		    		var pk:String = authObj[authorizationTablePkField];
+		    		var sql:String = "delete from "+relationTable+" where "+relationOwnerFkField+"=" + 
+		    						ownerId+" and "+relationAuthorizationFkField+" in (select "+ authTabkeUpdatePkField +" from " + 
+									"(select * from " +	authorizationTable+" m start with m."+authorizationTablePkField+"='"+pk+"' connect by prior m." + 
+		    						authorizationTablePkField+"=m."+authorizationTableParentFkField+") where " + isFolderField + "=" + "'N' )";
+		    		trace("update sql:"+sql);
+		    		sqlList = sqlList.concat(sql);
+		    	}
+		    	formService.executeBatchByDS(datasource,sqlList);
+		    }
+		    
+		    private function removeSelectedAuths():void{
+		    	var selectedAuthObjs:Array = assignedAuthTree.tree.selectedItems;
+		    	removeAuths(selectedAuthObjs);
+		    }
+		    
+		    private function removeAllAuths():void{
+		    	var allAuthObjs:Array = assignedAuthTree.getTreeData().toArray();
+		    	removeAuths(allAuthObjs);
+		    }
+		]]>
+	</mx:Script>
+	<core:BillTreePanel height="100%" width="40%" id="toAssignAuthTree" labelFieldName="{labelFieldName}"
+		parentFieldName="{authorizationTableParentFkField}" pkFieldName="{authorizationTablePkField}" seqFieldName="{authorizationTableSeqField}"
+		endpoint="{endpoint}"/>
+	<mx:VBox height="100%" width="20%" verticalAlign="middle" horizontalAlign="center">
+		<mx:Button label=">" width="100" click="assignSelectedAuth()"/>
+		<mx:Button label=">>" width="100" click="assignAllAuth()"/>
+		<mx:Button label="&lt;" width="100" click="removeSelectedAuths()"/>
+		<mx:Button label="&lt;&lt;" width="100" click="removeAllAuths()"/>
+		<mx:Button label="刷新" width="100" click="refresh()"/>
+	</mx:VBox>
+	<core:BillTreePanel height="100%" width="40%" id="assignedAuthTree" labelFieldName="{labelFieldName}"
+		parentFieldName="{authorizationTableParentFkField}" pkFieldName="{authorizationTablePkField}" seqFieldName="{authorizationTableSeqField}"
+		endpoint="{endpoint}"/>
+</mx:HBox>

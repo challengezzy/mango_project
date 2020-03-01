@@ -1,0 +1,259 @@
+package smartx.publics.metadata.bs.service;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.log4j.Logger;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.publics.metadata.vo.MetadataTemplet;
+
+/**
+ * 元数据模板服务
+ * @author gxlx
+ *
+ */
+public class SmartXMetadataTempletService {
+	private Logger logger = NovaLogger.getLogger(this);
+	private static Map<String, MetadataTemplet> metadataTempletCache = new ConcurrentHashMap<String, MetadataTemplet>();
+	
+	private static SmartXMetadataTempletService metadataTempletService;
+	
+	public static SmartXMetadataTempletService getInstance(){
+		if(metadataTempletService != null)
+			return metadataTempletService;
+		else
+			metadataTempletService = new SmartXMetadataTempletService();
+		
+		return metadataTempletService;
+	}
+	
+	public List<String> getGlobalMetadataTempletCodeList() throws Exception {
+		logger.debug("获取全局元数据模板编码列表");
+		CommDMO dmo = new CommDMO();
+		try{
+			List<String> result = new ArrayList<String>();
+			String sql = "select code from pub_metadata_templet ";
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql);
+			for(HashVO vo : vos){
+				result.add(vo.getStringValue(0));
+			}
+			return result;
+			
+		} catch (Exception e) {
+			logger.error("",e);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext(null);
+		}
+	}
+	
+	/**
+	 * 以"模板code@@versionCode"格式返回
+	 * @return
+	 * @throws Exception
+	 */
+	public List<String> getGlobalMetadataTempletCodeAndVersionCodeList() throws Exception {
+		List<String> result = new ArrayList<String>();
+		List<String> codeList = getGlobalMetadataTempletCodeList();
+		for(String code : codeList){
+			MetadataTemplet templet = findMetadataTemplet(code);
+			if(templet != null)
+				result.add(code+"@@"+templet.getVersionCode());
+		}
+		return result;
+	}
+	
+	public List<String> getUserMetadataTempletCodeList(String username) throws Exception {
+		logger.debug("获取用户["+username+"]元数据模板编码列表");
+		CommDMO dmo = new CommDMO();
+		try{
+			List<String> result = new ArrayList<String>();
+			String sql = "select code from pub_metadata_templet where scope=?";
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql, username);
+			for(HashVO vo : vos){
+				result.add(vo.getStringValue(0));
+			}
+			return result;
+			
+		} catch (Exception e) {
+			logger.error("",e);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext(null);
+		}
+		
+	}
+	
+	public MetadataTemplet findMetadataTemplet(String code) throws Exception{
+		logger.debug("获取元数据模板[code="+code+"]");
+		if(metadataTempletCache.containsKey(code)){
+			return metadataTempletCache.get(code);
+		}
+		else{
+			logger.debug("从数据库中读取元数据模板[code="+code+"]");
+			CommDMO dmo = new CommDMO();
+			try {
+				String sql = "select t.*" 
+							+",(select valueen from bfbiz_sysdictionary where classid='PUB_METADATA_TEMPLET' and attributeid='TYPE' and value=t.TYPE) typecode " 
+							+" from pub_metadata_templet t where code=?";
+				HashVO[] vos = dmo.getHashVoArrayByDS(null, sql, code);
+				if(vos.length == 0)
+					throw new Exception("未找到元数据模板");
+				HashVO vo = vos[0];
+				MetadataTemplet templet = new MetadataTemplet();
+				templet.setCode(vo.getStringValue("code"));
+				templet.setContent(vo.getStringValue("content"));
+				templet.setId(vo.getLongValue("id"));
+				templet.setName(vo.getStringValue("name"));
+				templet.setOwner(vo.getStringValue("owner"));
+				templet.setScope(vo.getStringValue("scope"));
+				templet.setType(vo.getIntegerValue("type"));
+				templet.setTypeCode(vo.getStringValue("typecode"));
+				//templet.setVersionCode(UUID.randomUUID().toString());
+				//使用元模板定义的数据内容生成的hash值来确定是否客户端重新下载，这样可以避免服务端的重起导致的频繁下载
+				templet.setVersionCode((vo.getStringValue("content")==null?"":vo.getStringValue("content")).hashCode()+"");
+				metadataTempletCache.put(code, templet);
+				return templet;
+			} catch (Exception e) {
+				logger.error("",e);
+				throw e;
+			}
+			finally{
+				dmo.releaseContext(null);
+			}
+		}
+	}
+	
+	public void resetCache(){
+		logger.debug("清空元数据模板缓存");
+		metadataTempletCache.clear();
+	}
+	
+	public String resetCacheByMtCode(String code){
+		logger.debug("更新元数据模板编码["+code+"]刷新服务端缓存");
+		if(metadataTempletCache.containsKey(code)){
+			metadataTempletCache.remove(code);
+		}
+		return code;
+	}
+	
+	/**
+	 * 直接从数据库中查询元数据
+	 * @param code
+	 * @return
+	 * @throws Exception
+	 */
+	public MetadataTemplet findMetadataTempletNoCache(String code) throws Exception{
+		resetCacheByMtCode(code);
+		return findMetadataTemplet(code);
+	}
+	
+	//add by caohenghui --start
+	/**
+	 * 直接从数据库中根据MTCODE数据批量更新缓存
+	 * @param codes
+	 * @return
+	 * @throws Exception
+	 */
+	public MetadataTemplet[] findMetadataTempletByCodeArray(String[] codes) throws Exception{
+		MetadataTemplet[] metadataTemplets = null;
+		if(codes != null){
+			metadataTemplets = new MetadataTemplet[codes.length];
+			for (int i =0 ; i< codes.length; i ++){
+				resetCacheByMtCode(codes[i]);
+				metadataTemplets[i] = findMetadataTemplet(codes[i]);
+			}
+		}
+		return metadataTemplets;
+	}
+	//add by caohenghui --end
+	
+	public void updateMetadataTempletContent(String code, String content) throws Exception{
+		logger.debug("更新元数据模板的内容[code="+code+"]");
+		CommDMO dmo = new CommDMO();
+		try{
+			dmo.executeUpdateClobByDS(null, "CONTENT", "pub_metadata_templet", "code='"+code+"'", content);
+			dmo.commit(null);
+			
+		} catch (Exception e) {
+			dmo.rollback(null);
+			logger.error("",e);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext(null);
+		}
+	}
+	
+	public void saveOrUpdateMetadataTemplet(Map<String,Object> templet) throws Exception {
+		CommDMO dmo = new CommDMO();
+		try{
+			String code = getString(templet.get("code"));
+			if(!StringUtil.isEmpty(code)){
+				HashVO[] vos = dmo.getHashVoArrayByDS(null, "select count(1) cou from pub_metadata_templet where code=?",code);
+				if(vos != null && vos.length >0){
+					if(vos[0].getIntegerValue("cou")>0){
+						logger.debug("更新元数据模板的内容[code="+code+"]");
+						String updateSQL = "update pub_metadata_templet set name=?,OWNER=?,SCOPE=?,TYPE=? where code=?";
+						dmo.executeUpdateByDS(null, updateSQL, getString(templet.get("name")),getString(templet.get("oowner")),getString(templet.get("scoppe")),getString(templet.get("type")),code);
+						dmo.commit(null);
+						
+						dmo.executeUpdateClobByDS(null, "CONTENT", "pub_metadata_templet", " code='"+code+"'", getString(templet.get("content")));
+						dmo.commit(null);
+						
+					}else{
+						logger.debug("新增元数据模板的内容[code="+code+"]");
+						String insertSQL = "insert into pub_metadata_templet(id,name,code,owner,scope,type) values(s_pub_metadata_templet.nextval,?,?,?,?,?)";
+						dmo.executeUpdateByDS(null, insertSQL, getString(templet.get("name")),code,getString(templet.get("owner")),getString(templet.get("scope")),getString(templet.get("type")));
+						dmo.commit(null);
+						
+						dmo.executeUpdateClobByDS(null, "CONTENT", "pub_metadata_templet", " code='"+code+"'", getString(templet.get("content")));
+						dmo.commit(null);
+					}
+				}
+			}
+		}catch(Exception e){
+			dmo.rollback(null);
+			logger.error("",e);
+			throw e;
+		}finally{
+			dmo.releaseContext(null);
+		}
+	}
+	
+	private String getString(Object obj){
+		if(obj == null){
+			return null;
+		}else{
+			return (String)obj.toString();
+		}
+	}
+	
+	/**
+	 * 上传xml字符串并保存为文件
+	 * @param filePath
+	 * @param xmlContent
+	 * @throws Exception
+	 */
+	public void uploadXML(String filePath, String xmlContent) throws Exception{
+		String sysRootPath = (String) Sys.getInfo("NOVA2_SYS_ROOTPATH");
+		File file = new File(sysRootPath+filePath);
+		if(!file.exists())
+			file.createNewFile();
+	    FileOutputStream stream = new FileOutputStream(file);
+	    stream.write(xmlContent.getBytes("UTF-8"));
+	    stream.close();
+	}
+}

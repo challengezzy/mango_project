@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:render ="smartx.flex.components.util.render.*"
+		 initialize="initParam()"
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			//必须指定如下参数
+			public var dataField:String;//取值域
+			public var paramObject:Object;//参数对象
+			
+			public var standardNum:Number = 50;//比较值				
+			public var upperLimit:Number =100;//上限				
+			public var lowerLimit:Number = 10;//下限		
+			
+			public var isLess:Boolean = false;//是否是比小				
+			public var isPercent:Boolean = true;//是否加百分号
+				
+			private function initParam():void{
+				
+				standardNum = Number(paramObject["standardNum"]);
+				//upperLimit = Number(paramObject["upperLimit"]);
+				//lowerLimit = Number(paramObject["lowerLimit"]);
+				
+				if(paramObject["isLess"] == "true")
+					isLess= true;
+				else
+					isLess=false;
+						
+				if(paramObject["isPercent"] == "true")
+					isPercent=true;
+				else
+					isPercent=false
+				
+			}
+				
+			override public function set data(value:Object):void
+			{
+				var itemValue:Number = Number(value[dataField]); 
+				// Calculate the difference.
+				var diff:Number = itemValue - standardNum;
+				if (diff < 0 && isLess) //低于某个数值染色
+				{
+					dataLable.setStyle("color", "red");
+				}else if(diff > 0 && !isLess){//高于标准值染色
+					dataLable.setStyle("color", "red");
+				}else{
+					dataLable.setStyle("color", "black");
+				}
+				
+				if(isPercent)
+					dataLable.text = itemValue + "%";
+				else
+					dataLable.text = itemValue + "";
+			}
+		]]>
+	</fx:Script>
+	<mx:Label id="dataLable" textAlign="center" width="100%" height="100%">
+	</mx:Label>
+</mx:Canvas>

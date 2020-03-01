@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtdesigner:MTDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:mtdesigner="smartx.flex.components.mtdesigner.*" layout="vertical"
+					   creationComplete="init()">
+
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.vo.GlobalConst;
+			
+
+			
+			private function init():void{
+				metadataService.uploadXML.addEventListener(ResultEvent.RESULT,uploadXMLHandler);
+				metadataService.uploadXML.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				this.sourceTextArea.editable = false;
+				tabNavigator.removeAllChildren();
+				tabNavigator.addChild(pivotComponentEditor);
+			}
+			
+			private function uploadXMLHandler(result:ResultEvent):void{
+				Alert.show("高级配置文件保存成功");
+			}
+			
+			
+			
+			protected function swfFilePathInput_changeHandler(event:Event):void
+			{
+				sourceXML.swfFilePath = swfFilePathInput.text;
+			}
+
+			protected function configUrlInput_changeHandler(event:Event):void
+			{
+				sourceXML.configUrl = configUrlInput.text; 
+			}
+
+			protected function advanceButton_clickHandler(event:MouseEvent):void
+			{
+				tabNavigator.addChild(advanceBox);
+				tabNavigator.selectedChild = advanceBox;
+				loadAdvanceConfigFile();
+				
+			}
+			
+			private function loadAdvanceConfigFile():void{
+				var urlrequest:URLRequest = new URLRequest(sourceXML.configUrl);
+				var urlLoader:URLLoader = new URLLoader();
+				urlLoader.addEventListener(IOErrorEvent.IO_ERROR,function(event:IOErrorEvent):void{
+					Alert.show("配置文件读取失败");
+				});
+				urlLoader.addEventListener(Event.COMPLETE,advanceConfigFileLoaded);
+				urlLoader.load(urlrequest);
+			}
+			
+			private function advanceConfigFileLoaded(event:Event):void{
+				advanceConfigTextInput.text = event.target.data as String;
+			}
+
+
+			protected function saveButton_clickHandler(event:MouseEvent):void
+			{
+				metadataService.uploadXML(configUrlInput.text,advanceConfigTextInput.text);
+			}
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:VBox width="100%" height="100%" id="pivotComponentEditor" label="PIVOT控件配置">
+			<mx:Form width="100%" height="100%">
+				<mx:FormItem label="资源文件路径">
+					<mx:TextInput id="swfFilePathInput"
+								  text="{sourceXML.swfFilePath}"
+								  change="swfFilePathInput_changeHandler(event)"
+								  width="320"/> 
+				</mx:FormItem>
+				<mx:FormItem label="配置文件URL">
+					<mx:TextInput id="configUrlInput"
+								  text="{sourceXML.configUrl}"
+								  change="configUrlInput_changeHandler(event)"
+								  width="320"/>
+				</mx:FormItem>
+				<mx:Button icon="{AssetsFileLib.serverenvIcon}" 
+						   toolTip="编辑配置文件的内容" label="读取配置文件" id="advanceButton" click="advanceButton_clickHandler(event)"/>
+			</mx:Form>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" id="advanceBox" label="高级"
+				 paddingBottom="5" paddingLeft="5"
+				 paddingTop="5" paddingRight="5">
+			<mx:ApplicationControlBar width="100%">
+				<mx:Button icon="{AssetsFileLib.saveIcon}" label="保存"
+						   id="saveButton" click="saveButton_clickHandler(event)"/>
+			</mx:ApplicationControlBar>
+			<mx:Label text="高级配置内容须点击上面的“保存”按钮才能生效！"/>
+			<mx:TextArea width="100%" height="100%" id="advanceConfigTextInput"/>
+		</mx:VBox>
+	</fx:Declarations>
+	
+</mtdesigner:MTDesigner>

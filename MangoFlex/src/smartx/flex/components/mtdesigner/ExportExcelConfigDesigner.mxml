@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtdesigner:MTDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:mtdesigner="smartx.flex.components.mtdesigner.*" 
+					   layout="vertical" creationComplete="init()" xmlns:itemcomponent="smartx.flex.components.itemcomponent.*">
+	<fx:Declarations>
+		<mx:VBox id="exportExcelConfigBox" label="导出EXCEL配置" width="100%" height="100%" 
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%">
+				<mx:Label text="数据源" width="25%" />
+				<mx:ComboBox id="datasourceCbo" dataProvider="{datasources}" change="datasourceCbo_changeHandler(event)"/>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Label text="类型" width="25%" />
+				<mx:ComboBox id="datatypeCbo" dataProvider="{datatypeDp}" labelField="name" change="datatypeCbo_changeHandler(event)" />
+			</mx:HBox>
+			<mx:HBox width="100%" id="relatedTable">
+				<mx:Label text.table="关系表" text.sql="自定义SQL" width="25%" />
+				<mx:TextArea id="sqlTxt" width="250" height="150" includeIn="sql" 
+							 text="{sourceXML.datasource.sql}" change="sqlTxt_changeHandler(event)"/>
+			</mx:HBox>
+		</mx:VBox>
+		<mx:VBox id="exportExcelDetailConfigBox" label="详细配置" width="100%" height="100%" show="exportExcelDetailConfigBox_showHandler(event)"
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%" >
+				<mx:ComboBox id="newFieldComboBox" editable="false" dataProvider="{fieldList}"/>
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addField()"/>
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteField()"/>
+			</mx:HBox>
+			<mx:DataGrid id="dataGrid" width="100%" height="100%" editable="true" dataProvider="{sourceXML.excelitems.item}"
+						 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true">
+				<!-- <item column="REGIONCODE" title="REGIONCODE" width="145" type="文本框" isexport="false"/> -->
+				<mx:columns>
+					<mx:DataGridColumn dataField="@column" headerText="列名称" editable="false" />
+					<mx:DataGridColumn dataField="@title" headerText="标题" editable="true" />
+					<mx:DataGridColumn dataField="@width" headerText="宽度" editable="true" />
+					<mx:DataGridColumn dataField="@type" headerText="类型" editable="true" >
+						<mx:itemEditor>
+							<fx:Component>
+								<mx:HBox width="100%" horizontalAlign="center">
+									<fx:Script>
+										<![CDATA[
+											import mx.collections.ArrayCollection;
+											
+											[Bindable]
+											private var typeDp:ArrayCollection = new ArrayCollection([
+												"文本框","数字框"
+											]);
+											
+											public function get text():String{
+												return typeCbo.selectedItem==null?"":typeCbo.selectedItem.toString();
+											}
+											
+											override public function set data(value:Object):void{
+												super.data = value;
+												if(value != null){
+													for each(var d:String in typeDp){
+														if(d == String(data.@type)){
+															typeCbo.selectedItem = d;
+															break;
+														}else
+															typeCbo.selectedItem = null;
+													}
+												}
+											}
+										]]>
+									</fx:Script>
+									<mx:ComboBox id="typeCbo" dataProvider="{typeDp}" change="{data.@type=typeCbo.selectedItem}"/>
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemEditor>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn dataField="@isexport" headerText="是否导出" editable="true" rendererIsEditor="true" >
+						<mx:itemRenderer>
+							<fx:Component>
+								<mx:HBox horizontalAlign="center" width="100%" horizontalScrollPolicy="off">
+									<fx:Script>
+										<![CDATA[
+											public function get text():String{
+												return isExportChk.selected?'true':'false';
+											}
+											
+											override public function set data(value:Object):void{
+												super.data = value;
+											}
+										]]>
+									</fx:Script>
+									
+									<mx:CheckBox id="isExportChk" selected="{data.@isexport=='true'?true:false}" 
+												 change="{data.@isexport=text}" />
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:VBox>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.core.cep.CEPUtils;
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			[Bindable]
+			private var datatypeDp:ArrayCollection = new ArrayCollection([
+				{name:"关系型数据源",data:DATATYPE_TABLE},
+				{name:"自定义SQL",data:DATATYPE_SQL}
+			]);
+			
+			[Bindable]
+			private var datasources:ArrayCollection = new ArrayCollection();
+			
+			private var relationDSRefPanel:ItemRefPanel;
+			
+			private var formService:RemoteObject;
+			
+			private const DATATYPE_TABLE:String = "table";
+			private const DATATYPE_SQL:String = "sql";
+			
+			[Bindable]
+			private var fieldList:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				this.sourceTextArea.editable = false;
+				if(sourceXML == null || sourceXML == ""){
+					sourceXML = <root>
+									<datasource>
+										<datatype>table</datatype>
+										<tablename />
+										<sql />
+									</datasource>
+									<excelitems />
+								</root>;
+				}
+				
+				if(endpoint == null)
+					endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				formService.queryAllRelationDsName.addEventListener(ResultEvent.RESULT,queryAllRelationDsNameHandler);
+				formService.queryAllRelationDsName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("查询关系数据源错误，请检查数据源设置。",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取表结构错误。",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				tabNavigator.removeAllChildren();
+				tabNavigator.addChildAt(exportExcelConfigBox,0);
+				tabNavigator.addChildAt(exportExcelDetailConfigBox,1);
+				
+				formService.queryAllRelationDsName();
+			}
+			
+			private function initParam():void{
+				var data:Object;
+				for each(data in datasources){
+					if(data == String(sourceXML.datasource.@name)){
+						datasourceCbo.selectedItem = data;
+						break;
+					}else
+						datasourceCbo.selectedItem = null;
+				}
+				
+				for each(data in datatypeDp){
+					if(data.data == sourceXML.datasource.datatype){
+						datatypeCbo.selectedItem = data;
+						break;
+					}else
+						datatypeCbo.selectedItem = null;
+				}
+				
+				datasourceCbo_changeHandler(null);
+				datatypeCbo_changeHandler(null);
+			}
+			
+			private function queryAllRelationDsNameHandler(event:ResultEvent):void{
+				datasources.removeAll();
+				var result:Array = event.result as Array;
+				for each(var value:String in result){
+					if(!StringUtil.beginsWith(value,GlobalConst.CEP_DATASOURCE_PREFIX))
+						datasources.addItem(value);
+				}
+				initParam();
+//				formService.getSimpleHashVoArrayByDS(null,modelQuerySQL);
+			}
+			
+			private function datasourceCbo_changeHandler(event:ListEvent):void{
+				sourceXML.datasource.@name = String(datasourceCbo.selectedItem);
+				initRelationDsRefPanel();
+			}
+			
+			private function initRelationDsRefPanel():void{
+				if(relationDSRefPanel != null)
+					relatedTable.removeChild(relationDSRefPanel);
+				var datasourceName:String = String(datasourceCbo.selectedItem);
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="表名";
+				templetItemVO.itemkey="tablename";
+				templetItemVO.refdesc="select table_name value#,1 code#,table_name 名称 from user_tables " +
+					"union select view_name value#,1 code#,view_name 名称 from user_views;ds="+datasourceName;
+				relationDSRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				relationDSRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(relationDSRefPanel.returnVO != null)
+						sourceXML.datasource.tablename = relationDSRefPanel.stringValue;
+					else
+						sourceXML.datasource.tablename = "";
+				});
+				relationDSRefPanel.addEventListener("initComplete",function(event:Event):void{
+					if(sourceXML.datasource.tablename != null && sourceXML.datasource.tablename != "")
+						relationDSRefPanel.setValueByItemId(sourceXML.datasource.tablename);
+				});
+				relatedTable.addChild(relationDSRefPanel);
+			}
+			
+			protected function datatypeCbo_changeHandler(event:ListEvent):void{
+				if(datatypeCbo.selectedIndex < 0)
+					return;
+				if(datatypeCbo.selectedItem.data == DATATYPE_TABLE){
+					currentState = "table";
+					if(relationDSRefPanel!= null && !relatedTable.contains(relationDSRefPanel))
+						relatedTable.addChild(relationDSRefPanel);
+				}else if(datatypeCbo.selectedItem.data == DATATYPE_SQL){
+					currentState = "sql";
+					if(relationDSRefPanel!= null && relatedTable.contains(relationDSRefPanel))
+						relatedTable.removeChild(relationDSRefPanel);
+				}
+				sourceXML.datasource.datatype = datatypeCbo.selectedItem.data;
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				fieldList.removeAll();
+				var t:TableDataStruct = event.result as TableDataStruct;
+				fieldList.addAll(new ArrayCollection(t.table_header));
+			}
+			
+			protected function exportExcelDetailConfigBox_showHandler(event:FlexEvent):void{
+				var tableName:String = sourceXML.datasource.datatype==DATATYPE_TABLE?sourceXML.datasource.tablename:sourceXML.datasource.sql;
+				var sql:String = "select * from (".concat(tableName).concat(") where 1=2");
+				formService.getTableDataStructByDS(datasourceCbo.selectedItem,sql);
+			}
+			
+			private function addField():void{
+				if(newFieldComboBox.selectedIndex < 0){
+					SmartXMessage.show("请选择需添加的列名！");
+					return;
+				}
+				var item:XML = <item column={newFieldComboBox.selectedItem} title="" width="145" type="文本框" isexport="true" />;
+				sourceXML.excelitems.appendChild(item);
+				refreshExcelDatagrid();
+			}
+			
+			private function deleteField():void{
+				if(dataGrid.selectedIndex < 0)
+					return;
+				CEPUtils.xmlDeleteNode(XML(dataGrid.selectedItem));
+				refreshExcelDatagrid();
+			}
+			
+			private function refreshExcelDatagrid():void{
+				dataGrid.dataProvider = sourceXML.excelitems.item;
+				dataGrid.invalidateList();
+			}
+			
+			protected function sqlTxt_changeHandler(event:Event):void{
+				sourceXML.datasource.sql = sqlTxt.text;
+			}
+			
+		]]>
+	</fx:Script>
+	<mtdesigner:states>
+		<s:State name="table" />
+		<s:State name="sql" />
+	</mtdesigner:states>
+</mtdesigner:MTDesigner>

@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		 creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.containers.Tile;
+			import mx.containers.TitleWindow;
+			import mx.controls.HRule;
+			import mx.controls.Label;
+			import mx.controls.Text;
+			import mx.controls.TextInput;
+			import mx.core.Container;
+			import mx.core.ScrollPolicy;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			
+			[Bindable]
+			public var debugMode:Boolean = false;
+
+			[Bindable]
+			public var attributesXml:XML;
+
+			private var formService:RemoteObject;
+			
+			private var loadWindow:LoadingWindow = new LoadingWindow();
+			
+			private var isControlInited:Boolean = false;
+			
+			private var controlContainer:Container;
+			
+			private var controlList:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				formService.getSimpleHashVOMapByPage.addEventListener(ResultEvent.RESULT,SimpleHashVOMapByPageHandler);					
+				formService.getSimpleHashVOMapByPage.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取卡片数据错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultDetail);
+					dispatchEvent(new Event(EntityModelListPanel.SHOWDATA_FINISH));
+					if(loadWindow.isPopUp)
+						PopUpManager.removePopUp(loadWindow);
+				});
+			}
+			
+			private function initControls():void{
+				this.removeAllChildren();
+				var defaultLayout:String = attributesXml.@defaultLayout;
+				if(defaultLayout == null || defaultLayout == ""){
+					defaultLayout = BAMConst.LAYOUT_ENTITYCARD_TILE;
+				}
+				if(defaultLayout == BAMConst.LAYOUT_ENTITYCARD_TILE){
+					controlContainer = new Tile();
+					controlContainer.setStyle("paddingLeft",40);
+					controlContainer.setStyle("paddingRight",40);
+					controlContainer.setStyle("paddingTop",20);
+					controlContainer.setStyle("paddingBottom",20);
+					controlContainer.setStyle("borderStyle","solid");
+					controlContainer.setStyle("verticalAlign","top");
+					controlContainer.setStyle("horizontalAlign","center");
+					for each(var attr:XML in attributesXml.attribute){
+						controlContainer.addChild(generateConrolBox(attr));
+					}
+				}
+				else if(defaultLayout == BAMConst.LAYOUT_ENTITYCARD_VBOX){
+					controlContainer = new VBox();
+					controlContainer.setStyle("paddingLeft",40);
+					controlContainer.setStyle("paddingRight",40);
+					controlContainer.setStyle("paddingTop",20);
+					controlContainer.setStyle("paddingBottom",20);
+					controlContainer.setStyle("borderStyle","solid");
+					controlContainer.setStyle("verticalAlign","top");
+					controlContainer.setStyle("horizontalAlign","center");
+					var index:int = 0;
+					for each(var attr2:XML in attributesXml.attribute){
+						controlContainer.addChild(generateConrolBox(attr2));
+						if(index < attributesXml.attribute.length){
+							var hrule:HRule = new HRule();
+							hrule.percentWidth = 100;
+							controlContainer.addChild(hrule);
+						}
+						index++;
+					}
+				}
+				else if(defaultLayout == BAMConst.LAYOUT_ENTITYCARD_GROUP){
+					controlContainer = new VBox();
+					var nodeList:XMLList = attributesXml.groupLayoutInfo.layoutTree.node;
+					for each(var node:XML in nodeList){
+						handleNodeXML(node,controlContainer);
+					}
+				}
+				controlContainer.percentHeight = 100;
+				controlContainer.percentWidth = 100;
+				
+				//controlContainer.setStyle("border
+				this.addChild(controlContainer);
+				
+				isControlInited = true;
+			}
+			
+			private function handleNodeXML(node:XML,parentContainer:Container):void{
+				var container:Container;
+				if(node.@type=="hbox"){
+					container = new HBox();
+					container.percentHeight = node.@percentHeight;
+					container.percentWidth = node.@percentWidth;
+					//container.setStyle("horizontalGap",70);
+					parentContainer.addChild(container);
+					for each(var child:XML in node.children()){
+						handleNodeXML(child,container);
+					}
+				}
+				else if(node.@type == "vbox"){
+					container = new VBox();
+					container.percentHeight = node.@percentHeight;
+					container.percentWidth = node.@percentWidth;
+					//container.setStyle("horizontalGap",70);
+					parentContainer.addChild(container);
+					for each(var child2:XML in node.children()){
+						handleNodeXML(child2,container);
+					}
+				}
+				else if(node.@type == "group"){
+					var window:TitleWindow = new TitleWindow();
+					window.percentHeight = node.@percentHeight;
+					window.percentWidth = node.@percentWidth;
+					window.title = node.@name;
+//					window.showCloseButton = true;
+//					
+//					window.addEventListener(CloseEvent.CLOSE,function(e:CloseEvent):void{
+//						var w:TitleWindow = e.target as TitleWindow;
+//						if(w != null && w.parent != null){
+//							w.parent.removeChild(w);
+//						}
+//					});
+					if(node.@layout == BAMConst.LAYOUT_ENTITYCARD_TILE){
+						container = new Tile();
+					}
+					else{
+						container = new VBox();
+					}
+					window.addChild(container);
+					parentContainer.addChild(window);
+					container.percentHeight = 100;
+					container.percentWidth = 100;
+					container.setStyle("paddingLeft",10);
+					container.setStyle("paddingRight",10);
+					container.setStyle("paddingTop",5);
+					container.setStyle("paddingBottom",5);
+					//container.setStyle("horizontalGap",70);
+					for each(var attr:XML in node.attribute){
+						container.addChild(generateConrolBox(attr,node.@layout));
+					}
+				}
+			}
+			
+			private function generateConrolBox(attr:XML,layout:String=BAMConst.LAYOUT_ENTITYCARD_TILE):UIComponent{
+				var hbox:HBox = new HBox();
+				if(layout == BAMConst.LAYOUT_ENTITYCARD_TILE){
+					hbox.width = 300;
+				}
+				else{
+					hbox.width = 600;
+				}
+//				box.percentHeight = 100;
+				var label:Label = new Label();
+				label.text = attr.@label+":";
+				label.width = 100;
+				label.toolTip = label.text;
+				//label.setStyle("fontWeight","bold");
+				//label.setStyle("color","gray");
+				hbox.horizontalScrollPolicy = ScrollPolicy.OFF;
+				hbox.verticalScrollPolicy = ScrollPolicy.OFF;
+				hbox.setStyle("verticalAlign","top");
+//				box.setStyle("borderStyle","solid");
+				hbox.addChild(label);
+				var textInput:Text = new Text();
+				textInput.maxWidth = hbox.width - label.width - 10;
+				
+				//textInput.editable = false;
+				textInput.setStyle("borderStyle","none");
+				hbox.addChild(textInput);
+				controlList.addItem({name:String(attr.@name).toLowerCase(),control:textInput});
+				return hbox;
+			}
+			
+			private function SimpleHashVOMapByPageHandler(event:ResultEvent):void{
+				var dataMap:Object = event.result;
+			}
+			
+			public function refreshData(data:Object):void{
+				if(!isControlInited){
+					initControls();
+				}
+				for each(var obj:* in controlList){
+					var name:String = obj.name;
+					var textInput:Text = obj.control;
+					if(textInput != null){
+						if(data[name]!=null){
+							textInput.text = String(data[name]);
+							textInput.toolTip = textInput.text;
+						}
+					}
+				}
+			}
+			
+			
+		]]>
+	</fx:Script>
+</mx:VBox>

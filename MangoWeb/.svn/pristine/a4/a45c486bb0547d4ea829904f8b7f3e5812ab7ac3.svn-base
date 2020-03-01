@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<actionScriptProperties analytics="false" mainApplicationPath="MangoWeb.mxml" projectUUID="dba719ee-8676-4e34-b680-9203efae25b1" version="10">
+  <compiler additionalCompilerArguments="-services &quot;D:/workspace_mango/MangoWeb/WebRoot/WEB-INF/flex/services-config.xml&quot; -locale en_US" autoRSLOrdering="true" copyDependentFiles="true" fteInMXComponents="false" generateAccessible="true" htmlExpressInstall="true" htmlGenerate="true" htmlHistoryManagement="true" htmlPlayerVersionCheck="true" includeNetmonSwc="false" outputFolderPath="WebRoot" removeUnusedRSL="false" rootURL="http://localhost:8080/MangoWeb" sourceFolderPath="flex_src" strict="true" targetPlayerVersion="0.0.0" useApolloConfig="false" useDebugRSLSwfs="true" verifyDigests="true" warn="true">
+    <compilerSourcePath/>
+    <libraryPath defaultLinkType="0">
+      <libraryPathEntry kind="4" path="">
+        <excludedEntries>
+          <libraryPathEntry kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/flex.swc" useDefaultLinkType="false"/>
+          <libraryPathEntry kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/core.swc" useDefaultLinkType="false"/>
+        </excludedEntries>
+      </libraryPathEntry>
+      <libraryPathEntry kind="1" linkType="1" path="flex_libs"/>
+      <libraryPathEntry kind="3" linkType="1" path="/MangoFlex/bin/MangoFlex.swc" useDefaultLinkType="false"/>
+    </libraryPath>
+    <sourceAttachmentPath/>
+  </compiler>
+  <theme themeIsDefault="false" themeIsSDK="true" themeLocation="${SDK_THEMES_DIR}/frameworks/themes/Halo"/>
+  <applications>
+    <application path="DashboardObjectViewer.mxml"/>
+    <application path="MangoWeb.mxml"/>
+  </applications>
+  <modules>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate01Frame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate01Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate02Frame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate02Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate03Frame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate03Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate04Frame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate04Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate09Frame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate09Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplate11Frame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplate11Frame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/styletemplate/StyleTemplateGroupListFrame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/styletemplate/StyleTemplateGroupListFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/MTDesignerFrame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/MTDesignerFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/mt/olap/PivotComponentFrame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/mt/olap/PivotComponentFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/sample/ceplistpanelsample.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/sample/ceplistpanelsample.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/sample/frame03sample.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/sample/frame03sample.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/sample/frame09sample.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/sample/frame09sample.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/sample/NovaChartFrameSample.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/sample/NovaChartFrameSample.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/sample/ProcessChartPanelSample.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/sample/ProcessChartPanelSample.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/authmgmt.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/authmgmt.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/streamdesigner.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/streamdesigner.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/streammodulemgmt.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/streammodulemgmt.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/templetmgmt2.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/templetmgmt2.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/workflowdesigner.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/workflowdesigner.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/workflowmonitor.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/workflowmonitor.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/workflowtask.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/workflowtask.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/mtmgmt.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/mtmgmt.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/DBViewExport.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/DBViewExport.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/DBFunctionExport.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/DBFunctionExport.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/FileManagerFrame.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/FileManagerFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/performance/jwebap.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/performance/jwebap.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/basic/system/dbexplorer/DBExplorer.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/basic/system/dbexplorer/DBExplorer.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/flex/modules/datatask/DataTaskManager.swf" optimize="true" sourcePath="flex_src/smartx/flex/modules/datatask/DataTaskManager.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/accountset/AdvAccountsetPanel.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/accountset/AdvAccountsetPanel.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/businessview/BusinessViewModeler.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/businessview/BusinessViewModeler.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/dashboard/Dashboard.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/dashboard/Dashboard.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/dashboard/DashboardManager.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/dashboard/DashboardManager.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/dashboardobject/DashboardObject.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/dashboardobject/DashboardObject.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/queryview/QueryviewModeler.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/queryview/QueryviewModeler.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/authority/DashboardAuthorityManager.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/authority/DashboardAuthorityManager.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/entitymodel/EntityModelFrame.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/entitymodel/EntityModelFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/workspace/Workspace.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/workspace/Workspace.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/entitymodel/EntityViewer.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/entitymodel/EntityViewer.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/entitymodel/EntityOLAPFrame.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/entitymodel/EntityOLAPFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/report/MTReportFrame.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/report/MTReportFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/dqc/EntityRuleCheckFrame.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/dqc/EntityRuleCheckFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/common/ExamineChart.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/common/ExamineChart.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/dqc/EntityRuleCorrectiveConfFrame.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/dqc/EntityRuleCorrectiveConfFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/dataanalyze/DataAnalyzeDBFrame.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/dataanalyze/DataAnalyzeDBFrame.mxml"/>
+    <module application="flex_src/MangoWeb.mxml" destPath="smartx/bam/flex/modules/CustomLibrary.swf" optimize="true" sourcePath="flex_src/smartx/bam/flex/modules/CustomLibrary.as"/>
+  </modules>
+  <buildCSSFiles/>
+  <flashCatalyst validateFlashCatalystCompatibility="false"/>
+</actionScriptProperties>

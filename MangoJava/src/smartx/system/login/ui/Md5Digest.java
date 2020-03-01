@@ -1,0 +1,141 @@
+/**************************************************************************
+ * $RCSfile: Md5Digest.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:41:32 $
+ **************************************************************************/
+package smartx.system.login.ui;
+
+import java.security.*;
+
+/**
+ * <p>Title: 数据签名工具类</p>
+ * <p>Description: NOVA </p>
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Gxlu inc., nm2 </p>
+ * @author Jedi H. Zheng
+ * @version 1.0
+ */
+public class Md5Digest implements IDigest {
+    private static final char WWFHexDigits[] = {
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j', 'k',
+        'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
+
+    static char hexDigits[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+    private static int hexDigitsLen;
+
+    static {
+        hexDigitsLen = WWFHexDigits.length;
+    }
+
+    /**
+     * 产生MD5密码，长度8位字符
+     * @param username 用户名
+     * @param passwd   密码明文
+     * @return String 密码密文
+     */
+    public String generatePasswd(String username, String passwd) {
+        /** sa/sa passwd='nbr78a1r' */
+        return MD5Str8(username + passwd + "WWF");
+    }
+
+    /**
+     * 产生8个字节的MD5数字签名
+     * @param s
+     * @return
+     */
+    public final static String MD5Str8(String s) {
+        try {
+            MessageDigest mdTemp = MessageDigest.getInstance("MD5");
+            mdTemp.update(s.getBytes());
+
+            byte[] md = mdTemp.digest();
+            int md5_len = md.length;
+            char str[] = new char[md5_len / 2];
+
+            for (int i = 0; i < md5_len; i++) {
+                int int0 = md[i++];
+                if (int0 < 0) {
+                    int0 += 256;
+                }
+
+                int int1 = md[i];
+                if (int1 < 0) {
+                    int1 += 256;
+                }
+
+                int int2 = int0 + (int1 << 8);
+
+                str[i / 2] = WWFHexDigits[int2 % hexDigitsLen];
+            }
+
+            return new String(str);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 生成32字节的MD5数字签名
+     * @param s
+     * @return
+     */
+    public final static String MD5(String s) {
+        try {
+            MessageDigest mdTemp = MessageDigest.getInstance("MD5");
+            mdTemp.update(s.getBytes());
+            byte[] md = mdTemp.digest();
+
+            int j = md.length;
+            char str[] = new char[j * 2];
+            int k = 0;
+            for (int i = 0; i < j; i++) {
+                byte byte0 = md[i];
+                str[k++] = hexDigits[byte0 >>> 4 & 0xf];
+                str[k++] = hexDigits[byte0 & 0xf];
+            }
+            return new String(str);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * SHA 数字签名
+     * @param s
+     * @return
+     */
+    public final static String SHA(String s) {
+        try {
+            MessageDigest mdTemp = MessageDigest.getInstance("SHA");
+            mdTemp.update(s.getBytes());
+            byte[] md = mdTemp.digest();
+
+            int j = md.length;
+            char str[] = new char[j * 2];
+            int k = 0;
+            for (int i = 0; i < j; i++) {
+                byte byte0 = md[i];
+                str[k++] = hexDigits[byte0 >>> 4 & 0xf];
+                str[k++] = hexDigits[byte0 & 0xf];
+            }
+            return new String(str);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+}
+/**************************************************************************
+ * $RCSfile: Md5Digest.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:41:32 $
+ *
+ * $Log: Md5Digest.java,v $
+ * Revision 1.2  2007/05/31 07:41:32  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:22:08  qilin
+ * no message
+ *
+ * Revision 1.2  2007/01/30 04:20:38  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

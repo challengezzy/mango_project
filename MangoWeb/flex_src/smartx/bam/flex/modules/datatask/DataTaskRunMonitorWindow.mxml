@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="400" height="300"
+				creationComplete="init()" showCloseButton="true" title="任务执行监控"
+				close="PopUpManager.removePopUp(this)"
+				>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			protected var formService:RemoteObject;
+			[Bindable]
+			protected var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			[Bindable]
+			protected var searchTaskSQL:String = "select dt.id,dt.code,dt.name,dt.mtcode,dt.cronexpression,dt.foregroundtask " +
+												"from pub_datatask_templet dt where 1=1  ";
+			[Bindable]
+			private var logCol:ArrayCollection = new ArrayCollection();
+			
+			public var curTaskInsId:String;	//当前监控的任务实例	
+			[Bindable]
+			public var taskCategory:String = "0";//必填,类别
+			
+			private var timer:Timer = new Timer(5000);//定时器，5s
+			
+			private function init():void{
+				
+				this.height = screen.height - 50;
+				this.width =  screen.width*2/3;		
+				
+				searchTaskSQL = searchTaskSQL+" and dtaskcategory="+this.taskCategory;
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				formService.getMessageByTaskId.addEventListener(ResultEvent.RESULT,getMessageByTaskIdHandler);
+				formService.getMessageByTaskId.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				formService.stopDataTask.addEventListener(ResultEvent.RESULT,function(event:ResultEvent):void{
+					SmartXMessage.show("数据预处理任务停止指令发送成功！");
+				});
+				formService.stopDataTask.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("数据预处理任务停止指令发送失败！",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});				
+				
+				timer.addEventListener(TimerEvent.TIMER,function(event:TimerEvent):void{
+					if( curTaskInsId != null)
+						formService.getMessageByTaskId(curTaskInsId);
+				});
+				
+				logArea.text = "";
+				if(timer && !timer.running){
+					timer.start();
+				}
+				
+				formService.getMessageByTaskId(curTaskInsId);
+			}
+			
+			private function taskItemClick(event:ListEvent):void{
+				var selectedObj:Object = taskList.selectedItem;
+				logArea.text = selectedObj["execlog"];
+				if(logScrollChk.selected)
+					logArea.verticalScrollPosition = logArea.maxVerticalScrollPosition;
+			}
+			
+			private function getMessageByTaskIdHandler(event:ResultEvent):void{
+				var msgArr:Array = event.result as Array;
+				if(msgArr != null && msgArr.length>0 ){
+					logCol.removeAll();
+					for each(var sp:SimpleHashVO in msgArr){
+						if(sp.dataMap["status"]==9||sp.dataMap["status"]==10){
+							if(timer && timer.running)
+								timer.stop();
+						}
+						
+						if(curTaskInsId == sp.dataMap["id"])
+							logArea.text = sp.dataMap["execlog"];
+						
+						if(logScrollChk.selected)
+							logArea.verticalScrollPosition = logArea.maxVerticalScrollPosition;
+
+						logCol.addItem(sp.dataMap);
+					}
+				}
+			}
+			
+			private function stopTaskHandler(event:MouseEvent):void{
+				formService.stopDataTask(curTaskInsId);
+			}
+		]]>
+	</fx:Script>
+	
+	<mx:VDividedBox width="100%" height="100%" paddingBottom="5" paddingLeft="3" paddingRight="3" paddingTop="3" >
+		<mx:DataGrid id="taskList" width="100%" height="100" dataProvider="{logCol}" itemClick="{taskItemClick(event)}">
+			<mx:columns>
+				<mx:DataGridColumn dataField="name" headerText="名称" />
+				<mx:DataGridColumn dataField="rate" headerText="进度(%)" />
+				<mx:DataGridColumn dataField="lastmassage" headerText="最后执行日志" />
+				<mx:DataGridColumn dataField="begintime" headerText="开始时间" />
+				<mx:DataGridColumn dataField="endtime" headerText="结束时间" />
+			</mx:columns>
+		</mx:DataGrid>
+		<mx:VBox height="100%" width="100%" paddingLeft="5" paddingRight="5">
+			<mx:HRule width="100%" />
+			<mx:HBox width="100%" paddingLeft="3" paddingRight="3">
+				<mx:CheckBox id="logScrollChk" label="日志滚动显示" selected="true"/>
+				<s:Spacer width="100%"/>
+				<mx:Button id="stopBtn" label="停止执行" icon="{AssetsFileLib.stopIcon}" 
+						   click="stopTaskHandler(event)" />
+			</mx:HBox>
+			<mx:TextArea width="100%" height="100%" text="" id="logArea" editable="false"/>
+		</mx:VBox>
+	</mx:VDividedBox>
+</mx:TitleWindow>

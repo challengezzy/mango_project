@@ -1,0 +1,122 @@
+<ReportSettings version="1.1">
+  <PageWidth>18</PageWidth>
+  <PageHeight>10</PageHeight>
+  <TopMargin>1.5</TopMargin>
+  <BottomMargin>1.5</BottomMargin>
+  <TableHeaderRepeat>true</TableHeaderRepeat>
+  <TableFooterRepeat>true</TableFooterRepeat>
+  <CanGrow>true</CanGrow>
+  <TableColumnSettings>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>2.2</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>2.3</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3.3</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting"/>
+    <ItemSetting type="TableColumnSetting">
+      <Width>2.3</Width>
+    </ItemSetting>
+  </TableColumnSettings>
+  <TableHeaderSettings>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <Value>ID</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>商品</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+          <ColSpan>3</ColSpan>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>名称</Value>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>名称</Value>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>数量</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>金额</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+      </TableCellSettings>
+    </ItemSetting>
+  </TableHeaderSettings>
+  <TableDetailSettings>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>ID</BindingColumn>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>名称</BindingColumn>
+          <ColSpan>3</ColSpan>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>数量</BindingColumn>
+          <Format>0.##</Format>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <BindingColumn>金额</BindingColumn>
+          <Format>C2</Format>
+        </ItemSetting>
+      </TableCellSettings>
+    </ItemSetting>
+  </TableDetailSettings>
+  <TableFooterSettings>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <Value>合计：</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <ColSpan>3</ColSpan>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting"/>
+        <ItemSetting type="TableCellSetting">
+          <Value>=SUM(Fields!数量.Value)</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Value>=SUM(Fields!金额.Value)</Value>
+          <Style>
+            <FontBold>true</FontBold>
+          </Style>
+          <Format>C2</Format>
+        </ItemSetting>
+      </TableCellSettings>
+    </ItemSetting>
+  </TableFooterSettings>
+  <TableGroupSettings>
+    <ItemSetting type="TableGroupSetting">
+      <GroupSize>5</GroupSize>
+    </ItemSetting>
+  </TableGroupSettings>
+</ReportSettings>

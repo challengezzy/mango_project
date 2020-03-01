@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   layout="absolute" width="100%" height="100%" 
+		   xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+		   initialize="init()"  >
+	<fx:Declarations>
+		<fx:Object id="importButton" label="导入" handler="{importHandler}" icon="{AssetsFileLib.importIcon}" rightClick="true"/>
+		<fx:Object id="exportButton" label="导出" handler="{exportHandler}" icon="{AssetsFileLib.exportIcon}" rightClick="true"/>
+		<fx:Object id="saveAsButton" label="另存为" handler="{saveAsHandler}" icon="{AssetsFileLib.saveasIcon}" rightClick="true"/>
+		
+		<mx:TitleWindow id="saveAsWindow" title="仪表盘对象另存为" width="250" height="150" 
+						showCloseButton="true" close="PopUpManager.removePopUp(saveAsWindow)">
+			<mx:VBox width="100%" height="100%">
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="名称" />
+					<mx:TextInput id="doName" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="编码" />
+					<mx:TextInput id="doCode" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="保存" click="saveAs_clickHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(saveAsWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.LinkButton;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.bam.flex.utils.DODesignerUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.bam.flex.vo.dashboard.DashboardObjConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.FileUploadPanel;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.XMLExportObject;
+			[Bindable]
+			private var treeTempletCode:String = "T_BAM_FOLDER_DASHBOARDOBJECT_TREE";
+			[Bindable]
+			private var templetCodeMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var loadAll:Boolean = true;
+			[Bindable]
+			private var parentFieldName:String = "PARENTID";
+			[Bindable]
+			private var seqFieldName:String ="NAME";
+			[Bindable]
+			private var labelFieldName:String = "NAME";
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var debugmode:Boolean;
+			[Bindable]
+			public var typeFiledName:String = "TYPE";
+			[Bindable]
+			public var fkFiledName:String = "PID";
+			[Bindable]
+			public var templetCodeParentFieldNameMap:Hashtable = new Hashtable();
+			[Bindable]
+			public var typeLabelMap:Hashtable = new Hashtable();
+			
+			private var advBtn:Button;
+			
+			private var mtcode:String;
+			
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var xmlFolder:XMLExportObject;
+			
+			private var xmlMTContent:XMLExportObject;
+			
+			private var flagName:String="dashboardobject";
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			private var bcp:BillCardPanel;
+			
+			private var isDashboardObject:Boolean = false;
+			
+			private var topContainer:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private function init():void{
+				templetCodeMap.add("2","T_BAM_FOLDER_DASHBOARDOBJECT");
+				templetCodeMap.add("DASHBOARDOBJECT","T_BAM_DASHBOARDOBJECT");
+				templetCodeParentFieldNameMap.add("T_BAM_FOLDER_DASHBOARDOBJECT","PARENTID");
+				templetCodeParentFieldNameMap.add("T_BAM_DASHBOARDOBJECT","FOLDERID");
+				typeLabelMap.add("2","仪表盘对象目录");
+				typeLabelMap.add("DASHBOARDOBJECT","仪表盘对象");
+				endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				debugmode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				
+				formService = new RemoteObject(destination);
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint != null){
+					formService.endpoint = endpoint;
+					bamService.endpoint = endpoint;
+				}
+				
+				formService.exportXmlToMDFile.addEventListener(ResultEvent.RESULT,exportXmlToMDFileHandler);
+				formService.exportXmlToMDFile.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.copyDashboardObj.addEventListener(ResultEvent.RESULT,copyQueryViewHandler);
+				bamService.copyDashboardObj.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				addButtons();
+			}
+			
+			private function createAdvBtn():Button{
+				var dashboardObjectMTUtil:DODesignerUtil = new DODesignerUtil(topContainer,bcp);
+				advBtn = new Button();
+				advBtn.label = "高级属性";
+				advBtn.setStyle("icon",AssetsFileLib.advanceIcon);
+				advBtn.addEventListener(MouseEvent.CLICK,dashboardObjectMTUtil.advClick);
+				return advBtn;
+			}
+			
+			private function itemChange(event:StyleTemplateEvent):void{
+				var obj:DisplayObject;
+				if(treePanel.cardPanelBox.getChildren().length > 0)
+					obj = treePanel.cardPanelBox.getChildAt(0);
+				if(obj && obj is BillCardPanel){
+					bcp = obj as BillCardPanel;
+					if(bcp.templetCode == "T_BAM_DASHBOARDOBJECT"){
+						isDashboardObject = true;
+						bcp.insertBfInterceptor = "smartx.bam.bs.dashboardobj.DboInsertBfFormInterceptor";
+						bcp.updateBfInterceptor = "smartx.bam.bs.dashboardobj.DboUpdateBfFormInterceptor";
+						treePanel.deleteAfIncCard = "smartx.bam.bs.dashboardobj.DboDeleteAfFormInterceptor";
+						treePanel.deleteBfIncCard = "smartx.bam.bs.dashboardobj.DboDeleteBfFormInterceptor";
+						bcp.removeEventListener(BillCardPanelEvent.SAVESUCCESSFUL,cardPanelSaveSuccessful);
+						bcp.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,cardPanelSaveSuccessful);
+						if(advBtn==null || (advBtn != null && !treePanel.buttonBar.contains(advBtn)))
+							treePanel.buttonBar.addChild(createAdvBtn());
+					}else{
+						isDashboardObject = false;
+						treePanel.deleteAfIncCard = "";
+						if(advBtn && treePanel.buttonBar.contains(advBtn))
+							treePanel.buttonBar.removeChild(advBtn);
+					}
+				}
+			}
+			
+			private function cardPanelSaveSuccessful(event:BillCardPanelEvent):void{
+				var obj:Object = bcp.getDataValue();
+				if(parseInt(obj[bcp.getTempletVO().pkname]) > 0){
+					var item:Object = treePanel.treePanel.tree.selectedItem;
+					var querySql:String = bcp.getTempletVO().pkname+"='"+obj[bcp.getTempletVO().pkname]+"'"
+					bcp.refresh(querySql);
+				}
+				mtcode = obj["MTCODE"];
+				if(mtcode== null || mtcode == "")
+					mtcode = DashboardObjConst.METADATA_PREFIX.concat(obj["CODE"]);
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(mtcode,endpoint);
+			}
+			
+			protected function addButtons():void{
+				treePanel.operationList.addItem({type:"separator"});
+				treePanel.operationList.addItem(importButton);
+				treePanel.operationList.addItem(exportButton);
+				treePanel.operationList.addItem({type:"separator"});
+				treePanel.operationList.addItem(saveAsButton);
+			}
+			
+			private function importHandler():void{
+				var fup:FileUploadPanel = new FileUploadPanel();
+				fup.addEventListener(BasicEvent.LOADDATA_SUCCESSFUL,uploadSuccessfulHandler);
+				fup.datasource = treePanel.treePanel.datasource;
+				fup.flagName = flagName;
+				
+				PopUpManager.addPopUp(fup,treePanel,true);
+				PopUpManager.centerPopUp(fup);
+			}
+			
+			private function exportHandler():void{
+				if(!treePanel.treePanel.tree.selectedItems.length > 0){
+					Alert.show("请选择要导出的仪表盘对象！");
+					return ;
+				}
+				
+				ConfirmUtil.confirm("确定要导出选中的仪表盘和仪表盘目录下的对象吗?",treePanel.treePanel,confirmHandler);
+				
+			}
+			
+			private function uploadSuccessfulHandler(event:BasicEvent):void{
+				treePanel.treePanel.load();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endOperat();
+				Alert.show(event.fault.faultString, '仪表盘对象错误!');
+			}
+			
+			private function exportXmlToMDFileHandler(event:ResultEvent):void{
+				var url:String = event.result as String;
+				navigateToURL(new URLRequest(url), "_blank");
+				endOperat();
+			}
+			
+			private function startOperat():void{
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在导出……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,treePanel,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endOperat():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					//计算要导出的仪表盘对象				
+					var selectObjs:Array = treePanel.treePanel.tree.selectedItems;
+					var fetchFolderSql:String ;//查询FOLDER对象
+					var fetchDashSql:String;//查询DASHBOARD对象
+					var fetchFolderIdsSql:String;//查询所有关联的目录ID
+					var dashboardIds:String = "-1";
+					var folderIds:String = "-1";
+					
+					for(var i:int=0;i<selectObjs.length;i++){
+						var tempObj:Object = selectObjs[i];
+						if( "仪表盘对象" == tempObj["TYPECN"]){
+							dashboardIds = dashboardIds + "," + tempObj["PID"];
+						}else if("仪表盘对象目录" == tempObj["TYPECN"]){
+							folderIds = folderIds + "," + tempObj["PID"];
+						}
+					}
+					
+					fetchFolderIdsSql = "select id from bam_folder f connect by prior f.parentid = f.id start with f.id in ( "
+						+ " select o.folderid from bam_dashboardobject o where o.id in (" + dashboardIds + ") )"
+						+ " union all"
+						+ " select id from bam_folder f connect by prior f.parentid = f.id start with f.id in (" + folderIds + ")"
+						+ " union all"
+						+ " select id from bam_folder f connect by prior f.id = f.parentid start with f.id in (" + folderIds + ")";
+					
+					fetchFolderSql = "select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=2 and id in (" + fetchFolderIdsSql + ")"
+					
+					fetchDashSql = "select NAME,CODE,DESCRIPTION,TYPE,MTCODE from bam_dashboardobject o where o.id in (" + dashboardIds + ")"
+						+ " union "
+						+ " select NAME,CODE,DESCRIPTION,TYPE,MTCODE from bam_dashboardobject o where o.folderid in (" + fetchFolderIdsSql + ")";
+					
+					var fetchDashMtCodesSql:String = "select MTCODE from bam_dashboardobject o where o.id in (" + dashboardIds + ")"
+						+ " union "
+						+ " select MTCODE from bam_dashboardobject o where o.folderid in (" + fetchFolderIdsSql + ")";
+					
+					var xmlExportObject:XMLExportObject = new XMLExportObject();
+					xmlExportObject.tableName="BAM_DASHBOARDOBJECT";
+					xmlExportObject.pkName="ID";
+					xmlExportObject.fkName="FOLDERID";
+					xmlExportObject.visiblePkName="code";
+					xmlExportObject.datasource=treePanel.treePanel.datasource;
+					//xmlExportObject.fetchSql = "select NAME,CODE,DESCRIPTION,TYPE,MTCODE from BAM_DASHBOARDOBJECT ";
+					xmlExportObject.fetchSql = fetchDashSql;
+					
+					xmlFolder = new XMLExportObject();
+					xmlFolder.tableName="BAM_FOLDER";
+					xmlFolder.pkName="ID";
+					xmlFolder.fkName="PARENTID";
+					xmlFolder.visiblePkName="code,type";
+					xmlFolder.datasource=treePanel.treePanel.datasource;
+					
+					//xmlFolder.fetchSql = "select NAME,CODE,DESCRIPTION,TYPE,SEQ from BAM_FOLDER where TYPE=2";
+					xmlFolder.fetchSql = fetchFolderSql;
+					xmlFolder.childObjects = [];
+					xmlFolder.childObjects.push(xmlFolder);
+					xmlFolder.childObjects.push(xmlExportObject);
+					
+					xmlMTContent = new XMLExportObject();
+					xmlMTContent.tableName="pub_metadata_templet";
+					xmlMTContent.pkName="id";
+					xmlMTContent.visiblePkName="code";
+					xmlMTContent.datasource=treePanel.treePanel.datasource;
+					//xmlMTContent.fetchSql = "select name,code,owner,scope,content,type from pub_metadata_templet where code in (select MTCODE from BAM_DASHBOARDOBJECT )";
+					xmlMTContent.fetchSql = "select name,code,owner,scope,content,type from pub_metadata_templet where code in (" + fetchDashMtCodesSql + " )";
+					
+					startOperat();
+					formService.exportXmlToMDFile([xmlFolder,xmlMTContent],"dashboard_object_data.MD",flagName);
+				}
+			}
+			
+			private function saveAsHandler():void{
+				if(!isDashboardObject){
+					Alert.show("目录不能执行该操作!");
+					return;
+				}
+				if(treePanel.treePanel.tree.selectedItem == null )
+					return;
+				PopUpManager.addPopUp(saveAsWindow,this,true);
+				PopUpManager.centerPopUp(saveAsWindow);
+			}
+			
+			private function saveAs_clickHandler():void{
+				if(StringUtils.trim(doName.text) == ""){
+					Alert.show("仪表盘对象名称不能为空！");
+					return;
+				}
+				
+				if(StringUtils.trim(doCode.text) == ""){
+					Alert.show("仪表盘对象编码不能为空！");
+					return;
+				}
+				var dataValue:Object = bcp.getDataValue();
+				dataValue["NAME"] = doName.text;
+				dataValue["CODE"] = doCode.text;
+				dataValue["OWNER"] = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME);
+				bamService.copyDashboardObj(dataValue);
+			}
+			
+			private function copyQueryViewHandler(event:ResultEvent):void{
+				treePanel.treePanel.load();
+				PopUpManager.removePopUp(saveAsWindow);
+			}
+			
+		]]>
+	</fx:Script>
+	<styletemplate:StyleTemplate03 id="treePanel" templetCode="{treeTempletCode}" debugMode="{debugmode}"
+								   templetCodeParentFieldNameMap="{templetCodeParentFieldNameMap}"
+								   endpoint="{endpoint}"
+								   typeTempletCodeMap="{templetCodeMap}"
+								   loadAll="{loadAll}"
+								   parentFieldName="{parentFieldName}"
+								   seqFieldName="{seqFieldName}"
+								   labelFieldName="{labelFieldName}"
+								   typeFieldName="{typeFiledName}"
+								   fkFieldName="{fkFiledName}"
+								   typeLabelMap="{typeLabelMap}"
+								   itemChange="itemChange(event)"/>
+</mx:Module>

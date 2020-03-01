@@ -1,0 +1,828 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+								 xmlns:s="library://ns.adobe.com/flex/spark" 
+								 xmlns:mx="library://ns.adobe.com/flex/mx" 
+								 creationComplete="init()" xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*">
+	<designer:states>
+		<s:State name="All"/>
+		<s:State name="DegrafaGauge"/>
+		<s:State name="AngularGauge"/>
+		<s:State name="HLinearGauge"/>
+		<s:State name="HLED"/>
+		<s:State name="VLED"/>
+		<s:State name="Bulb"/>
+		<s:State name="Cylinder"/>
+		<s:State name="Thermometer"/>
+		<s:State name="HBullet"/>
+		<s:State name="VBullet"/>
+	</designer:states>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.events.SliderEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.ResultEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.mtchart.vo.FusionWidgetsType;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			private function init():void{
+				currentState = FusionWidgetsType.DEGRAFAGAUGE;
+			}
+			
+			override public function generalFormComplete():void{
+				if(contentXml.extend.length() == 0){
+					var extendXML:XML = <extend/>;
+					contentXml.appendChild(extendXML);
+				}
+				if(contentXml.extend.chartConfig.length() == 0){
+					var xml:XML = <chartConfig><chart><colorRange/><dials/><pointers/></chart></chartConfig>;
+					contentXml.extend.appendChild(xml);
+				}
+				
+				var i:int = 0;
+				for each(var o:* in chartTypeCollection){
+					if(o.value == contentXml.extend.chartType){
+						chartTypeInput.selectedIndex = i;
+						currentState = o.value;
+						break;
+					}
+					i++;
+				}
+				i = 0;
+				for each(var s:String in paletteCollection){
+					if(s == contentXml.extend.chartConfig.chart.@palette){
+						paletteInput.selectedIndex = i;
+						break;
+					}
+					i++;
+				}
+			}
+			
+			private function valueFieldInput_changeHandler(event:Event):void{
+				contentXml.extend.valueField = valueFieldInput.text;
+			}
+
+
+			private function widthInput_changeHandler(event:Event):void{
+				contentXml.extend.width = widthInput.text;
+			}
+
+
+			private function heightInput_changeHandler(event:Event):void{
+				contentXml.extend.height = heightInput.text;
+			}
+
+			private function chartTypeInput_changeHandler(event:ListEvent):void{
+				if(chartTypeInput.selectedItem != null){
+					var chartType:String = chartTypeInput.selectedItem.value
+					contentXml.extend.chartType = chartType;
+					currentState = chartType;
+				}
+				else
+					currentState = "All";
+			}
+
+			private function lowerLimitInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@lowerLimit = lowerLimitInput.text;
+			}
+
+			private function upperLimitInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@upperLimit = upperLimitInput.text;
+			}
+
+			private function lowerLimitDisplayInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@lowerLimitDisplay = lowerLimitDisplayInput.text;
+			}
+
+			private function upperLimitDisplayInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@upperLimitDisplay = upperLimitDisplayInput.text;
+			}
+
+			private function paletteInput_changeHandler(event:ListEvent):void{
+				contentXml.extend.chartConfig.chart.@palette = paletteInput.selectedLabel;
+			}
+
+			private function gaugeStartAngleInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@gaugeStartAngle = gaugeStartAngleInput.value;
+			}
+
+			private function gaugeEndAngleInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@gaugeEndAngle = gaugeEndAngleInput.value;
+			}
+
+			private function numberPrefixInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@numberPrefix = numberPrefixInput.text;
+			}
+
+			private function numberSuffixInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.@numberSuffix = numberSuffixInput.text;
+			}
+
+			private function addDialButton_clickHandler(event:MouseEvent):void{
+				var dialsXML:XML = <dials/>;
+				if(contentXml.extend.chartConfig.chart.dials.length()==0)
+					contentXml.extend.chartConfig.chart.appendChild(dialsXML);
+				var tempid:String;
+				for(var i:Number=1;;i++){
+					tempid = "dial"+i;
+					if(contentXml.extend.chartConfig.chart.dials.dial.(@id==tempid).length()==0)
+						break;
+				}
+				
+				var xml:XML = <dial value="0" valueField="value"/>;
+				xml.@id=tempid;
+				contentXml.extend.chartConfig.chart.dials.appendChild(xml);
+			}
+
+			private function deleteDialButton_clickHandler(event:MouseEvent):void{
+				if(dialDataGrid.selectedIndex > 0)
+					delete contentXml.extend.chartConfig.chart.dials.dial[dialDataGrid.selectedIndex];
+			}
+
+			private function addColorRangeButton_clickHandler(event:MouseEvent):void{
+				var xml:XML = <color/>;
+				contentXml.extend.chartConfig.chart.colorRange.appendChild(xml);
+			}
+
+
+			private function deleteColorRangeButton_clickHandler(event:MouseEvent):void{
+				if(colorDataGrid.selectedIndex >= 0)
+					delete contentXml.extend.chartConfig.chart.colorRange.color[colorDataGrid.selectedIndex];
+			}
+
+
+			private function addPointerButton_clickHandler(event:MouseEvent):void{
+				var pointersXML:XML = <pointers/>;
+				if(contentXml.extend.chartConfig.chart.pointers.length()==0)
+					contentXml.extend.chartConfig.chart.appendChild(pointersXML);
+				var tempid:String;
+				for(var i:Number=1;;i++){
+					tempid = "pointer"+i;
+					if(contentXml.extend.chartConfig.chart.pointers.pointer.(@id==tempid).length()==0)
+						break;
+				}
+				var xml:XML = <pointer value="0" valueField="value"/>;
+				xml.@id = tempid;
+				contentXml.extend.chartConfig.chart.pointers.appendChild(xml);
+			}
+
+			private function deletePointerButton_clickHandler(event:MouseEvent):void{
+				if(pointerDataGrid.selectedIndex >= 0){
+					delete contentXml.extend.chartConfig.chart.pointers.pointer[pointerDataGrid.selectedIndex];
+				}
+			}
+
+			private function showValueInput_clickHandler(event:MouseEvent):void{
+				contentXml.extend.chartConfig.chart.@showValue = showValueInput.selected?"1":"0";
+			}
+
+
+			private function valueInput_changeHandler(event:Event):void{
+				contentXml.extend.chartConfig.chart.value = valueInput.text;
+			}
+
+
+			private function diameterInput_changeHandler(event:Event):void{
+				contentXml.extend.diameter = diameterInput.value;
+			}
+			
+			override public function initTableStructComplete():void{
+				if(valueFieldInput == null)
+					return;
+				
+				var temp:String = valueFieldInput.text;
+				
+				valueFieldInput.dataProvider = fieldList;
+				
+				callLater(function(valueFieldText:String):void{
+					valueFieldInput.selectedIndex = -1;
+					valueFieldInput.text = valueFieldText;
+				},[temp]);
+			}
+
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:Form width="100%" height="100%">
+			<mx:FormItem label="类型" required="true">
+				<mx:ComboBox id="chartTypeInput" labelField="label" change="chartTypeInput_changeHandler(event)">
+					<mx:dataProvider>
+						<fx:Array id="chartTypeCollection">
+							<fx:Object label="角度盘" value="{FusionWidgetsType.DEGRAFAGAUGE}"/>
+							<fx:Object label="高级角度盘" value="{FusionWidgetsType.ANGULARGAUGE}"/>
+							<!--fx:Object label="水平线" value="{FusionWidgetsType.HLINEARGAUGE}"/-->
+							<fx:Object label="水平LED" value="{FusionWidgetsType.HLED}"/>
+							<fx:Object label="竖直LED" value="{FusionWidgetsType.VLED}"/>
+							<fx:Object label="灯泡" value="{FusionWidgetsType.BULB}"/>
+							<fx:Object label="圆柱体" value="{FusionWidgetsType.CYLINDER}"/>
+							<fx:Object label="温度计" value="{FusionWidgetsType.THERMOMETER}"/>
+							<!--fx:Object label="水平靶心图" value="{FusionWidgetsType.HBULLET}"/>
+							<fx:Object label="竖直靶心图" value="{FusionWidgetsType.VBULLET}"/-->
+						</fx:Array>
+					</mx:dataProvider>
+				</mx:ComboBox>
+			</mx:FormItem>
+			<mx:FormItem label="外观" required="true" includeIn="DegrafaGauge">
+				<mx:RadioButtonGroup change="{contentXml.extend.chartConfig.skin=event.target.selectedValue;}" 
+									 id="skinGroup"/>
+				<mx:RadioButton label="指针" selected="{contentXml.extend.chartConfig.skin.length()==0||contentXml.extend.chartConfig.skin=='gaugeSkin'}" 
+								value="gaugeSkin" groupName="skinGroup"/>
+				<mx:RadioButton label="拨盘" selected="{contentXml.extend.chartConfig.skin=='dialSkin'}"
+								value="dialSkin" groupName="skinGroup"/>					
+			</mx:FormItem>
+			<mx:FormItem label="表盘直径" required="true" includeIn="DegrafaGauge">
+				<mx:HSlider minimum="0" maximum="2000" id="diameterInput" 
+							value="{contentXml.extend.diameter}"
+							change="diameterInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="绝对宽度">
+				<mx:TextInput id="widthInput" text="{contentXml.extend.width}"
+							  change="widthInput_changeHandler(event)"
+							  restrict="0-9"/>
+			</mx:FormItem>
+			<mx:FormItem label="绝对高度">
+				<mx:TextInput id="heightInput" text="{contentXml.extend.height}"
+							  change="heightInput_changeHandler(event)"
+							  restrict="0-9"/>
+			</mx:FormItem>
+
+			<mx:FormItem label="是否显示数值" required="true">
+				<mx:CheckBox id="showValueInput" selected="{contentXml.extend.chartConfig.chart.@showValue=='1'}"
+							 click="showValueInput_clickHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="下限值" required="true">
+				<mx:TextInput id="lowerLimitInput" text="{contentXml.extend.chartConfig.chart.@lowerLimit}"
+							  change="lowerLimitInput_changeHandler(event)"
+							  restrict="0-9."/>
+			</mx:FormItem>
+			<mx:FormItem label="上限值" required="true">
+				<mx:TextInput id="upperLimitInput" text="{contentXml.extend.chartConfig.chart.@upperLimit}"
+							  change="upperLimitInput_changeHandler(event)"
+							  restrict="0-9."/>
+			</mx:FormItem>
+			<mx:FormItem label="数值前缀" excludeFrom="DegrafaGauge">
+				<mx:TextInput id="numberPrefixInput" text="{contentXml.extend.chartConfig.chart.@numberPrefix}"
+							  change="numberPrefixInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="数值后缀" excludeFrom="DegrafaGauge">
+				<mx:TextInput id="numberSuffixInput" text="{contentXml.extend.chartConfig.chart.@numberSuffix}"
+							  change="numberSuffixInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="下限标示" excludeFrom="DegrafaGauge">
+				<mx:TextInput id="lowerLimitDisplayInput" text="{contentXml.extend.chartConfig.chart.@lowerLimitDisplay}"
+							  change="lowerLimitDisplayInput_changeHandler(event)" />
+			</mx:FormItem>
+			<mx:FormItem label="上限标示" excludeFrom="DegrafaGauge">
+				<mx:TextInput id="upperLimitDisplayInput" text="{contentXml.extend.chartConfig.chart.@upperLimitDisplay}"
+							  change="upperLimitDisplayInput_changeHandler(event)"/>
+			</mx:FormItem>
+			<mx:FormItem label="调色方案" required="true" excludeFrom="DegrafaGauge">
+				<mx:ComboBox id="paletteInput" change="paletteInput_changeHandler(event)">
+					<mx:dataProvider>
+						<fx:Array id="paletteCollection">
+							<fx:String>1</fx:String>
+							<fx:String>2</fx:String>
+							<fx:String>3</fx:String>
+							<fx:String>4</fx:String>
+							<fx:String>5</fx:String>
+						</fx:Array>
+					</mx:dataProvider>
+				</mx:ComboBox>
+			</mx:FormItem>
+			<mx:FormItem label="起点角度" includeIn="AngularGauge,DegrafaGauge">
+				<mx:HBox width="100%">
+					<mx:HSlider minimum="-360" maximum="360" snapInterval="1"
+								id="gaugeStartAngleInput" value="{contentXml.extend.chartConfig.chart.@gaugeStartAngle}"
+								change="gaugeStartAngleInput_changeHandler(event)"/>
+					<mx:Label text="未定义" color="0xD5D1CF" visible="{contentXml.extend.chartConfig.chart.@gaugeStartAngle.length()==0}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="终点角度" includeIn="AngularGauge,DegrafaGauge">
+				<mx:HBox width="100%">
+					<mx:HSlider minimum="-360" maximum="360" snapInterval="1"
+								id="gaugeEndAngleInput" value="{contentXml.extend.chartConfig.chart.@gaugeEndAngle}"
+								change="gaugeEndAngleInput_changeHandler(event)"/>
+					<mx:Label text="未定义" color="0xD5D1CF" visible="{contentXml.extend.chartConfig.chart.@gaugeEndAngle.length()==0}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="数值分段" required="true">
+				<mx:VBox width="350" height="120">
+					<mx:HBox width="100%">
+						<mx:LinkButton icon="{AssetsFileLib.addIcon}" 
+									   width="22" height="22" toolTip="添加数值分段"
+									   id="addColorRangeButton"
+									   click="addColorRangeButton_clickHandler(event)"
+									   />
+						<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" 
+									   width="22" height="22" toolTip="删除数值分段"
+									   id="deleteColorRangeButton"
+									   click="deleteColorRangeButton_clickHandler(event)"
+									   />
+					</mx:HBox>
+					<mx:DataGrid width="100%" height="100%" editable="true" id="colorDataGrid"
+								 dataProvider="{contentXml.extend.chartConfig.chart.colorRange.color}">
+						<mx:columns>
+							<mx:DataGridColumn headerText="下限值" editable="true" dataField="@minValue"/>
+							<mx:DataGridColumn headerText="上限值" editable="true" dataField="@maxValue"/>
+							<mx:DataGridColumn headerText="颜色" editable="true" dataField="@code" rendererIsEditor="true"
+											   editorDataField="value">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:HBox horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off" >
+											<fx:Script>
+												<![CDATA[
+													public function get value():String
+													{
+														return String( data.@code );
+													}
+													override public function set data(value:Object):void
+													{
+														super.data = value;
+														var code:String = value.@code;
+														rangeColorPicker.selectedColor = parseInt(code,16);
+													}
+												]]>
+											</fx:Script>
+											<mx:ColorPicker id="rangeColorPicker" change="{data.@code=rangeColorPicker.selectedColor.toString(16);}"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="标签" editable="true" dataField="@label"/>
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+			</mx:FormItem>
+			<mx:FormItem label="标度" includeIn="AngularGauge">
+				<mx:VBox width="350" height="120">
+					<mx:HBox width="100%">
+						<mx:LinkButton icon="{AssetsFileLib.addIcon}" 
+									   width="22" height="22" toolTip="添加标度"
+									   id="addDialButton"
+									   click="addDialButton_clickHandler(event)"
+									   />
+						<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" 
+									   width="22" height="22" toolTip="删除标度"
+									   id="deleteDialButton"
+									   click="deleteDialButton_clickHandler(event)"
+									   />
+					</mx:HBox>
+					<mx:DataGrid width="100%" height="100%" editable="true" id="dialDataGrid"
+								 dataProvider="{contentXml.extend.chartConfig.chart.dials.dial}" >
+						<mx:columns>
+							<!--mx:DataGridColumn headerText="ID" editable="false" dataField="@id"/--> 
+							<mx:DataGridColumn headerText="绑定字段名" editable="true" dataField="@valueField" rendererIsEditor="true">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:HBox horizontalScrollPolicy="off" initialize="init()" width="100%">
+											<fx:Script>
+												<![CDATA[
+													import mx.events.CollectionEvent;
+													import mx.events.FlexEvent;
+													
+													public function get text():String{
+														return String(data.@valueField);
+													}
+													
+													override public function set data(value:Object):void
+													{
+														super.data = value;
+														dialValueFieldInput.selectedIndex = -1;
+														dialValueFieldInput.text = value.@valueField;
+													}
+													
+													protected function init():void
+													{
+														outerDocument.fieldList.addEventListener(CollectionEvent.COLLECTION_CHANGE,
+															function(e:CollectionEvent):void{
+															dialValueFieldInput.selectedIndex = -1;
+															dialValueFieldInput.text = data.@valueField;
+														});
+													}
+													
+												]]>
+											</fx:Script>
+											<mx:ComboBox id="dialValueFieldInput" dataProvider="{outerDocument.fieldList}"
+														 change="{data.@valueField=dialValueFieldInput.text}" width="80"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>	
+							<mx:DataGridColumn headerText="背景色" editable="true" dataField="@bgColor"
+											   rendererIsEditor="true"
+											   editorDataField="value">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:HBox horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+											<fx:Script>
+												<![CDATA[
+													public function get value():String
+													{
+														return String( data.@bgColor );
+													}
+													override public function set data(value:Object):void
+													{
+														super.data = value;
+														var code:String = value.@bgColor;
+														dialBgColorPicker.selectedColor = parseInt(code,16);
+													}
+												]]>
+											</fx:Script>
+											<mx:ColorPicker id="dialBgColorPicker" change="{data.@bgColor=dialBgColorPicker.selectedColor.toString(16);}"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="边框颜色" editable="true" dataField="@borderColor"
+											   rendererIsEditor="true"
+											   editorDataField="value">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:HBox horizontalAlign="center" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+											<fx:Script>
+												<![CDATA[
+													public function get value():String
+													{
+														return String( data.@borderColor );
+													}
+													override public function set data(value:Object):void
+													{
+														super.data = value;
+														var code:String = value.@borderColor;
+														dialBorderColorPicker.selectedColor = parseInt(code,16);
+													}
+												]]>
+											</fx:Script>
+											<mx:ColorPicker id="dialBorderColorPicker" change="{data.@borderColor=dialBorderColorPicker.selectedColor.toString(16);}"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="初始值" editable="true" dataField="@value"/>
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+			</mx:FormItem>
+			<mx:FormItem label="指针" includeIn="HLinearGauge">
+				<mx:VBox width="350" height="120">
+					<mx:HBox width="100%">
+						<mx:LinkButton icon="{AssetsFileLib.addIcon}" 
+									   width="22" height="22" toolTip="添加指针"
+									   id="addPointerButton"
+									   click="addPointerButton_clickHandler(event)"
+									   />
+						<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" 
+									   width="22" height="22" toolTip="删除指针"
+									   id="deletePointerButton"
+									   click="deletePointerButton_clickHandler(event)"
+									   />
+					</mx:HBox>
+					<mx:DataGrid width="100%" height="100%" editable="true" id="pointerDataGrid"
+								 dataProvider="{contentXml.extend.chartConfig.chart.pointers.pointer}" >
+						<mx:columns>
+							<mx:DataGridColumn headerText="ID" editable="false" dataField="@id"/>
+							<mx:DataGridColumn headerText="绑定字段名" editable="true" dataField="@valueField"
+											   rendererIsEditor="true">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:HBox horizontalScrollPolicy="off" initialize="init()">
+											<fx:Script>
+												<![CDATA[
+													import mx.events.CollectionEvent;
+													import mx.events.FlexEvent;
+													
+													public function get text():String{
+														return String(data.@valueField);
+													}
+													
+													override public function set data(value:Object):void
+													{
+														super.data = value;
+														pointerValueFieldInput.selectedIndex = -1;
+														pointerValueFieldInput.text = value.@valueField;
+													}
+													
+													protected function init():void
+													{
+														outerDocument.fieldList.addEventListener(CollectionEvent.COLLECTION_CHANGE,function(e:CollectionEvent):void{
+															pointerValueFieldInput.selectedIndex = -1;
+															pointerValueFieldInput.text = data.@valueField;
+														});
+													}
+													
+												]]>
+											</fx:Script>
+											<mx:ComboBox id="pointerValueFieldInput" dataProvider="{outerDocument.fieldList}"
+														 change="{data.@valueField=pointerValueFieldInput.text}" width="80"/>
+										</mx:HBox>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="初始值" editable="true" dataField="@value"/>
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+			</mx:FormItem>
+			<mx:FormItem label="绑定字段名" required="true" excludeFrom="AngularGauge">
+				<mx:ComboBox id="valueFieldInput" text="{contentXml.extend.valueField}" selectedIndex="-1"
+							  change="valueFieldInput_changeHandler(event)" editable="true"/>
+			</mx:FormItem>
+			<mx:FormItem label="初始值" excludeFrom="AngularGauge,DegrafaGauge">
+				<mx:TextInput id="valueInput" text="{contentXml.extend.chartConfig.chart.value}"
+							  change="valueInput_changeHandler(event)"
+							  restrict="0-9."/>
+			</mx:FormItem>
+			<!--mx:FormItem label="目标值" includeIn="HBullet,VBullet">
+				<mx:TextInput id="targetInput" text="{contentXml.extend.chartConfig.chart.target}"
+							  change="targetInput_changeHandler(event)"
+							  restrict="0-9."/>
+			</mx:FormItem-->
+			<mx:FormItem label="背景色" includeIn="DegrafaGauge">
+				<mx:ColorPicker selectedColor="0x327bc2" change="{contentXml.extend.chartConfig.backgroundColor=event.target.selectedColor.toString(16)}"
+								/>
+			</mx:FormItem>
+			<mx:FormItem label="显示边框" includeIn="AngularGauge,HLED,VLED,Bulb,Thermometer">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="showBorderInput"
+								 selected="{contentXml.extend.chartConfig.chart.@showGaugeBorder=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@showGaugeBorder=showBorderInput.selected?'1':'0'}"
+								 toolTip="是否显示边框"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@showGaugeBorder.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@showGaugeBorder}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="边框颜色" includeIn="AngularGauge,HLED,VLED,Bulb,Thermometer">
+				<mx:HBox width="100%">
+					<mx:ColorPicker id="borderColorInput"
+									selectedColor="{parseInt(contentXml.extend.chartConfig.chart.@gaugeBorderColor,16)}"
+									change="{contentXml.extend.chartConfig.chart.@gaugeBorderColor=borderColorInput.selectedColor.toString(16)}"
+									toolTip="选择边框颜色"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@gaugeBorderColor.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@gaugeBorderColor}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="边框粗细" includeIn="AngularGauge,HLED,VLED,Bulb,Thermometer">
+				<mx:HBox width="100%">
+					<mx:TextInput id="borderThicknessInput"
+									text="{contentXml.extend.chartConfig.chart.@gaugeBorderThickness}"
+									change="{contentXml.extend.chartConfig.chart.@gaugeBorderThickness=borderThicknessInput.text}"
+									restrict="0-9."
+									toolTip="设置边框粗细"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@gaugeBorderThickness.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@gaugeBorderThickness}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="内半径" includeIn="AngularGauge">
+				<mx:HBox width="100%">
+					<mx:TextInput id="innerRadiusInput"
+								  text="{contentXml.extend.chartConfig.chart.@gaugeInnerRadius}"
+								  change="{contentXml.extend.chartConfig.chart.@gaugeInnerRadius=innerRadiusInput.text}"
+								  restrict="0-9%"
+								  toolTip="设置内半径大小，可以设成相对外于半径的百分比，如'20%'"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@gaugeInnerRadius.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@gaugeInnerRadius}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="外半径" includeIn="AngularGauge">
+				<mx:HBox width="100%">
+					<mx:TextInput id="outerRadiusInput"
+								  text="{contentXml.extend.chartConfig.chart.@gaugeOuterRadius}"
+								  change="{contentXml.extend.chartConfig.chart.@gaugeOuterRadius=outerRadiusInput.text}"
+								  restrict="0-9"
+								  toolTip="设置外半径大小"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@gaugeOuterRadius.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@gaugeOuterRadius}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="显示刻度" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="showTickMarkInput"
+								 selected="{contentXml.extend.chartConfig.chart.@showTickMarks=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@showTickMarks=showTickMarkInput.selected?'1':'0'}"
+								 toolTip="是否显示刻度"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@showTickMarks.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@showTickMarks}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="显示刻度数值" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="showTickMarkValueInput"
+								 selected="{contentXml.extend.chartConfig.chart.@showTickValues=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@showTickValues=showTickMarkValueInput.selected?'1':'0'}"
+								 toolTip="是否显示刻度数值"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@showTickValues.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@showTickValues}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="刻度显示间隔" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:TextInput id="tickValueStepInput"
+								  text="{contentXml.extend.chartConfig.chart.@tickValueStep}"
+								  change="{contentXml.extend.chartConfig.chart.@tickValueStep=tickValueStepInput.text}"
+								  restrict="0-9"
+								  toolTip="设置刻度显示间隔，即设置每隔多少个主刻度单位显示刻度值"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@tickValueStep.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@tickValueStep}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="刻度值精度" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:TextInput id="tickValueDecimalsInput"
+								  text="{contentXml.extend.chartConfig.chart.@tickValueDecimals}"
+								  change="{contentXml.extend.chartConfig.chart.@tickValueDecimals=tickValueDecimalsInput.text}"
+								  restrict="0-9"
+								  toolTip="设置刻度值精度，即显示时保留的小数位数"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@tickValueDecimals.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@tickValueDecimals}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="强制精度显示" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="forceTickValueDecimalsInput"
+								 selected="{contentXml.extend.chartConfig.chart.@forceTickValueDecimals=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@forceTickValueDecimals=forceTickValueDecimalsInput.selected?'1':'0'}"
+								 toolTip="是否强制刻度值以指定小数精度显示"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@forceTickValueDecimals.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@forceTickValueDecimals}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="在内部显示刻度" includeIn="AngularGauge">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="placeTicksInsideInput"
+								 selected="{contentXml.extend.chartConfig.chart.@placeTicksInside=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@placeTicksInside=placeTicksInsideInput.selected?'1':'0'}"
+								 toolTip="是否在内部圈显示刻度"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@placeTicksInside.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@placeTicksInside}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="在内部显示刻度值" includeIn="AngularGauge,Bulb">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="placeValuesInsideInput"
+								 selected="{contentXml.extend.chartConfig.chart.@placeValuesInside=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@placeValuesInside=placeValuesInsideInput.selected?'1':'0'}"
+								 toolTip="是否在内部显示刻度"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@placeValuesInside.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@placeValuesInside}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="自动调整刻度" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="adjustTMInput"
+								 selected="{contentXml.extend.chartConfig.chart.@adjustTM=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@adjustTM=adjustTMInput.selected?'1':'0'}"
+								 toolTip="是否自动调整刻度分配，若设为是，则主刻度和次刻度数量设置无效"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@adjustTM.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@adjustTM}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="主刻度数量" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:TextInput id="majorTMNumberInput"
+								  text="{contentXml.extend.chartConfig.chart.@majorTMNumber}"
+								  change="{contentXml.extend.chartConfig.chart.@majorTMNumber=majorTMNumberInput.text}"
+								  restrict="0-9"
+								  toolTip="设置主刻度的数量"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@majorTMNumber.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@majorTMNumber}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="次刻度数量" includeIn="AngularGauge,HLED,VLED,Cylinder,Thermometer">
+				<mx:HBox width="100%">
+					<mx:TextInput id="minorTMNumberInput"
+								  text="{contentXml.extend.chartConfig.chart.@minorTMNumber}"
+								  change="{contentXml.extend.chartConfig.chart.@minorTMNumber=minorTMNumberInput.text}"
+								  restrict="0-9"
+								  toolTip="设置次刻度的数量"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@minorTMNumber.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@minorTMNumber}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="同色显示" includeIn="HLED,VLED">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="useSameFillBgColorInput"
+								 selected="{contentXml.extend.chartConfig.chart.@useSameFillBgColor=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@useSameFillBgColor=useSameFillBgColorInput.selected?'1':'0'}"
+								 toolTip="是否使用单色显示LED柱，还是分段颜色显示LED柱"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@useSameFillBgColor.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@useSameFillBgColor}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="LED单位格大小" includeIn="HLED,VLED">
+				<mx:HBox width="100%">
+					<mx:TextInput id="ledSizeInput"
+								  text="{contentXml.extend.chartConfig.chart.@ledSize}"
+								  change="{contentXml.extend.chartConfig.chart.@ledSize=ledSizeInput.text}"
+								  restrict="0-9"
+								  toolTip="设置每个LED单元格的大小"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@ledSize.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@ledSize}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="LED单位格间隔" includeIn="HLED,VLED">
+				<mx:HBox width="100%">
+					<mx:TextInput id="ledGapInput"
+								  text="{contentXml.extend.chartConfig.chart.@ledGap}"
+								  change="{contentXml.extend.chartConfig.chart.@ledGap=ledGapInput.text}"
+								  restrict="0-9"
+								  toolTip="设置每个LED单元格的大小"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@ledGap.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@ledGap}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="3D显示" includeIn="Bulb">
+				<mx:HBox width="100%">
+					<mx:CheckBox id="is3DInput"
+								 selected="{contentXml.extend.chartConfig.chart.@is3D=='1'}"
+								 change="{contentXml.extend.chartConfig.chart.@is3D=is3DInput.selected?'1':'0'}"
+								 toolTip="是否使用3D显示"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@is3D.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@is3D}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="表盘半径" includeIn="Bulb">
+				<mx:HBox width="100%">
+					<mx:TextInput id="gaugeRadiusInput"
+								  text="{contentXml.extend.chartConfig.chart.@gaugeRadius}"
+								  change="{contentXml.extend.chartConfig.chart.@gaugeRadius=gaugeRadiusInput.text}"
+								  restrict="0-9"
+								  toolTip="设置表盘半径"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@gaugeRadius.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@gaugeRadius}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="圆柱半径" includeIn="Cylinder">
+				<mx:HBox width="100%">
+					<mx:TextInput id="cylRadiusInput"
+								  text="{contentXml.extend.chartConfig.chart.@cylRadius}"
+								  change="{contentXml.extend.chartConfig.chart.@cylRadius=cylRadiusInput.text}"
+								  restrict="0-9"
+								  toolTip="设置圆柱半径"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@cylRadius.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@cylRadius}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="圆柱高度" includeIn="Cylinder">
+				<mx:HBox width="100%">
+					<mx:TextInput id="cylHeightInput"
+								  text="{contentXml.extend.chartConfig.chart.@cylHeight}"
+								  change="{contentXml.extend.chartConfig.chart.@cylHeight=cylHeightInput.text}"
+								  restrict="0-9"
+								  toolTip="设置圆柱高度"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@cylHeight.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@cylHeight}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="圆柱颜色" includeIn="Cylinder">
+				<mx:HBox width="100%">
+					<mx:ColorPicker id="cylFillColorInput"
+									selectedColor="{parseInt(contentXml.extend.chartConfig.chart.@cylFillColor,16)}"
+									change="{contentXml.extend.chartConfig.chart.@cylFillColor=cylFillColorInput.selectedColor.toString(16)}"
+									toolTip="选择圆柱颜色"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@cylFillColor.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@cylFillColor}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="温度计颜色" includeIn="Thermometer">
+				<mx:HBox width="100%">
+					<mx:ColorPicker id="gaugeFillColorInput"
+									selectedColor="{parseInt(contentXml.extend.chartConfig.chart.@gaugeFillColor,16)}"
+									change="{contentXml.extend.chartConfig.chart.@gaugeFillColor=gaugeFillColorInput.selectedColor.toString(16)}"
+									toolTip="选择温度计颜色"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@gaugeFillColor.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@gaugeFillColor}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="温度泡半径" includeIn="Thermometer">
+				<mx:HBox width="100%">
+					<mx:TextInput id="thmBulbRadiusInput"
+								  text="{contentXml.extend.chartConfig.chart.@thmBulbRadius}"
+								  change="{contentXml.extend.chartConfig.chart.@thmBulbRadius=thmBulbRadiusInput.text}"
+								  restrict="0-9"
+								  toolTip="设置温度计下液泡的半径"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@thmBulbRadius.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@thmBulbRadius}"/>
+				</mx:HBox>
+			</mx:FormItem>
+			<mx:FormItem label="温度计高度" includeIn="Thermometer">
+				<mx:HBox width="100%">
+					<mx:TextInput id="thmHeightInput"
+								  text="{contentXml.extend.chartConfig.chart.@thmHeight}"
+								  change="{contentXml.extend.chartConfig.chart.@thmHeight=thmHeightInput.text}"
+								  restrict="0-9"
+								  toolTip="设置温度计高度"/>
+					<mx:Label color="0xD5D1CF" text="{contentXml.extend.chartConfig.chart.@thmHeight.length()==0?'未定义':'重置'}" 
+							  click="{delete contentXml.extend.chartConfig.chart.@thmHeight}"/>
+				</mx:HBox>
+			</mx:FormItem>
+		</mx:Form>
+	</mx:VBox>
+</designer:BaseDesigner>

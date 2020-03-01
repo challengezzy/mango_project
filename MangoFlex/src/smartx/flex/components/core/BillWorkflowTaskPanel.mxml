@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" 
+	width="100%" height="100%" xmlns:ns1="smartx.flex.components.*"
+	xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+	creationComplete="init()" xmlns:controls="qs.controls.*" xmlns:code="http://code.google.com/p/flexlib/" verticalGap="6" xmlns:core="smartx.flex.components.core.*" xmlns:util="smartx.flex.components.util.*">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.controls.Alert;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.ItemClickEvent;
+			import mx.managers.PopUpManager;
+			import mx.managers.ToolTipManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import qs.calendar.Calendar;
+			import qs.calendar.CalendarSet;
+			import qs.calendar.iParser;
+			import qs.controls.calendarDisplayClasses.CalendarDisplayEvent;
+			import qs.utils.DateRange;
+			import qs.utils.DateUtils;
+			import qs.utils.StringUtils;
+			
+			import sjd.controls.HtmlToolTip;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.workflow.TaskHandleModeChooserWindow;
+			import smartx.flex.components.core.workflow.WorkflowMonitorWindow;
+			import smartx.flex.components.core.workflow.task.TaskRule;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.workflow.TaskAssign;
+			import smartx.flex.components.vo.workflow.TaskAssignRule;
+			
+			[Bindable]
+			public var userId:String;
+			public var destinationForWorkflow:String = GlobalConst.SERVICE_WORKFLOW;
+			[Bindable]
+		    public var endpointForWorkflow:String;
+		    [Bindable]
+		    public var debugMode:Boolean = false;
+		    private var novaWorkflowService:RemoteObject;
+		    
+		    protected static const displayOptions:Array = [{label:'月视图',value:'month'},{label:'周视图',value:'week'},{label:'日视图',value:'day'}];
+		    
+		    [Bindable]
+		    private var currentTaskProvider:ArrayCollection = new ArrayCollection();
+		    
+		    [Bindable] 
+		    private var calSet:CalendarSet = new CalendarSet();
+		    
+		    public var taskRuleList:ArrayCollection;
+		    
+		    
+			private function init():void{
+				ToolTipManager.toolTipClass = HtmlToolTip;
+				novaWorkflowService = new RemoteObject(destinationForWorkflow);
+		        if(endpointForWorkflow!=null)
+		        	novaWorkflowService.endpoint = endpointForWorkflow;
+		        novaWorkflowService.getCurrentTasks.addEventListener(ResultEvent.RESULT,getCurrentTasksHandler);
+		        novaWorkflowService.getCurrentTasks.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.finishTask.addEventListener(ResultEvent.RESULT,finishTaskHandler);
+		        novaWorkflowService.finishTask.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        currentTaskDataGrid.cudg.allowMultipleSelection = true;
+		        
+		        chooser.dayNames=["日","一","二","三","四","五","六"]; 
+ 				chooser.monthNames=["一","二","三","四","五","六","七","八","九","十","十一","十二"];
+			}
+			
+			public function refresh():void{
+				if(userId == null){
+					Alert.show("必须指定用户id");
+					return;
+				}
+				novaWorkflowService.getCurrentTasks(userId);
+				taskLogListPanel.query();
+				
+			}
+			
+			private function getCurrentTasksHandler(event:ResultEvent):void{
+				var result:ArrayCollection = event.result as ArrayCollection;
+				if(result != null){
+					currentTaskProvider = new ArrayCollection();
+					clearCalendar();
+					for each (var temp:TaskAssign in result){
+						var tmpObj:Object = new Object();
+						tmpObj.realTaskAssign = temp;
+						tmpObj.assignTime = temp.assignTime;
+						tmpObj.activityName = temp.activity.uiname;
+						if(temp.taskAssignRule != null && temp.taskAssignRule.taskAssignRuleTemplate != null)
+							tmpObj.assignRule = temp.taskAssignRule.taskAssignRuleTemplate.name;
+						currentTaskProvider.addItem(tmpObj);
+						//以下更新日历视图
+						var endDate:Date = new Date(temp.assignTime.getTime()+1*1000*60*60);//默认三天做完
+						//addCalendarTime(temp.assignTime,endDate,temp.activity.uiname,temp.activity.uiname,0xFF0000);
+						var description:String = "派发时间: "+dateFormatter.format(temp.assignTime)+"\n" + 
+								"最后期限：" + "\n" + 
+								"派发方式："+tmpObj.assignRule+"\n";
+								
+						addCalendarTime(temp.assignTime,endDate,temp.activity.uiname,description,0xBB0000,temp);
+					}
+					//定义Sort对象
+					var sort:Sort = new Sort();
+					//如果按照降序排序，需要修改一下
+					sort.fields = [new SortField("assignTime",false,true)];
+					currentTaskProvider.sort = sort;
+					currentTaskProvider.refresh();
+					currentTaskDataGrid.initdata(currentTaskProvider);
+				}
+			}
+			
+			private function submit():void{
+				var selectedObjects:Array = currentTaskDataGrid.cudg.selectedItems;
+				for each (var tmpObj:Object in selectedObjects){
+					var taskAssign:TaskAssign = tmpObj.realTaskAssign;
+					if(taskAssign == null)
+						continue;
+					novaWorkflowService.finishTask(taskAssign.id,userId);
+				}
+			}
+			
+			private function monitor():void{
+				var selectedObject:Object = currentTaskDataGrid.cudg.selectedItem;
+				if(selectedObject != null){
+					var taskAssign:TaskAssign = selectedObject.realTaskAssign;
+					if(taskAssign == null)
+						return;
+					monitorTask(taskAssign);
+				}
+			}
+			
+			private function monitorTask(taskAssign:TaskAssign):void{
+				var window:WorkflowMonitorWindow = new WorkflowMonitorWindow();
+				window.processInstanceId = String(taskAssign.processInstanceId);
+				PopUpManager.addPopUp(window,this.root);
+				PopUpManager.centerPopUp(window);
+			}
+			
+			private function viewByListView():void{
+				var selectedObjects:Array = currentTaskDataGrid.cudg.selectedItems;
+				if(selectedObjects.length != 1){
+					Alert.show("请选择要处理的工作项，并且一次只能查看一个工作项");
+					return;
+				}
+				var tmpObj:Object = selectedObjects[0];
+				var taskAssign:TaskAssign = tmpObj.realTaskAssign;
+				if(taskAssign == null)
+					return;
+				viewTask(taskAssign);
+			}
+			
+			private function viewTask(taskAssign:TaskAssign):void{
+				if(taskRuleList == null || taskRuleList.length == 0){
+					Alert.show("没有设置任何工作项处理规则");
+					return;
+				}
+				for each(var taskRule:TaskRule in taskRuleList){
+					var u:UIComponent = taskRule.getDetailUI(taskAssign);
+					if(u != null){
+						PopUpManager.addPopUp(u,this.root);
+						PopUpManager.centerPopUp(u);
+						return;
+					}
+				}
+				Alert.show("没有找到任何匹配的工作项处理规则");
+			}
+			
+			private function handleByListView():void{
+				var selectedObjects:Array = currentTaskDataGrid.cudg.selectedItems;
+				if(selectedObjects.length != 1){
+					Alert.show("请选择要处理的工作项，并且一次只能处理一个工作项");
+					return;
+				}
+				var tmpObj:Object = selectedObjects[0];
+				var taskAssign:TaskAssign = tmpObj.realTaskAssign;
+				if(taskAssign == null)
+					return;
+				handleTask(taskAssign);
+			}
+			
+			private function handleTask(taskAssign:TaskAssign):void{
+				if(taskRuleList == null || taskRuleList.length == 0){
+					Alert.show("没有设置任何工作项处理规则");
+					return;
+				}
+				for each(var taskRule:TaskRule in taskRuleList){
+					var u:UIComponent = taskRule.getHandleUI(taskAssign);
+					if(u != null){
+						u.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+							refresh();
+						});
+						PopUpManager.addPopUp(u,this.root);
+						PopUpManager.centerPopUp(u);
+						return;
+					}
+				}
+				Alert.show("没有找到任何匹配的工作项处理规则");
+			}
+			
+			private function finishTaskHandler(event:ResultEvent):void{
+				Alert.show("提交成功");
+				refresh();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+		    
+		    private function formatDate(item:Object,column:DataGridColumn):String{
+            	return dateFormatter.format(item[column.dataField]);
+			}
+			
+			private function changeView(event:ItemClickEvent):void{
+				mainViewStack.selectedIndex = event.index;
+			}
+			
+			//以下为日历视图下的方法
+			
+			protected function goToToday():void{
+				cal.range = new DateRange(new Date(),new Date());
+			}
+			
+			protected function displayModeItemClickHandler():void{
+				cal.displayMode=displayOptions[displayMode.selectedIndex].value;
+			}
+			
+			protected function updateRange():void{
+				cal.displayMode = "auto";
+				if(chooser.selectedRanges.length == 0)
+					return;
+				var selRange:Object = chooser.selectedRanges[0];
+				cal.range = new DateRange(selRange.rangeStart,selRange.rangeEnd);			
+			}
+
+			protected function rangeChangeHandler():void{
+				chooser.selectedRanges = [ {rangeStart: cal.range.start, rangeEnd: cal.range.end}];
+				chooser.displayedYear = cal.range.start.fullYear;
+				chooser.displayedMonth = cal.range.start.month;
+			}
+			
+			protected function dayClickHandler(d:Date):void
+			{
+				cal.displayMode = "auto";
+				cal.range = new DateRange(d,d);						
+			}
+			
+			protected function displayModeHandler():void
+			{
+				switch(cal.displayMode)
+				{
+					case "day":
+					case "days":
+						displayMode.selectedIndex = 2;
+						break;
+					case "week":
+					case "weeks":
+						displayMode.selectedIndex = 1;
+						break;
+					case "month":
+					default:
+						displayMode.selectedIndex = 0;
+						break;					
+				}
+			}
+			
+			private function clearCalendar():void{
+				calSet = new CalendarSet();
+				cal.dataProvider = calSet.events;
+			}
+			
+			//We creat a calendar body to parse the event, refer to function loadCalendar
+			private function addCalendarDay(start:Date, end:Date, summary:String, description:String = "", color:Number = 0, extendObject:Object=null):void{
+				if(DateUtils.toIcsDate(start) == DateUtils.toIcsDate(end)){
+						return;
+				}else{
+					end.date += 1;
+	
+				}
+				description = StringUtils.replaceAll(description, "\n", "\\n");
+				description = StringUtils.replaceAll(description, "\r", "\\n");
+				var now:Date = new Date();
+				
+				//A event begin with BEGIN:VCALENDAR, end with END:VEVENT
+				//And Time Zone currently is not used
+				var calData:String = 
+				"BEGIN:VCALENDAR\r\n"+
+				"PRODID:-//Google Inc//Google Calendar 70.9054//EN\r\n"+
+				"VERSION:2.0\r\n"+
+				"CALSCALE:GREGORIAN\r\n"+
+				"METHOD:PUBLISH\r\n"+
+				"X-WR-CALNAME:test cal\r\n"+
+				"X-WR-TIMEZONE:America/Los_Angeles\r\n"+
+				"X-WR-CALDESC:\r\n"+
+				
+				"BEGIN:VEVENT\r\n"+
+				"DTSTART;VALUE=DATE:"+DateUtils.toIcsDate(start)+"\r\n"+
+				"DTEND;VALUE=DATE:"+DateUtils.toIcsDate(end)+"\r\n"+
+				"DTSTAMP:"+DateUtils.toIcsDate(now) + "T" + DateUtils.toIcsTime(now)+"Z\r\n"+
+				/*
+				"DTSTART;VALUE=DATE:20060924\r\n"+
+				"DTEND;VALUE=DATE:20060925\r\n"+
+				"DTSTAMP:20060907T165551Z\r\n"+
+				*/
+				"ORGANIZER;CN=test cal:MAILTO:0vpmlit9621663ap27ilpg4hr0@group.calendar.goog\r\n"+
+				" le.com\r\n"+
+	//TODO change generate the uid from server
+				"UID:cagcjos8b9sd7641vbk6mcv708@google.com\r\n"+
+				"CLASS:PRIVATE\r\n"+
+				"CREATED:"+DateUtils.toIcsDate(now) + "T" + DateUtils.toIcsTime(now)+"Z\r\n"+
+				"LAST-MODIFIED:"+DateUtils.toIcsDate(now) + "T" + DateUtils.toIcsTime(now)+"Z\r\n"+
+				/*
+				"CREATED:20060907T165040Z\r\n"+
+				"LAST-MODIFIED:20060907T165101Z\r\n"+
+				*/
+				"SEQUENCE:1\r\n"+
+				"STATUS:CONFIRMED\r\n"+
+				"DESCRIPTION:"+description+"\r\n"+
+				"SUMMARY:"+summary+"\r\n"+
+				//"SUMMARY:cross week 2 day event\r\n"+
+				"TRANSP:OPAQUE\r\n"+
+				"END:VEVENT\r\n"+
+				
+				/*"BEGIN:VTIMEZONE\r\n"+
+				"TZID:America/Los_Angeles\r\n"+
+				"X-LIC-LOCATION:America/Los_Angeles\r\n"+
+				"BEGIN:STANDARD\r\n"+
+				"TZOFFSETFROM:-0700\r\n"+
+				"TZOFFSETTO:-0800\r\n"+
+				"TZNAME:PST\r\n"+
+				"DTSTART:19701025T020000\r\n"+
+				"RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU\r\n"+
+				"END:STANDARD\r\n"+
+				"BEGIN:DAYLIGHT\r\n"+
+				"TZOFFSETFROM:-0800\r\n"+
+				"TZOFFSETTO:-0700\r\n"+
+				"TZNAME:PDT\r\n"+
+				"DTSTART:19700405T020000\r\n"+
+				"RRULE:FREQ=YEARLY;BYMONTH=4;BYDAY=1SU\r\n"+
+				"END:DAYLIGHT\r\n"+
+				"END:VTIMEZONE\r\n"+*/
+				"END:VCALENDAR";
+	
+				var p:iParser = new iParser();
+				var calendar:Calendar  = p.parse(calData)[0];
+				//The color is set to every calendar event.
+				//Maybe we should add a new parameter in the calendar body text to save the color for every event instead of just use the color for whole canlendar.
+				calendar.contextColor = color;
+				calendar.name = "name";
+				calendar.events[0].extendObject = extendObject;
+				calSet.calendars = calSet.calendars.concat([calendar]);							
+				cal.dataProvider = calSet.events;
+			}
+		
+		
+			//We creat a calendar body to parse the event, refer to function loadCalendar
+			private function addCalendarTime(start:Date, end:Date, summary:String, description:String = "", color:Number = 0, extendObject:Object=null):void{
+				var now:Date = new Date();
+				description = StringUtils.replaceAll(description, "\n", "\\n");
+				description = StringUtils.replaceAll(description, "\r", "\\n");
+				var calData:String = 
+				"BEGIN:VCALENDAR\r\n"+
+				"PRODID:-//Google Inc//Google Calendar 70.9054//EN\r\n"+
+				"VERSION:2.0\r\n"+
+				"CALSCALE:GREGORIAN\r\n"+
+				"METHOD:PUBLISH\r\n"+
+				//"X-WR-CALNAME:test cal\r\n"+
+				//"X-WR-TIMEZONE:America/Los_Angeles\r\n"+
+				//"X-WR-CALDESC:\r\n"+
+				"BEGIN:VEVENT\r\n"+
+				"DTSTART;TZID=America/Los_Angeles:" + DateUtils.toIcsDate(start) + "T" + DateUtils.toIcsTime(start)+"\r\n"+
+				"DTEND;TZID=America/Los_Angeles:" + DateUtils.toIcsDate(end) + "T" + DateUtils.toIcsTime(end)+"\r\n"+
+				//"DTSTART;TZID=America/Los_Angeles:20060923T160000\r\n"+
+				//"DTEND;TZID=America/Los_Angeles:20060923T210000\r\n"+
+				"DTSTAMP:"+DateUtils.toIcsDate(now) + "T" + DateUtils.toIcsTime(now)+"Z\r\n"+
+				//"DTSTAMP:20060907T165551Z\r\n"+
+				"ORGANIZER;CN=test cal:MAILTO:0vpmlit9621663ap27ilpg4hr0@group.calendar.goog\r\n"+
+				" le.com\r\n"+
+				"UID:j1o618k1tklj779nu2kgj9560s@google.com\r\n"+
+				"CLASS:PRIVATE\r\n"+
+				"CREATED:20060907T165444Z\r\n"+
+				"LAST-MODIFIED:20060907T165444Z\r\n"+
+				"LOCATION:\r\n"+
+				"SEQUENCE:0\r\n"+
+				"STATUS:CONFIRMED\r\n"+
+				"DESCRIPTION:"+description+"\r\n"+
+				"SUMMARY:"+summary+"\r\n"+
+				//"SUMMARY:timed event\r\n"+
+				"TRANSP:OPAQUE\r\n"+
+				"END:VEVENT\r\n"+
+				/*"BEGIN:VTIMEZONE\r\n"+
+				"TZID:America/Los_Angeles\r\n"+
+				"X-LIC-LOCATION:America/Los_Angeles\r\n"+
+				"BEGIN:STANDARD\r\n"+
+				"TZOFFSETFROM:-0700\r\n"+
+				"TZOFFSETTO:-0800\r\n"+
+				"TZNAME:PST\r\n"+
+				"DTSTART:19701025T020000\r\n"+
+				"RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU\r\n"+
+				"END:STANDARD\r\n"+
+				"BEGIN:DAYLIGHT\r\n"+
+				"TZOFFSETFROM:-0800\r\n"+
+				"TZOFFSETTO:-0700\r\n"+
+				"TZNAME:PDT\r\n"+
+				"DTSTART:19700405T020000\r\n"+
+				"RRULE:FREQ=YEARLY;BYMONTH=4;BYDAY=1SU\r\n"+
+				"END:DAYLIGHT\r\n"+
+				"END:VTIMEZONE\r\n"+*/
+				"END:VCALENDAR";
+		
+				var p:iParser = new iParser();
+				var calendar:Calendar  = p.parse(calData)[0];
+				//The color is set to every calendar event.
+				//Maybe we should add a new parameter in the calendar body text to save the color for every event instead of just use the color for whole canlendar.			
+				calendar.contextColor = color;
+				calendar.name = "name";
+				calendar.events[0].extendObject = extendObject;
+				calSet.calendars = calSet.calendars.concat([calendar]);							
+				cal.dataProvider = calSet.events;
+			}
+			
+			private function taskHandler(event:CalendarDisplayEvent):void{
+				var taskAssign:TaskAssign = event.event.extendObject as TaskAssign;
+				if(taskAssign == null){
+					Alert.show("该工作项没有正确关联到工作流任务","Error");
+					return;
+				}
+				var window:TaskHandleModeChooserWindow = new TaskHandleModeChooserWindow();
+				window.cancelHandler = function():void{
+					PopUpManager.removePopUp(window);
+				};
+				window.viewModeHandler = function():void{
+					PopUpManager.removePopUp(window);
+					viewTask(taskAssign);
+				};
+				window.handleModeHandler = function():void{
+					PopUpManager.removePopUp(window);
+					handleTask(taskAssign);
+				};
+				window.monitorModeHandler = function():void{
+					PopUpManager.removePopUp(window);
+					monitorTask(taskAssign);
+				};
+				PopUpManager.addPopUp(window,this.root,true);
+				PopUpManager.centerPopUp(window);
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:Style>
+		.calendarDisplay {
+			hourBackgroundColor: #FFFFFF;
+			hourThickness: 1;
+			hourColor: #BBBBBB;
+			hourDividerThickness: 2;
+			hourDividerColor: #AAAAFF;	
+			hourBackgroundColor: #DDDDFF;
+			allDayDividerThickness: 2;
+			allDayDividerColor: #AAAAFF;	
+			allDayBackgroundColor: #DDDDFF;
+			hourStyleName: bigHours;
+			/*
+			eventDragSkin: Embed('../assets/images/eventDragImage.svg');
+			*/
+		}
+		
+		.bigHours {
+			font-size: 12;	
+		}
+		
+		.calendarsContainer {
+			color: #000000;
+			border-style: solid;
+			corner-radius: 10;
+			border-color: #888888;
+			border-thickness: 3;	
+			background-color: #FFFFFF; 
+			padding-right: 10;
+			padding-left: 10;
+			padding-top: 10;
+			padding-bottom: 10;
+			
+		}
+	</mx:Style>
+	<mx:DateFormatter id="dateFormatter" formatString="YYYY-MM-DD HH:NN:SS"/>
+	<mx:DateFormatter id="dayFormatter" formatString="EEE,YYYY.MM.DD"/>
+	<viewStackEffects:Pixelate id="effect"/>
+	<mx:HBox width="100%" horizontalAlign="right">
+		<mx:Image source="{AssetsFileLib.bigbookIcon}" width="50" height="50"/>
+		<mx:Label text="我的工作项" width="100%" fontSize="25" fontFamily="Verdana" fontWeight="bold"/>
+		<mx:ToggleButtonBar id="toggleButtonBar" width="200" itemClick="changeView(event)">
+	 		<mx:dataProvider>
+	            <mx:Array>
+	            	<mx:Object label="列表视图" icon="{AssetsFileLib.listviewIcon}"/>
+	            	<mx:Object label="日历视图" icon="{AssetsFileLib.calendarIcon}"/> 
+	            </mx:Array>
+	        </mx:dataProvider>
+		</mx:ToggleButtonBar>
+	</mx:HBox>
+	<mx:HBox id="toolBox" width="100%" paddingLeft="5">
+		<mx:Button toolTip="刷新" icon="{AssetsFileLib.refreshIcon}" click="refresh()" label="刷新"/>
+	</mx:HBox>
+	<mx:ViewStack id="mainViewStack" width="100%" height="100%" >
+		<mx:VBox id="listViewBox" width="100%" height="100%" showEffect="{effect}" hideEffect="{effect}">
+			<mx:TabNavigator width="100%" height="100%" creationPolicy="all">
+				<mx:VBox label="待办工作项" width="100%" height="100%">
+					<mx:HBox width="100%">
+						<mx:Button label="查看" icon="{AssetsFileLib.viewIcon}" click="viewByListView()"/>
+						<mx:Button label="处理" icon="{AssetsFileLib.handleIcon}" click="handleByListView()"/>
+						<mx:Button label="流程" icon="{AssetsFileLib.eyeIcon}" click="monitor()"/>
+					</mx:HBox>
+					<util:PageDataGrid width="100%" height="100%" id="currentTaskDataGrid" pagecount="20">
+						<util:mygridcolumns>
+							<mx:DataGridColumn headerText="派发时间" dataField="assignTime" width="200" labelFunction="formatDate"/>
+							<mx:DataGridColumn headerText="任务环节名" dataField="activityName" width="250"/>
+							<!--<mx:DataGridColumn headerText="最后期限" dataField="deadlineTime" width="200" labelFunction="formatDate"/>-->
+							<mx:DataGridColumn headerText="派发方式" dataField="assignRule"/>
+						</util:mygridcolumns>
+					</util:PageDataGrid>
+				</mx:VBox>
+				<mx:VBox label="已办工作项" width="100%" height="100%">
+					<core:BillListPanel id="taskLogListPanel" templetCode="T_PUB_WF_TASKLOG_2" 
+					debugMode="{debugMode}" editable="false" showEditBox="false" showQuickQueryPanel="false" showLoadingWindow="false" showInitingWindow="false" width="100%" height="100%"
+					initQueryCondition="userid={userId} order by finishtime desc"
+					endpoint="{endpointForWorkflow}"/>
+				</mx:VBox>
+			</mx:TabNavigator>
+			
+		</mx:VBox>
+		<mx:HBox id="calendarBox" backgroundColor="#343434" showEffect="{effect}" hideEffect="{effect}" paddingTop="5">
+			<mx:VBox>			
+				<mx:VBox minWidth="250" horizontalAlign="center" styleName="calendarsContainer">
+					<mx:Label text="{dayFormatter.format(cal.range.start)}"  fontSize="20" fontFamily="Arial" fontWeight="bold" color="#FF0000"/>				
+					<mx:HBox>
+						<mx:Button label="&lt;&lt;" click="cal.previous();" />
+						<mx:Button label="今天" click="goToToday()" />
+						<mx:Button label="&gt;&gt;" click="cal.next();" />
+					</mx:HBox>		
+					<mx:ToggleButtonBar dataProvider="{displayOptions}" selectedIndex="0"  id="displayMode" itemClick="displayModeItemClickHandler()"/>									
+				</mx:VBox>
+				<mx:VBox minWidth="250" horizontalAlign="center" styleName="calendarsContainer">			
+					<mx:HRule width="100%" />
+					<mx:DateChooser id="chooser" change="updateRange()" allowDisjointSelection="false" allowMultipleSelection="true" width="100%"/>
+				</mx:VBox>
+			</mx:VBox>
+			<mx:VBox width="100%" height="100%">
+				<controls:CalendarDisplay id="cal" width="100%" height="100%" animated="true"  styleName="calendarDisplay"
+					headerClick="dayClickHandler(event.dateTime)"
+					dayClick="dayClickHandler(event.dateTime)"
+					displayModeChange="displayModeHandler()"
+					change="rangeChangeHandler()" 
+					itemEdit="taskHandler(event)"
+					allowDrag="false"/>
+			</mx:VBox>
+			
+		</mx:HBox>
+	</mx:ViewStack>	
+</mx:VBox>

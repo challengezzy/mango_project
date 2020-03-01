@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ====================================================================== 
+     2014-9-16 下午04:43:15                                                        
+     Mango
+     ====================================================================== -->
+<project name="Mango" default="all">
+	<tstamp>
+		<format property="today" pattern="yyyyMMdd" />
+	</tstamp>
+	<property name="output" value="./output" />
+	<property name="script.root" value="./script" />
+	<property name="release.root" value="${output}/release${today}" />
+	<property name="release.javasdk" value="${release.root}/SDK" />
+	<property name="release.webproject" value="${release.root}/WebProject" />
+	<property name="release.script" value="${release.root}/script" />
+	<property name="release.config" value="${release.webproject}/config" />
+	<property name="mangojava.root" value="../MangoJava" />
+	<property name="mangoasset.root" value="../MangoAsset" />
+	<property name="mangoflex.root" value="../MangoFlex" />
+	<property name="mangoweb.root" value="../MangoWeb" />
+	
+	<target name="all" depends="buildJavaSDK,buildFlex,copy" />
+
+	<target name="init">
+		<mkdir dir="${output}" />
+		<delete dir="${release.root}" />
+		<mkdir dir="${release.root}" />
+	</target>
+
+	<target name="buildJavaSDK" depends="init">
+		<delete dir="${release.javasdk}" />
+		<mkdir dir="${release.javasdk}" />
+
+		<echo message="Building MangoJava" />
+		<ant antfile="build.xml" dir="${mangojava.root}/build" target="jar" inheritall="no" />
+		<copy todir="${release.javasdk}">
+			<fileset dir="${mangojava.root}/jar" includes="*.jar" />
+		</copy>
+		<echo message="MangoJava builded" />
+	</target>
+	<target name="buildFlex">
+		<echo message="Building MangoAsset" />
+		<ant antfile="build.xml" dir="${mangoasset.root}/build" target="buildSwc" inheritall="no" />
+		<echo message="Building MangoFlex" />
+		<ant antfile="build.xml" dir="${mangoflex.root}/build" target="buildSwc" inheritall="no" />
+		<echo message="Building MangoWeb" />
+		<ant antfile="build.xml" dir="${mangoweb.root}/build" target="compileMangoWeb" inheritall="no" />
+	</target>
+	<target name="copy">
+		<copy todir="${release.webproject}">
+			<fileset dir="${mangoweb.root}/war" includes="*.war" />
+		</copy>
+		<copy todir="${release.javasdk}">
+			<fileset dir="${mangoflex.root}/swc" includes="*.swc" />
+		</copy>
+		<copy todir="${release.script}">
+			<fileset dir="${script.root}/current" excludes="uncommitted/**" />
+		</copy>
+		<copy todir="${release.config}">
+			<fileset dir="${mangoweb.root}/WebRoot/WEB-INF">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+	</target>
+</project>

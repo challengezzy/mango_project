@@ -1,0 +1,279 @@
+/* CSS file */
+@namespace "http://www.adobe.com/2006/mxml";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace s "library://ns.adobe.com/flex/spark";
+
+	mx|Application,s|Application {
+	   backgroundColor: #f2f2f2;
+	   backgroundGradientAlphas: 0, 0;
+	   themeColor: #949494;
+	   fontSize: 12;
+	}
+	mx|Panel {
+	   borderColor: #565656;
+	   borderAlpha: 1;
+	   borderThicknessLeft: 1;
+	   borderThicknessTop: 1;
+	   borderThicknessBottom: 1;
+	   borderThicknessRight: 1;
+	   cornerRadius: 0;
+	   highlightAlphas: 0, .1;
+	   headerColors: #6d6d6d, #434343;
+	   dropShadowEnabled: false;
+	   titleStyleName: "mypanelTitle";
+	   headerHeight:22;
+	   backgroundColor: #FFFFFF;
+	   backgroundAlpha: 1;
+	}
+	mx|DataGrid {
+		header-background-skin: Embed(source="assets/skins/DataGrid_headerBackgroundSkin.png");
+		header-separator-skin: Embed(source="assets/skins/DataGrid_headerSeparatorSkin.png");
+		sort-arrow-skin: Embed(source="assets/skins/DataGrid_sortArrowSkin.png");
+		header-style-name: mydataGridHeaderStyle;
+	}
+	
+	.mydataGridHeaderStyle {
+		color: #ffffff;
+	}
+	mx|ComboBox {
+	   cornerRadius: 0;
+	}
+	mx|NumericStepper {
+	   borderStyle: solid;
+	   borderColor: #999999;
+	   backgroundAlpha: 1;
+	   cornerRadius: 0;
+	   border-thickness-left:0;
+	}
+	.mypanelTitle {
+	  	color: #ffffff;
+   		fontWeight: bold;
+		headerStyleName: accordionHeader;
+	}
+	mx|TabNavigator {
+	   tabHeight: 22;
+	   horizontalGap: 4;
+	   backgroundAlpha: 1;
+	   borderColor: #333333;
+	   borderThickness: 1;
+	   tabStyleName: "myTabs";
+	   firstTabStyleName: "myTabs";
+	   lastTabStyleName: "myTabs";
+	   selectedTabTextStyleName: "mySelectedTabs";
+	   tabOffset: 7;
+	}
+	.myTabs {
+	   cornerRadius: 0;
+	   highlightAlphas: 0, 0.1;
+	   fillAlphas: 1.0, 1.0, 1.0, 1.0;
+	   fillColors: #FFFFFF, #FFFFFF;
+	   borderColor: #333333;
+	   color: #2d2d2d;
+	   textRollOverColor: #333333;
+	   themeColor: #333333;		
+	}
+	.mySelectedTabs {
+	   color: #333333;
+	   textRollOverColor: #333333;
+	}
+	mx|TabBar {
+	   backgroundAlpha: 1;
+	   borderColor: #333333;
+	   borderThickness: 1;
+	   tabStyleName: "myTabs";
+	   firstTabStyleName: "myTabs";
+	   lastTabStyleName: "myTabs";
+	   selectedTabTextStyleName: "mySelectedTabs";
+	 }
+	 .myTabs2 {
+	   cornerRadius: 0;
+	   highlightAlphas: 0.12, 0.1;
+	   fillAlphas: 0.96, 1;
+	   fillColors: #e0e0e0, #cacaca;
+	   borderColor: #585858;
+	   color: #ffffff;
+	   textRollOverColor: #333333;
+	   themeColor: #333333;
+	}
+	.mySelectedTabs2 {
+	   color: #333333;
+	   textRollOverColor: #333333;
+	}
+	mx|TitleWindow {
+		backgroundColor: #ffffff;	
+		backgroundAlpha: 1;
+		drop-shadow-enabled: false;
+	    cornerRadius: 0;
+	}
+	
+	mx|Alert {
+		background-color:#ffffff;
+		color:#000000;
+		header-style-name: "headerStyle";
+	    header-height: 0;
+	    padding-bottom:10;
+	    border-color:#000000;
+	}
+	
+	.headerStyle {
+		background-alpha:0;
+		header-height:1;
+		font-size:0;	
+	}
+	
+    mx|Button {
+       cornerRadius: 1;
+       paddingTop: 2;
+       paddingBottom: 2;
+       color: #333333;
+       textRollOverColor: #333333;
+       textSelectedColor: #333333;
+       borderColor: #999999;
+       themeColor: #494949;
+       highlightAlphas: 0, 0.2;
+	   fillAlphas: .85, .85, 1, 1;
+	   fillColors: #ededed, #b9b9b9, #ededed, #b9b9b9;
+	   color: #333333;
+    }
+    mx|ToolTip {
+	   cornerRadius: 0;
+	   color: #333333;
+	   drop-shadow-enabled:false;
+	   dropShadowEnabled: false;
+	   fontSize: 12; 
+	}
+    mx|CheckBox {
+		disabledIcon: Embed(source="assets/skins/CheckBox_disabledIcon.png");
+		downIcon: Embed(source="assets/skins/CheckBox_downIcon.png");
+		overIcon: Embed(source="assets/skins/CheckBox_overIcon.png");
+		selectedDisabledIcon: Embed(source="assets/skins/CheckBox_selectedDisabledIcon.png");
+		selectedDownIcon: Embed(source="assets/skins/CheckBox_selectedDownIcon.png");
+		selectedOverIcon: Embed(source="assets/skins/CheckBox_selectedOverIcon.png");
+		selectedUpIcon: Embed(source="assets/skins/CheckBox_selectedUpIcon.png");
+		upIcon: Embed(source="assets/skins/CheckBox_upIcon.png");
+	}
+	mx|AccordionHeader	{
+		disabledSkin: Embed(source="assets/skins/AccordionHeader_disabledSkin.png");
+		downSkin: Embed(source="assets/skins/DataGrid_headerBackgroundSkin.png");
+		overSkin: Embed(source="assets/skins/AccordionHeader_overSkin.png");
+		selectedSkin: Embed(source="assets/skins/DataGrid_headerBackgroundSkin.png");
+		upSkin: Embed(source="assets/skins/DataGrid_headerBackgroundSkin.png");
+		selected-up-skin: Embed(source="assets/skins/DataGrid_headerBackgroundSkin.png");
+		selected-over-skin: Embed(source="assets/skins/AccordionHeader_overSkin.png");
+		color: #ffffff;
+		selected-down-skin: Embed(source="assets/skins/DataGrid_headerBackgroundSkin.png");
+		textRollOverColor: #ffffff;
+		text-selected-color: #ffffff;
+	}
+	mx|Slider {
+		thumbDisabledSkin: Embed(source="assets/skins/Slider_thumbDisabledSkin.png");
+		thumbDownSkin: Embed(source="assets/skins/Slider_thumbDownSkin.png");
+		thumbOverSkin: Embed(source="assets/skins/Slider_thumbOverSkin.png");
+		thumbUpSkin: Embed(source="assets/skins/Slider_thumbUpSkin.png");
+		trackSkin: Embed(source="assets/skins/Slider_trackSkin.png");
+	}
+	
+	mx|VSlider	{
+		thumbDisabledSkin: Embed(source="assets/skins/Slider_thumbDisabledSkin.png");
+		thumbDownSkin: Embed(source="assets/skins/Slider_thumbDownSkin.png");
+		thumbOverSkin: Embed(source="assets/skins/Slider_thumbOverSkin.png");
+		thumbUpSkin: Embed(source="assets/skins/Slider_thumbUpSkin.png");
+		trackSkin: Embed(source="assets/skins/Slider_trackSkin.png");	
+	}
+	
+
+	
+	
+
+	mx|HScrollBar {
+	   fillAlphas: 1, 1, 0.75, 0.65;
+	   fillColors: #ffffff, #cccccc, #ffffff, #eeeeee;
+	}
+
+	mx|VScrollBar {
+	   fillAlphas: 1, 1, 0.75, 0.65;
+	   fillColors: #ffffff, #cccccc, #ffffff, #eeeeee;
+	}
+
+
+	mx|ComboBox {
+	   dropdownStyleName: "myComboBoxDropDowns";
+	   color: #000000;
+	}
+
+	.myComboBoxDropDowns {
+	   borderThickness: 1;
+	   borderColor: #919495;
+	   dropShadowEnabled: false;
+	   shadowDirection: center;
+	   shadowDistance: 0;
+	}
+
+	mx|DateChooser {
+		cornerRadius: 0;
+		borderThickness: 1;
+		horizontalGap: 0;
+		verticalGap: 6;
+		headerColors: #666666, #666666;
+		highlightAlphas: 1, 1;
+		fillAlphas: 1, 1, 1, 1;
+		fillColors: #003333, #003399, #009999, #006666;
+		borderColor: #666666;
+		backgroundAlpha: 1;
+		dropShadowEnabled: false;
+		shadowDistance: 0;
+		shadowDirection: right;
+		fontSize: 11;
+		headerStyleName: "mydateChooserHeaderStyle";   weekDayStyleName: "mydateChooserWeekDayStyle";   todayStyleName: "mydateChooserTodayStyle";
+	}
+	
+	.mydateChooserHeaderStyle {
+		color: #ffffff;
+		fontFamily: Verdana;
+		fontWeight: bold;
+		fontSize: 11;
+		fontStyle: normal;
+		textDecoration: none;
+	}
+	
+	.mydateChooserWeekDayStyle {
+		fontFamily: Georgia;
+	}
+	
+	.mydateChooserTodayStyle {
+		color: #ffffff;
+		fontWeight: bold;
+		fontStyle: normal;
+		textDecoration: none;
+	}
+
+	mx|DateChooser {
+		nextMonthDisabledSkin: Embed(source="assets/skins/DateChooser_nextMonthDisabledSkin.png");
+		nextMonthDownSkin: Embed(source="assets/skins/DateChooser_nextMonthDownSkin.png");
+		nextMonthOverSkin: Embed(source="assets/skins/DateChooser_nextMonthOverSkin.png");
+		nextMonthUpSkin: Embed(source="assets/skins/DateChooser_nextMonthUpSkin.png");
+		prevMonthDisabledSkin: Embed(source="assets/skins/DateChooser_prevMonthDisabledSkin.png");
+		prevMonthDownSkin: Embed(source="assets/skins/DateChooser_prevMonthDownSkin.png");
+		prevMonthOverSkin: Embed(source="assets/skins/DateChooser_prevMonthOverSkin.png");
+		prevMonthUpSkin: Embed(source="assets/skins/DateChooser_prevMonthUpSkin.png");
+	}
+	
+	mx|DateField {
+		disabledSkin: Embed(source="assets/skins/DateField_disabledSkin.png");
+		downSkin: Embed(source="assets/skins/DateField_downSkin.png");
+		overSkin: Embed(source="assets/skins/DateField_overSkin.png");
+		upSkin: Embed(source="assets/skins/DateField_upSkin.png");
+	}
+	
+	mx|LinkButton {
+		color: #000000;
+	}
+	
+	mx|Tree
+	{
+		defaultLeafIcon: Embed(source="assets/skins/Tree_defaultLeafIcon.png");
+		folderClosedIcon: Embed(source="assets/skins/Tree_folderClosedIcon.png");
+		folderOpenIcon: Embed(source="assets/skins/Tree_folderOpenIcon.png");
+	}
+	
+	

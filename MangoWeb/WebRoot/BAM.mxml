@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:ns="flexlib.containers.*"
+			   xmlns:mx="library://ns.adobe.com/flex/mx" minWidth="955" minHeight="600" creationComplete="init()" preinitialize="initStyle()" >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			import mx.effects.Effect;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.bam.flex.modules.report.utils.ReportPanel;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.mtchart.MTCardChartPanel;
+			import smartx.flex.components.core.mtchart.MTGeoMapChartPanel;
+			import smartx.flex.components.core.mtchart.MTIndicatorPanel;
+			import smartx.flex.components.core.mtchart.MTListChartPanel;
+			import smartx.flex.components.core.mtchart.MTMultiSeriesChartPanel;
+			import smartx.flex.components.core.mtchart.MTOLAPChartPanel;
+			import smartx.flex.components.core.mtchart.MTProcessChartPanel;
+			import smartx.flex.components.core.mtchart.MTSingleSeriesPanel;
+			import smartx.flex.components.core.mtchart.MTTreeGridChartPanel;
+			import smartx.flex.components.core.mtchart.MTXYPlotChartPanel;
+			import smartx.flex.components.event.MetadataTempletUtilEvent;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			
+			private var mTSingleSeriesPanel:MTSingleSeriesPanel;
+			private var mTMultiSeriesChartPanel:MTMultiSeriesChartPanel;
+			private var mTXYPlotChartPanel:MTXYPlotChartPanel;
+			private var mTGeoMapChartPanel:MTGeoMapChartPanel;
+			private var mTIndicatorPanel:MTIndicatorPanel;
+			private var mTListChartPanel:MTListChartPanel;
+			private var mTTreeGridChartPanel:MTTreeGridChartPanel;
+			private var mTCardChartPanel:MTCardChartPanel;
+			private var mTOLAPChartPanel:MTOLAPChartPanel;
+			private var mTProcessChartPanel:MTProcessChartPanel;
+			
+			private var debugMode:Boolean = false;
+			
+			private var endpoint:String;
+			
+			[Bindable]
+			private var switchEffect:Effect;
+			
+			[Bindable]
+			public var sysParams:Object;
+			
+			private var dashboardCode:String;
+			
+			private var bamService:RemoteObject;
+			
+			private var version:String;
+			
+			private var mtCodeArr:Array;
+			
+			
+			private function init():void{
+				
+				var tempParams:Object = FlexGlobals.topLevelApplication.parameters;
+				if(tempParams != null ){
+					endpoint = tempParams["endpoint"];
+				}
+				if(endpoint == null ){
+					Alert.show("必须指定endpoint");
+					return;
+				}
+				
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				var tempMtCodeStr:String = tempParams["mtcode"];
+				
+				var objInfo:Object = ObjectUtil.getClassInfo(tempParams);
+				var fieldArr:Array = objInfo["properties"] as Array;
+				sysParams = new Object();
+				if(fieldArr != null ){
+					for each(var fieldName:String in fieldArr){
+						var paramValue:String = String(tempParams[fieldName]);
+						if(fieldName == "endpoint" || fieldName == "endpoint_polling" || fieldName == "endpoint_streaming"){
+							continue;
+						}else{
+							sysParams[fieldName] = paramValue;
+						}
+					}
+				}
+				
+				if(!BAMUtil.isEmpty(tempMtCodeStr)){
+					mtCodeArr = tempMtCodeStr.split(";");
+				}
+				
+				ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT,endpoint);
+				
+				if(tabNavigator.getChildren().length>0){
+					tabNavigator.removeAllChildren();
+				}
+				
+				var util:MetadataTempletUtil = MetadataTempletUtil.getInstance();
+				util.addEventListener(MetadataTempletUtilEvent.INIT_GLOBAL_COMPLETE,initGlobalMetadataTempletCacheComplete);
+				OperatingTipUtil.startOperat("正在初始化缓存...");
+				util.initGlobalMetadataTempletCache(endpoint);
+				
+			}
+			
+			private function initGlobalMetadataTempletCacheComplete(event:MetadataTempletUtilEvent):void{
+				OperatingTipUtil.endOperat();
+				if(mtCodeArr != null ){
+					for each(var mtCode:String in mtCodeArr){
+						var reportPanel:ReportPanel = new ReportPanel();
+						reportPanel.mtCode = mtCode;
+						reportPanel.sysParams = sysParams;
+						tabNavigator.addChild(reportPanel);
+					}
+				}
+				mainStack.selectedChild = tabNavigator;
+			}
+			
+			private function onReturn():void{
+				mainStack.selectedChild = tabNavigator;
+			}
+			
+			public function addDetailDisplay(display:DisplayObject):void{
+				if(detailContener.getChildren().length>0){
+					detailContener.removeAllChildren();
+				}
+				detailContener.addChild(display);
+				mainStack.selectedChild = detailVbox;
+			}
+			private function initStyle():void{
+				FlexGlobals.topLevelApplication.styleManager.loadStyleDeclarations2("style/blackwhite.swf");
+			}
+			
+			public function addDisplayToNavigator(display:DisplayObject):void{
+				tabNavigator.addChild(display);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all" >
+		
+		<ns:SuperTabNavigator width="100%" height="100%" id="tabNavigator" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}" >
+		</ns:SuperTabNavigator>
+		
+		<mx:VBox width="100%" height="100%" id="detailVbox" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}" >
+			<mx:HBox width="100%" horizontalAlign="right">
+				<mx:Button label="返回" click="onReturn()" />
+			</mx:HBox>
+			<ns:SuperTabNavigator width="100%" height="100%" id="detailContener" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}" >
+			</ns:SuperTabNavigator>
+		</mx:VBox>
+		
+	</mx:ViewStack>
+</s:Application>

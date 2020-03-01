@@ -1,0 +1,234 @@
+/**************************************************************************
+ * $RCSfile: ShowNovaRemoteExceptionDialog.java,v $  $Revision: 1.3 $  $Date: 2007/06/06 12:59:21 $
+ *
+ * $Log: ShowNovaRemoteExceptionDialog.java,v $
+ * Revision 1.3  2007/06/06 12:59:21  qilin
+ * no message
+ *
+ * Revision 1.2  2007/05/31 07:38:16  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:01:36  qilin
+ * no message
+ *
+ * Revision 1.5  2007/03/07 08:36:38  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/03/07 08:32:20  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/03/07 02:01:55  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/02/10 09:36:50  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/02/10 08:59:52  shxch
+ * *** empty log message ***
+ *
+ **************************************************************************/
+
+package smartx.framework.metadata.ui;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import javax.swing.border.EmptyBorder;
+
+import smartx.framework.common.vo.*;
+
+/**
+ * @author user
+ *
+ */
+public class ShowNovaRemoteExceptionDialog extends NovaDialog implements ActionListener {
+    NovaRemoteException e=null;
+
+    private JLabel lbIcon = null;
+    private JMultilineLabel lbSimpleInfo = null;
+    private JTextArea taClientStack = null;
+    private JTextArea taServerStack = null;
+    JScrollPane scrollpaneClientStack = null;
+    JScrollPane scrollpaneServerStack = null;
+    JButton btnOk = null;
+    private JButton btnSwitch = null;
+    private JPanel panelDetail;
+
+    private boolean isDetailShown = false;
+
+    int iDetailHeight = 0;
+
+    private String strSimpleMessage = null;
+    private String strClientStackMessage = null;
+    private String strServerStackMessage = null;
+
+    public ShowNovaRemoteExceptionDialog(Container _parent, NovaRemoteException _e) {
+        super(_parent, "错误");
+        this.setModal(true);
+        this.setResizable(false);
+        this.e = _e;
+        strSimpleMessage = getSimpleMessage(e);
+        strClientStackMessage = getClientStackMessage(e);
+        strServerStackMessage = getServerStackMessage(e);
+        init();
+        pack();
+        centerDialog();
+        this.setVisible(true);
+    }
+
+    private void init() {
+        lbIcon = new JLabel(UIManager.getIcon("OptionPane.errorIcon"), JLabel.CENTER);
+        lbSimpleInfo = new JMultilineLabel(strSimpleMessage,2,60);
+        taClientStack = new JTextArea(strClientStackMessage);
+        taServerStack = new JTextArea(strServerStackMessage);
+        scrollpaneClientStack = new JScrollPane(taClientStack);
+        scrollpaneServerStack = new JScrollPane(taServerStack);
+        btnOk = new JButton("确定");
+        btnOk.setDefaultCapable(true);
+        btnOk.addActionListener(this);
+        this.getRootPane().setDefaultButton(btnOk);
+        btnSwitch = new JButton();
+        btnSwitch.addActionListener(this);
+
+        this.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+
+        //Layout
+        lbIcon.setBorder(new EmptyBorder(10, 10, 10, 10));
+        lbSimpleInfo.setBorder(new EmptyBorder(0, 0, 0, 10));
+        taClientStack.setEditable(false);
+        taClientStack.setBackground(UIManager.getColor("OptionPane.background"));
+        taServerStack.setEditable(false);
+        taServerStack.setBackground(UIManager.getColor("OptionPane.background"));
+        scrollpaneClientStack.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 10, 0, 10),
+            scrollpaneClientStack.getBorder()));
+        scrollpaneClientStack.setPreferredSize(new Dimension(450, 150));
+        scrollpaneServerStack.setBorder(BorderFactory.createCompoundBorder(new EmptyBorder(0, 10, 0, 10),
+            scrollpaneServerStack.getBorder()));
+        scrollpaneServerStack.setPreferredSize(new Dimension(450, 150));
+
+        JPanel panelInfo = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+
+        panelInfo.add(lbIcon);
+        panelInfo.add(lbSimpleInfo);
+
+        JPanel panelButton = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        panelButton.add(btnOk);
+        panelButton.add(btnSwitch);
+
+        JPanel panelNorth=new JPanel(new BorderLayout());
+        panelNorth.add(panelInfo,BorderLayout.NORTH);
+        panelNorth.add(panelButton,BorderLayout.CENTER);
+
+        panelDetail=new JPanel(new BorderLayout());
+        JSplitPane panelDetailSplit=new JSplitPane(JSplitPane.VERTICAL_SPLIT,scrollpaneClientStack,scrollpaneServerStack);
+        panelDetailSplit.setDividerLocation(150);
+        panelDetail.add(panelDetailSplit,BorderLayout.CENTER);
+
+        this.getContentPane().setLayout(new BorderLayout());
+        this.getContentPane().add(panelNorth,BorderLayout.NORTH);
+        this.getContentPane().add(panelDetail,BorderLayout.CENTER);
+
+        this.addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                closeDialog();
+            }
+
+            public void windowOpened(WindowEvent e) {
+                btnOk.requestFocus();
+                iDetailHeight = (int) panelDetail.getPreferredSize().getHeight();
+                switchDetailInfo();
+            }
+        });
+
+        KeyListener keylistener = new KeyAdapter() {
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE
+                    && (e.getModifiers() & (InputEvent.SHIFT_MASK
+                                            | InputEvent.CTRL_MASK | InputEvent.ALT_MASK)) == 0) {
+                    closeDialog();
+                }
+            }
+        };
+
+        btnOk.addKeyListener(keylistener);
+        btnSwitch.addKeyListener(keylistener);
+        taClientStack.addKeyListener(keylistener);
+        taServerStack.addKeyListener(keylistener);
+    }
+
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == btnOk) {
+            closeDialog();
+        } else
+        if (e.getSource() == btnSwitch) {
+            isDetailShown = !isDetailShown;
+            switchDetailInfo();
+        }
+    }
+
+    void closeDialog() {
+        this.dispose();
+    }
+
+    void switchDetailInfo() {
+        Dimension d = this.getSize();
+
+        if (isDetailShown) {
+            panelDetail.setVisible(true);
+            d.height = d.height+iDetailHeight;
+            btnSwitch.setText("简要(D)<<");
+        } else {
+            panelDetail.setVisible(false);
+            d.height =d.height- iDetailHeight;
+            btnSwitch.setText("详细(D)>>");
+        }
+
+        btnSwitch.setMnemonic('D');
+        this.setSize(d);
+        this.doLayout();
+    }
+
+    public static String getSimpleMessage(NovaRemoteException e) {
+        return e.getMessage();
+    }
+
+    private String getClientStackMessage(NovaRemoteException e) {
+        return e.getClientStackDetail();
+    }
+
+    private String getServerStackMessage(NovaRemoteException e) {
+        return e.getServerStackDetail();
+    }
+
+    public void centerDialog() {
+       Dimension dialogSize = getSize();
+       Dimension userScreen = Toolkit.getDefaultToolkit().getScreenSize();
+       int x = userScreen.width / 2 - dialogSize.width / 2;
+       int y = userScreen.height / 2 - dialogSize.height / 2;
+       setLocation(x, y);
+   }
+}
+
+class JMultilineLabel extends JTextArea {
+    public JMultilineLabel(String text) {
+        super(text);
+    }
+
+    public JMultilineLabel(String text, int rows, int columns) {
+        super(text, rows, columns);
+    }
+
+    public void updateUI() {
+        super.updateUI();
+
+        setLineWrap(true);
+        setWrapStyleWord(true);
+        setHighlighter(null);
+        setEditable(false);
+        setSelectedTextColor(UIManager.getColor("Label.foreground"));
+
+        LookAndFeel.installBorder(this, "Label.border");
+        LookAndFeel.installColorsAndFont(this, "Label.background", "Label.foreground", "Label.font");
+    }
+}

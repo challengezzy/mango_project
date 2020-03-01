@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml" 
+		   layout="vertical" width="100%" height="100%" 
+		   xmlns:components="smartx.flex.components.*" 
+		   xmlns:chart="smartx.flex.components.chart.*" 
+		   xmlns:mx1="org.efflex.mx.*" 
+		   xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+		   xmlns:core="smartx.flex.components.core.*" 
+		   xmlns:chart1="smartx.flex.components.core.chart.*"
+		   initialize="init()"> 
+	<!--add by zhangzz for issue#SMARTX-8 begin-->
+	<mx:Script>
+		<![CDATA[
+			import smartx.flex.components.basic.ClientEnviorment;
+			[Bindable]
+			public var endpoint:String;
+			
+			public function init():void
+			{
+				endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			}
+		]]>
+	</mx:Script>
+	<!--add by zhangzz for issue#SMARTX-8 end-->
+	<mx:Fade id="effect"/>
+	<core:BillChartPanel endpoint="{endpoint}" templetCode="PUB_USER_CODE1"  width="100%" height="100%" debugMode="true">
+		<core:charts>
+			<mx:Array>
+				<chart1:AdvPieChart title="用户登录次数统计饼图" pieChartDataField="LOGINCOUNT" pieChartNameField="NAME" pieChartLabelField="NAME" showEffect="{effect}"/>
+				<chart1:AdvBarChart title="用户登录次数统计横柱状图" categoryField="NAME" showEffect="{effect}">
+					<chart1:series>
+						<mx:Object valueField="LOGINCOUNT" displayName="登录次数"/>
+						<mx:Object valueField="VERSION" displayName="版本号"/>
+					</chart1:series>
+				</chart1:AdvBarChart>
+				<chart1:AdvColumnChart title="用户登录次数统计纵柱状图" categoryField="NAME" showEffect="{effect}">
+					<chart1:series>
+						<mx:Object valueField="LOGINCOUNT" displayName="登录次数"/>
+						<mx:Object valueField="VERSION" displayName="版本号"/>
+					</chart1:series>
+				</chart1:AdvColumnChart>
+			</mx:Array>
+		</core:charts>
+	</core:BillChartPanel>
+</mx:Module>

@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="580" height="450" 
+			allowDrag="true" allowClose="true" allowMaximize="true" 
+			allowMinimize="true" allowResize="true" close="onClose()" fontSize="12" 
+			xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+			xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+			xmlns:core="smartx.flex.components.core.*"
+			xmlns:fx="http://ns.adobe.com/mxml/2009"
+			title="业务规则配置"
+			>
+	<fx:Declarations>
+		<mx:VBox id="conditionBox" width="100%" >
+			<mx:Label text="触发条件:" />
+			<mx:TextArea width="100%" id="conditionTa" editable="false"/>
+			<mx:Label text="重置条件:" />
+			<mx:TextArea width="100%" id="resetConditionTa" editable="false" />
+		</mx:VBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.IFlexDisplayObject;
+			import mx.effects.Effect;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.bam.flex.modules.common.CustomerTextInput;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var initQueryCondition:String;
+			[Bindable]
+			public var templeteId:String;
+			[Bindable]
+			public var businessruleId:String;
+			[Bindable]
+			public var isEdit:Boolean;
+			[Bindable]
+			public var besdesc:String;
+			[Bindable]
+			public var onQuery:Function;
+			
+			[Bindable]
+			private var templeteObj:Object;
+			
+			[Bindable]
+			private var alertId:String;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			private var userName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME));
+			
+			private function init():void{
+
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				formService = new RemoteObject(destination);
+				bamService = new RemoteObject("smartXBAMService");
+				if(endpoint!=null){
+					formService.endpoint = endpoint;
+					bamService.endpoint = endpoint;
+				}
+				
+				formService.getSequenceNextValByDS.addEventListener(ResultEvent.RESULT,getSequenceNextValByDSHandler);
+				formService.getSequenceNextValByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getParaInfo.addEventListener(ResultEvent.RESULT,getParaInfoHandler);
+				bamService.getParaInfo.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getCondition.addEventListener(ResultEvent.RESULT,getConditionHandler);
+				bamService.getCondition.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getRuleInfoByBusinessruleId.addEventListener(ResultEvent.RESULT,getRuleInfoByBusinessruleidHandler);
+				bamService.getRuleInfoByBusinessruleId.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.createRuleByTemplete.addEventListener(ResultEvent.RESULT,createRuleByTempleteHandler);
+				bamService.createRuleByTemplete.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				if(isEdit){
+					
+					ruleStack.selectedChild =step1;
+					lastStepBtn1.visible = false;
+					
+					bamService.getCondition(templeteId);
+					ruleCodeTxt.editable = false;
+					bamService.getRuleInfoByBusinessruleId(businessruleId);
+					
+					bestextArea.text = (besdesc==null||besdesc=="null")?"":besdesc;
+					
+				}else{
+					formService.getSequenceNextValByDS(null,"s_bam_businessrule");
+					ruleStack.selectedChild =step0;	
+					listPanel.isShowAlert = false;
+					listPanel.query(false,true,true);
+				}
+				
+				initData();
+				
+			}
+			
+			private function initData():void{
+				
+				var arrayCol:ArrayCollection = new ArrayCollection();
+				
+				var obj1:Object = new Object();
+				obj1["value"] = 0;
+				obj1["valuecn"] = "每次均发送";
+				arrayCol.addItem(obj1);
+				
+				var obj2:Object = new Object();
+				obj2["value"] = 1;
+				obj2["valuecn"] = "只发送一次";
+				arrayCol.addItem(obj2);
+				
+				ruleTypeCbb.selectedItem = obj1;
+				ruleTypeCbb.dataProvider = arrayCol;
+				
+				bamService.getParaInfo(templeteId,businessruleId,isEdit);
+				
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			private function getRuleInfoByBusinessruleidHandler(event:ResultEvent):void{
+				var array:Array = event.result as Array;
+				for each(var vo:SimpleHashVO in array){
+					var obj:Object = vo.dataMap;
+					
+					descTa.text = obj["description"] as String;
+					ruleNameTxt.text = obj["name"] as String;
+					ruleCodeTxt.text = obj["code"] as String;
+					alertId = obj["actionalertid"] as String;
+				}
+			}
+			
+			private function getSequenceNextValByDSHandler(event:ResultEvent):void{
+				
+				this.businessruleId = event.result as String;
+				
+				templatenameTxt.text = '业务规则'+businessruleId;
+				templatecodeTxt.text = 'BUSINESSRULECODE'+businessruleId;
+				
+				ruleNameTxt.text = '告警规则'+businessruleId;
+				ruleCodeTxt.text = 'alertRuleCode'+businessruleId;
+			}
+			
+			private function getParaInfoHandler(event:ResultEvent):void{
+				
+				var array:Array = event.result as Array;
+				var contentXml:XML = new XML("<root />");
+				var flag:Boolean = true;
+				paraVbox.removeAllChildren();
+				for each(var simpleVO:SimpleHashVO in array){
+					
+					var obj:Object = simpleVO.dataMap;
+					
+					var parameterinfo:String = obj["parameterinfo"] as String;
+					
+					if(parameterinfo != null && parameterinfo != "" && flag){
+						contentXml = new XML(parameterinfo);
+						
+					}
+					
+					if(flag){
+						
+						var businessName:String = obj["rname"] as String;
+						var businessCode:String = obj["rcode"] as String;
+						
+						if(businessName !=null && businessName != ""){
+							templatenameTxt.text = businessName;
+						}
+						
+						if(businessCode !=null && businessCode != ""){
+							templatecodeTxt.text = businessCode;
+						}
+						flag = false;
+					}
+					
+					var paraName:String = obj["pname"] as String;
+					var paraType:String = obj["ptype"] as String;
+					var caption:String = obj["pcaption"] as String;
+					var value:String = getValueByElename(contentXml,paraName);
+					
+					if(paraName !=null && paraName !=""){
+						var dataObj:Object = new Object();
+						dataObj["titlevalue"] = caption;
+						dataObj["datavalue"] = value;
+						dataObj["datafield"] = paraName;
+						dataObj["datatype"] = paraType;
+						
+						var cti:CustomerTextInput = new CustomerTextInput();
+						cti.dataObj = dataObj;
+						
+						paraVbox.addChild(cti);
+					}
+					
+				}
+			}
+			
+			private function getConditionHandler(event:ResultEvent):void{
+				var array:Array = event.result as Array;
+				for each(var simpleVO:SimpleHashVO in array){
+					var obj:Object = simpleVO.dataMap;
+					var flag:String = String(obj["showcondition"]);
+					if(flag == "1"){
+						
+						conditionVbox.addChild(conditionBox);
+						
+						conditionTa.text = obj["condition"] as String;
+						resetConditionTa.text = obj["resetcondition"] as String;
+						
+						
+					}else{
+						if(conditionVbox.contains(conditionBox)){
+							conditionVbox.removeChild(conditionBox);
+						}
+					}
+				}
+			}
+			
+			private function createRuleByTempleteHandler(event:ResultEvent):void{
+				endOperat();
+				Alert.show("规则创建成功!", '提示');
+				onClose();
+				onQuery();
+			}
+			
+			private function onClose():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+
+			protected function createBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				ConfirmUtil.confirm("确定要生成告警规则吗?",this,confirmHandler);
+
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				
+				if(event.detail == Alert.YES){
+				
+					var dataValue:Object = new Object();
+					var dateType:Object = new Object();
+					
+					var dataInfo:Object = new Object();
+					
+					var item:Object = ruleTypeCbb.selectedItem;
+					var actionType:String = String(item["value"]);
+					
+					dataInfo["description"] = descTa.text;
+					dataInfo["rulename"] = ruleNameTxt.text;
+					dataInfo["rulecode"] = ruleCodeTxt.text;
+					dataInfo["actiontype"] = actionType;
+					dataInfo["besname"] = templatenameTxt.text;
+					dataInfo["bescode"] = templatecodeTxt.text;
+					dataInfo["besdesc"] = bestextArea.text;
+					dataInfo["alertid"] = alertId;
+					
+					var array:Array = paraVbox.getChildren();
+					
+					for each(var obj:Object in array){
+						
+						var cti:CustomerTextInput = obj as CustomerTextInput;
+						
+						var tempData:Object = cti.getDataObject();
+						
+						dataValue[tempData["datafield"]] = tempData["datavalue"];
+						dateType[tempData["datafield"]] = tempData["datatype"];
+					}
+					startOperat();
+					bamService.createRuleByTemplete(templeteId,userName,businessruleId,dataValue,dateType,dataInfo,isEdit);
+					
+				}
+			}
+			
+			private function saveOrupdate():void{
+				
+			}
+			
+			private function saveAndClose():void{
+				saveOrupdate();
+				onClose();
+			}
+
+
+			protected function nextStepBtn0_clickHandler():void
+			{
+				var item:Object = listPanel.getSelectedRowValue();
+				
+				if(item == null){
+					Alert.show("请先选择一个模板!","提示");
+				}else{
+					
+					templeteObj = item;
+					
+					this.templeteId = String(item["ID"]);
+					
+					bamService.getParaInfo(templeteId,businessruleId,isEdit);
+					
+					bamService.getCondition(templeteId);
+					
+					ruleStack.selectedChild = step1;
+				}
+				
+			}
+
+
+			protected function lastStepBtn1_clickHandler(event:MouseEvent):void
+			{
+				ruleStack.selectedChild = step0;
+			}
+
+
+			protected function nextStepBtn1_clickHandler(event:MouseEvent):void
+			{
+				ruleStack.selectedChild = step2;
+			}
+			
+			protected function lastStepBtn2_clickHandler(event:MouseEvent):void
+			{
+				ruleStack.selectedChild = step1;
+			}
+			
+			private function getValueByElename(xml:XML,name:String):String{
+				var value:String = "";
+				for each(var item:XML in xml.data){
+					var tempname:String = item.@name;
+					if(tempname == name){
+						value = item.@value;
+						break;
+					}
+				}
+				return value;
+			}
+			
+			private function startOperat():void{
+				
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在执行……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,this,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endOperat():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+
+		]]>
+	</fx:Script>
+	
+	<mx:VBox label="" width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" 
+			 hideEffect="{switchEffect}" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		
+		<mx:ViewStack width="100%" height="100%" id="ruleStack" creationPolicy="all">
+			
+			<mx:VBox width="100%" height="100%" id="step0" >
+				<core:BillListPanel doubleClick="nextStepBtn0_clickHandler()" showInitingWindow="false" 
+									destination="{destination}" endpoint="{endpoint}" templetCode="T_V_BAM_RULETEMPLATE_C" 
+									id="listPanel" editable="true" width="100%" height="100%" showEditBox="false" debugMode="{debugMode}" >
+				</core:BillListPanel>
+				<mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+					<mx:Button id="nextStepBtn0" label="下一步" toolTip="选择一个规则模板,进入下一步操作" 
+							   click="nextStepBtn0_clickHandler()" icon="{AssetsFileLib.nextstepIcon}" />
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:VBox width="100%" height="100%" id="step1">
+				<mx:HBox width="100%" >
+					<mx:Label text="业务规则名称:" />
+					<mx:TextInput id="templatenameTxt" toolTip="输入业务规则的名称" />
+					<mx:Label text="业务规则编码:" />
+					<mx:TextInput id="templatecodeTxt" toolTip="输入业务规则的编码" />
+				</mx:HBox>
+				<mx:Label text="描述:" toolTip="输入业务规则的名称" />
+				<mx:TextArea id="bestextArea" width="100%"/>
+				<mx:VBox width="100%" id="conditionVbox" />
+				<mx:Label text="参数配置:"/>
+			    <mx:VBox width="100%" id="paraVbox" height="100%" horizontalAlign="left" />
+				<mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+					<mx:Button id="lastStepBtn1" label="上一步" toolTip="返回上一步操作" 
+							   click="lastStepBtn1_clickHandler(event)" icon="{AssetsFileLib.laststepIcon}" />
+					<mx:Button id="nextStepBtn1" label="下一步" toolTip="进入下一步操作" 
+							   click="nextStepBtn1_clickHandler(event)" icon="{AssetsFileLib.nextstepIcon}" />
+				</mx:HBox>
+				
+			</mx:VBox>
+			
+			<mx:VBox width="100%" height="100%" id="step2" >
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="选择告警类型:" />
+					<mx:ComboBox id="ruleTypeCbb" labelField="valuecn"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="告警规则名称:" />
+					<mx:TextInput id="ruleNameTxt" toolTip="输入告警规则的名称" />
+					<mx:Label text="告警规则编码:" />
+					<mx:TextInput id="ruleCodeTxt" toolTip="输入告警规则的编码" />
+				</mx:HBox>
+				<mx:Label text="描述:" />
+				<mx:TextArea id="descTa" width="100%" height="100%" toolTip="输入对规则的描述" />
+				<mx:HBox width="100%" horizontalAlign="right" verticalAlign="bottom">
+					<mx:Button id="lastStepBtn2" label="上一步" toolTip="返回上一步操作" 
+							   click="lastStepBtn2_clickHandler(event)" icon="{AssetsFileLib.laststepIcon}" />
+					<mx:Button id="createBtn" label="生成告警规则" toolTip="确认后将按照上述条件生成告警规则" 
+							   click="createBtn_clickHandler(event)" icon="{AssetsFileLib.okIcon}" />
+				</mx:HBox>
+			</mx:VBox>
+			
+		</mx:ViewStack>
+	</mx:VBox>
+	
+</SuperPanel>

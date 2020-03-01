@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtdesigner:MTDesigner xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:mtdesigner="smartx.flex.components.mtdesigner.*" layout="vertical"
+					   creationComplete="init()" width="700">
+
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:VBox width="100%" height="100%" id="systemConfigEditor" label="系统参数配置">
+			<mx:Form id="systemConfigEditorForm" width="100%" height="100%">
+				<mx:FormItem label="浏览器标题">
+					<mx:TextInput id="browserTitleInput"
+								  text="{sourceXML.title}"
+								  change="{sourceXML.title=browserTitleInput.text}"
+								  width="320"/> 
+				</mx:FormItem>
+				<mx:FormItem label="登陆背景图片">
+					<mx:TextInput id="loginBackgroundImageUrlInput"
+								  text="{sourceXML.loginBackgroundImageUrl}"
+								  change="loginBackgroundImageUrlInput_changeHandler(event)"
+								  width="320"/> 
+				</mx:FormItem>
+				<mx:FormItem label="标题图片（左上）">
+					<mx:TextInput id="titleImageUrlInput"
+								  text="{sourceXML.titleImageUrl}"
+								  change="titleImageUrlInput_changeHandler(event)"
+								  width="320"/>
+				</mx:FormItem>
+				<mx:FormItem label="标题标志图片（右上）">
+					<mx:TextInput id="titleLogoImageUrlInput"
+								  text="{sourceXML.titleLogoImageUrl}"
+								  change="titleLogoImageUrlInput_changeHandler(event)"
+								  width="320"/>
+				</mx:FormItem>
+				<mx:FormItem label="大图标左侧图片">
+					<mx:TextInput id="leftImageUrlInput"
+								  text="{sourceXML.leftImageUrl}"
+								  change="leftImageUrlInput_changeHandler(event)"
+								  width="320"/>
+				</mx:FormItem>
+				<mx:FormItem label="数据建模模块URL">
+					<mx:TextInput id="dbExplorerUrlInput"
+								  text="{sourceXML.address}"
+								  change="{sourceXML.address=dbExplorerUrlInput.text}"
+								  width="320"/> 
+				</mx:FormItem>
+				<mx:FormItem label="欢迎界面高度">
+					<mx:TextInput id="welcomeFrameHeightInput" text="{sourceXML.welcomeFrameHeight}" change="{sourceXML.welcomeFrameHeight=welcomeFrameHeightInput.text}" restrict="0-9" width="320"/> 
+				</mx:FormItem>
+				<mx:FormItem label="欢迎界面内容">
+					<mx:CheckBox id="enableUserInfoPodInput" toolTip="是否显示用户信息框"
+								 label="用户信息" selected="{sourceXML.enableUserInfoPod!='false'}"
+								 click="enableUserInfoPodInput_clickHandler(event)"/>
+					<mx:CheckBox id="enableMessageWindowPodInput" toolTip="是否显示公告框"
+								 label="公告信息" selected="{sourceXML.enableMessageWindowPod!='false'}"
+								 click="enableMessageWindowPodInput_clickHandler(event)"/>
+					<mx:CheckBox id="enableHistoryWindowPodInput" toolTip="是否显示访问历史框"
+								 label="访问历史" selected="{sourceXML.enableHistoryWindowPod!='false'}"
+								 click="enableHistoryWindowPodInput_clickHandler(event)"/>
+					<mx:CheckBox id="enableCalendarWindowPodInput" toolTip="是否显示日历"
+								 label="是否显示日历" selected="{sourceXML.enableCalendarPod!='false'}"
+								 click="enableCalendarWindowPodInput_clickHandler(event)"/>
+				</mx:FormItem>
+				<mx:FormItem label="公告每页最大数量">
+					<mx:TextInput id="messagePageSizeInput"
+								  text="{sourceXML.messagePageSize}"
+								  change="{sourceXML.messagePageSize=messagePageSizeInput.text}"
+								  restrict="0-9"
+								  /> 
+				</mx:FormItem>
+				<mx:FormItem label="菜单显示方式">
+					<mx:ComboBox id="menuTypeCob" labelField="name" dataProvider="{dataCol}" change="menuTypeCob_dataChangeHandler(event)" creationComplete="menuTypeCob_creationCompleteHandler(event)" />
+				</mx:FormItem>
+				<mx:FormItem id="imageMenuHeightFormItem" label="大图标菜单高度">
+					<mx:TextInput id="imageMenuHeightInput" text="{sourceXML.imageMenuHeight}" change="{sourceXML.imageMenuHeight=imageMenuHeightInput.text}" restrict="0-9" width="320"/> 
+				</mx:FormItem>
+				<mx:FormItem id="imageBackgroundColorFormItem" label="大图标菜单背景色">
+					<mx:HBox width="100%" >
+						<mx:TextInput id="imageBackgroundColorInput" toolTip="示例:00CCFF" text="{sourceXML.imageBackgroundColor}" change="{sourceXML.imageBackgroundColor=imageBackgroundColorInput.text}" restrict="A-F,a-f,0-9" width="320"/>
+						<mx:ColorPicker id="imageBackgroundColorPicker" change="imageBackgroundColorPicker_changeHandler(event)" showTextField="false"/>
+					</mx:HBox>
+				</mx:FormItem>
+				<mx:FormItem id="imageLabelColorFormItem" label="大图标菜单标题色">
+					<mx:HBox width="100%" >
+						<mx:TextInput id="imageLabelColorInput" toolTip="示例:00CCFF" text="{sourceXML.imageLabelColor}" change="{sourceXML.imageLabelColor=imageLabelColorInput.text}" restrict="A-F,a-f,0-9" width="320"/>
+						<mx:ColorPicker id="imageLabelColorPicker" change="imageLabelColorPicker_changeHandler(event)" showTextField="false"/>
+					</mx:HBox> 
+				</mx:FormItem>
+				<mx:FormItem label="是否显示工具栏">
+					<mx:CheckBox id="showToolBoxInput" selected="{sourceXML.showToolBox=='true'}"
+								 click="showToolBoxInput_clickHandler(event)"/>
+				</mx:FormItem>
+				<mx:FormItem label="是否显示标题栏">
+					<mx:CheckBox id="showTitleFlagInput" selected="{sourceXML.showTitleFlag=='true'}"
+								 click="showTitleFlagInput_clickHandler(event)"/>
+				</mx:FormItem>
+				<mx:FormItem label="默认打开菜单">
+					<mx:VBox width="500" height="150">
+						<mx:HBox width="100%">
+							<mx:TextInput width="170" id="newOpenMenuInput" toolTip="输入要新增的菜单编码"/>
+							<mx:LinkButton icon="{AssetsFileLib.addIcon}" 
+										   width="22" height="22" toolTip="新增默认打开菜单"
+										   id="addNewOpenMenuButton"
+										   click="addNewOpenMenuButton_clickHandler(event)"
+										   />
+							<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" 
+										   width="22" height="22" toolTip="删除选中的菜单"
+										   id="removeNewOpenMenuButton"
+										   click="removeNewOpenMenuButton_clickHandler(event)"
+										   />
+						</mx:HBox>
+						<mx:List id="defaultOpenMenuList" width="100%" height="100%"
+								 dataProvider="{sourceXML.customeMenus.customeMenu}"
+								 labelField="@code"/>
+					</mx:VBox>
+				</mx:FormItem>
+				<mx:FormItem label="元数据设计器关联">
+					<mx:VBox width="500" height="200">
+						<mx:HBox width="100%">
+							<mx:ComboBox id="mttypeComboBox" editable="true">
+								<mx:dataProvider>
+									["DEFAULT","SYSTEMCONFIG","STYLETEMPLATE","PIVOTTABLE","SYNONYMS","DATATASKTYPE","DQCCHECKITEM","EXPORTEXCEL"]
+								</mx:dataProvider>
+							</mx:ComboBox>
+							<mx:LinkButton icon="{AssetsFileLib.addIcon}" 
+										   width="22" height="22" toolTip="新增元数据设计器关联"
+										   id="addNewMTDesignerButton"
+										   click="addNewMTDesignerButton_clickHandler(event)"
+										   />
+							<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" 
+										   width="22" height="22" toolTip="删除选中的元数据设计器关联"
+										   id="removeMTDesignerButton"
+										   click="removeMTDesignerButton_clickHandler(event)"
+										   />
+						</mx:HBox>
+						<mx:DataGrid id="mtdesignerGrid" width="100%" height="100%" editable="true" dataProvider="{sourceXML.mtdesigners.designer}">
+							<mx:columns>
+								<mx:DataGridColumn headerText="元数据模板类型" editable="false" dataField="@mttype"/>
+								<mx:DataGridColumn headerText="实现类" editable="true" dataField="@uiclass" />
+							</mx:columns>
+						</mx:DataGrid>
+					</mx:VBox>
+				</mx:FormItem>
+			</mx:Form>
+		</mx:VBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ListEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.workflow.Utils;
+			
+			[Bindable]
+			private var dataCol:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				iniMenuTypeData();
+				this.sourceTextArea.editable = false;
+				tabNavigator.removeAllChildren();
+				tabNavigator.addChildAt(systemConfigEditor,0);
+			}
+			
+			private function iniMenuTypeData():void{
+				dataCol.removeAll();
+				for each(var item:XML in sourceXML.menuType.item){
+					var obj:Object = new Object();
+					obj["name"] = String(item.@name);
+					obj["value"] = String(item.@value);
+					dataCol.addItem(obj);
+				}
+			}
+			
+			private function setItemByValue(value:String):void{
+				var obj:Object = null;
+				if(dataCol != null){
+					for each(var item:Object in dataCol){
+						var tempValue:String = item["value"];
+						if(value==tempValue){
+							obj = item;
+							break;
+						}
+					}
+				}
+				if(obj != null){
+					menuTypeCob.selectedItem = obj;
+				}else{
+					menuTypeCob.selectedIndex = 0;
+				}
+				menuTypeCob_dataChangeHandler(null);
+			}
+
+			protected function loginBackgroundImageUrlInput_changeHandler(event:Event):void
+			{
+				sourceXML.loginBackgroundImageUrl = loginBackgroundImageUrlInput.text;
+			}
+
+
+			protected function menuTypeInputGroup_itemClickHandler(event:ItemClickEvent):void
+			{
+				sourceXML.verticalMenu = event.currentTarget.selectedValue;
+			}
+
+
+			protected function showToolBoxInput_clickHandler(event:MouseEvent):void
+			{
+				sourceXML.showToolBox = showToolBoxInput.selected?"true":"false";
+			}
+
+
+			protected function titleImageUrlInput_changeHandler(event:Event):void
+			{
+				sourceXML.titleImageUrl = titleImageUrlInput.text;
+			}
+
+
+			protected function titleLogoImageUrlInput_changeHandler(event:Event):void
+			{
+				sourceXML.titleLogoImageUrl = titleLogoImageUrlInput.text;
+			}
+
+
+			protected function showTitleFlagInput_clickHandler(event:MouseEvent):void
+			{
+				sourceXML.showTitleFlag = showTitleFlagInput.selected?"true":"false";
+			}
+
+
+
+			protected function addNewOpenMenuButton_clickHandler(event:MouseEvent):void
+			{
+				if(sourceXML.customeMenus.length == 0){
+					var menus:XML = <customeMenus/>;
+					sourceXML.appendChild(menus);
+				}
+				var code:String = newOpenMenuInput.text;
+				if(code == null || code == "")
+					return; 
+				if(sourceXML.customeMenus.customeMenu.(@code==code).length>0){
+					Alert.show("要添加的菜单已存在");
+					return;
+				}
+				var newMenuXML:XML = <customeMenu/>;
+				newMenuXML.@code = code;
+				sourceXML.customeMenus.appendChild(newMenuXML);
+				newOpenMenuInput.text = "";
+			}
+
+
+			protected function removeNewOpenMenuButton_clickHandler(event:MouseEvent):void
+			{
+				if(defaultOpenMenuList.selectedItem != null){
+					var selectedXML:XML = defaultOpenMenuList.selectedItem as XML;
+					Utils.xmlDeleteNode(selectedXML);
+				}
+			}
+
+
+			protected function addNewMTDesignerButton_clickHandler(event:MouseEvent):void
+			{
+				if(mttypeComboBox.selectedLabel != null && mttypeComboBox.selectedLabel !=""){
+					var newXML:XML = <designer/>
+					newXML.@mttype = mttypeComboBox.selectedLabel;
+					newXML.@uiclass = "smartx.flex.components.mtdesigner.MTDesigner";
+					sourceXML.mtdesigners.appendChild(newXML);
+				}
+			}
+
+			protected function removeMTDesignerButton_clickHandler(event:MouseEvent):void
+			{
+				if(mtdesignerGrid.selectedItem != null){
+					var selectedXML:XML = mtdesignerGrid.selectedItem as XML;
+					Utils.xmlDeleteNode(selectedXML);
+				}
+			}
+
+			protected function menuTypeCob_dataChangeHandler(event:ListEvent):void
+			{
+				var selectedItem:Object = menuTypeCob.selectedItem;
+				if(selectedItem != null){
+					if(sourceXML.menuType.length()>0){
+						sourceXML.menuType.@value = selectedItem["value"];
+					}else{
+						sourceXML.appendChild(new XML("menuType"));
+						sourceXML.menuType.@value = selectedItem["value"];
+					}
+				}
+			}
+			
+			protected function menuTypeCob_creationCompleteHandler(event:FlexEvent):void
+			{
+				setItemByValue(String(sourceXML.menuType.@value));
+			}
+			
+			protected function leftImageUrlInput_changeHandler(event:Event):void
+			{
+				sourceXML.leftImageUrl = leftImageUrlInput.text;
+				
+			}
+			
+			protected function imageBackgroundColorPicker_changeHandler(event:ColorPickerEvent):void
+			{
+				var temp:String = imageBackgroundColorPicker.selectedColor.toString(16);
+				imageBackgroundColorInput.text = temp;
+				sourceXML.imageBackgroundColor = temp;
+				
+			}
+			
+			protected function imageLabelColorPicker_changeHandler(event:ColorPickerEvent):void
+			{
+				var temp2:String = imageLabelColorPicker.selectedColor.toString(16);
+				imageLabelColorInput.text = temp2;
+				sourceXML.imageLabelColor = temp2;
+			}
+			
+			protected function enableUserInfoPodInput_clickHandler(event:MouseEvent):void
+			{
+				sourceXML.enableUserInfoPod = enableUserInfoPodInput.selected?"true":"false";
+			}
+			
+			protected function enableMessageWindowPodInput_clickHandler(event:MouseEvent):void
+			{
+				sourceXML.enableMessageWindowPod = enableMessageWindowPodInput.selected?"true":"false";
+			}
+			
+			protected function enableHistoryWindowPodInput_clickHandler(event:MouseEvent):void
+			{
+				sourceXML.enableHistoryWindowPod = enableHistoryWindowPodInput.selected?"true":"false";
+			}
+			
+			protected function enableCalendarWindowPodInput_clickHandler(event:MouseEvent):void
+			{
+				sourceXML.enableCalendarPod = enableCalendarWindowPodInput.selected?"true":"false";
+				
+			}
+			
+		]]>
+	</fx:Script>
+</mtdesigner:MTDesigner>

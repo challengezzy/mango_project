@@ -1,0 +1,246 @@
+package smartx.framework.common.vo;
+
+
+import java.io.File;
+import java.io.IOException;
+
+import org.apache.log4j.Appender;
+import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.DailyRollingFileAppender;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
+
+import smartx.framework.common.ui.UIUtil;
+import smartx.framework.common.utils.Sys;
+
+/**
+ * 日志文件.所有的Logger为novalogger的子Logger
+ *
+ */
+public class NovaLogger {
+	//是否初始化
+	private static boolean isInit=false;
+	
+	/**
+	 * 获得指定的类的日志
+	 * 由本方法可以保证，所有的日志都是统一的采用本类设置的日志格式。
+	 * @return
+	 */
+	public static Logger getLogger() {		
+		return getLogger("Unknown Class");
+	}
+
+	/**
+	 * 获得指定的类的日志
+	 * 由本方法可以保证，所有的日志都是统一的采用本类设置的日志格式。
+	 * @param obj
+	 * @return
+	 */
+	public static Logger getLogger(Object obj) {
+		return getLogger(obj.getClass());
+	}
+
+	/**
+	 * 获得指定的类的日志
+	 * 由本方法可以保证，所有的日志都是统一的采用本类设置的日志格式。
+	 * @param cls
+	 * @return
+	 */
+	public static Logger getLogger(Class cls) {
+		return getLogger(cls.getName());
+	}
+	
+	/**
+	 * 获得指定的类的日志
+	 * 由本方法可以保证，所有的日志都是统一的采用本类设置的日志格式。
+	 * @param cls
+	 * @return
+	 */
+	public static Logger getLogger(String cls) {
+		if(!isInit) initLogger();
+		return Logger.getLogger(cls);
+	}
+
+	
+
+	//禁止实例化
+	private NovaLogger() {
+	}
+	
+	public static boolean isInit(){
+		return isInit;
+	}
+	
+	private static void initLogger(){
+		//判断是否客户端
+		String path=null,setting=null;
+		String[] tmp=null;
+		if(System.getProperty("SERVER_HOST_NAME")==null){//Server
+			path = (String)Sys.getInfo("LOG_PATH");
+			if(path==null) path = "c:";
+			setting=(String)Sys.getInfo("LOG_SETTING");			
+		}else{//Client
+			path = System.getProperty("ClientCodeCache");
+			if(path==null) path = "c:";
+			path += "_novalog";
+	    	try{
+	    		System.out.println("获得LOG_SETTING");
+	    		setting=UIUtil.getEnvironmentParamStr("LOG_SETTING");
+	    		System.out.println(setting);
+			}catch(NovaRemoteException e){
+			      System.out.println("获得服务器端信息时发生远程错误："+e.getMessage());
+			      e.printStackTrace();			      
+			}catch(Exception e){
+			      System.out.println("获得服务器端信息时发生其它错误："+e.getMessage());
+			      e.printStackTrace();			      
+			}
+		}		
+		if(setting==null) setting="DEBUG,3,N/A";
+		System.out.println("服务器端日志设置："+setting);
+		setting+=",end";		
+		tmp=setting.split(",");
+		
+		initLogger(tmp[0],tmp[1],path,tmp[2]);
+		
+		isInit=true;//
+    }
+    
+	//真正的初始化
+	private static void initLogger(String level,String type,String path,String cls) {
+		//日志目录初始化
+  		File log_dir_file = new File(path);
+		String log_dir = log_dir_file.getAbsolutePath();
+		if (!log_dir_file.exists()) {
+			log_dir_file.mkdir();
+		}
+		
+		//初始化日志
+		
+		
+		
+		Logger log=null;
+		//判断是否客户端
+		if(System.getProperty("SERVER_HOST_NAME")==null){//Server
+//			URL url=NovaLogger.class.getResource("/conf/log4j.xml");
+//			if(url!=null){
+//				try{
+//					DOMConfigurator.configure(url);
+//				}catch(Throwable e){
+//					e.printStackTrace();
+//				}
+//			}			
+			
+			log=(cls==null||cls.trim().equals("")||cls.trim().equals("N/A"))?Logger.getRootLogger():Logger.getLogger(cls);
+			log.removeAllAppenders();
+		    //BasicConfigurator.configure(); 		    
+		}else{//Client
+			//log4j.rootLogger=DEBUG,A1
+			//log4j.category=INFO,A1 
+			//log4j.appender.A1=org.apache.log4j.ConsoleAppender 
+			//log4j.appender.A1.layout=org.apache.log4j.PatternLayout 
+			//log4j.appender.A1.layout.ConversionPattern=%d{yyyy-MM-dd HH:mm:ss,SSS} [%c]-[%p] %m%n 
+			//由于默认取log4j.xml，这里没用
+//			Properties p=new Properties();
+//			p.setProperty("log4j.rootCategory", "INFO,A1");
+//			p.setProperty("log4j.category", "INFO,A1");
+//			p.setProperty("log4j.appender.A1", "org.apache.log4j.ConsoleAppender");
+//			p.setProperty("log4j.appender.A1.layout", "org.apache.log4j.PatternLayout");
+//			p.setProperty("log4j.appender.A1.layout.ConversionPattern", "%d{yyyy-MM-dd HH:mm:ss,SSS} [%c]-[%p] %m%n");
+//			new PropertyConfigurator().doConfigure(p,new DefaultRepositorySelector(new NOPLoggerRepository()).getLoggerRepository());
+//			log=(cls==null||cls.trim().equals(""))?Logger.getRootLogger():Logger.getLogger(cls);
+			//BasicConfigurator.configure();
+//			URL url=NovaLogger.class.getResource("/conf/log4j.xml");
+//			if(url!=null){
+//				try{
+//					DOMConfigurator.configure(url);					
+//				}catch(Throwable e){
+//					//TODO 需要处理一下这里出现的错误
+//					e.printStackTrace();
+//				}
+//			}			
+//			log=Logger.getLogger(cls);
+			log=(cls==null||cls.trim().equals("")||cls.trim().equals("N/A"))?Logger.getRootLogger():Logger.getLogger(cls);
+			log.removeAllAppenders();
+			//BasicConfigurator.configure();			
+		}
+		// outputtype:
+		// 1:只输出控制台不输出文件
+		// 2:只输出文件,不输出控件台
+		// 3:同时输出控制台与文件
+		log.setAdditivity(false);
+		Appender appender = null;
+		//root.removeAllAppenders();
+		PatternLayout patten = new PatternLayout("%d{yyyy-MM-dd HH:mm:ss} %p %m <%C:%L> %n");
+		if (type == null || type.equalsIgnoreCase("1")) {
+			try{
+				appender = new ConsoleAppender(patten, ConsoleAppender.SYSTEM_OUT);
+				log.addAppender(appender);
+				log.info("设置日志控制台输出。");
+			}catch(Throwable e){
+				//e.printStackTrace();
+			}
+		}else if (type.equalsIgnoreCase("2")) {
+			try {
+				String fpath=(path + "/" + "SmartXlog.log").replaceAll("//", "/");
+				appender = new DailyRollingFileAppender(patten, fpath, "'.'yyyy-MM-dd");
+				((DailyRollingFileAppender) appender).setAppend(false); //
+				log.addAppender(appender);
+				log.info("设置日志文件输出，位置【"+fpath+"】。");
+			} catch (IOException e) {
+				//System.out.println("初始化log4j时,生成日志文件错误.");
+				//e.printStackTrace();
+			}
+		} else {
+			try {
+				appender = new ConsoleAppender(patten, ConsoleAppender.SYSTEM_OUT);
+				log.addAppender(appender);
+				log.info("设置日志控制台输出。");
+			} catch (Throwable e) {
+				//e.printStackTrace();
+			}
+			try {
+				String fpath=(path + "/" + "SmartXlog.log").replaceAll("//", "/");
+				System.out.println(fpath);
+				appender = new DailyRollingFileAppender(patten, fpath, "'.'yyyy-MM-dd");
+				((DailyRollingFileAppender) appender).setAppend(false); //
+				log.addAppender(appender);
+				log.info("设置日志文件输出，位置【"+ fpath +"】。");
+			} catch (Throwable e) {
+				//System.out.println("初始化log4j时,生成日志文件错误.");
+				//e.printStackTrace();
+			}			
+		}
+		
+		
+		initLogLevel(log,level);		
+		
+		
+	}
+	
+	
+    
+
+	private static void initLogLevel(Logger log,String loglevel) {
+		//DEBUG，INFO，WARN，ERROR，FATAL
+		//System.out.println("输入的："+loglevel);
+		Level level = Level.INFO;
+		if (loglevel == null)
+			level = Level.INFO;
+		else if (loglevel.equalsIgnoreCase("DEBUG"))
+			level = Level.DEBUG;
+		else if (loglevel.equalsIgnoreCase("INFO"))
+			level = Level.INFO;
+		else if (loglevel.equalsIgnoreCase("ERROR"))
+			level = Level.ERROR;
+		else if (loglevel.equalsIgnoreCase("FATAL"))
+			level = Level.FATAL;
+		else if (loglevel.equalsIgnoreCase("WARN"))
+			level = Level.WARN;
+		else
+			level = Level.INFO;
+		log.setLevel(level);
+	}
+
+	
+}

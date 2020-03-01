@@ -1,0 +1,113 @@
+/**************************************************************************
+ * $RCSfile: DefaultMainFrame.java,v $  $Revision: 1.2.8.1 $  $Date: 2009/12/21 02:57:33 $
+ **************************************************************************/
+package smartx.publics.styletemplet.ui.templet09;
+
+import java.util.*;
+
+/**
+ * 第9种模板,即多子表 一个主表拖几个子表,所有子表都有一个外键指向主表的主键!!! 所有子表的增删改都是直接在列表中直接进行,而不是切换到卡片!F
+ *
+ * @author sunxf
+ *
+ */
+public class DefaultMainFrame extends AbstractTempletFrame09 {
+
+    private static final long serialVersionUID = 1L;
+    protected HashMap map = new HashMap(); //
+    
+    /**
+     * 构造方法
+     */
+    public DefaultMainFrame(){
+    	
+    }
+    
+    public DefaultMainFrame(HashMap _map) {
+        super("" + _map.get("SYS_SELECTION_PATH").toString());
+        this.map = _map;
+        init();
+    }
+
+    public ArrayList getChildTableFK() {
+        ArrayList child_templet_FK = new ArrayList();
+        String childtempletcodes = (String) map.get("CHILD_FORPKNAME");
+        String[] ctemplets = childtempletcodes.split(",");
+        for (int i = 0; i < ctemplets.length; i++) {
+            child_templet_FK.add(ctemplets[i]);
+        }
+        return child_templet_FK;
+    }
+
+    public ArrayList getChildTablePK() {
+        ArrayList child_templet_PK = new ArrayList();
+        String childtempletcodes = (String) map.get("CHILD_PKNAME");
+        String[] ctemplets = childtempletcodes.split(",");
+        for (int i = 0; i < ctemplets.length; i++) {
+            child_templet_PK.add(ctemplets[i]);
+        }
+        return child_templet_PK;
+    }
+
+    public ArrayList getChildTableTempletcode() {
+        ArrayList child_templet_code = new ArrayList();
+        String childtempletcodes = (String) map.get("CHILDTEMPLETE_CODE");
+        String[] ctemplets = childtempletcodes.split(",");
+        for (int i = 0; i < ctemplets.length; i++) {
+            child_templet_code.add(ctemplets[i]);
+        }
+        return child_templet_code;
+    }
+
+    public String getParentTablePK() {
+        return (String) map.get("PARENT_PKNAME");
+    }
+
+    public String getParentTableTempletcode() {
+        return (String) map.get("PARENTTEMPLETE_CODE");
+    }
+
+    public String[] getSys_Selection_Path() {
+        return (String[]) map.get("SYS_SELECTION_PATH"); //
+    }
+
+    public String getCustomerpanel() {
+        return (String) map.get("CUSTOMERPANEL"); //
+    }
+
+    public String getUiinterceptor() {
+        return (String) map.get("UIINTERCEPTOR"); //
+    }
+
+    public String getBsinterceptor() {
+        return (String) map.get("BSINTERCEPTOR"); //
+    }
+
+    public boolean isShowsystembutton() {
+        if (map.get("SHOWSYSBUTTON") == null) {
+            return true;
+        }
+        return ( (String) map.get("SHOWSYSBUTTON")).equals("是") ? true : false;
+    }
+}
+/**************************************************************************
+ * $RCSfile: DefaultMainFrame.java,v $  $Revision: 1.2.8.1 $  $Date: 2009/12/21 02:57:33 $
+ *
+ * $Log: DefaultMainFrame.java,v $
+ * Revision 1.2.8.1  2009/12/21 02:57:33  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/05/31 07:39:05  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:14:29  qilin
+ * no message
+ *
+ * Revision 1.3  2007/03/05 09:59:13  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 04:48:30  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

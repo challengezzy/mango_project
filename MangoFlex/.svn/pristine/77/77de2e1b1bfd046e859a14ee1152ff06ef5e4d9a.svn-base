@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" xmlns:pivot="com.flexmonster.pivot.*"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			public var metadataTemplet:MetadataTemplet;
+			
+			public var pivotComponent:BillPivotComponent;
+			
+			private function init():void{
+				if(metadataTemplet == null)
+					throw new Error("元数据模板不能为空");
+				var xml:XML = metadataTemplet.contentXML;
+				var swfFilePath:String = xml.swfFilePath;
+				var configUrl:String = xml.configUrl;
+				pivotComponent = new BillPivotComponent();
+				pivotComponent.percentHeight = 100;
+				pivotComponent.percentWidth = 100;
+				pivotComponent.mode = GlobalConst.MODE_PIVOTCOMPONENT_CONFIGFILE;
+				if(swfFilePath != null && swfFilePath != "")
+					pivotComponent.swfFilePath = swfFilePath;
+				else
+					pivotComponent.swfFilePath = "olap/";
+				if(configUrl != null && configUrl != "")
+					pivotComponent.configUrl = configUrl;
+				else
+					pivotComponent.configUrl = "olap/pivotTableConfig.xml";
+				this.addChild(pivotComponent);
+			}
+		]]>
+	</fx:Script>
+</mx:Canvas> 

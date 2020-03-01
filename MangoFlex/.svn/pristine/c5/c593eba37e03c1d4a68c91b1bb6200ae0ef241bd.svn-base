@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml" width="1024" height="768" creationComplete="init()" fontSize="12">
+	<mx:Metadata>		       
+	    [Event(name='loginSuccessful',type='smartx.flex.components.event.BasicEvent')]
+	    [Event(name='loginFailed',type='smartx.flex.components.event.BasicEvent')]
+	</mx:Metadata>
+	<mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+		import mx.controls.Alert;
+		import mx.core.FlexGlobals;
+		import mx.core.IFlexDisplayObject;
+		import mx.events.CloseEvent;
+		import mx.managers.PopUpManager;
+		import mx.rpc.events.FaultEvent;
+		import mx.rpc.events.ResultEvent;
+		import mx.rpc.remoting.mxml.RemoteObject;
+		
+		import smartx.flex.components.assets.AssetsFileLib;
+		import smartx.flex.components.event.BasicEvent;
+		import smartx.flex.components.util.HelpUtil;
+		import smartx.flex.components.util.LoadingWindow;
+		import smartx.flex.components.util.MetadataTempletUtil;
+		import smartx.flex.components.util.OperatingTipUtil;
+		import smartx.flex.components.vo.GlobalConst;
+		
+		private var formService:RemoteObject;
+		public var destination:String = GlobalConst.SERVICE_FORM;
+		public var endpoint:String;
+		[Bindable]
+		public var debugMode:Boolean = false;
+		private var callType:String = debugMode?"y":"n";//兼容nova的一些处理逻辑
+		private var nova2DesktopXML:XML;
+		private var nova2DesktopObject:Object;
+		[Bindable]
+		public var loginImageWidth:int = 800;
+		[Bindable]
+		public var loginImageHeight:int = 600;
+		[Bindable]
+		public var defaultUsername:String = "";
+		[Bindable]
+		public var defaultUserpwd:String = "";
+		[Bindable]
+		public var defaultAdminpwd:String = "";
+		[Bindable]
+		public var autoLogin:Boolean = false;
+//		[Embed(source='../assets/images/logo/earth.jpg')]
+//		[Bindable]
+//		public var loginBackgroundImage:Class;
+		
+		[Bindable]
+		public var loginBackgroundImageUrl:String;
+		
+		[Bindable]
+		public static var userIcon:Class = AssetsFileLib.userIcon;
+		
+		[Bindable]
+		public static var pwdIcon:Class = AssetsFileLib.pwdIcon;
+		
+		[Bindable]
+		public static var adminpwdIcon:Class = AssetsFileLib.adpwdIcon;
+		
+		public var loginingWindow:IFlexDisplayObject;
+		
+		[Bindable]
+		public var rememberPassword:Boolean = false;
+		
+		private var localUserInfo:SharedObject = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_USERINFO);
+		
+		[Bindable]
+		public var userinfo:String = FlexGlobals.topLevelApplication.parameters["userinfo"] as String;
+		
+		private function init():void{
+			formService = new RemoteObject(destination);
+		    if(endpoint!=null)
+		        formService.endpoint = endpoint;
+		    formService.getDeskTopDesign.addEventListener(ResultEvent.RESULT,getDeskTopDesignHandler);
+		    formService.getDeskTopDesign.addEventListener(FaultEvent.FAULT,faultHandler);
+		    formService.getSmartXConfig.addEventListener(ResultEvent.RESULT,getSmartXConfigHandler);
+		    formService.getSmartXConfig.addEventListener(FaultEvent.FAULT,faultHandler);
+		    formService.getFlexWorkflowConfig.addEventListener(ResultEvent.RESULT,getFlexWorkflowConfigHandler);
+		    formService.getFlexWorkflowConfig.addEventListener(FaultEvent.FAULT,faultHandler);
+		    formService.login.addEventListener(ResultEvent.RESULT,loginHandler);
+		    formService.login.addEventListener(FaultEvent.FAULT,faultHandler);
+		    formService.getUserManageRegionList.addEventListener(ResultEvent.RESULT,getUserManageRegionHandler);
+		    formService.getUserManageRegionList.addEventListener(FaultEvent.FAULT,faultHandler);
+			
+			addEventListener(KeyboardEvent.KEY_UP,keyUpHander);
+			
+			if(loginBackgroundImageUrl == null || loginBackgroundImageUrl == ""){
+				if(mainVbox.contains(imgVbox)){
+					mainVbox.removeChild(imgVbox);
+				}
+			}
+			
+			if(userinfo != null && userinfo != "" && userinfo != "null"){
+				if(localUserInfo != null ){
+					localUserInfo.clear();
+				}
+				main.selectedChild = urlLoginBox;
+				userinfo = decodeURI(userinfo);
+				var array:Array = userinfo.split("@");
+				if(array != null && array.length == 3){
+					var times:Number = parseInt(array[0]);
+					var nowDate:Date = new Date();
+					if((nowDate.getTime()-times)<=3000){
+						loginFromUrl(array[1],array[2]);
+					}else{
+						Alert.show("登录超时!","登录超时",Alert.OK,this,function(evetn:CloseEvent):void{
+							closeIE();
+						});
+						autoLogin = false;
+						userinfo = "";
+					}
+				}else{
+					Alert.show("非法登录信息!","非法登录信息",Alert.OK,this,function(evetn:CloseEvent):void{
+						closeIE();
+					});
+					autoLogin = false;
+					userinfo = "";
+				}
+			}else{
+				main.selectedChild = mainVbox;
+				if(autoLogin)
+					login();
+			}
+
+		}
+		
+		private function getDeskTopDesignHandler(event:ResultEvent):void{
+			nova2DesktopXML = event.result as XML;
+			nova2DesktopObject = new Object();
+			var ela:XMLList = nova2DesktopXML.child("loginConfig").child("action-"+callType);
+			
+			nova2DesktopObject["implcls"] = ela.child("impl-cls").toString();
+			
+			var bg:Object = new Object();
+			bg["bg-color"] = ela.child("background").child("bg-color").toString();
+			nova2DesktopObject["background"] = bg;
+			
+			var ectrls:XMLList = ela.child("ctrl-list");
+			var elst:XMLList = ectrls.children();
+			var ctrlList:ArrayCollection = new ArrayCollection();
+			for each(var ctrl:XML in elst){
+				var ctrlMap:Object = new Object();
+				var attrs:XMLList = ctrl.attributes();
+				for(var i:int=0;i<attrs.length();i++){
+					var attrName:String = attrs[i].name();
+					ctrlMap[attrName] = ctrl.attribute(attrName).toString();
+				}
+				ctrlList.addItem(ctrlMap);
+			}
+			nova2DesktopObject["ctrl-list"] = ctrlList;
+			
+		}
+		
+		private function faultHandler(event:FaultEvent):void{   
+			Alert.show(event.fault.faultString, 'Error');
+		}
+		
+		protected function keyUpHander(event:KeyboardEvent):void{
+			
+			if(event.keyCode == Keyboard.ENTER){
+				login();
+			}
+		}
+			
+		private function reset():void{
+			username.text = "";
+			userpwd.text = "";
+			adpwd.text = "";
+		}
+		
+		private function login():void{
+			if(rememberPasswordBox.selected){
+				//记住密码
+				localUserInfo.data.username = username.text;
+				localUserInfo.data.userpwd = userpwd.text;
+				localUserInfo.data.adpwd = adpwd.text;
+				localUserInfo.data.rememberPassword = rememberPassword = rememberPasswordBox.selected;
+				localUserInfo.data.autoLogin = autoLogin = autoLoginBox.selected;
+			}
+			else{
+				localUserInfo.clear();
+			}
+        	if(loginingWindow == null){
+  				var temp:LoadingWindow = new LoadingWindow();
+  				temp.text = "正在验证用户……";
+  				loginingWindow = temp;
+        	}
+  			PopUpManager.addPopUp(loginingWindow,this,true);
+  			PopUpManager.centerPopUp(loginingWindow);
+//			OperatingTipUtil.startOperat("正在验证用户……",this);
+  			if(userpwd.text == "")
+  				userpwd.text= null;
+  			if(adpwd.text == "")
+  				adpwd.text= null;	
+			formService.login(username.text,userpwd.text,adpwd.text,debugMode);
+			
+		}
+		
+		private function loginFromUrl(username:String,userpwd:String):void{
+			if(localUserInfo != null ){
+				localUserInfo.clear();
+			}
+			if(loginingWindow == null){
+				var temp:LoadingWindow = new LoadingWindow();
+				temp.text = "正在验证用户……";
+				loginingWindow = temp;
+			}
+			PopUpManager.addPopUp(loginingWindow,this,true);
+			PopUpManager.centerPopUp(loginingWindow);
+			formService.login(username,userpwd,null,false);
+		}
+		
+		private function loginHandler(event:ResultEvent):void{
+			var loginInfo:LoginInfoVO = LoginInfoVO(event.result);
+			if(loginingWindow != null)
+				PopUpManager.removePopUp(loginingWindow);
+//			OperatingTipUtil.endOperat();
+			
+			switch(loginInfo.loginStatus){
+				case LoginInfoVO.USER_LOGINOK_TYPE://登录成功
+					MetadataTempletUtil.getInstance().initUserMetadataTempletCache(username.text,endpoint);
+					break;
+				case LoginInfoVO.ADMINUSER_LOGINOK_TYPE://管理员登录成功
+					MetadataTempletUtil.getInstance().initUserMetadataTempletCache(username.text,endpoint);
+					break;
+				case LoginInfoVO.USER_ERROR_TYPE:
+					Alert.show("用户名或密码错误!", "错误");
+					dispatchEvent(new BasicEvent(BasicEvent.LOGIN_FAILED));
+					return;
+				case LoginInfoVO.USER_ACCOUTSTATUS_DISABLED:
+					Alert.show("该用户已停用!", "错误");
+					dispatchEvent(new BasicEvent(BasicEvent.LOGIN_FAILED));
+					return;
+				case LoginInfoVO.USER_ACCOUT_EXPDATE:
+					Alert.show("该用户已过期!!", "错误");
+					dispatchEvent(new BasicEvent(BasicEvent.LOGIN_FAILED));
+					return;
+				case LoginInfoVO.USER_PWD_EXPDATE:
+					Alert.show("该用户密码已过期!", "错误");
+					dispatchEvent(new BasicEvent(BasicEvent.LOGIN_FAILED));
+					return;
+				case LoginInfoVO.ADMINUSER_ERROR_TYPE:
+					Alert.show("管理用户名或密码错误!", "错误");
+					dispatchEvent(new BasicEvent(BasicEvent.LOGIN_FAILED));
+					return;
+				case LoginInfoVO.USER_IP_UNAUTHORIZED:
+					Alert.show("该用户禁止从当前IP登录", "错误");
+					dispatchEvent(new BasicEvent(BasicEvent.LOGIN_FAILED));
+					return;
+			}
+			
+			var tempEndpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			var tempPolling_point:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT_POLLING) as String;
+			var tempStreaming_point:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT_STREAMING) as String;
+			var tempDeskTopFrame:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			var tempWebroot:String =  ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_WEBROOT) as String;
+			
+			ClientEnviorment.getInstance().clearClientEnviorment();
+			
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT,tempEndpoint);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT_POLLING,tempPolling_point);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_ENDPOINT_STREAMING,tempStreaming_point);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.DESKTOP_FRAME,tempDeskTopFrame);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_SERVICE_WEBROOT,tempWebroot);
+			
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_INFOVO,loginInfo);
+			
+//			HelpUtil.getInstance().refreshEvents();
+			
+			var userparamMap:Object = loginInfo.userParam;
+			for(var keyname:String in userparamMap){
+				ClientEnviorment.getInstance().putVar(keyname ,userparamMap[keyname]);
+			}
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME, loginInfo.loginName);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_USER_ID,loginInfo.id);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_USER_CODE,loginInfo.code);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_USER_NAME,loginInfo.name);
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_USER_DBREADWRITE,loginInfo.dbReadWriteAuth);
+			
+			formService.getUserManageRegionList(loginInfo.id);
+			var temp:LoadingWindow = new LoadingWindow();
+			temp.text = "正在读取配置文件……";
+			loginingWindow = temp;
+			PopUpManager.addPopUp(loginingWindow,this,true);
+			PopUpManager.centerPopUp(loginingWindow);
+			
+			HelpUtil.getInstance().refreshEvents();
+			HelpUtil.getInstance().getHelpWindow().addEventListener("refreshHelpEventsComplete",function(event:BasicEvent):void{
+				
+				//读取用户管理区域
+				formService.getSmartXConfig();
+				
+			});
+		}
+		
+		private function getUserManageRegionHandler(event:ResultEvent):void{
+			var regions:ArrayCollection = event.result as ArrayCollection;
+			if(regions != null){
+				ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_USER_MANAGEREGION,regions);
+				var regionStr:String = "-1";
+				for each(var region:String in regions){
+					regionStr += ","+region;
+				}
+				ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_LOGIN_USER_MANAGEREGION_STR,regionStr);
+			}
+		}
+		
+		private function getSmartXConfigHandler(event:ResultEvent):void{
+			PopUpManager.removePopUp(loginingWindow);
+			var smartxConfigXML:XML = event.result as XML;
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_XML_NOVA2CONFIG,smartxConfigXML);
+			loadCustomerLibrary(smartxConfigXML);
+		}
+		
+		private function getFlexWorkflowConfigHandler(event:ResultEvent):void{
+			var configXML:XML = event.result as XML;
+			ClientEnviorment.getInstance().putVar(ClientEnviorment.KEY_XML_WORKFLOWCONFIG,configXML);
+//			if(loginingWindow != null)
+//				PopUpManager.removePopUp(loginingWindow);
+			dispatchEvent(new BasicEvent(BasicEvent.LOGIN_SUCCESSFUL));
+		}
+		private var index:int;;
+		private var loader:Loader;
+		private var xmlArr:Array;
+		private var context:LoaderContext;
+		private function loadCustomerLibrary(smartX2ConfigXml:XML):void{
+//			if(loginingWindow != null && loginingWindow is LoadingWindow){
+//				var temp:LoadingWindow = loginingWindow as LoadingWindow;
+//				temp.text = "正在下载库文件……";
+//			}
+			
+			index = 0;
+			loader = new Loader();
+			context = new LoaderContext();
+			context.applicationDomain = ApplicationDomain.currentDomain;
+			loader.contentLoaderInfo.addEventListener(Event.COMPLETE,loadCompleteHandler);
+			
+			xmlArr = [];
+			if(smartX2ConfigXml.additionalLibs.swfList.file.length() == 0){
+				//没有需要加载的，直接进行下一步
+				formService.getFlexWorkflowConfig();
+			}else{
+				var temp:LoadingWindow = new LoadingWindow();
+				temp.text = "正在下载库文件……";
+				loginingWindow = temp;
+				PopUpManager.addPopUp(loginingWindow,this,true);
+				PopUpManager.centerPopUp(loginingWindow);
+//				OperatingTipUtil.startOperat("正在下载库文件……",this);
+				for each(var swfDoc:XML in smartX2ConfigXml.additionalLibs.swfList.file)
+				{
+					var swfPath:String = swfDoc.@path;
+					xmlArr.push(swfPath);
+				}
+				loadLib(loader,xmlArr[index]);
+			}
+
+		}
+		
+		private function loadLib(loader:Loader,filePath:String):void{
+			if(filePath)
+				loader.load(new URLRequest(filePath), context);
+			else{
+				index++;
+				if(index < xmlArr.length)
+					loadLib(loader,xmlArr[index]);
+			}
+		} 
+		
+		private function loadCompleteHandler(event:Event):void{
+			index++;
+			if(index < xmlArr.length)
+				loadLib(loader,xmlArr[index]);
+			else{
+				//全部加载完了
+//				OperatingTipUtil.endOperat();
+				PopUpManager.removePopUp(loginingWindow);
+				formService.getFlexWorkflowConfig();
+			}
+		}
+		
+		private function closeIE():void{
+			navigateToURL(new URLRequest('javascript:window.opener=null;window.close()'),'_self');
+		}
+		
+	]]>
+	</mx:Script>
+	<mx:ViewStack id="main" height="100%" width="100%" creationPolicy="all" >
+		
+		<mx:VBox width="100%" height="100%" id="mainVbox" horizontalAlign="center" verticalAlign="middle">
+			<mx:VBox id="imgVbox" borderStyle="solid">
+				<mx:Image source="{loginBackgroundImageUrl}"/>
+			</mx:VBox>
+			<mx:HBox width="100%" horizontalGap="2" horizontalAlign="center">
+				<mx:Image source="{userIcon}"/>
+				<mx:Label text="用户"   width="40"/>
+				<mx:TextInput width="70" borderStyle="solid" id="username" text="{defaultUsername}" />
+				<mx:Image source="{pwdIcon}"/>
+				<mx:Label text="密码"  width="40"/>
+				<mx:TextInput width="70" borderStyle="solid" id="userpwd" displayAsPassword="true" text="{defaultUserpwd}" />
+				<mx:Image source="{adminpwdIcon}" visible="{debugMode}"/>
+				<mx:Label text="管理密码" color="blue" width="67" visible="{debugMode}"/>
+				<mx:TextInput width="70" borderStyle="solid" id="adpwd" displayAsPassword="true" text="{defaultAdminpwd}" visible="{debugMode}" />
+				<mx:CheckBox label="记住密码" selected="{rememberPassword}" id="rememberPasswordBox"/>
+				<mx:CheckBox label="自动登录" selected="{autoLogin}" id="autoLoginBox"/>
+				<mx:Button label="登录" click="login()"/>
+				<mx:Button label="重置" click="reset()"/>
+			</mx:HBox>
+		</mx:VBox>
+		
+		<mx:VBox id="urlLoginBox" width="100%" height="100%">
+			<!--<mx:Image source="{loginBackgroundImageUrl}"/>-->
+		</mx:VBox>
+		
+  	</mx:ViewStack>
+	      
+</mx:Canvas>

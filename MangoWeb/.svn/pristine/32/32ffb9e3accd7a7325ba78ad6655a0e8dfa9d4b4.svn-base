@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="100%" height="100%" xmlns:components="smartx.flex.components.*" xmlns:authorizationmgmt="smartx.flex.components.authorizationmgmt.*"
+		creationComplete="init()" xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import mx.events.ListEvent;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import mx.events.ItemClickEvent;
+			
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private function init():void{
+				if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+					debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				userListPanel.dataGrid.addEventListener(ListEvent.ITEM_CLICK,function(event:ListEvent):void{
+					if(userListPanel.getSelectedRowValue() != null){
+						var userid:String = userListPanel.getSelectedRowValue()["ID"];
+						userTreePanel.ownerId = userid;
+						userTreePanel.refresh(); 
+					}
+				});
+				roleListPanel.dataGrid.addEventListener(ListEvent.ITEM_CLICK,function(event:ListEvent):void{
+					if(roleListPanel.getSelectedRowValue() != null){
+						var roleid:String = roleListPanel.getSelectedRowValue()["ID"];
+						roleTreePanel.ownerId = roleid;
+						roleTreePanel.refresh(); 
+					}
+				});
+				workpositionListPanel.dataGrid.addEventListener(ListEvent.ITEM_CLICK,function(event:ListEvent):void{
+					if(workpositionListPanel.getSelectedRowValue() != null){
+						var workpositionid:String = workpositionListPanel.getSelectedRowValue()["ID"];
+						workpositionTreePanel.ownerId = workpositionid;
+						workpositionTreePanel.refresh(); 
+					}
+				});
+				
+			}
+			private function changeView(event:ItemClickEvent):void{
+				mainViewStack.selectedIndex = event.index;
+			}
+		]]>
+	</mx:Script>
+	<mx:ToggleButtonBar id="toggleButtonBar" width="300" itemClick="changeView(event)">
+	 		<mx:dataProvider>
+	            <mx:Array>
+	            	<mx:Object label="用户" icon="@Embed(source='../../assets/images/usermgmt.gif')"/>
+	            	<mx:Object label="角色" icon="@Embed(source='../../assets/images/rolemgmt.gif')"/> 
+	            	<mx:Object label="工位" icon="@Embed(source='../../assets/images/workpositionmgmt.gif')"/>
+	            </mx:Array>
+	        </mx:dataProvider>
+	</mx:ToggleButtonBar>
+	<viewStackEffects:Pixelate id="effect"/>
+	<mx:ViewStack id="mainViewStack" width="100%" height="100%" >
+		<mx:VBox id="userBox" showEffect="{effect}" hideEffect="{effect}">
+			<core:BillListPanel id="userListPanel" width="100%" height="50%" 
+				templetCode="T_PUB_USER" debugMode="{debugMode}" editable="false" showInitingWindow="false"
+				endpoint="{endpoint}"/>
+			<core:BillAuthorizationTreePanel id="userTreePanel" width="100%" height="50%"
+			    authorizationTable="v_flex_menu" authorizationTableParentFkField="PARENTMENUID"
+			    authorizationTablePkField="ID" ownerTable="pub_user" ownerTablePkField="ID" isFolderField="ISFOLDER"
+			    relationTable="pub_user_menu" relationTablePkField="ID" relationAuthorizationFkField="MENUID"
+			    relationOwnerFkField="USERID" authorizationTableSeqField="SEQ" labelFieldName="LOCALNAME"
+				endpoint="{endpoint}"/>
+		</mx:VBox>
+		<mx:VBox id="roleBox" showEffect="{effect}" hideEffect="{effect}">
+			<core:BillListPanel id="roleListPanel" width="100%" height="50%" 
+				templetCode="PUB_ROLE_CODE1" debugMode="{debugMode}" editable="false" showInitingWindow="false"
+				endpoint="{endpoint}"/>
+			<core:BillAuthorizationTreePanel id="roleTreePanel" width="100%" height="50%"
+			    authorizationTable="v_flex_menu" authorizationTableParentFkField="PARENTMENUID"
+			    authorizationTablePkField="ID" ownerTable="PUB_ROLE" ownerTablePkField="ID" isFolderField="ISFOLDER"
+			    relationTable="pub_role_menu" relationTablePkField="ID" relationAuthorizationFkField="MENUID"
+			    relationOwnerFkField="ROLEID" authorizationTableSeqField="SEQ" labelFieldName="LOCALNAME"
+				endpoint="{endpoint}"/>
+		</mx:VBox>
+		<mx:VBox id="workpositionBox" showEffect="{effect}" hideEffect="{effect}">
+			<core:BillListPanel id="workpositionListPanel" width="100%" height="50%" 
+				templetCode="PUB_WORKPOSITION_CODE1" debugMode="{debugMode}" editable="false" showInitingWindow="false"
+				endpoint="{endpoint}"/>
+			<core:BillAuthorizationTreePanel id="workpositionTreePanel" width="100%" height="50%"
+			    authorizationTable="v_flex_menu" authorizationTableParentFkField="PARENTMENUID"
+			    authorizationTablePkField="ID" ownerTable="PUB_WORKPOSITION" ownerTablePkField="ID" isFolderField="ISFOLDER"
+			    relationTable="pub_workposition_menu" relationTablePkField="ID" relationAuthorizationFkField="MENUID"
+			    relationOwnerFkField="WORKPOSITIONID" authorizationTableSeqField="SEQ" labelFieldName="LOCALNAME"
+				endpoint="{endpoint}"/>
+		</mx:VBox>
+	</mx:ViewStack>
+	
+</mx:Module>

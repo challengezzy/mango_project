@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" 
+				xmlns:containers="net.brandonmeyer.containers.*" 
+				width="590" height="530" title="打印预览"
+				allowResize="true" allowClose="true" allowDrag="true"
+				close="close()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.Box;
+			import mx.containers.Canvas;
+			import mx.containers.VBox;
+			import mx.controls.Image;
+			import mx.core.IUIComponent;
+			import mx.core.UIComponent;
+			import mx.managers.PopUpManager;
+			import mx.printing.FlexPrintJobScaleType;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.itemcomponent.ItemUIComponent;
+			
+			private var printJob:PrintJob = null;
+			
+			public var imgScale:Number = 1.0;//图形缩放大小
+			public var previewRatio:Number = 1.0;//预览缩放大小
+			private var orientation:String = PrintJobOrientation.PORTRAIT;//方向纵向打印
+			//打印伸缩类型 
+			private var scaleType:String = FlexPrintJobScaleType.SHOW_ALL;//缩放对象以适合在单个页面中填充一个尺寸
+			
+			public var printObjArr:ArrayCollection = new ArrayCollection();
+			private var imgs:ArrayCollection = new ArrayCollection();//预览图片
+			
+			public var printUtil:PrintJobUtil;
+			
+			[Bindable]
+			public var curPage:int = 0;//当前页
+			[Bindable]
+			public var totalPage:int = 0;//总页数
+			
+			[Bindable]
+			private var scaleTypeCboData:ArrayCollection = new ArrayCollection([
+				{label:"适合页面", value: FlexPrintJobScaleType.SHOW_ALL },
+				{label:"适合宽度", value: FlexPrintJobScaleType.MATCH_WIDTH },
+				{label:"适合高度", value: FlexPrintJobScaleType.MATCH_HEIGHT },
+				{label:"充满页面", value: FlexPrintJobScaleType.FILL_PAGE},
+				{label:"实际大小", value: FlexPrintJobScaleType.NONE}
+			]);
+			
+			[Bindable]
+			private var orientationCboData:ArrayCollection = new ArrayCollection([
+				{label:"纵向", value: PrintJobOrientation.PORTRAIT },
+				{label:"横向", value: PrintJobOrientation.LANDSCAPE }
+			]);
+			
+			/**
+			 * 预览分析
+			 * */
+			public function analyzePreview():void{
+				imgs.removeAll();
+				if(printUtil == null)
+					printUtil = new PrintJobUtil();
+				
+				printUtil.imgList = imgs;
+				
+				for each (var po:IUIComponent in printObjArr)
+				{
+					imgScale = printUtil.analyseObject(po,scaleType,orientation,false);
+				}
+				
+				addPage(imgs);
+			}
+			
+			
+			/**
+			 * 添加打印预览页面
+			 * */
+			private function addPage(imgs:ArrayCollection):void
+			{
+				showVs.removeAllChildren();
+				if(imgs.length == 0){
+					curPage =0;
+					totalPage = 0;
+				}else{
+					curPage = 1;
+					totalPage = imgs.length;
+				}
+				
+				for each(var bitmap:Bitmap in imgs)
+				{
+					bitmap.scaleX = imgScale * previewRatio;
+					bitmap.scaleY = imgScale * previewRatio;
+					
+					//img.scaleX = previewRatio;
+					//img.scaleY = previewRatio;
+//					var canvas:Canvas = new Canvas();
+//					
+//					if(orientation == PrintJobOrientation.LANDSCAPE){
+//						canvas.height = printUtil.pageWidth;
+//						canvas.width = printUtil.pageHeight;
+//					}else{
+//						canvas.height = printUtil.pageHeight;
+//						canvas.width = printUtil.pageWidth;
+//					}
+//					
+//					var component:UIComponent = new UIComponent();
+//					component.addChild(bitmap);					
+//					canvas.addChild(component);
+					
+					var img:Image = new Image();
+					img.source = bitmap
+					var vbox:VBox = new VBox();
+					vbox.height = 500;
+					vbox.width = 580;
+					
+					vbox.addChild(img);
+					showVs.addChild(vbox);
+				}
+				showVs.selectedIndex = 0;
+			}
+			
+			private function close():void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function nextPage():void
+			{
+				if (showVs.selectedIndex < showVs.numChildren - 1)
+				{
+					showVs.selectedIndex = showVs.selectedIndex + 1;
+					curPage = showVs.selectedIndex + 1
+				}
+			}
+			
+			private function previousPage():void
+			{
+				if (showVs.selectedIndex > 0)
+				{
+					showVs.selectedIndex = showVs.selectedIndex - 1;
+					curPage = showVs.selectedIndex + 1;
+				}
+			}
+			
+			//执行打印
+			private function doPrint():void
+			{
+				printJob = printUtil.getPrintJob();			
+				if (printJob.start())
+				{
+					for each (var po:IUIComponent in printObjArr)
+					{
+						printUtil.analyseObject(po,scaleType,orientation,true);
+					}
+					printJob.send();
+				}
+				close();
+			}
+			//缩放方式变化
+			private function onScaleTypeChange():void{
+				scaleType = scaleTypeComBox.selectedItem.value;
+				analyzePreview();
+			}
+			
+			private function onOrientationChange():void{
+				orientation = orientationComBox.selectedItem.value;
+				analyzePreview();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:HBox horizontalAlign="center" verticalAlign="middle" width="100%" height="25" paddingTop="2" paddingLeft="10" paddingRight="10">
+		<mx:Label id="pageLabel" text="{curPage}/{totalPage} 页" fontWeight="bold" fontSize="12"/>
+		<mx:VRule height="100%" width="1"/>
+		<mx:LinkButton icon="{AssetsFileLib.pagePrevIcon}" toolTip="上一页"  click="previousPage()" width="22" height="22"/>
+		<mx:LinkButton icon="{AssetsFileLib.pageNextIcon}" toolTip="下一页"  click="nextPage()" width="22" height="22"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label text="缩放:" fontSize="12" fontWeight="bold"/>
+		<mx:ComboBox id="scaleTypeComBox" dataProvider="{scaleTypeCboData}"  change="{onScaleTypeChange()}" height="22"/>
+		<mx:VRule height="100%" width="1"/>
+		<mx:Label text="方向:" fontSize="12" fontWeight="bold"/>
+		<mx:ComboBox id="orientationComBox" dataProvider="{orientationCboData}"  change="{onOrientationChange()}" height="22"/>
+		<mx:VRule height="100%" width="1"/>
+		<mx:Button icon="{AssetsFileLib.printIcon}" label="打印"  click="doPrint()"  height="22"/>
+		<mx:Button icon="{AssetsFileLib.closeIcon}" label="关闭"  click="close()" height="22"/>
+	</mx:HBox>
+	<mx:HRule width="100%" height="3"/>
+	<mx:ViewStack id="showVs" width="100%" height="100%" paddingBottom="2" paddingLeft="1" paddingRight="1"/>
+</containers:SuperPanel>

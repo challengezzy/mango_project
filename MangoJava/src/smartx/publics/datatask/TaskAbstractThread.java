@@ -1,0 +1,374 @@
+package smartx.publics.datatask;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+import org.dom4j.Element;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.utils.ExceptionUtil;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.vo.DMOConst;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.metadata.bs.NovaServerEnvironment;
+import smartx.framework.metadata.vo.jepfunctions.JepFormulaParse;
+import smartx.publics.datatask.vo.DataTaskConst;
+import smartx.publics.datatask.vo.DataTaskInstance;
+import smartx.publics.datatask.vo.DataTaskLog;
+
+/**
+ * 任务处理抽象类
+ * @author zhangzy
+ * @version 1.0
+ * @created 2011/8/30 9:38:01
+ */
+public abstract class TaskAbstractThread extends Thread {
+
+	protected Logger logger = NovaLogger.getLogger(TaskAbstractThread.class);
+	protected boolean isRun = false;
+	
+	protected StringBuffer taskLogStr = new StringBuffer();
+	
+	protected DataTaskInstance taskVo = null;
+	protected int taskId =-1;
+	protected String version;//记录批次号,是当前时间的一个时间戳,精确到毫秒
+	
+	HashMap<String, Integer> subTaskLogBeginMap = new HashMap<String, Integer>();
+	HashMap<String, Integer> subTaskLogEndMap = new HashMap<String, Integer>();
+	
+	private CommDMO dmo=new CommDMO();	
+	/**
+	 * 任务执行结果
+	 */
+	protected boolean execResult = false;
+	
+	/**
+	 * 记录批次号,是当前时间的一个时间戳,精确到毫秒
+	 */
+	public String getVersion() {
+		return version;
+	}
+
+	/**
+	 * @param version the version to set
+	 */
+	public void setVersion(String version) {
+		this.version = version;
+	}
+
+	/**
+	 * 数据执行过程中的共享变量空间
+	 */
+	protected Map<String,String> sharedPramMap=new HashMap<String,String>();
+	
+	/**
+	 * 添加任务执行共享变量
+	 * @param key
+	 * @param value
+	 */
+	public void addSharedValue(String key,String value){
+		sharedPramMap.put(key, value);
+	}
+	
+	/**
+	 * 查找变量值
+	 * @param key
+	 * @return
+	 */
+	public String getSharedValue(String key){
+		return sharedPramMap.get(key);
+	}
+	
+	/**
+	 * 
+	 * @param vo
+	 */
+	public void init(DataTaskInstance vo){
+		this.taskVo=vo;
+		this.taskId= vo.getId();
+	}
+
+	/**
+	 * 线程是否运行
+	 */
+	public boolean isRunning(){
+		return isRun;
+	}
+
+	public void run(){
+		isRun=true;
+		
+		try{
+			//判断是否有相同的任务正在处理或等待处理
+			String sqlsel="SELECT 1 FROM PUB_DATATASK WHERE NAME= '"+ taskVo.getName() + "' AND STATUS=1";
+			HashVO[] rvos = dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sqlsel);
+			if( rvos.length > 0){
+				logTaskRun("存在相同的数据任务【" + taskVo.getName() + "】正在处理中！");
+				doEnd(10,"存在相同的数据任务【" + taskVo.getName() + "】正在处理中！");
+				return;
+			}
+		}catch (Exception e) {
+			execResult = false;
+			logTaskRun("执行数据任务发生异常：", ExceptionUtil.getStackTraceMessage(e));
+			doEnd(10,"遇到错误执行中止：" + e.getMessage());
+			return;
+		}
+
+		//更新数据库状态 开始
+		doBegin();
+		logTaskRun("开始执行数据预处理任务【"+taskVo.getName()+"】...", "");
+		
+		//执行业务
+		try{
+			doAction(taskVo.getTaskContent(),false,"",taskId+"");
+		}catch(Exception e){
+			execResult = false;
+			logTaskRun("执行数据任务发生异常：", ExceptionUtil.getStackTraceMessage(e));
+			doEnd(10,"遇到错误执行中止：" + e.getMessage());
+			return;
+		}finally{
+			isRun=false;
+		}
+		
+		execResult = true;
+		doEnd(9,"任务正常执行结束！");
+		logTaskRun("结束执行数据预处理任务【" +taskVo.getName()+"】。", "");
+		//logger.info("结束执行"+taskVo.getName()+"任务！");
+	}
+	
+	/**
+	 * 执行任务内容
+	 * @param taskContent 任务内容
+	 * @param isSubTask 是否是子任务
+	 * @throws Exception
+	 */
+	public abstract String doAction(String taskContent,boolean isSubTask,String subtaskName,String curTaskId)throws Exception;
+	
+	
+	/**
+	 * 记录任务执行日志
+	 * @param message
+	 */
+	public void logTaskRun(String message){
+		logTaskRun(message, "");
+	}
+	
+	/**
+	 * 记录任务执行日志
+	 */
+	public void logTaskRun(String message, String taskDetail) {
+		logger.debug(message);//输出日志到日志文件
+		try {
+			
+			//记录日志到日志明细表，现改为记录到任务实例中 2012/7/16
+//			if(taskDetail.length() > 3600)
+//				taskDetail = taskDetail.substring(0, 3600);
+//			String str_taskDetail = taskDetail.replaceAll("'", "''");
+//			String sql = "INSERT INTO PUB_DATATASKLOG(ID,DATATASKID,DATATASKTEMPLETID,LOGTIME,TASKNAME,MASSAGE,TASKDETAIL) "
+//					+ " VALUES(S_PUB_DATATASKLOG.NEXTVAL, "
+//					+ taskId
+//					+ ","
+//					+ taskVo.getDatataskTempletid()
+//					+ ",SYSDATE,'" + taskVo.getName() + "','" + message + "',?)";
+//			dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql,str_taskDetail);
+//			dmo.commit(DMOConst.DS_DEFAULT);
+			
+			DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss ");
+			String dataStr =  dateFormat.format(new Date());
+			taskLogStr.append("\n").append(dataStr).append(message);
+			if(taskDetail.length() > 0)
+				taskLogStr.append("\n ").append(taskDetail);
+
+			DataTaskLog taskLog = new DataTaskLog();
+			taskLog.setDataTaskId(taskId + "");
+			taskLog.setMessage(message);
+			taskLog.setTaskDetail(taskDetail);
+			taskLog.setLogTime(new Date());
+			taskLog.setTaskName(taskVo.getName());
+			
+			//MessagePushService.pushMessage("datatask_log", taskLog, taskId + ""); 任务日志由客户端获取，不再推送
+			
+			dmo.executeUpdateClobByDS(DMOConst.DS_DEFAULT, "execlog", "pub_datatask", " id="+taskId,taskLogStr.toString());
+			dmo.commit(DMOConst.DS_DEFAULT);
+			
+		} catch (Exception e) {
+			logger.error("记录数据任务执行日志发生错误！", e);
+			try {
+				dmo.rollback(DMOConst.DS_DEFAULT);
+			} catch (Exception ex) {
+			}
+		} finally {
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+	
+	protected int getTaskStatus(){
+		try{
+			String sql="SELECT STATUS FROM PUB_DATATASK WHERE ID= ?";
+			HashVO[] vos= dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sql,taskId);
+			if( vos.length > 0){
+				int status = vos[0].getIntegerValue("STATUS").intValue();
+				return status;
+			}else{
+				return 9;//结束
+			}
+		}catch (Exception e) {
+			logger.error("查询任务状态报错", e);
+			return 9;//
+		}finally{
+			try{dmo.releaseContext(DMOConst.DS_DEFAULT);}catch(Exception e){};
+		}
+	}
+	
+	/**
+	 * 任务执行百分比跟踪
+	 */
+	protected void updateTaskRate(String rate, String explain) {
+		String str_explain = explain.replaceAll("'", "''");
+		if(str_explain.length() > 3600)
+			str_explain = str_explain.substring(0, 3600);
+		
+		String sql;
+		if(rate != null && !"".equals(rate))
+			sql = "UPDATE PUB_DATATASK SET RATE=" + rate + ", LASTMASSAGE=? WHERE id= " + taskId;
+		else
+			sql = "UPDATE PUB_DATATASK SET LASTMASSAGE=? WHERE id= " + taskId;
+		
+		try {
+			dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql,str_explain);
+			dmo.commit(DMOConst.DS_DEFAULT);
+		} catch (Exception e) {
+			logger.error("更新任务执行进度时异常！", e);
+			try {
+				dmo.rollback(DMOConst.DS_DEFAULT);
+			} catch (Exception ex) {
+			}
+		} finally {
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+	
+	protected void doBegin(){
+		try{
+			String sql="UPDATE PUB_DATATASK SET STATUS=1,BEGINTIME=SYSDATE,RATE=0 WHERE ID="+taskId;
+			dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql);
+			dmo.commit(DMOConst.DS_DEFAULT);
+		}catch(Exception e){
+			try{dmo.rollback(DMOConst.DS_DEFAULT);}catch(Exception ex){};
+		}finally{
+			try{dmo.releaseContext(DMOConst.DS_DEFAULT);}catch(Exception e){};
+		}
+	}
+	
+	protected void doEnd(int status,String lastMassage){
+		if(lastMassage.length() > 3700)
+			lastMassage = lastMassage.substring(0, 3700);
+			
+		try{
+			String sql="UPDATE PUB_DATATASK SET STATUS= "+ status +",LASTMASSAGE=? ,ENDTIME=SYSDATE,RATE=100 WHERE ID="+taskId;
+			dmo.executeUpdateByDS(DMOConst.DS_DEFAULT, sql,lastMassage);
+			dmo.commit(DMOConst.DS_DEFAULT);
+			
+			//dealTaskLog(MessagePushService.getInstance().getMessageByTaskId(taskId+""));
+			
+			if(execResult)
+				dealSubsequentTask();
+			else{
+				logger.info("任务执行失败，其后续任务不处理！");
+			}
+			
+		}catch(Exception e){
+			try{dmo.rollback(DMOConst.DS_DEFAULT);}catch(Exception ex){};
+		}finally{
+			try{dmo.releaseContext(DMOConst.DS_DEFAULT);}catch(Exception e){};
+		}
+	}
+	
+	/**
+	 * 执行后置任务，取决于3个条件：1，任务是否正常执行完成   2，执行时选择是否执行后置任务  3,任务本身是否设置执行后置任务
+	 */
+	private void dealSubsequentTask(){
+		
+		String isRunSub = sharedPramMap.get(DataTaskConst.PARAM_RUN_SUBSEQUENT);
+		if(isRunSub == null || !"TRUE".equalsIgnoreCase(isRunSub)){
+			logTaskRun("后置任务设置为不执行，跳过后置任务处理。", "");
+			return;
+		}
+		
+		try{
+			
+			String sql = "select t.*, m.content from pub_datatask_templet t, pub_metadata_templet m where t.mtcode = m.code and t.foregroundtask in (select temp.code from pub_datatask tt,pub_datatask_templet temp where temp.id=tt.datatasktempletid and tt.id = ?)";
+			
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql,this.taskId);
+			if(vos != null && vos.length>0){
+				JepFormulaParse jepParse = new JepFormulaParse(JepFormulaParse.li_bs);
+				for(HashVO taskVo : vos){
+					try{
+						String taskContent = taskVo.getStringValue("CONTENT");
+						
+						//这里对参数进行解析，取值可以通过两种方式：1，系统函数    2，服务端环境变量
+						String[] keys = StringUtil.getFormulaMacPars(taskContent);
+						for(int j=0;j<keys.length;j++){
+							String paramKey = keys[j];
+							if(!sharedPramMap.containsKey(paramKey)){
+								if( paramKey.indexOf(")") > 0 ){//函数
+									String paramValue = (String)jepParse.execFormula(paramKey);
+									sharedPramMap.put(paramKey, paramValue);
+								}else{
+									if(NovaServerEnvironment.getInstance().get(paramKey) != null){
+										sharedPramMap.put(paramKey, (String)NovaServerEnvironment.getInstance().get(paramKey));
+									}
+								}
+							}
+						}
+						
+						if(!StringUtil.isEmpty(taskContent)){
+							Document doc = DocumentHelper.parseText(taskContent);
+							Element root = doc.getRootElement();
+							Element paramsEle = root.element("datatask").element("initparam");
+							if(paramsEle != null){
+								List paramsList = paramsEle.elements();
+								if(paramsList != null){
+									for(Object obj : paramsList){
+										Element paramItem = (Element)obj;
+										String key = paramItem.attributeValue("name");
+										String value = paramItem.getText();
+										if(!sharedPramMap.containsKey(key)){
+											sharedPramMap.put(key, value);
+										}
+									}
+								}
+							}
+						}
+						
+						taskContent = StringUtil.buildExpression(sharedPramMap, taskContent);
+						
+						CommTaskManager.getInstance().addAndStartTask(taskVo.getStringValue("ID"), taskVo.getStringValue("NAME"), taskContent, sharedPramMap);
+						
+						logTaskRun("启动执行其后置任务【"+taskVo.getStringValue("NAME")+"】", "");
+					}catch(Exception ex){
+						logger.debug("",ex);
+					}
+				}
+			}
+			
+		}catch(Exception e){
+			logger.debug("",e);
+		}finally{
+			dmo.releaseContext(null);
+		}
+	}
+	
+	public Map<String, String> getSharedPramMap() {
+		return sharedPramMap;
+	}
+
+}

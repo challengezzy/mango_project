@@ -1,0 +1,85 @@
+package smartx.publics.job;
+
+
+import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.Arrays;
+
+import javax.swing.JButton;
+
+import smartx.framework.common.job.ui.IJobServiceIFC;
+import smartx.framework.common.ui.NovaConstants;
+import smartx.framework.common.ui.NovaRemoteServiceFactory;
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.metadata.ui.AbstractCustomerButtonBarPanel;
+import smartx.framework.metadata.ui.NovaMessage;
+import smartx.framework.metadata.vo.BillVO;
+import smartx.publics.styletemplet.ui.templet02.AbstractTempletFrame02;
+
+public class JobOperationButtonPanel extends AbstractCustomerButtonBarPanel   
+		implements ActionListener {
+	private static final long serialVersionUID = -4110652430438148265L;
+	/**
+	 * 当前可处理的任务标签列表
+	 */
+	protected static String[] JOB_TAGS=null; 
+	static{
+		String tmp=(String)Sys.getInfo("JOB_TAGS");
+		JOB_TAGS=(tmp==null||tmp.trim().equals(""))?(new String[]{}):tmp.trim().split(",");
+	}
+	
+	protected JButton start_btn = new JButton("启动任务");
+	protected JButton stop_btn = new JButton("终止任务");
+	protected AbstractTempletFrame02 parent = null;
+	
+	public void initialize() {
+		this.setLayout(new FlowLayout(FlowLayout.LEFT));
+		start_btn.addActionListener(this);
+		stop_btn.addActionListener(this);
+		this.add(start_btn);
+		this.add(stop_btn);
+		if(this.getParentFrame() instanceof AbstractTempletFrame02){
+			parent = (AbstractTempletFrame02)getParentFrame();
+		}
+
+	}
+
+	private void startJob() throws Exception {
+		BillVO billvo = parent.getBillListPanel().getBillVO(parent.getBillListPanel().getSelectedRow());
+		String tag=billvo.getRealValue("JOBTAG");
+		if(Arrays.binarySearch(JOB_TAGS, tag)==-1){
+			throw new Exception("所选择启动的任务的标签不是当前服务所支持的标签！");			
+		}
+		IJobServiceIFC jobsrv = (IJobServiceIFC) NovaRemoteServiceFactory.getInstance().lookUpService(IJobServiceIFC.class);
+		jobsrv.jobStart(billvo.getHashVO().getLongValue("ID").longValue());
+	}
+
+	private void endJob() throws Exception {
+		BillVO billvo = parent.getBillListPanel().getBillVO(parent.getBillListPanel().getSelectedRow());
+		String tag=billvo.getRealValue("JOBTAG");
+		if(Arrays.binarySearch(JOB_TAGS, tag)==-1){
+			throw new Exception("所选择启动的任务的标签不是当前服务所支持的标签！");
+		}
+		IJobServiceIFC jobsrv = (IJobServiceIFC) NovaRemoteServiceFactory.getInstance().lookUpService(IJobServiceIFC.class);
+		jobsrv.jobStop(billvo.getHashVO().getLongValue("ID").longValue());
+	}
+
+	public void actionPerformed(ActionEvent e) {
+		try
+		{
+			if (e.getSource() == start_btn) {
+				startJob();
+				NovaLogger.getLogger(this).info("已经向任务发出开始指令。");
+			} else if (e.getSource() == stop_btn) {
+				endJob();
+				NovaLogger.getLogger(this).info("已经向任务发出终止指令。");
+			}
+		} catch (Exception ex) {
+			NovaMessage.show(this, ex.getMessage(), NovaConstants.MESSAGE_ERROR);
+		}
+
+	}
+
+}

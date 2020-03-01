@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="utf-8"?>
+<nbvc:BusinessViewConfig xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:nbvc="smartx.bam.flex.modules.businessview.config.*" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" 
+				title="普通视图配置" width="1000" height="500"
+				xmlns:containers="net.brandonmeyer.containers.*">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.listClasses.ListBase;
+			import mx.core.DragSource;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			private var formService:RemoteObject;
+			
+			private var smartXFormService:RemoteObject;
+			
+			private var destination:String = BAMConst.BAM_Service;
+			
+			private var currBvName:String;//最近添加业务视图名称
+			
+			private var currBvEvent:String;//最近添加业务视图对应事件名称
+			
+			private var currBvWindowAlias:String;//最近添加业务视图对应窗口别名
+			
+			private var currBvCode:String;//最近添加业务视图编码
+			
+			private var currBvWindow:String; //最近添加业务视图对应窗口
+
+			private var windowAliasMap:Hashtable = new Hashtable();//被添加的业务视图对应窗口名称别名集合
+			
+			private var typeChooserWindow:ComboBoxWindow = new ComboBoxWindow();
+			
+			override protected function init():void{
+				super.init();
+				if(!mainbox.contains(winHbox))
+					mainbox.addChild(winHbox);
+				bvTreeData = new XMLList();
+				formService = new RemoteObject(destination);
+				smartXFormService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint != null && endpoint != ""){
+					formService.endpoint = endpoint;
+					smartXFormService.endpoint = endpoint;
+				}
+				formService.getTableStructByName.addEventListener(ResultEvent.RESULT,getTableStructByNameHandler);
+				formService.getTableStructByName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+//					Alert.show("业务视图["+currBvName+"]不存在或没有启动！","error");
+					managerEventAlias();
+					generateFromSql();
+					createNode([],[]);
+				});
+				if(contentXml == null){
+					contentXml = <normalBvDesign>
+						            <schema />
+                                    <conditions />
+                                 </normalBvDesign>;
+				}else
+					xmlConvertToProperty();
+				typeChooserWindow.title = "选择视图类型";
+				typeChooserWindow.dataProvider = new ArrayCollection([
+					{label:"业务视图",data:"bv"},
+					{label:"查询视图",data:"qv"}
+				]);
+				typeChooserWindow.width = 250;
+				typeChooserWindow.height = 150;
+				typeChooserWindow.labelField = "label";
+				typeChooserWindow.confirmFunc = function():void{
+					if(typeChooserWindow.mainComboBox.selectedItem.data == "bv"){//选择业务视图
+						addBusinessView();
+						PopUpManager.removePopUp(typeChooserWindow);
+					}else if(typeChooserWindow.mainComboBox.selectedItem.data == "qv"){
+						addQueryView();
+						PopUpManager.removePopUp(typeChooserWindow);
+					}
+				};
+			}
+			
+			override protected function setUniqueLabelField():void{
+				uniqueLabelField = "aliasName";
+			}
+			
+			private function getTableStructByNameHandler(event:ResultEvent):void{
+				managerEventAlias();
+				generateFromSql();
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				createNode(tableDataStruct.table_header,tableDataStruct.table_body_type);
+			}
+			
+			private function managerEventAlias():void{
+				if(windowAliasMap.containsKey(currBvWindowAlias)){
+					currBvWindowAlias = getNewName(currBvWindowAlias,null,true);
+					windowAliasMap.add(currBvWindowAlias,currBvWindow);
+				}else
+					windowAliasMap.add(currBvWindowAlias,currBvWindow);
+			}
+			
+			private function generateFromSql():void{
+				fromSql.text = "";
+				var keySet:Array = windowAliasMap.getKeySet();
+				for(var i:Number=0;i<keySet.length;i++){
+					if(i == keySet.length-1)
+						fromSql.text = fromSql.text.concat(windowAliasMap.find(keySet[i])).concat(" as ").concat(keySet[i]);
+					else
+						fromSql.text = fromSql.text.concat(windowAliasMap.find(keySet[i])).concat(" as ").concat(keySet[i]).concat(",");
+				}
+			}
+			
+			private function addQueryView():void{
+				var dialog:RefDialog = new RefDialog();
+				dialog.init2(smartXFormService,"select datasourcename value#,sql code#,name 名称,code from V_BAM_QUERYVIEW",null);
+				dialog.title = "选择查询视图";
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						currBvName = dialog.refName;
+						currBvCode = null;
+						var currQvDatasource:String = StringUtil.replace(dialog.refPK,"datasource_relation_","");
+						currBvWindow = "sql:".concat(currQvDatasource).concat("[\"").concat(dialog.refCode).concat("\"]");
+						currBvWindowAlias = dialog.dataGrid.selectedItem["strRow"][3];
+						formService.getTableStructByName(dialog.refPK,dialog.refCode);
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+			}
+			
+			private function addBusinessView():void{
+				var dialog:RefDialog = new RefDialog();
+				dialog.init2(smartXFormService,"select code value#,streamname code#,name 名称,streamwindowname 窗口名称# from v_bam_businessview where status in (0,1)",null);
+				dialog.title = "选择业务视图";
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						currBvEvent = dialog.refCode;
+						currBvName = dialog.refName;
+						currBvCode = dialog.refPK;
+						currBvWindow = dialog.dataGrid.selectedItem["strRow"][3];
+						currBvWindowAlias = dialog.dataGrid.selectedItem["strRow"][3];
+						formService.getTableStructByName(GlobalConst.CEP_DATASOURCE_PREFIX.concat(GlobalConst.DEFAULTPROVIDERNAME_CEP),currBvWindow);
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+			}
+			
+			private function addView():void{
+				if(!typeChooserWindow.isPopUp){
+					PopUpManager.addPopUp(typeChooserWindow,this,true);
+					PopUpManager.centerPopUp(typeChooserWindow);
+				}
+			}
+			
+			private var selectBvNode:Object;
+			
+			private function delBusinessView():void{
+				if(bvTree.selectedIndex >-1){
+					selectBvNode = bvTree.selectedItem;
+					if(selectBvNode.@type=="child")
+						Alert.show("请选择该业务视图名称!");
+					else
+						ConfirmUtil.confirm("是否删除该视图？",this,delBusinessViewConfirmHandler);
+				}else
+					Alert.show("请选择要删除的视图!");
+			}
+			
+			private function delBusinessViewConfirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					for each(var node:XML in bvTreeXml.node){
+						if(node.@eventAlias == selectBvNode.@eventAlias){
+							CEPUtils.xmlDeleteNode(node);
+							var tempDataProvider:ArrayCollection = new ArrayCollection();
+							tempDataProvider.addAll(dataProvider);
+							for each(var data:Object in tempDataProvider){
+								var fieldName:String = data.fieldName;
+								if(fieldName.indexOf(node.@eventAlias) >= 0)
+									dataProvider.removeItemAt(dataProvider.getItemIndex(data));
+							}
+							for each(var eventAlias:String in windowAliasMap.getKeySet()){
+								if(eventAlias == node.@eventAlias)
+									windowAliasMap.remove(eventAlias);
+							}
+							generateFromSql();
+						}
+					}
+				}
+					
+			}
+			
+			private function createNode(fieldNames:Array,fieldTypes:Array):void{
+				var node:XML = <node />;
+				node.@label = currBvName;
+				node.@event = currBvEvent;
+				node.@type = "parent";
+				node.@window = currBvWindow;
+				node.@code = currBvCode;
+				node.@eventAlias = currBvWindowAlias;
+				for(var i:Number=0;i<fieldNames.length;i++){
+					var subNode:XML = <node />;
+					subNode.@label = fieldNames[i];
+					subNode.@type = "child";
+					subNode.@event = currBvEvent;
+					subNode.@fieldType = fieldTypes[i];
+					subNode.@eventAlias = currBvWindowAlias;
+					node.appendChild(subNode);
+				}
+				bvTreeXml.appendChild(node);
+				if(bvTreeXml.node.length() > 0)
+					bvTreeData = bvTreeXml.node;
+				bvTree.invalidateList();
+			}
+			
+			private function addBusinessViewField():void{
+				var dgData:Object = new Object();
+				dgData.aliasName = getNewName("aliasName");
+				dgData.fieldName = getNewName("fieldName");
+				dgData.groupbyField = "false";
+				dataProvider.addItem(dgData);
+			}
+			
+			private function getNewName(fieldName:String,aliasName:String=null,isAlias:Boolean=false):String{
+				var i:int=1;
+				while(true){
+					var name:String = (aliasName==null?fieldName:aliasName)+i;
+					if(isAlias?isEventAliasExists(name):isNameExists(name,fieldName)){
+						i++;
+						continue;
+					}
+					return name;
+				}
+				return null;
+			}
+			
+			private function isNameExists(name:String,fieldName:String):Boolean{
+				for each(var data:Object in dataProvider){
+					if(data[fieldName] == name)
+						return true;
+				}
+				return false;
+			}
+			//事件别名是否存在
+			private function isEventAliasExists(alias:String):Boolean{
+				for each(var data:String in windowAliasMap.getKeySet()){
+					if(data == alias)
+						return true;
+				}
+				return false;
+			}
+			
+			private function delBusinessViewField():void{
+				var datas:Array = dataGrid.selectedItems;
+				for each(var data:Object in datas){
+					dataProvider.removeItemAt(dataProvider.getItemIndex(data));
+				}
+			}
+
+			private function dataGrid_dragEnterHandler(event:DragEvent):void{
+				if( event.dragInitiator is Tree ) {
+					DragManager.showFeedback(DragManager.COPY);
+					var ds:DragSource = event.dragSource;
+					if( !ds.hasFormat("treeItems") ) return;
+					
+					var items:Array = ds.dataForFormat("treeItems") as Array;
+					for(var i:Number=0; i < items.length; i++) {
+						var item:XML = XML(items[i]);
+						if( item.@type == "parent" ) return;
+					}
+					DragManager.acceptDragDrop(UIComponent(event.currentTarget)); 
+				} 
+			}
+
+			private function dataGrid_dragDropHandler(event:DragEvent):void{
+				var dragSource:DragSource = event.dragSource;
+				if(dragSource.hasFormat("treeItems")){
+					var datas:Array = dragSource.dataForFormat("treeItems") as Array;
+					for(var i:Number=0; i < datas.length; i++) {
+						var dgData:Object = new Object();
+						var item:XML = XML(datas[i]);
+						dgData.fieldName = item.@eventAlias+"."+item.@label;
+						dgData.groupbyField = "false";
+						dgData.aliasName = item.@label;
+						for each(var data:Object in dataProvider){
+							if(data.aliasName == item.@label)
+								dgData.aliasName = getNewName("aliasName",item.@label);
+						}
+						dgData.fieldType = convertFieldType(item.@fieldType);
+						dataProvider.addItem(dgData);
+					}
+				}
+				onDragExit(event);
+			}
+			
+			private function bvTree_dragCompleteHandler(event:DragEvent):void{
+				event.preventDefault();
+			}
+			
+			private function onDragExit(event:DragEvent) : void{
+				var dropTarget:ListBase=ListBase(event.currentTarget);   
+				dropTarget.hideDropFeedback(event);
+			}
+
+			override public function getEpl():String{
+				var epl:String = getHeaderEpl().concat(getBodyEpl());
+				epl = epl.concat(getWindowEpl());
+				return epl;
+			}
+			
+			private function getHeaderEpl():String{
+				var headerEpl:String = "module "+PREFIX_MODULE.concat(bvCode).concat(";\n");
+				for each(var node:XML in bvTreeXml.node){
+					var code:String = String(node.@code);
+					if(code == "null")
+						continue;
+					if(headerEpl.indexOf(PREFIX_MODULE.concat(node)) >= 0)
+						continue;
+					headerEpl = headerEpl.concat("uses ").concat(PREFIX_MODULE).concat(code).concat(";\n");
+				}
+				return headerEpl;
+			}
+			
+			private function getBodyEpl():String{
+				var bodyEpl:String = "\n";
+				var fromCondition:String = "from ".concat(fromSql.text);
+				var createSchema:String = "create schema ".concat(eventName).concat(" as(");
+				var groupby:String = " group by ";
+				var insertEvent:String = "insert into ".concat(eventName).concat(" select ");
+				var groupbyFlag:Boolean = false;
+				for(var i:Number=0;i<dataProvider.length;i++){
+					var data:Object = dataProvider.getItemAt(i);
+					var aliasName:String = data.aliasName;
+					var fieldName:String = data.fieldName;
+					var groupbyField:String = data.groupbyField;
+					var fieldType:String  =data.fieldType;
+					if(groupbyField=="true"){
+						groupby = groupby.concat(fieldName).concat(",");
+						groupbyFlag = true;
+					}
+					if(i==dataProvider.length-1){
+						createSchema = createSchema.concat(aliasName).concat(" ").concat(fieldType).concat(");\n");
+						insertEvent = insertEvent.concat(fieldName).concat(" as ").concat(aliasName).concat(" ");
+					}else{
+						createSchema = createSchema.concat(aliasName).concat(" ").concat(fieldType).concat(",");
+						insertEvent = insertEvent.concat(fieldName).concat(" as ").concat(aliasName).concat(",");
+					}
+				}
+				bodyEpl = bodyEpl.concat(createSchema).concat(insertEvent).concat(fromCondition);
+				if(whereSql.text != "")
+					bodyEpl = bodyEpl.concat(" where ").concat(whereSql.text);
+				if(groupbyFlag)
+					bodyEpl = bodyEpl.concat(groupby.substring(0,groupby.length-1));
+				if(orderbySql.text != "")
+					bodyEpl = bodyEpl.concat(" order by ").concat(orderbySql.text);
+				return bodyEpl.concat(";");
+			}
+			
+			private function clearContentXml():void{
+				delete contentXml.refbvs;
+				delete contentXml.schema.*;
+				delete contentXml.conditions.*;
+			}
+			
+			override protected function propertyConvertToXml():void{
+				clearContentXml();
+				
+				contentXml.appendChild(bvTreeXml);
+				
+				if(isKeepBvChx.selected){
+					contentXml.schema.@isSave = "true";
+					contentXml.schema.@unit = windowTypeCbo.selectedItem["data"];
+					contentXml.schema.@value = windowTypeCbo.selectedItem["data"]=="unique"?uniqueCbo.selectedItem[uniqueLabelField]:windowParamTxt.text;
+				}
+				else
+					contentXml.schema.@isSave = "false";
+				for each(var data:Object in dataProvider){
+					var field:XML = <field />;
+					field.@alias = data["aliasName"];
+					field.@name = data["fieldName"];
+					field.@isGroupby = data["groupbyField"];
+					field.@type = data["fieldType"];
+					contentXml.schema.appendChild(field);
+				}
+				var fromXml:XML = <from>{fromSql.text}</from>;
+				contentXml.conditions.appendChild(fromXml);
+				var whereXml:XML = <where>{whereSql.text}</where>
+				contentXml.conditions.appendChild(whereXml);
+				var orderbyXml:XML = <orderby>{orderbySql.text}</orderby>;
+				contentXml.conditions.appendChild(orderbyXml);
+			}
+			
+			private function xmlConvertToProperty():void{
+				bvTreeData = contentXml.refbvs.node;
+				bvTreeXml.appendChild(contentXml.refbvs.node);
+				for each(var bvData:XML in bvTreeData){
+					windowAliasMap.add(String(bvData.@eventAlias),String(bvData.@window));
+				}
+				
+				for each(var field:XML in contentXml.schema.field){
+					var data:Object = {aliasName:field.@alias,fieldName:field.@name,groupbyField:field.@isGroupby,fieldType:field.@type};
+					dataProvider.addItem(data);
+				}
+				fromSql.text = contentXml.conditions.from;
+				whereSql.text = contentXml.conditions.where;
+				orderbySql.text = contentXml.conditions.orderby;
+				setWindow();
+			}
+
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<mx:HDividedBox width="100%" height="100%">
+			<mx:VBox width="30%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%" id="treeButtonBox" >
+					<mx:Button icon="{AssetsFileLib.addIcon}" toolTip="添加视图" label="添加视图" click="addView()"/>
+					<mx:Button icon="{AssetsFileLib.minuseIcon}" toolTip="删除视图" label="删除视图" click="delBusinessView()"/>
+				</mx:HBox>
+				<mx:Tree allowMultipleSelection="true" allowDragSelection="true" dragEnabled="true" width="100%" height="100%" 
+						 id="bvTree" labelField="@label" dataProvider="{bvTreeData}" dragComplete="bvTree_dragCompleteHandler(event)"/>
+			</mx:VBox>
+			<mx:VBox width="70%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:VBox id="mainbox" width="100%" height="50%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+					<mx:HBox width="100%" horizontalAlign="left">
+						<mx:Label text="可从工作集拖动字段" />
+						<mx:HBox width="100%" horizontalAlign="right">
+							<mx:Button icon="{AssetsFileLib.addIcon}" toolTip="添加字段" label="添加字段" 
+									   click="addBusinessViewField()"/>
+							<mx:Button icon="{AssetsFileLib.minuseIcon}" toolTip="删除字段" label="删除字段" 
+									   click="delBusinessViewField()"/>
+						</mx:HBox>
+					</mx:HBox>
+					<mx:DataGrid id="dataGrid" width="100%" height="100%" dataProvider="{dataProvider}" editable="true" dragEnabled="true"
+								 dragDrop="dataGrid_dragDropHandler(event)" dragEnter="dataGrid_dragEnterHandler(event)" dragExit="onDragExit(event)"
+								 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" allowMultipleSelection="true">
+						<mx:columns>
+							<mx:DataGridColumn headerText="字段名称" editable="true" dataField="aliasName" />
+							<mx:DataGridColumn headerText="字段表达式" editable="true" dataField="fieldName" />
+							<mx:DataGridColumn headerText="是否分组" dataField="groupbyField" editable="false" textAlign="center">
+								<mx:itemRenderer>
+									<fx:Component>
+										<mx:CheckBox paddingLeft="10" selected="{data.groupbyField=='false'?false:true}" click="{data.groupbyField = data.groupbyField=='false'?'true':'false'}"/>
+									</fx:Component>
+								</mx:itemRenderer>
+							</mx:DataGridColumn>
+							<mx:DataGridColumn headerText="字段类型" editable="true" dataField="fieldType" editorDataField="value">
+								<mx:itemEditor>
+									<fx:Component>
+										<mx:ComboBox>
+											<mx:dataProvider>  
+												<fx:String>String</fx:String>  
+												<fx:String>int</fx:String>  
+												<fx:String>double</fx:String>  
+												<fx:String>float</fx:String>  
+												<fx:String>long</fx:String>
+												<fx:String>java.util.Date</fx:String>
+												<fx:String>boolean</fx:String>
+												<fx:String>java.math.BigDecimal</fx:String>  
+											</mx:dataProvider>  
+										</mx:ComboBox>
+									</fx:Component>
+								</mx:itemEditor>
+							</mx:DataGridColumn>
+						</mx:columns>
+					</mx:DataGrid>
+				</mx:VBox>
+				<mx:TabNavigator width="100%" height="50%" creationPolicy="all">
+					<mx:VBox width="100%" height="100%" label="From 子句">
+						<mx:TextArea width="100%" height="100%" id="fromSql" />
+					</mx:VBox>
+					<mx:VBox width="100%" height="100%" label="where 子句">
+						<mx:TextArea width="100%" height="100%" id="whereSql" />
+					</mx:VBox>
+					<mx:VBox width="100%" height="100%" label="排序方式">
+						<mx:TextArea width="100%" height="100%" id="orderbySql" />
+					</mx:VBox>
+				</mx:TabNavigator>
+			</mx:VBox>
+		</mx:HDividedBox>
+		<mx:HBox id="btnBox" width="100%" paddingTop="5" horizontalAlign="right" paddingRight="5">
+			<mx:Button id="showMtBtn" label="显示元数据XML" visible="{debugMode}" click="{Alert.show(getContentXml())}"/>
+			<mx:Button id="showSqlBtn" label="显示EPL表达式" click="showEpl()"/>
+			<mx:Button id="saveBvBtn" label="确定" click="confirmFun()"/>
+			<mx:Button id="cancellBtn" label="取消" click="close()"/>
+		</mx:HBox>
+	</mx:VBox>
+</nbvc:BusinessViewConfig>

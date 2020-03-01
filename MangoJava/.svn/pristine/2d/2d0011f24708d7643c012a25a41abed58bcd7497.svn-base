@@ -1,0 +1,20 @@
+package smartx.publics.clustercompute.service;
+
+import java.util.Map;
+
+import smartx.framework.common.ui.NovaRemoteCallServiceIfc;
+import smartx.publics.clustercompute.vo.ClusterComputeTaskResult;
+
+/**
+ * 集群计算服务端远程调用方法
+ * @author teddyxu
+ *
+ */
+public interface ClusterComputeServerService extends NovaRemoteCallServiceIfc{
+	/**
+	 * 子节点任务的完成应答
+	 * @param subTaskCode
+	 * @param responseMap
+	 */
+	public void makeSubTaskResponse(String subTaskCode, ClusterComputeTaskResult result);
+}

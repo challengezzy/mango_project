@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AdvChart xmlns="smartx.flex.components.core.chart.*" xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.charts.series.BarSeries;
+			import mx.collections.ArrayCollection;
+			
+			[Bindable]
+			public var series:Array;
+			[Bindable]
+			public var categoryField:String;
+
+			private var _dataProvider:ArrayCollection;
+
+			private function init():void{
+				if(series != null){
+					barChart.series = new Array();
+					for each (var o:Object in series){
+						var s:BarSeries = new BarSeries();
+						s.yField = categoryField;
+						s.xField = o["valueField"];
+						s.displayName = o["displayName"];
+						barChart.series.push(s);
+					}
+				}	
+			}
+			
+			public function refreshSeries(_series:Array):void{
+				series = _series;
+				init();
+			}
+			
+			public override function refreshData(dataProvider:ArrayCollection):void{
+				_dataProvider = dataProvider;
+				barChart.dataProvider = dataProvider;
+			}						
+		]]>
+	</mx:Script>
+
+	<mx:VBox width="100%" height="100%">
+		<mx:Label text="{title}" width="100%" textAlign="center" fontSize="14" fontWeight="bold"/>
+		<mx:BarChart id="barChart" height="100%" width="100%" 
+            paddingLeft="5" paddingRight="5" 
+            showDataTips="true" fontSize="12">
+                
+            <mx:verticalAxis>
+                <mx:CategoryAxis categoryField="{categoryField}"/>
+            </mx:verticalAxis>
+
+        </mx:BarChart>
+
+        <mx:Legend dataProvider="{barChart}" direction="horizontal"/>
+
+	</mx:VBox>
+</AdvChart>

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" label="{titleName}"
+		   creationComplete="init()" xmlns:s="library://ns.adobe.com/flex/spark" >
+	<fx:Declarations>
+		<mx:Button id="showQueryBtn" height="22" label="显示查询框" click="showQueryBtn_clickHandler(event)" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.core.UIComponent;
+			import mx.events.FlexEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.bam.flex.modules.dashboard.DashboardPanel;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var debugMode:Boolean = false;
+			
+			public var queryPanel:QueryPanel;
+			
+			private var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			[Binbable]
+			public var sysParams:Object;
+			
+			[Bindable]
+			public var customeParams:Object;
+			
+			[Bindable]
+			public var initCompleteFun:Function=function(event:ReportEvent):void{
+				
+			};
+			
+			[Bindable]
+			public var mtCode:String;
+			
+			[Bindable]
+			public var needDbTool:Boolean = false;
+			
+			[Bindable]
+			public var titleName:String;
+			
+			private var dashboardCode:String;
+			
+			private var bamService:RemoteObject;
+			
+			private var version:String;
+			
+			private var height_temp:Number;
+			
+			private function init():void{
+				
+				var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtCode);
+				if(metadataTemplet == null){
+					throw new Error("元数据模板不能为空");
+				}
+				var xml:XML = metadataTemplet.contentXML;
+				
+				dashboardCode = String(xml.dashboard.@code);
+				if(!BAMUtil.isEmpty(String(xml.title))){
+					titleName = String(xml.title);
+				}
+				initQueryPanel(xml);
+			}
+			
+			private function initQueryPanel(contentXML:XML):void{
+				
+				queryPanel = new QueryPanel();
+				queryPanel.height = 104;
+				
+				var xmlList:XMLList = contentXML.queryPanel.@height;
+				if(xmlList != null && xmlList.length() >0 && xmlList[0] != null && xmlList[0] != "" ){
+					queryPanel.height = parseInt(String(xmlList[0]));
+				}
+				
+				queryPanel.mtContent = contentXML;
+				queryPanel.endpoint = endpoint;
+				queryPanel.sysParams = sysParams;
+				queryPanel.customeParams = customeParams;
+				
+				queryPanel.hideFunction = hideQueryPanel;
+				
+				queryPanel.addEventListener(ReportEvent.QUERY_COMPLETE,queryCompleteHandler);
+				if(initCompleteFun != null){
+					queryPanel.addEventListener(ReportEvent.INIT_COMPLETE,initCompleteFun);
+				}
+				
+				if(queryVbox.getChildren().length >0){
+					queryVbox.removeAllChildren();
+				}
+				
+				if(!queryVbox.contains(queryPanel)){
+					queryVbox.addChild(queryPanel);
+				}
+				
+			}
+			
+			public function onQuery(needChechCondition:Boolean=true,needAlert:Boolean=true):void{
+				if(queryPanel != null ){
+					queryPanel.onQuery(needChechCondition,needAlert);
+				}
+			}
+			
+			public function onReset():void{
+				if(queryPanel != null ){
+					queryPanel.onReset();
+				}
+			}
+			
+			private function queryCompleteHandler(event:ReportEvent):void{
+				version = event.version;
+				hideQueryPanel();
+				initDashBordPanel(dashboardCode);
+			}
+			
+			private function initDashBordPanel(dashboardCode:String):void{	
+				var shareObj:SharedObject= SharedObject.getLocal(MTChartConst.SHAREOBJ_DBO_VARIABLE,"/");
+				//仪表盘变量
+				var arr:Array = new Array();
+				var obj:Object = new Object();
+				obj["name"] = "version";
+				obj["defaultValue"] = version;				
+				arr.push(obj);
+				
+				//把查询框中的数量加入到仪表盘变量中去
+				var objInfo:Object = ObjectUtil.getClassInfo(queryPanel.customeParams); 
+				var fieldName:Array = objInfo["properties"] as Array; 
+				for each(var q:QName in fieldName){ 
+					//q.localName 属性名称，value对应的值 
+					var value:String = queryPanel.customeParams[q.localName] as String;
+					obj = new Object();
+					obj["name"] = q.localName;
+					obj["defaultValue"] = value;
+					arr.push(obj);
+				}
+				
+				shareObj.data[dashboardCode] = arr;
+				
+				var dashboard:DashboardPanel = new DashboardPanel();
+				dashboard.endpoint = endpoint;
+				dashboard.dbcodeFromUrl = dashboardCode;
+				dashboard.needDbTool = needDbTool;
+				dashboard.isNeedRefreshMessageBox = false;
+				
+				try{
+					if(dashbordVbox.getChildren().length>0){
+						dashbordVbox.removeAllChildren();
+					}
+				} 
+				catch(error:Error) {
+				}
+				dashbordVbox.addChild(dashboard);				
+			}
+			
+			private function hideQueryPanel():void{
+				
+				if(queryPanel != null && queryVbox.contains(queryPanel)){
+					queryVbox.removeChild(queryPanel);
+				}
+				
+				if(showQueryBtn != null && !queryVbox.contains(showQueryBtn)){
+					queryVbox.addChild(showQueryBtn);
+				}
+			}
+			
+			protected function showQueryBtn_clickHandler(event:MouseEvent):void
+			{
+				
+				if(showQueryBtn != null && queryVbox.contains(showQueryBtn)){
+					queryVbox.removeChild(showQueryBtn);
+				}
+				
+				if(queryPanel != null && !queryVbox.contains(queryPanel)){
+					queryVbox.addChild(queryPanel);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%"  height="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+		<mx:VBox id="queryVbox" width="100%" borderStyle="solid" />
+		<mx:VBox id="dashbordVbox" width="100%" height="100%"/>
+	</mx:VBox>
+</mx:VBox>

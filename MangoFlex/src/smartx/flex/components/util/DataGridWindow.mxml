@@ -1,0 +1,15 @@
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:local="com.jivesoftware.spark.*" 
+			xmlns:util="smartx.flex.components.util.*"
+			xmlns:mx="http://www.adobe.com/2006/mxml" width="820" height="480" close="PopUpManager.removePopUp(this)" 
+			allowDrag="true" allowClose="{showCloseButton}" allowMaximize="true" allowMinimize="true" allowResize="true" >
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var showCloseButton:Boolean;
+		]]>
+	</mx:Script>
+	<util:PageDataGrid width="100%" height="100%" id="dataGrid"/>
+</SuperPanel>
+

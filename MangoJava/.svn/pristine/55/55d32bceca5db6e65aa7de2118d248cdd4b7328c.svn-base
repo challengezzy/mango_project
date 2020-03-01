@@ -1,0 +1,996 @@
+/**************************************************************************
+ * $RCSfile: UIRefTreeDialog.java,v $  $Revision: 1.9.2.4 $  $Date: 2010/01/21 08:17:56 $
+ **************************************************************************/
+package smartx.framework.metadata.ui.componentscard;
+
+import java.util.*;
+
+import java.awt.*;
+import java.awt.event.*;
+
+import javax.swing.*;
+import javax.swing.event.*;
+import javax.swing.table.*;
+import javax.swing.tree.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.common.vo.*;
+import smartx.framework.metadata.ui.*;
+import smartx.framework.metadata.vo.*;
+
+
+/**
+ * 获得树型参照
+ * 
+ * @author Administrator
+ * 
+ */
+public class UIRefTreeDialog extends NovaDialog implements RefDialogIFC {
+	private static final long serialVersionUID = 1L;
+
+	private static int id_index = 0;
+
+	private static int name_index = 2;
+
+	private TableDataStruct struct = null;
+
+	protected JTree jt_menu = null;
+
+	private JTree jt_sub = null;
+
+	private JTable table = null;
+
+	private String str_RefName;
+
+	private String str_sql;
+
+	private String tree_ID = null;
+
+	private String tree_parentID = "parentmenuid";
+
+	private JButton[] jbt_operator = null;
+
+	private JTextField jtf_search = null;
+
+	protected String[][] str_data = null;
+
+	protected DefaultTableModel tableModel = null;
+
+	protected String[] table_header = null;
+
+	private boolean tableFlag = false;
+
+	private boolean treeFlag = false;
+
+	private HashVO[] subtree_vo = null;
+
+	private int li_closeType = -1;
+
+	private JPanel jpn_btn = null;
+
+	private ActionListener listener = null;
+
+	private KeyAdapter adapter = null;
+
+	private MouseAdapter m_adapter = null;
+
+	private String str_datasourcename = null; // 数据源名称
+
+	private boolean loadall = true;
+
+	private HashMap valueMap = new HashMap();
+	// 存储在懒加载时，已经搜寻过的标点，在双击时不再去数据库取数据
+	protected LinkedList dealedNodeList = null;
+
+	protected RefItemVO refVO=null;
+	
+	
+	public UIRefTreeDialog(Container _parent, String _name,
+			String _refname_str, String _sql, String _id, String _parentid,
+			String _datasourcename) throws Exception {
+		this(_parent, _name, _refname_str, _sql, _id, _parentid,
+				_datasourcename, "TRUE");
+	}
+
+	public UIRefTreeDialog(Container _parent, String _name,
+			String _refname_str, String _sql, String _id, String _parentid,
+			String _datasourcename, String loadall) throws Exception {
+		super(_parent, _name, 700, 500); //
+		checkLoadAll(loadall);
+		this.str_sql = _sql;
+		this.tree_ID = _id;
+		this.tree_parentID = _parentid;
+		this.str_RefName = _refname_str;
+		this.str_datasourcename = _datasourcename; //
+		initialize(); //
+		this.setVisible(true);
+	}
+
+	private void initialize() throws Exception {
+		getInitData();
+		listener = new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				dealAcitonPerform(e);
+			}
+		};
+		adapter = new KeyAdapter() {
+			public void keyPressed(KeyEvent e) {
+				dealKeyPerform(e);
+			}
+		};
+		m_adapter = new MouseAdapter() {
+			public void mouseClicked(MouseEvent e) {
+				dealMousePerform(e);
+			}
+		};
+		JScrollPane jsp_table = getJSPTable();
+		getMenuTree();
+		getSubMenuTree(null);
+
+		JPanel jpn_left = new JPanel();
+		jpn_left.setLayout(new BorderLayout());
+
+		JScrollPane jsp_tree = new JScrollPane(jt_menu);
+		JScrollPane jsp_subtree = new JScrollPane(jt_sub);
+		jt_sub.setBackground(new Color(240, 240, 240));
+		JSplitPane splitMenuPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+				jsp_tree, jsp_subtree);
+
+		splitMenuPane.setDividerLocation(275);
+		splitMenuPane.setDividerSize(5);
+		splitMenuPane.setOneTouchExpandable(true);
+
+		jbt_operator = new JButton[4];
+		JPanel searchPanel = getSearchPanel();
+		jpn_left.add(splitMenuPane, BorderLayout.CENTER);
+		jpn_left.add(searchPanel, BorderLayout.NORTH);
+
+		JPanel jpn_right = new JPanel();
+
+		int temp = getInitRow();
+		if (temp >= 0) {
+			Rectangle rect = table.getCellRect(temp, 0, true);
+			table.scrollRectToVisible(rect);
+			table.setRowSelectionInterval(getInitRow(), getInitRow());
+		}
+		jbt_operator[0] = getBtn("确定", new Dimension(85, 20));
+		jbt_operator[1] = getBtn("取消", new Dimension(85, 20));
+		jbt_operator[2] = getBtn("取消", new Dimension(85, 20)); // 将原来关闭改名为取消,将原来的取消注销了!!
+
+		jpn_btn = new JPanel();
+		jpn_btn.setLayout(new FlowLayout(FlowLayout.CENTER, 30, 10));
+		jpn_btn.add(jbt_operator[0]);
+		// jpn_btn.add(jbt_operator[1]); //将取消按钮去掉!!
+		jpn_btn.add(jbt_operator[2]);
+		jpn_btn.addMouseListener(m_adapter);
+
+		jpn_right.setLayout(new BorderLayout());
+		jpn_right.add(jsp_table, BorderLayout.CENTER);
+		jpn_right.add(new JLabel("  "), BorderLayout.EAST);
+		jpn_right.add(new JLabel("  "), BorderLayout.WEST);
+
+		JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+				jpn_left, jpn_right);
+		splitPane.setDividerLocation(220);
+		splitPane.setDividerSize(10);
+		splitPane.setOneTouchExpandable(true);
+
+		this.getContentPane().add(splitPane, BorderLayout.CENTER);
+		this.getContentPane().add(jpn_btn, BorderLayout.SOUTH);
+
+	}
+
+	protected void checkLoadAll(String isload) {
+		if (isload == null)
+			this.loadall = true;
+		else if ("FALSE".equalsIgnoreCase(isload))
+			this.loadall = false;
+	}
+
+	/**
+	 * 集中处理鼠标事件
+	 * 
+	 * @param e
+	 */
+	protected void dealMousePerform(MouseEvent e) {
+		Object obj = e.getSource();
+		if (obj.equals(jpn_btn)) {
+			if (e.getButton() == MouseEvent.BUTTON3) {
+				showSQL();
+			}
+		} else if (obj.equals(table)) {
+			if (treeFlag) {
+				return;
+			}
+			tableFlag = true;
+			resetTree();
+			getFocuse();
+			tableFlag = false;
+		}
+	}
+
+	/**
+	 * 集中处理按钮事件
+	 * 
+	 * @param e
+	 */
+	protected void dealAcitonPerform(ActionEvent e) {
+		Object obj = e.getSource();
+		if (obj.equals(jbt_operator[0])) {
+			onConfirm();
+		} else if (obj.equals(jbt_operator[1])) {
+			onCancel();
+		} else if (obj.equals(jbt_operator[2])) {
+			onClose();
+		} else if (obj.equals(jbt_operator[3])) {
+			dealSearch(jtf_search.getText());
+		}
+	}
+
+	/**
+	 * 处理键盘事件
+	 * 
+	 * @param e
+	 */
+	protected void dealKeyPerform(KeyEvent e) {
+		Object obj = e.getSource();
+		if (obj.equals(jtf_search)) {
+			if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+				dealSearch(jtf_search.getText());
+			}
+		} else if (obj.equals(jt_menu)) {
+			if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+				DefaultMutableTreeNode node = (DefaultMutableTreeNode) jt_menu
+						.getLastSelectedPathComponent();
+
+				if (node.isLeaf()) {
+					return;
+				}
+				DefaultMutableTreeNode node_child = (DefaultMutableTreeNode) node
+						.getChildAt(0);
+
+				DefaultTreeModel model = (DefaultTreeModel) jt_menu.getModel();
+
+				TreeNode[] nodes = model.getPathToRoot(node_child);
+				TreePath path = new TreePath(nodes);
+
+				jt_menu.makeVisible(path);
+				jt_menu.scrollPathToVisible(path);
+			}
+		}
+	}
+
+	/**
+	 * 获得左边树上边的搜索框
+	 * 
+	 * @return
+	 */
+	private JPanel getSearchPanel() {
+		JPanel panel = new JPanel();
+
+		jtf_search = new JTextField();
+		jtf_search.setPreferredSize(new Dimension(90, 20));
+		jtf_search.addKeyListener(adapter);
+
+		jbt_operator[3] = getBtn(UIUtil.getImage("images/platform/find.gif"),
+				new Dimension(18, 18));
+
+		FlowLayout layout = new FlowLayout();
+		layout.setAlignment(FlowLayout.CENTER);
+		panel.setLayout(layout);
+		panel.add(jtf_search);
+		panel.add(jbt_operator[3]);
+
+		return panel;
+	}
+
+	/**
+	 * 定制所有按钮
+	 * 
+	 * @param _obj:StringORIcon
+	 * @param _demension:初始大小
+	 * @return
+	 */
+	private JButton getBtn(Object _obj, Dimension _demension) {
+		JButton jbt_temp = null;
+		if (_obj instanceof String) {
+			jbt_temp = new JButton(_obj.toString());
+		} else if (_obj instanceof Icon) {
+			jbt_temp = new JButton((Icon) _obj);
+		}
+		jbt_temp.setPreferredSize(_demension);
+		jbt_temp.addActionListener(listener);
+		jbt_temp.addKeyListener(adapter);
+		return jbt_temp;
+	}
+
+	private Enumeration currentEmu = null;
+	private String str_searchedname = "";
+
+	private void dealSearch(String _name) {
+		if (_name == null || _name.trim().equals("")) {
+			return;
+		}
+		if (!this.str_searchedname.equals(_name)) {
+			this.str_searchedname = _name;
+			DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) jt_menu
+					.getModel().getRoot();
+			this.currentEmu = rootNode.preorderEnumeration();
+		} else {
+			if (!this.currentEmu.hasMoreElements()) {
+				if (NovaMessage.confirm(this, "您已经查找到最后了，要从头查找吗？") == true) {
+					DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) jt_menu
+							.getModel().getRoot();
+					this.currentEmu = rootNode.preorderEnumeration();
+				} else {
+					NovaMessage.show("查找不到更多的节点！");
+					return;
+				}
+			}
+		}
+
+		while (this.currentEmu.hasMoreElements()) {
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode) this.currentEmu
+					.nextElement();
+			if (node.isRoot()) {
+				continue;
+			}
+			HashVO vo = (HashVO) node.getUserObject();
+			String temp_name = vo.getStringValue(2); //
+			int compareCount = temp_name.indexOf(_name.trim());
+			if (compareCount >= 0) {
+				DefaultTreeModel model = (DefaultTreeModel) jt_menu.getModel();
+
+				TreeNode[] nodes = model.getPathToRoot(node);
+				TreePath path = new TreePath(nodes);
+
+				jt_menu.makeVisible(path);
+				jt_menu.setSelectionPath(path);
+				jt_menu.scrollPathToVisible(path);
+				return;
+			} else if (!this.currentEmu.hasMoreElements()) {
+				if (NovaMessage.confirm(this, "您已经查找到最后了，要从头查找吗？") == true) {
+					DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) jt_menu
+							.getModel().getRoot();
+					this.currentEmu = rootNode.preorderEnumeration();
+				} else {
+					NovaMessage.show("查找不到更多的节点！");
+					return;
+				}
+			}
+		}
+	}
+
+	/**
+	 * 根据母节点_node来构建子树
+	 * 
+	 * @param _node
+	 */
+	private void getSubMenuTree(DefaultMutableTreeNode _node) {
+		subtree_vo = getSubHashVO(_node);
+
+		if (subtree_vo == null) {
+			DefaultMutableTreeNode root = new DefaultMutableTreeNode("根节点"); // 创建根结点
+			DefaultTreeModel subtree_model = new DefaultTreeModel(root);
+			jt_sub = new JTree(subtree_model);
+
+			TreeNode[] nodes = subtree_model.getPathToRoot(root);
+			TreePath path = new TreePath(nodes);
+			jt_sub.scrollPathToVisible(path);
+			jt_sub.setSelectionPath(path);
+			jt_sub.makeVisible(path);
+
+			SubMenuTreeRender aMyTreeRender = new SubMenuTreeRender(path);
+			jt_sub.setCellRenderer(aMyTreeRender);
+
+			return;
+		}
+		if (jt_sub == null) {
+			DefaultMutableTreeNode root = new DefaultMutableTreeNode("根节点"); // 创建根结点
+			DefaultTreeModel subtree_model = new DefaultTreeModel(root);
+			jt_sub = new JTree(subtree_model);
+		}
+
+		DefaultTreeModel subtree_model = (DefaultTreeModel) jt_sub.getModel();
+		if (((DefaultMutableTreeNode) subtree_model.getRoot()).getChildCount() > 0) {
+			subtree_model
+					.removeNodeFromParent((DefaultMutableTreeNode) subtree_model
+							.getChild(subtree_model.getRoot(), 0));
+		}
+		DefaultMutableTreeNode node_root = (DefaultMutableTreeNode) subtree_model
+				.getRoot(); // 创建根结点
+		DefaultMutableTreeNode newChild = null;
+		for (int i = 0; i < subtree_vo.length; i++) {
+			newChild = new DefaultMutableTreeNode(subtree_vo[i]);
+			subtree_model.insertNodeInto(newChild, node_root, 0);
+			node_root = (DefaultMutableTreeNode) subtree_model.getChild(
+					node_root, 0);
+
+			TreeNode[] nodes = subtree_model.getPathToRoot(node_root);
+			TreePath path = new TreePath(nodes);
+			jt_sub.scrollPathToVisible(path);
+			jt_sub.setSelectionPath(path);
+			jt_sub.makeVisible(path);
+
+			SubMenuTreeRender aMyTreeRender = new SubMenuTreeRender(path);
+			jt_sub.setCellRenderer(aMyTreeRender);
+		}
+	}
+
+	/**
+	 * 根据母节点来获得子树的HashVO[]
+	 * 
+	 * @param _node
+	 * @return
+	 */
+	private HashVO[] getSubHashVO(DefaultMutableTreeNode _node) {
+		if (_node == null) {
+			return null;
+		}
+		Vector _vec = new Vector();
+		while (true) {
+			if (_node.isRoot()) {
+				break;
+			}
+			HashVO vo = (HashVO) _node.getUserObject();
+			_vec.add(vo);
+			_node = (DefaultMutableTreeNode) _node.getParent();
+		}
+		if (_vec.size() > 0) {
+			HashVO[] _vo = new HashVO[_vec.size()];
+			for (int i = 0; i < _vec.size(); i++) {
+				_vo[i] = (HashVO) _vec.get(_vec.size() - 1 - i);
+			}
+			return _vo;
+		}
+		return null;
+	}
+
+	/**
+	 * 获得表数据的初始行，主要在初始化时调用
+	 * 
+	 * @return
+	 */
+	private int getInitRow() {
+		if (str_RefName.equals("") || str_RefName == null) {
+			return -1;
+		}
+		int li_rowcount = table.getModel().getRowCount();
+		String temp_str;
+		for (int i = 0; i < li_rowcount; i++) {
+			temp_str = (String) this.table.getModel().getValueAt(i, name_index);
+			if (temp_str.equals(this.str_RefName)) {
+				String selected_id = (String) table.getModel().getValueAt(i,
+						id_index);
+				tableFlag = true;
+				getTreePath(selected_id);
+				tableFlag = false;
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * 获得带有滚动条的JTable
+	 * 
+	 * @return
+	 */
+	private JScrollPane getJSPTable() {
+		ListAndTableFactoty latf_table = new ListAndTableFactoty();
+
+		JScrollPane jsp_1 = latf_table.getJSPTable(new Vector(), table_header,
+				null);
+		latf_table.setAllColumnUnEditeable();
+		table = latf_table.getTable();
+		tableModel = latf_table.getTableModel();
+		table.addMouseListener(m_adapter);
+		return jsp_1;
+	}
+
+	/**
+	 * 根据表的选择行，重新设置树
+	 */
+	protected void resetTree() {
+		int selected_index = table.getSelectedRow();
+		String selected_id = (String) table.getModel().getValueAt(
+				selected_index, id_index);
+		getTreePath(selected_id);
+	}
+
+	/**
+	 * 获得选择的节点,主要指jt_menu
+	 * 
+	 * @param _id
+	 * @return
+	 */
+	private DefaultMutableTreeNode getSelectedNode(String _id) {
+		DefaultMutableTreeNode rootNode = (DefaultMutableTreeNode) jt_menu
+				.getModel().getRoot();
+		Enumeration e = rootNode.breadthFirstEnumeration();
+		while (e.hasMoreElements()) {
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode) e
+					.nextElement();
+			if (node.isRoot()) {
+				continue;
+			}
+			HashVO vo = (HashVO) node.getUserObject();
+			String temp_id = vo.getStringValue(0);
+			if (temp_id.equals(_id)) {
+				return node;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * 设置选择路径的颜色
+	 * 
+	 * @param _node
+	 */
+	private void setSelectedPathColor(DefaultMutableTreeNode _node) {
+		if (_node == null) {
+			return;
+		}
+
+		DefaultTreeModel model = (DefaultTreeModel) jt_menu.getModel();
+
+		TreeNode[] nodes = model.getPathToRoot(_node);
+		TreePath path = new TreePath(nodes);
+
+		MyTreeRender aMyTreeRender = new MyTreeRender(path);
+		jt_menu.setCellRenderer(aMyTreeRender);
+	}
+
+	/**
+	 * 根据_id来获得树的路径
+	 * 
+	 * @param _id
+	 * @return
+	 */
+	private TreePath getTreePath(String _id) {
+		DefaultMutableTreeNode node = getSelectedNode(_id);
+		setSelectedPathColor(node);
+		this.getSubMenuTree(node);
+		if (node == null) {
+			return null;
+		}
+		DefaultTreeModel model = (DefaultTreeModel) jt_menu.getModel();
+
+		TreeNode[] nodes = model.getPathToRoot(node);
+		TreePath path = new TreePath(nodes);
+
+		jt_menu.makeVisible(path);
+		jt_menu.setSelectionPath(path);
+		jt_menu.scrollPathToVisible(path);
+		return path;
+	}
+
+	/**
+	 * 初始化表数据和表头
+	 * 
+	 * @return
+	 * @throws Exception
+	 */
+	protected void getInitData() throws Exception {
+		String _sql = str_sql;
+		if(this.loadall){
+			_sql = UIUtil.rebuildLazyLoadTreeSQL(_sql);
+		}else{
+			_sql = UIUtil.rebuildLazyLoadTreeSQL(_sql, null);
+		}
+		struct = UIUtil.getTableDataStructByDS(this.str_datasourcename, _sql); //
+		table_header = struct.getTable_header();
+	}
+
+	protected void resetData(String _sql) throws Exception {
+		//System.out.println("refresh data:" + _sql);
+		struct = UIUtil.getTableDataStructByDS(this.str_datasourcename, _sql); //
+		str_data = struct.getTable_body();
+	}
+
+	protected String[] rebuildTableData(DefaultMutableTreeNode node) {
+		if (node == null)
+			return null;
+		HashVO vo = (HashVO) node.getUserObject();
+		String[] keys = vo.getKeys();
+		String[] values = new String[keys.length];
+		for (int i = 0; i < table.getModel().getColumnCount()-1; i++) {
+			values[i]=vo.getStringValue(table.getModel().getColumnName(i+1));
+		}
+		return values;
+	}
+    private void refreshTableData(String key)
+    {
+    	String[][] data = str_data;
+    	if(key!=null)
+    	{
+    		data = (String[][])valueMap.get(key);
+    	}
+    	 if (data.length <= 0) {
+             return;
+         }
+         clearTable();
+         for (int i = 0; i < data.length; i++) {
+        	 Vector _vec = new Vector();
+        	 for (int j = 0; j < data[i].length; j++) {
+                 _vec.add(data[i][j]);
+             }
+             tableModel.addRow(_vec);
+         }
+         table.updateUI();
+    }
+    private void refreshTableData(DefaultMutableTreeNode parentNode, String key) {
+		if(loadall&&valueMap.get(key)==null)
+		{
+			if(parentNode==null)
+				return;
+			String [][] str_value = new String[parentNode.getChildCount()][];
+			for(int i=0; i<parentNode.getChildCount(); i++)
+			{
+				DefaultMutableTreeNode node = (DefaultMutableTreeNode)parentNode.getChildAt(i);
+				str_value[i]=rebuildTableData(node);
+			}
+			valueMap.put(key, str_value);
+		}
+		String[][] data = str_data;
+		if (key != null) {
+			data = (String[][]) valueMap.get(key);
+		}
+		if (data == null || data.length <= 0) {
+			return;
+		}
+		clearTable();
+		for (int i = 0; i < data.length; i++) {
+			Vector _vec = new Vector();
+			for (int j = 0; j < data[i].length; j++) {
+				_vec.add(data[i][j]);
+			}
+			tableModel.addRow(_vec);
+		}
+		table.updateUI();
+	}
+	/**
+	 * 获得menu树
+	 */
+	private void getMenuTree() {
+		if (jt_menu == null) {
+			if (loadall) {
+				jt_menu = UIUtil.getJTreeByParentPK_HashVO(str_datasourcename,"根", str_sql, this.tree_ID, this.tree_parentID);
+				try {
+					//resetData(UIUtil.rebuildLazyLoadTreeSQL(str_sql,tree_parentID, null));
+					resetData(UIUtil.rebuildLazyLoadTreeSQL(str_sql, null));
+					valueMap.put("-1", str_data);
+					refreshTableData("-1");
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			} else {
+				jt_menu = UIUtil.getLazyLoadJTree(str_datasourcename, "根",str_sql, this.tree_parentID);
+				try {
+					//resetData(UIUtil.rebuildLazyLoadTreeSQL(str_sql,tree_parentID, null));
+					resetData(UIUtil.rebuildLazyLoadTreeSQL(str_sql, null));
+					valueMap.put("-1", str_data);
+					refreshTableData("-1");
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+			jt_menu.addTreeSelectionListener(new TreeSelectionListener() {
+				public void valueChanged(TreeSelectionEvent evt) {
+					if (tableFlag) {
+						return;
+					}
+					treeFlag = true;
+					TreePath[] paths = evt.getPaths();
+
+					for (int i = 0; i < paths.length; i++) {
+						if (evt.isAddedPath(i)) {
+							DefaultMutableTreeNode node = (DefaultMutableTreeNode) paths[i]
+									.getLastPathComponent();
+							onChangeSelectTree(node); // This node has been
+						}
+					}
+					treeFlag = false;
+				}
+			});
+			jt_menu.addMouseListener(new MyMouseListener());
+			jt_menu.addKeyListener(adapter);
+			jt_menu.setRootVisible(false); //
+		}
+		return;
+	}
+
+	protected class MyMouseListener extends MouseAdapter {
+
+		public void mouseClicked(MouseEvent e) {
+			TreePath path = jt_menu.getSelectionPath();
+			if (path == null
+					|| ((DefaultMutableTreeNode) path.getLastPathComponent())
+							.isRoot()) {
+				return;
+			}
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode) path
+					.getLastPathComponent();
+			if (!loadall && e.getClickCount() == 2) {
+
+				if (dealedNodeList == null)
+					dealedNodeList = new LinkedList();
+				for (int i = 0; i < dealedNodeList.size(); i++) {
+					if (dealedNodeList.get(i).equals(
+							((HashVO) node.getUserObject())
+									.getStringValue(tree_ID)))
+						return;
+				}
+				try {
+					UIUtil.fetchChildofTreeNode(str_datasourcename, str_sql, node,tree_parentID, ((HashVO) node.getUserObject()).getStringValue(tree_ID));
+				} catch (Exception e1) {
+					NovaMessage.show(jt_menu, e1.getMessage(), NovaConstants.MESSAGE_ERROR);
+				}
+				try {
+					//resetData(UIUtil.rebuildLazyLoadTreeSQL(str_sql,tree_parentID, ((HashVO) node.getUserObject()).getStringValue(tree_ID)));
+					resetData(UIUtil.rebuildLazyLoadTreeSQL(str_sql,((HashVO) node.getUserObject()).getStringValue(tree_ID)));
+					valueMap.put(((HashVO) node.getUserObject())
+							.getStringValue(tree_ID), str_data);
+					refreshTableData(((HashVO) node.getUserObject())
+							.getStringValue(tree_ID));
+					dealedNodeList.add(((HashVO) node.getUserObject())
+							.getStringValue(tree_ID));
+				} catch (Exception e1) {
+					e1.printStackTrace();
+					System.out.print("刷新数据出错...");
+				}
+				if (node.getChildCount() != 0) {
+					DefaultTreeModel model = (DefaultTreeModel) jt_menu
+							.getModel();
+					TreePath p = new TreePath(model.getPathToRoot(node
+							.getFirstChild()));
+					jt_menu.expandPath(p);
+					jt_menu.setSelectionPath(p);
+					jt_menu.scrollPathToVisible(p);
+					jt_menu.updateUI();
+				}
+			}
+		}
+	}
+
+	/**
+	 * 处理树的选择节点的变更的事件
+	 * 
+	 * @param _node
+	 */
+	private void onChangeSelectTree(DefaultMutableTreeNode _node) {
+		if (_node.isRoot()) {
+			refreshTableData(null,"-1");
+		} else {
+			HashVO vo_node = (HashVO) _node.getUserObject();
+			String str_id = vo_node.getStringValue(0); //
+			DefaultMutableTreeNode _pnode = (DefaultMutableTreeNode) _node
+					.getParent();
+			String parentid = "-1";
+			if (!_pnode.isRoot()) {
+				parentid = ((HashVO) _pnode.getUserObject()).getStringValue(0);
+			}
+			refreshTableData(_pnode,parentid);
+			setSelectedPathColor(_node);
+			getSubMenuTree(_node);
+
+			int li_rowcount = table.getRowCount();
+			for (int i = 0; i < li_rowcount; i++) {
+				if (str_id.equals(table.getModel().getValueAt(i, 0))) {
+					table.setRowSelectionInterval(i, i);
+					return;
+				}
+			}
+		}
+	}
+
+	
+
+	/**
+	 * 清空数据表
+	 */
+	public void clearTable() {
+		int li_rowcount = tableModel.getRowCount();
+		for (int i = li_rowcount - 1; i >= 0; i--) {
+			tableModel.removeRow(i);
+		}
+		table.updateUI();
+	}
+
+	protected void getFocuse() {
+	}
+
+	protected void onConfirm() {
+		int li_selectedRow = jt_menu.getSelectionCount(); //
+		if (li_selectedRow <= 0) {
+			NovaMessage.show(this, "请选择一条记录");
+			this.requestFocus();
+			return;
+		}
+
+		DefaultMutableTreeNode node = (DefaultMutableTreeNode) jt_menu
+				.getLastSelectedPathComponent();
+
+		if (node.isRoot()) {
+			NovaMessage.show(this, "请不要操作根节点！");
+			this.requestFocus();
+			return;
+		}
+
+		HashVO _vo = (HashVO) node.getUserObject(); //
+		this.refVO=new RefItemVO(_vo);
+		
+		li_closeType = 0;
+		this.dispose();
+	}
+
+	private void onCancel() {
+		this.refVO=null;
+		li_closeType = 1;
+		this.dispose();
+	}
+
+	protected void onClose() {
+		this.refVO=null;
+		li_closeType = 2;
+		this.dispose();
+	}
+
+
+	protected class MyCellEditor extends DefaultCellEditor {
+		private static final long serialVersionUID = 1259100940105603890L;
+
+		public MyCellEditor() {
+			this(new JTextField());
+		}
+
+		public MyCellEditor(JTextField _textfield) {
+			super(_textfield);
+		}
+
+		public boolean isCellEditable(EventObject evt) {
+			if (evt instanceof MouseEvent) {
+				int li_count = ((MouseEvent) evt).getClickCount();
+				if (li_count >= 3) {
+					return true;
+				} else {
+					return false;
+				}
+			}
+			return false;
+		}
+
+	}
+
+	protected class MyTreeRender extends DefaultTreeCellRenderer {
+		private static final long serialVersionUID = 4104163070905939850L;
+
+		TreePath path;
+
+		public MyTreeRender(TreePath path) {
+			this.path = path;
+		}
+
+		public Component getTreeCellRendererComponent(JTree tree, Object value,
+				boolean sel, boolean expanded, boolean leaf, int row,
+				boolean hasFocus) {
+			Component cell = super.getTreeCellRendererComponent(tree, value,
+					sel, expanded, leaf, row, hasFocus);
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+			DefaultMutableTreeNode[] nodes = (DefaultMutableTreeNode[]) Arrays
+					.asList(path.getPath()).toArray(
+							new DefaultMutableTreeNode[0]);
+			boolean iffind = false;
+			for (int i = 0; i < nodes.length; i++) {
+				if (nodes[i] == node) {
+					iffind = true;
+					break;
+				}
+			}
+
+			if (iffind) {
+				cell.setForeground(Color.red);
+			} else {
+				cell.setForeground(Color.black);
+			}
+			return cell;
+		}
+	}
+
+	/**
+	 * 对话框的操作类型：确认/取消/关闭
+	 * @return
+	 */
+	public int getCloseType() {
+		return li_closeType;
+	}
+
+	/**
+     * 返回参照选项值
+     * @return
+     */
+	public RefItemVO getRefVO() {
+		return this.refVO;
+	}
+
+	private void showSQL() {
+		System.out.println(this.str_sql);
+		JOptionPane.showMessageDialog(this, this.str_sql); //
+	}
+
+	class SubMenuTreeRender extends DefaultTreeCellRenderer {
+		private static final long serialVersionUID = 2347459122605778243L;
+
+		TreePath path;
+
+		public SubMenuTreeRender(TreePath path) {
+			this.path = path;
+		}
+
+		public Component getTreeCellRendererComponent(JTree tree, Object value,
+				boolean sel, boolean expanded, boolean leaf, int row,
+				boolean hasFocus) {
+			JLabel cell = (JLabel) super.getTreeCellRendererComponent(tree,
+					value, sel, expanded, leaf, row, hasFocus);
+			cell.setOpaque(true);
+			cell.setBackground(new Color(250, 250, 250));
+			cell.setBackground(new Color(240, 240, 240));
+			cell.setEnabled(false);
+			return cell;
+		}
+	}
+
+}
+/*******************************************************************************
+ * $RCSfile: UIRefTreeDialog.java,v $ $Revision: 1.9.2.4 $ $Date: 2007/11/09
+ * 11:40:29 $
+ * 
+ * $Log: UIRefTreeDialog.java,v $
+ * Revision 1.9.2.4  2010/01/21 08:17:56  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.9.2.3  2010/01/20 09:55:27  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.9.2.2  2010/01/05 09:10:49  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.9.2.1  2008/08/27 07:00:22  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.9  2008/01/17 05:56:01  wangqi
+ * *** empty log message ***
+ * Revision 1.7 2007/11/09 11:40:29 john_liu
+ * 2007.11.09 by john_liu MR#: BIZM20071023-59
+ * 
+ * Revision 1.6 2007/09/04 03:03:50 yanghuan
+ * 根据陈学进的需求，设置变量属性为protected:str_data、table_header、jt_menu、tableModel；
+ * 设置内部类属性为protected:MyCellEditor、MyTreeRender； dealSearch(String _name)中if
+ * (compareCount == 0)改为if (compareCount >= 0)
+ * 
+ * Revision 1.5 2007/09/03 06:36:35 yanghuan private Object[][] getData() throws
+ * Exception方法private改为protected
+ * 
+ * Revision 1.4 2007/05/31 07:38:19 qilin code format
+ * 
+ * Revision 1.3 2007/05/22 07:58:46 qilin no message
+ * 
+ * Revision 1.2 2007/05/22 02:03:33 sunxb *** empty log message ***
+ * 
+ * Revision 1.1 2007/05/17 06:01:06 qilin no message
+ * 
+ * Revision 1.7 2007/04/05 09:40:50 shxch *** empty log message ***
+ * 
+ * Revision 1.6 2007/03/28 11:36:28 shxch *** empty log message ***
+ * 
+ * Revision 1.5 2007/03/28 10:13:01 shxch *** empty log message ***
+ * 
+ * Revision 1.4 2007/02/27 06:03:02 shxch *** empty log message ***
+ * 
+ * Revision 1.3 2007/02/10 08:51:57 shxch *** empty log message ***
+ * 
+ * Revision 1.2 2007/01/30 05:14:30 lujian *** empty log message ***
+ * 
+ * 
+ ******************************************************************************/

@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					xmlns:mx="library://ns.adobe.com/flex/mx"
+					width="100%" height="100%" fontSize="12"
+					xmlns:chart="smartx.flex.components.core.chart.*"
+					xmlns:mtchart="smartx.flex.components.core.mtchart.*"
+					initialize="preInit()" >
+	<fx:Declarations>
+		<chart:AdvListChart id="listChartPanel" queryColumns="{queryColumns}" statisticFields="{statisticFields}" width="100%" height="100%"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import flash.utils.getDefinitionByName;
+			
+			import mx.charts.ChartItem;
+			import mx.charts.Legend;
+			import mx.charts.chartClasses.Series;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.ListEvent;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+			import mx.managers.PopUpManager;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.ListPanelDebugInfoWindow;
+			import smartx.flex.components.core.chart.AdvListChart;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.listener.MTListCustomButtonListener;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.util.ComboBoxWindow;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.export.ChartExportUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			[Bindable]
+			private var columns:Array =  new Array();
+			[Bindable]
+			private var queryColumns:Array = new Array();//查询字段列表
+			[Bindable]
+			private var statisticFields:Array = [];//统计字段
+			[Bindable]
+			private var datas:ArrayCollection;
+			
+			private var exportOptWindow:ComboBoxWindow;
+			
+			override protected function preInit():void{
+				super.preInit();
+				var xml:XML = metadataTemplet.contentXML;
+				for each(var item:XML in xml.extend.items.item){
+					var isShow:String = item.@isShowField;
+					if(isShow == "Y" || isShow =="y"){
+						var column:DataGridColumn = new DataGridColumn();
+						column.headerText = item.@labelField;
+						column.dataField = item.@dataField;
+						if(item.@width.length() > 0)
+							column.width = Number(item.@width);
+						if(item.@itemRenderer.length()>0){
+							var rendererName:String = String(item.@itemRenderer);
+							if(rendererName != null && rendererName!= ""){
+								var classRef:Class = getDefinitionByName(rendererName) as Class;
+								column.itemRenderer = new ClassFactory(classRef);
+							}
+						}
+						column.editable = false;
+						columns = this.columns.concat(column);
+						
+						var isQuery:String = item.@isQueryField;
+						if( isQuery == "Y" || isQuery == "y"){
+							queryColumns = queryColumns.concat( item.@dataField.toString());
+						}
+						var isStatistic:String = item.@isStatisticField;
+						if(isStatistic.toUpperCase() == "Y")
+							statisticFields.push(String(item.@dataField));
+					}
+				}
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				//不提供详情信息查看，详情按钮去除
+				setMenuItemIsEnable(MTChartConst.MTCHART_KEY_DETAIL,false);
+				
+				mainBox.addChild(listChartPanel);
+				listChartPanel.columns = columns;
+				listChartPanel.addEventListener(AdvListChart.SHOWDATA_FINISH,showDataFinishHandler);
+				listChartPanel.dataListGrid.addEventListener(ListEvent.ITEM_CLICK,
+					function(event:ListEvent):void{
+						selectedItems = new ArrayCollection(listChartPanel.dataListGrid.selectedItems);
+						selectedEvent();
+					});
+				registerListItemClickListener(listChartPanel.dataListGrid,this);
+				if(metadataTemplet.contentXML.extend.showQueryBox == "false" && metadataTemplet.contentXML.extend.showCustomButtonBox == "false")
+					listChartPanel.removeChild(listChartPanel.simpleQueryPanel);
+				else if(metadataTemplet.contentXML.extend.showQueryBox == "false")
+					listChartPanel.simpleQueryPanel.removeChild(listChartPanel.searchBox);
+				else if(metadataTemplet.contentXML.extend.showCustomButtonBox == "false")
+					listChartPanel.simpleQueryPanel.removeChild(listChartPanel.buttonBox);
+				if(metadataTemplet.contentXML.extend.showPageBox == "false")
+					listChartPanel.removeChild(listChartPanel.pageBox);
+				if(metadataTemplet.contentXML.extend.pageSize.length() > 0 &&  metadataTemplet.contentXML.extend.pageSize != "")
+					listChartPanel.pageSize = metadataTemplet.contentXML.extend.pageSize;
+				if(metadataTemplet.contentXML.extend.statisticType.length() > 0 && metadataTemplet.contentXML.extend.statisticType != "")
+					listChartPanel.statisticType = metadataTemplet.contentXML.extend.statisticType;
+				
+				initCustomButtons();
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			//真正的底层控件数据刷新
+			override protected function selfRefreshData():void{
+				super.selfRefreshData();
+				if( !isDataParseError && ( !isAccessFilterError || isIgnoreAccessParamError) ){
+					listChartPanel.dataSource = datasource;
+					listChartPanel.sql = realSql;
+					listChartPanel.refresh();
+				}else{
+					isLoading = false;
+				}
+			}
+
+			override public function refresh(event:TimerEvent):void
+			{
+				isLoading = true;
+				setQueryDataSql();
+			}
+			
+			//调用自己的刷新处理方式
+			override public function refreshComplete():void{
+				this.refresh(null);
+			}
+			
+			private function showDataFinishHandler(event:Event):void{
+				//数据加载显示完毕
+				isLoading = false;
+				listChartPanel.dataListGrid.dataProvider = MTChartUtil.parseSynonyms(ArrayCollection(listChartPanel.dataListGrid.dataProvider),metadataTemplet.contentXML);
+			}
+			
+			override protected function export():void{
+				if(exportOptWindow == null)
+					exportOptWindow = new ComboBoxWindow();
+				exportOptWindow.title = "导出方式选择"
+				exportOptWindow.dataProvider = exportOptArray;
+				exportOptWindow.confirmFunc = exportConfirmHandler;
+				
+				if(!exportOptWindow.isPopUp){
+					PopUpManager.addPopUp(exportOptWindow,this,true);
+					PopUpManager.centerPopUp(exportOptWindow);
+				}
+			}
+			
+			override protected function exportConfirmHandler():void{
+				PopUpManager.removePopUp(exportOptWindow);
+				
+				var fileName:String = "mtListChart";
+				if("" != StringUtil.trim(title) )
+					fileName = title;
+				//目前支持3中格式的导出
+				if( exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_PNG)
+					ChartExportUtil.exportChart(exportObj,fileName);
+				else if(exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_CURDATA_CSV)
+					listChartPanel.exportCurData(fileName);
+				else if(exportOptWindow.getSelectedItem() == MTChartConst.EXPOPTION_ALLDATA_CSV)
+					listChartPanel.exportAllData(fileName);
+			}
+			
+			private var iconComponentArray:Array = [];
+			
+			private var listenerMap:Hashtable = new Hashtable();
+			
+			private function initCustomButtons():void{
+				var customButton:XMLList = metadataTemplet.contentXML..customButton;
+				if(customButton.length() > 0){
+					for each(var buttonXML:XML in customButton.button){
+						var button:Button = new Button();
+						button.id = buttonXML.@id;
+						button.label = buttonXML.@label;
+						button.toolTip = buttonXML.@toolTip;
+						var iconUrl:String = buttonXML.@icon;
+						if(iconUrl != null && iconUrl != ""){
+							var cardIcon:Class = IconUtility.getClass(button,iconUrl,16,16);
+							button.setStyle("icon",cardIcon);
+							iconComponentArray.push(button);
+						}
+						
+						var listenerArr:Array = [];
+						
+						for each(var listener:String in buttonXML.listeners.listener){
+							var classRefrence:Class = getDefinitionByName(listener) as Class;
+							var customButtonListener:MTListCustomButtonListener = new classRefrence() as MTListCustomButtonListener;
+							listenerArr.push(customButtonListener);
+						}
+						listenerMap.add(button.id,listenerArr);
+						
+						button.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var listeners:Array = listenerMap.find(event.target.id) as Array;
+							for each(var listener:MTListCustomButtonListener in listeners){
+								listener.buttonClick(getMTChart());
+							}
+						});
+						listChartPanel.buttonBox.addChild(button);
+					}
+				}
+			}
+			
+			private function getMTChart():MTListChartPanel{
+				return this;
+			}
+			
+			override public function destroy():void{
+				super.destroy();
+				for each (var obj:* in iconComponentArray){
+					IconUtility.destroy(obj);
+				}
+				iconComponentArray = null;
+				listenerMap.clear();
+			}
+			
+		]]>
+	</fx:Script>
+</mtchart:MTChartPanel>

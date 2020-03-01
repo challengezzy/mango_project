@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<chart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:adv="smartx.flex.components.core.chart.*"
+		   xmlns:chart="smartx.flex.components.core.mtchart.*"
+		   width="100%" height="100%" initialize="preInit()" >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.charts.ChartItem;
+			import mx.charts.Legend;
+			import mx.charts.chartClasses.Series;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.FlexEvent;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.chart.AdvPlotChart;
+			import smartx.flex.components.core.chart.AdvXYAreaChart;
+			import smartx.flex.components.core.chart.AdvXYChart;
+			import smartx.flex.components.core.chart.AdvXYColumnChart;
+			import smartx.flex.components.core.chart.AdvXYLineChart;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+
+			private var selectedItem:int = -1;
+			private var ro:RemoteObject;
+			private var xyChart:AdvXYChart;
+			
+			override protected function preInit():void{
+				super.preInit();
+				var xml:XML = metadataTemplet.contentXML;
+				if(mc.chartType == "linechart")
+					xyChart = new AdvXYLineChart();
+				else if(mc.chartType == "areachart")
+					xyChart = new AdvXYAreaChart();
+				else if(mc.chartType == "columnchart")
+					xyChart = new AdvXYColumnChart();
+				else
+					xyChart = new AdvPlotChart();
+				title = mc.chartName;
+				xyChart.timeMode = mc.lineMode;
+				xyChart.isHorizontalLegend = mc.isHorizontalLegend;
+				for each(var item:XML in xml.extend.items.item){
+					xyChart.displayname = item.@displayfield;
+					xyChart.xField = item.@xfield;
+					xyChart.yField = item.@yfield;
+					
+					xyChart.xAxisType = item.@xAxisType;
+					xyChart.yAxisType = item.@yAxisType;
+					
+					xyChart.verticalTitle = item.@yfieldlabel;
+					xyChart.verticalField = item.@verticalfield;
+					
+					xyChart.horizontalTitle = item.@xfieldlabel
+					xyChart.horizontalField =item.@horizontalfield;
+					
+					xyChart.isShowLabels = item.@isShowLabels=="true"?true:false;
+					if(item.@color != "")
+						xyChart.colors = String(item.@color).split(",");
+					if(item.@serialName != "")
+						xyChart.seriesNames = String(item.@serialName).split(",");
+				}
+				
+				xyChart.initialize();
+				
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				xyChart.addEventListener(FlexEvent.CREATION_COMPLETE,xyChartCreationCompleteHandler);
+				mainBox.addChild(xyChart);
+				
+				//refresh(null);
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			private function xyChartCreationCompleteHandler(event:FlexEvent):void{
+				if(xyChart is AdvXYColumnChart)
+					registerChartClickListener((xyChart as AdvXYColumnChart).columnChart,this);
+			}
+			
+			private function getCustomizeColors(item:ChartItem, index:Number):IFill{
+				var color:uint = uint(mc.colors[index]) ;
+				var sc:SolidColor = new SolidColor(color,0.6);
+				return sc;
+			}
+			
+			override public function refreshComplete():void{
+				xyChart.refreshData(dataProvider);
+				super.refreshComplete();
+			}
+		]]>
+	</fx:Script>
+</chart:MTChartPanel>

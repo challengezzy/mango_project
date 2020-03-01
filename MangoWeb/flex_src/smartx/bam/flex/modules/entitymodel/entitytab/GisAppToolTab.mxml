@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitytab:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:entitytab="smartx.bam.flex.modules.entitymodel.entitytab.*" 
+					   width="100%" height="100%" label="工具">
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			[Bindable]
+			internal var preloadTypeDp:ArrayCollection = new ArrayCollection([
+				{name:"不加载",data:"no"},{name:"最小化",data:"minimized"},{name:"打开",data:"open"}
+			]);
+			
+			private function addWidget():void{
+				var widgetXml:XML = <widget name='工具' url='' width='' 
+									icon='' height='' x='' y='' preload='no'/>;
+				selectedItem.content.widgets.appendChild(widgetXml);
+				refreshWidgetDg();
+			}
+			
+			private function deleteWidget():void{
+				if(widgetDg.selectedItems.length < 0)
+					return;
+				for each(var widgetXml:XML in widgetDg.selectedItems){
+					CEPUtils.xmlDeleteNode(widgetXml);
+				}
+				refreshWidgetDg();
+			}
+			
+			private function generateWidgetId():void{
+				var i:int = 1;
+				for each(var widgetXml:XML in  selectedItem.content.widgets.widget){
+					widgetXml.@id = i;
+					i++;
+				}
+			}
+			
+			private function refreshWidgetDg():void{
+				widgetDg.dataProvider = selectedItem.content.widgets.widget;
+				widgetDg.invalidateDisplayList();
+				generateWidgetId();
+			}
+			
+			private function preloadLabelFun(item:Object, column:DataGridColumn):String{
+				for each(var data:Object in preloadTypeDp){
+					if(String(item.@preload) == data.data)
+						return data.name;
+				}
+				return "";
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox id="mainBox" width="100%" height="100%" 
+			 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%">
+			<mx:Button icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addWidget()"/>
+			<mx:Button icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteWidget()"/>
+		</mx:HBox>
+		<mx:DataGrid id="widgetDg" width="100%" height="80%" 
+					 dataProvider="{selectedItem.content.widgets.widget}" editable="true" allowMultipleSelection="true">
+			<mx:columns>
+				<mx:DataGridColumn headerText="名称" dataField="@name" />
+				<mx:DataGridColumn headerText="实现类" dataField="@url" />
+				<mx:DataGridColumn headerText="图标" dataField="@icon" />
+				<mx:DataGridColumn headerText="宽度" dataField="@width" />
+				<mx:DataGridColumn headerText="高度" dataField="@height" />
+				<mx:DataGridColumn headerText="X" dataField="@x" />
+				<mx:DataGridColumn headerText="Y" dataField="@y" />
+				<mx:DataGridColumn headerText="预加载方式" dataField="@preload" labelFunction="preloadLabelFun">
+					<mx:itemEditor>
+						<fx:Component>
+							<mx:HBox width="100%" horizontalAlign="center">
+								<fx:Script>
+									<![CDATA[
+										import mx.events.ListEvent;
+										public function get text():String{
+											return preloadCbo.selectedItem==null?"":preloadCbo.selectedItem.data;
+										}
+										
+										override public function set data(value:Object):void{
+											super.data = value;
+											if(value != null){
+												var preload:String = String(value.@preload);
+												for each(var data:Object in outerDocument.preloadTypeDp){
+													if(preload == data.data){
+														preloadCbo.selectedItem = data;
+														break
+													}else
+														preloadCbo.selectedItem = null;
+												}
+											}else
+												preloadCbo.selectedItem = null;
+										}
+										
+									]]>
+								</fx:Script>
+								<mx:ComboBox id="preloadCbo" width="100%"
+											 labelField="name" dataProvider="{outerDocument.preloadTypeDp}" />
+							</mx:HBox>
+						</fx:Component>
+					</mx:itemEditor>
+				</mx:DataGridColumn>
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+</entitytab:AbstractTab>

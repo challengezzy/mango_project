@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Controls>
+	<!-- 流程图空间配置参数 -->
+	<ChartDataColumn>PROCESSCHARTDATA</ChartDataColumn>
+	<ChartKeyColumn>PROCESSCHARTDATA</ChartKeyColumn>
+	<CustomConfig>
+	   <IsCustomConfig>true</IsCustomConfig>
+	   <MaxTimeLimit></MaxTimeLimit>
+	   <MinTimeLimit></MinTimeLimit>
+	   <PeriodDay>30</PeriodDay>
+	   <DataConvertClass>smartx.pam.flex.modules.processchart.PAMProcessDataConvertImpl</DataConvertClass>
+	</CustomConfig>
+	<Layout>
+		<!-- 布局模式
+			<item>ConcentricRadial</item>
+			<item>ParentCenteredRadial</item>
+			<item>SingleCycleCircle</item>
+			<item>Hyperbolic</item>
+			<item>Hierarchical</item>
+			<item>ForceDirected</item>
+			<item>ISOM</item>
+			<item>DirectPlacement</item>
+			<item>Phyllotactic</item>
+		 -->
+		<LayoutMode>ConcentricRadial</LayoutMode>
+		<HierarchicalLayout>
+		    <!-- 层次布局方向
+		        <item>Top Down</item>
+				<item>Bottom Up</item>
+				<item>Left-Right</item>
+				<item>Right-Left</item>
+		     -->
+			<Orientation>Top Down</Orientation>
+			<!-- 节点间距 0-200 -->
+			<NodeSpacing>20</NodeSpacing>
+			<ToggleSiblingSpread>true</ToggleSiblingSpread>
+			<ToggleNodeInterleaving>true</ToggleNodeInterleaving>
+			<ToggleHonorNodeSize>false</ToggleHonorNodeSize>
+		</HierarchicalLayout>
+		<ForceDirectedLayout>
+			<ToggleDamping>true</ToggleDamping>
+		</ForceDirectedLayout>
+		<PhyllotacticLayout>
+			<!-- Layout Angle -360 到360 之间 -->
+			<Angle>30</Angle>
+		</PhyllotacticLayout>
+		<CommonLayoutControl>
+			<!-- 连线长度,0-600 -->
+			<LinkLength>100</LinkLength>
+			<ToggleAnimation>false</ToggleAnimation>
+			<ToggleAutoFit>true</ToggleAutoFit>
+		</CommonLayoutControl>
+	</Layout>
+	<!-- 节点风格
+	    <item>Default</item>
+		<item>Basic</item>
+		<item>Basic+Effects</item>
+		<item>SimpleCircle</item>
+		<item>SimpleCircle+Effects</item>
+		<item>Icons</item>
+		<item>Rotated Rectangle</item>
+		<item>Size by Value</item>
+		<item>WFB</item>
+	    -->
+	<NodeSytles>Icons</NodeSytles>
+	 <!-- 连线风格
+	    <item>Default</item>
+        <item>DirectedArrows</item>
+        <item>DirectedBalloons</item>
+        <item>Orthogonal</item>
+        <item>Flow</item>
+        <item>Bezier</item>
+        <item>Circular</item>
+        <item>Hyperbolic</item> 
+     -->
+	<EdgeStyles>Default</EdgeStyles>
+	<EdgeLabelStyles>
+     <!-- 连线图标
+        <mx:String>Default</mx:String>
+		<mx:String>Basic</mx:String>
+		<mx:String>WFB</mx:String>
+      -->
+      <EdgeLabel>Default</EdgeLabel>
+      <ToggleEdgeLabel>true</ToggleEdgeLabel>
+	</EdgeLabelStyles>
+	<ViewControls>
+		<!-- 分离程度1-10之间 -->
+		<DegreesOfSeparation></DegreesOfSeparation>
+		<!-- 放大比例 0.25到2 -->
+		<BirdEyeZoom>1</BirdEyeZoom>
+		<!-- 图标比例 0.5到2 -->
+		<ScaleLabels>1</ScaleLabels>
+	
+	</ViewControls>
+</Controls>

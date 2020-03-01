@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<chart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:chart="smartx.flex.components.core.mtchart.*"
+		   width="100%" height="100%" 
+		   initialize="preInit()" xmlns:components="com.fusioncharts.components.*">
+	
+	<chart:states>
+		<mx:State name="piechart"/>
+		<mx:State name="fusion"/>
+	</chart:states>
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:SeriesInterpolate id="interpolate" elementOffset="10"/>
+		<!-- This Stroke is used for the callout lines. -->
+		<mx:SolidColorStroke id="callouts" weight="2" color="0x999999" alpha=".8" caps="square"/>
+		<!-- This Stroke is used to separate the wedges in the pie. -->
+		<mx:SolidColorStroke id="radial" weight="1" color="0xFFFFCC" alpha=".3"/>
+		<!-- This Stroke is used for the outer border of the pie. -->
+		<mx:SolidColorStroke id="pieborder" color="0x000000" weight="2" alpha=".5"/>
+		
+		<mx:VBox width="100%" height="100%" id="contentBox">
+			<mx:Canvas width="100%" height="100%" includeIn="piechart" id="pieCanvas">
+				<mx:Legend id="pieLegend" dataProvider="{pieChart}" x="0" y="0" width="15%"/>
+				<mx:Canvas width="100%" height="100%" >
+					<mx:PieChart id="pieChart" width="100%" height="100%"
+								 itemClick="pieChartClick(event.hitData.item)"
+								 showDataTips="true" showEffect="Fide" 
+								 hideEffect="Fide" moveEffect="Glow" focusInEffect="Glow">
+						<mx:series>
+							<mx:PieSeries fontSize="12"
+										  labelPosition="callout"
+										  calloutStroke="{callouts}"
+										  radialStroke="{radial}"
+										  stroke="{pieborder}"
+										  labelField="{labelField}" 
+										  field="{dataField}" 
+										  nameField="{nameField}" 
+										  showDataEffect="{interpolate}"/>
+						</mx:series>
+					</mx:PieChart>
+				</mx:Canvas>
+			</mx:Canvas>
+			<mx:VBox width="100%" height="100%" includeIn="fusion" id="fusionCanvas" horizontalAlign="center" verticalAlign="top">
+				<!--components:FusionCharts id="fc" width="100%" height="100%" FCFolder="{FUSIONDIR}" FCLoadEvent="fc_FCLoadEventHandler(event)">
+				<components:FCChartData FCParams="{params}" FCStyles="{chartStyles}"/>
+				</components:FusionCharts-->
+			</mx:VBox>
+		</mx:VBox>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.events.FCEvent;
+			import com.fusioncharts.components.FusionCharts;
+			
+			import mx.charts.ChartItem;
+			import mx.charts.Legend;
+			import mx.charts.chartClasses.Series;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.graphics.IFill;
+			import mx.graphics.SolidColor;
+			import mx.rpc.Fault;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			[Bindable]
+			private var dataField:String;
+			[Bindable]
+			private var nameField:String;
+			[Bindable]
+			private var labelField:String;
+			
+			private var linkField:String;//F系图超链接字段
+			
+			private var selectedItem:int = -1;
+			
+			private var colors:Array = [];
+			//初始化参数
+			[Bindable]
+			private var params:ArrayCollection = new ArrayCollection([
+				{palette:'2'},
+				{baseFontSize:'12'},
+				{showFCMenuItem:'0'}
+			]);
+			//初始化样式
+			[Bindable]
+			private var chartStyles:ArrayCollection=new ArrayCollection([
+				{name:"CaptionFontStyle",type:"font",font:"Verdana",size:"22"},
+				{toObject:"CAPTION",styles:"CaptionFontStyle"},
+			]);
+			
+			//fusion的swf文件位置
+			private static const FUSIONDIR:String = "charts/fusioncharts.com/fusioncharts";
+			
+			private var fc:FusionChartsWrapper;
+			
+			override protected function preInit():void{
+				super.preInit();
+				if(mc.dataFileds.length == 0)
+					throw new Error("视图数据字段不能为空!");
+				dataField = mc.dataFileds[0];
+				if(mc.nameFileds.length > 0)
+					nameField = mc.nameFileds[0];
+				if(mc.labelFileds.length > 0)
+					labelField = mc.labelFileds[0];
+				if(mc.colors.length > 0){
+					var colorStr:String = mc.colors[0];
+					colors = colorStr.split(",");
+				}
+				if(mc.linkFileds.length > 0)
+					linkField = mc.linkFileds[0];
+				if(mc.chartType == "piechart"){
+					currentState = "piechart";
+					
+				}
+				else{
+					currentState = "fusion";
+				}
+	
+				
+			}
+			
+			private function initForPieChart():void{
+				if(!mc.isShowLabel)
+					pieChart.series[0].setStyle("labelPosition","none");
+				if(contentXml.extend.isShowLegend != "true")//不显示图例
+					pieLegend.visible = false;
+			}
+			
+			private function initForFusionChart():void{
+				//params.addItem({caption:mc.chartName});
+				
+				if(mc.colors.length > 0)
+					params.addItem({paletteColors:mc.colors[0]});
+				
+				if(!mc.isShowLabel)
+					params.addItem({showNames:'0'});
+				
+				if(contentXml.extend.isShowLegend != "true")
+					params.addItem({showLegend:'0'});
+				else
+					params.addItem({showLegend:'1'});
+				
+				if(contentXml.extend.isShowAnimation != "true")
+					params.addItem({animation:'0'});
+				else
+					params.addItem({animation:'1'});
+				
+				if(contentXml.extend.isShowValue != "true")
+					params.addItem({showvalues:'0'});
+				else
+					params.addItem({showvalues:'1'});
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				mainBox.addChild(contentBox);
+				if(mc.chartType == "piechart"){
+					initForPieChart();
+					
+				}
+				else{
+					initForFusionChart();
+				}
+				
+				dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+			}
+			
+			private function loadColor():void{
+				//颜色的数量如果不和数据的条数相同则沿用饼图原来的颜色
+				if(dataProvider.length == colors.length){
+					var scs:Array = [];
+					for each(var colorStr:String in colors){
+						colorStr = "0x".concat(colorStr);
+						var sc:SolidColor = new SolidColor(parseInt(colorStr),0.6);
+						scs.push(sc);
+					}
+					if(scs.length > 0)
+						pieChart.series[0].setStyle("fills",scs);
+				}
+			}
+			
+			private function pieChartClick(item:Object):void{
+				var index:int = dataProvider.getItemIndex(item);
+				selectedItems = new ArrayCollection([item]);
+				selectedEvent();
+				var explodeData:Array = [];
+				if(selectedItem == index){
+					//已经选中，则缩回
+					selectedItem = -1;
+				}
+				else{
+					explodeData[index] = 0.15;
+					selectedItem = index;
+				}
+				pieChart.series[0].perWedgeExplodeRadius = explodeData;
+			}
+			
+			override public function refreshComplete():void{
+				if(currentState == "piechart")
+					loadDataForPieChart();
+				else{
+					loadDataForFusionChart();
+				}
+				super.refreshComplete();
+			}
+			
+			private function loadDataForPieChart():void{
+				loadColor();
+				pieChart.dataProvider = dataProvider;
+			}
+			
+			private function loadDataForFusionChart():void{
+				var datas:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<dataProvider.length;i++){
+					var tempData:Object = dataProvider.getItemAt(i);
+					var data:Object = {label:tempData[labelField],value:tempData[dataField],link:"S-".concat(tempData[linkField])};
+					datas.addItem(data);
+				}
+				if(fc == null){
+					fc = new FusionChartsWrapper();
+					//fc.percentHeight = 100;
+					//fc.percentWidth = 100;
+					if(contentXml.extend.height.length() > 0 && contentXml.extend.height != "")
+						fc.height = Number(contentXml.extend.height);
+					else
+						fc.percentHeight = 100;
+					if(contentXml.extend.width.length() > 0 && contentXml.extend.width != "")
+						fc.width = Number(contentXml.extend.width);
+					else
+						fc.percentWidth = 100;
+
+					fc.FCFolder = FUSIONDIR;
+					fc.FCChartType = mc.chartType;
+					//fc.addEventListener(FCEvent.FCLoadEvent,fc_FCLoadEventHandler);
+					fc.FCData(datas);
+					fc.FCParams(params);
+					fc.FCStyles(chartStyles);
+					fusionCanvas.addChild(fc);
+					registerFCChartClickListener(fc,this);
+				}
+				else{
+					fc.FCData(datas);
+					fc.FCParams(params);
+					fc.FCStyles(chartStyles);
+					fc.FCRender();
+				}
+			}
+			
+			public override function destroy():void
+			{
+				if(fc != null)
+					fc.destroy();
+				if(fusionCanvas != null)
+					fusionCanvas.removeAllChildren();
+				fc = null;
+				removeAllChildren();
+				super.destroy();
+			}
+			
+		]]>
+	</fx:Script>
+</chart:MTChartPanel>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100" horizontalGap="0" verticalAlign="middle"
+		 creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			private var _buttonOfNew:Boolean = false;
+			
+			
+			protected function init():void
+			{
+				if(!_buttonOfNew)
+					this.removeChild(newButton);
+			}
+			
+			public function set buttonOfNew(b:Boolean):void{
+				if(b != _buttonOfNew){
+					_buttonOfNew = b;
+					if(b){
+						this.addChild(newButton);
+					}
+					else{
+						this.removeChild(newButton);
+					}
+				}
+			}
+			
+			public function get buttonOfNew():Boolean{
+				return _buttonOfNew;
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:TextInput width="100%" id="refInput" height="24" borderStyle="solid" editable="false"/>
+	<mx:Button  id="refButton" width="20" height="20" icon="{AssetsFileLib.refsearchIcon}"
+				tabFocusEnabled="false" toolTip="查找"/>
+	<mx:Button  id="newButton" width="20" height="20" icon="{AssetsFileLib.newIcon}"
+				tabFocusEnabled="false" toolTip="新建"/>
+</mx:HBox>

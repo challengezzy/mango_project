@@ -1,0 +1,77 @@
+/**************************************************************************
+ * $RCSfile: NovaRemoteException.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:23 $
+ **************************************************************************/
+package smartx.framework.common.vo;
+
+import java.rmi.*;
+
+public class NovaRemoteException extends RemoteException {
+
+    private static final long serialVersionUID = -1357463874090659084L;
+
+    private Throwable serverTargetEx = null;
+
+    public NovaRemoteException(String _message) {
+        super(_message);
+    }
+
+    public String getClientStackDetail() {
+        String str_mess = ""; //
+        StackTraceElement[] stackItems = this.getStackTrace();
+        for (int i = 0; i < stackItems.length; i++) {
+            str_mess = str_mess + stackItems[i] + "\r\n"; //把实际堆栈搞进来!
+        }
+        return str_mess;
+    }
+
+    public String getServerStackDetail() {
+        String str_mess = ""; //
+        StackTraceElement[] stackItems = getServerTargetEx().getStackTrace();
+        for (int i = 0; i < stackItems.length; i++) {
+            str_mess = str_mess + stackItems[i] + "\r\n"; //把实际堆栈搞进来!
+        }
+        return str_mess;
+    }
+
+    public Throwable getServerTargetEx() {
+        return serverTargetEx;
+    }
+
+    public void setServerTargetEx(Throwable serverTargetEx) {
+        this.serverTargetEx = serverTargetEx;
+    }
+
+}
+/**************************************************************************
+ * $RCSfile: NovaRemoteException.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:23 $
+ *
+ * $Log: NovaRemoteException.java,v $
+ * Revision 1.2  2007/05/31 07:38:23  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 05:56:47  qilin
+ * no message
+ *
+ * Revision 1.3  2007/03/07 08:36:38  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/03/07 08:32:20  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/03/07 02:01:56  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/02/10 08:51:58  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/02/10 08:33:32  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/02/10 07:13:05  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 03:38:02  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

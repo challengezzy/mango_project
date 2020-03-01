@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:degrafa="http://www.degrafa.com/2007" left="0" right="3">
+	
+	<!--Use the Degrafa namespace, don't need the IDropInListItemRenderer 
+	in this case.-->
+	
+	<mx:Script>
+		<![CDATA[
+			
+			[Bindable]
+    		private var dataValue1:Number;
+			
+			[Bindable]
+    		private var dataValue2:Number;
+						
+			[Bindable]
+    		private var capacity:Number;
+    		
+			//Get the data for both bars.			    		
+    		override public function set data(value:Object):void{
+    			
+    			super.data = value;
+    			dataValue1= data["used"]; 
+				dataValue2= data["free"]; 
+    			capacity= data.capacity; 
+				this.toolTip = String(dataValue1/capacity*100)+"%";
+    		}
+    		
+						
+		]]>
+	</mx:Script>
+	
+	<mx:filters>
+		<mx:DropShadowFilter alpha=".5" distance="2" />
+	</mx:filters>
+	
+	<!--Use a composition as we are rendering multiple items-->	
+	<degrafa:GeometryComposition id="barcomp" graphicsTarget="{[this]}">
+		
+		<!--Used Bar rectangle-->
+		<degrafa:RoundedRectangleComplex id="bar1" y="1" 
+			bottomLeftRadius="2" topLeftRadius="2"  
+    		height="{ height-2 }" width="{width * (dataValue1 / capacity)}">
+        	<degrafa:fill>
+        		<degrafa:LinearGradientFill angle="90">
+        	    	<degrafa:GradientStop alpha="1"  color="#FF0000"/>
+	        		<degrafa:GradientStop alpha="1" color="#333333"/>
+	        	</degrafa:LinearGradientFill>
+        	</degrafa:fill>
+    	</degrafa:RoundedRectangleComplex>
+		
+		<!--Free Bar rectangle, offset x to bar1-->
+		<degrafa:RoundedRectangleComplex id="bar2" y="1" x="{bar1.width}" 
+			bottomRightRadius="2" topRightRadius="2"  
+    		height="{ height-2 }" width="{width * (dataValue2 / capacity)}">
+        	<degrafa:fill>
+        		<degrafa:LinearGradientFill angle="90">
+        	    	<degrafa:GradientStop alpha="1"  color="#00FF00"/>
+	        		<degrafa:GradientStop alpha="1" color="#333333"/>
+	        	</degrafa:LinearGradientFill>
+        	</degrafa:fill>
+    	</degrafa:RoundedRectangleComplex>
+		
+		
+		<!--White wash offsetting the position, size and fill rectangle for effect-->
+		<degrafa:RoundedRectangle x="2" y="2" id="wash"	width="{(bar1.width+bar2.width)-2}" height="{height/2}">
+			<degrafa:fill>
+            	<degrafa:LinearGradientFill height="{wash.height}" 
+            		width="{wash.width}" angle="90">
+            	    <degrafa:GradientStop alpha="1" color="#FFF"/>
+		        	<degrafa:GradientStop alpha="0" color="#FFF"/>
+		        </degrafa:LinearGradientFill>
+            </degrafa:fill>
+		</degrafa:RoundedRectangle>
+    
+    	
+	</degrafa:GeometryComposition>			        	   
+    
+    
+    	
+    	
+	
+	
+	
+</mx:Canvas>

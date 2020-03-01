@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="270" height="150" 
+			allowDrag="true" allowClose="true" allowMaximize="true" 
+			allowMinimize="true" allowResize="true" close="onClose()" fontSize="12" 
+			xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+			xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+			xmlns:core="smartx.flex.components.core.*"
+			xmlns:fx="http://ns.adobe.com/mxml/2009"
+			title="告警类型另存为..."
+			>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.IFlexDisplayObject;
+			import mx.effects.Effect;
+			import mx.effects.EffectInstance;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+			
+			import smartx.bam.flex.modules.common.CustomerTextInput;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.core.BillListPanel;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			
+			[Bindable]
+			public var item:Object;
+			
+			[Bindable]
+			public var listPanel:BillListPanel;
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var userName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME));
+			
+			private function init():void{
+				
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				formService = new RemoteObject(destination);
+				bamService = new RemoteObject("smartXBAMService");
+				if(endpoint!=null){
+					formService.endpoint = endpoint;
+					bamService.endpoint = endpoint;
+				}
+				
+				bamService.copyAlertType.addEventListener(ResultEvent.RESULT,copyAlertTypeHandler);
+				bamService.copyAlertType.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endOperat();
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			private function copyAlertTypeHandler(event:ResultEvent):void{
+				endOperat();
+				Alert.show("保存成功","提示");
+				listPanel.query(false,true,true);
+				onClose()
+			}
+			
+			private function onClose():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function save():void{
+				
+				var name:String = typeName.text;
+				if(name == null || name ==""){
+					Alert.show("名称不能为空","提示");
+					return;
+				}
+				
+				var code:String = typeCode.text;
+				if(code == null || code ==""){
+					Alert.show("编码不能为空","提示");
+					return;
+				}
+				
+				item["NAME"] = name;
+				item["CODE"] = code;
+				
+				startOperat();
+				bamService.copyAlertType(item);
+				
+			}
+			
+			private function startOperat():void{
+				
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在执行……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,this,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endOperat():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox horizontalAlign="center" width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Label width="60" text="名称:" />
+			<mx:TextInput id="typeName" width="100%" />
+		</mx:HBox>
+		
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Label width="60" text="编码:" />
+			<mx:TextInput id="typeCode" width="100%" />
+		</mx:HBox>
+		
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+			<mx:Button id="saveBtn" label="确定" click="save()" />
+			<mx:Button id="cancelBtn" label="取消" click="onClose()" />
+		</mx:HBox>
+		
+	</mx:VBox>
+	
+</SuperPanel>

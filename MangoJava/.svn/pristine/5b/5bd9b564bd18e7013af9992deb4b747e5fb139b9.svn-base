@@ -1,0 +1,103 @@
+/**
+ * 
+ */
+package smartx.publics.form.bs.interceptors.datatask;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+
+import smartx.framework.common.job.bs.JobServer;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.metadata.vo.Pub_Templet_1VO;
+import smartx.publics.datatask.DataTaskCronJob;
+import smartx.publics.form.bs.service.FormInterceptor;
+
+/**
+ * @author caohenghui
+ * 
+ */
+public class DataTaskChangedAfter implements FormInterceptor {
+
+	protected Logger logger = NovaLogger.getLogger(this.getClass());
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * smartx.publics.form.bs.service.FormInterceptor#doSomething(smartx.framework
+	 * .metadata.vo.Pub_Templet_1VO, java.util.Map)
+	 */
+	@Override
+	public void doSomething(Pub_Templet_1VO templetVO, Map<String, Object> dataValue) throws Exception {
+		JobDataMap dataMap = new JobDataMap();
+		dataMap.put("ID", dataValue.get("ID"));
+		dataMap.put("CONTENT", dataValue.get("CONTENT"));
+		String jobName = dataValue.get("CODE") + "";
+		String type = dataValue.get("TYPE")+"";//任务类型，判断是0--普通,还是 1--循环任务
+		try {
+			//加入循环任务的调度中(如果没有加入)
+			if("循环任务".equals(type) ){
+				//如果存在，则删除重新放入（加为调度时间可能发生了变化）
+				if(JobServer.isCronJobExist(jobName)){
+					JobServer.removeJob(jobName, "DataTask");
+				}
+				JobDetail jobDetail = new JobDetail();
+				jobDetail.setJobClass(DataTaskCronJob.class);
+				jobDetail.setGroup("DataTask");
+				jobDetail.setName(jobName);
+				jobDetail.setJobDataMap(dataMap);
+				JobServer.addCronJob(jobDetail, dataValue.get("CRONEXPRESSION") + ""); 
+			}else{
+				JobServer.removeJob(jobName, "DataTask");
+			}
+			
+		} catch (Exception e) {
+			logger.error("数据任务【" + jobName + "】类型变更调度时异常！", e);
+			return;
+		}
+		logger.debug("数据任务【" + jobName + "】类型变更调度成功！");
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * smartx.publics.form.bs.service.FormInterceptor#doSomething(smartx.framework
+	 * .metadata.vo.Pub_Templet_1VO, java.util.List)
+	 */
+	@Override
+	public void doSomething(Pub_Templet_1VO templetVO, List<Map<String, Object>> dataValueList) throws Exception {
+		// TODO Auto-generated method stub
+
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * smartx.publics.form.bs.service.FormInterceptor#doSomething(java.util.Map)
+	 */
+	@Override
+	public void doSomething(Map<String, Object> map) throws Exception {
+		// TODO Auto-generated method stub
+
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * smartx.publics.form.bs.service.FormInterceptor#doSomething(java.util.
+	 * List)
+	 */
+	@Override
+	public void doSomething(List<Map<String, Object>> dataValueList) throws Exception {
+		// TODO Auto-generated method stub
+
+	}
+
+}

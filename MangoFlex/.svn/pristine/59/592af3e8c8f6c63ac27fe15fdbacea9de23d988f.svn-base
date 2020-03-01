@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" title="帮助主题"
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"  
+				xmlns:rf = "com.randomFractals.media.controls.*"
+				xmlns:bd="net.brandonmeyer.containers.*"
+				width="{withNum}" height="{heightNum}"
+				creationComplete="creationCompleteHandler()" initialize="init()" showCloseButton="true" close="{PopUpManager.removePopUp(this)}" >
+	<fx:Declarations>
+		<mx:VBox id="helpVbox" width="100%" height="100%" paddingBottom="3" paddingLeft="3" paddingTop="3" >
+			<mx:HBox width="100%" horizontalAlign="left" verticalAlign="bottom" >
+				<mx:Label id="nameLab" fontSize="22" color="0x0000CD" fontWeight="bold" />
+				<mx:HBox id="webPageHbox" width="100%" horizontalAlign="right" >
+					
+				</mx:HBox>
+			</mx:HBox>
+			<mx:VBox id="contentVbox" width="100%" horizontalAlign="left" >
+				
+			</mx:VBox>
+			<mx:Label text="下级主题:" fontSize="14" />
+			<mx:VBox id="childrenVbox" width="100%" horizontalAlign="left" >
+				
+			</mx:VBox>
+		</mx:VBox>
+		
+		<mx:VBox id="searchVbox" width="100%" height="100%" >
+			<mx:VBox id="headVbox" width="100%" horizontalAlign="left" >
+				<mx:Label fontSize="22" text="搜索结果" color="0x0000CD" fontWeight="bold" />
+				<mx:Label text="-以下显示与您搜索匹配的前20条记录" fontStyle="italic" />
+			</mx:VBox>
+			<mx:VBox id="searchItemVbox" width="100%" horizontalAlign="left" >
+				
+			</mx:VBox>
+		</mx:VBox>
+		
+		<mx:TitleWindow id="playerTw" xmlns:fx="http://ns.adobe.com/mxml/2009" title="视频"
+						xmlns:s="library://ns.adobe.com/flex/spark" showCloseButton="true"
+						xmlns:mx="library://ns.adobe.com/flex/mx"  close="closePlayer(event)"
+						horizontalAlign="center" verticalAlign="middle"
+						>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" title="帮助设置"
+						xmlns:s="library://ns.adobe.com/flex/spark" id="helpSetTw"
+						xmlns:mx="library://ns.adobe.com/flex/mx" width="180" height="130" showCloseButton="true" close="close()">
+			<mx:CheckBox id="eventCb" label="响应帮助事件" />
+			<mx:HBox width="100%" horizontalAlign="center" >
+				<mx:Button label="确定" click="button1_clickHandler(event)" />
+				<mx:Button label="取消" click="close()" />
+			</mx:HBox>
+		</mx:TitleWindow>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.randomFractals.media.controls.VideoPlayer;
+			
+			import mx.controls.Image;
+			import mx.controls.Text;
+			import mx.controls.TextArea;
+			import mx.events.CloseEvent;
+			import mx.events.ResizeEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import net.brandonmeyer.events.SuperPanelEvent;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.util.HelpUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var formService:RemoteObject;
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			
+			public var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var videoPlay:VideoPlayer = null;
+			
+			[Bindable]
+			public var helpId:String = null;
+			
+			[Bindable]
+			public var parentId:String = null;
+			
+			[Bindable]
+			public var withNum:Number = 360;
+			
+			[Bindable]
+			public var heightNum:Number = 560;
+			
+			
+			private var eventCode:String;
+			
+			private function init():void{
+				
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.getHelpInfo.addEventListener(ResultEvent.RESULT,getHelpInfoHandler);
+				formService.getHelpInfo.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				formService.searchHelpInfo.addEventListener(ResultEvent.RESULT,searchHelpInfoHandler);
+				formService.searchHelpInfo.addEventListener(FaultEvent.FAULT,faultHandler);   
+				
+			}
+			
+			private function creationCompleteHandler():void{
+				
+				desktop = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+				this.height = desktop.height*0.9;
+				
+			}
+			
+			private function getHelpInfoHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var obj:Object = event.result;
+				if(mainVbox.getChildren().length>0){
+					mainVbox.removeAllChildren();
+				}
+				mainVbox.addChild(helpVbox);
+				
+				if(webPageHbox.getChildren().length>0){
+					webPageHbox.removeAllChildren();
+				}
+				if(contentVbox.getChildren().length>0){
+					contentVbox.removeAllChildren();
+				}
+				if(childrenVbox.getChildren().length>0){
+					childrenVbox.removeAllChildren();
+				}
+				
+				if(obj != null){
+					
+					helpId = obj["id"];
+					parentId = obj["parentid"];
+					eventCode = obj["eventcode"];
+					nameLab.text = obj["name"];
+					if(obj["webpageurl"] != null && obj["webpageurl"] != ""){
+						var webLink:LinkButton = new LinkButton();
+						webLink.toolTip = "打开网页连接";
+						webLink.data = obj["webpageurl"];
+						webLink.setStyle("icon",AssetsFileLib.goWebPageIcon);
+						webLink.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var temp:LinkButton = event.currentTarget as LinkButton;
+							navigateToURL(new URLRequest(temp.data as String), "_blank");
+						});
+						webPageHbox.addChild(webLink);
+					}
+				
+					var textArea:Text = new Text();
+					textArea.percentWidth = 100;
+					textArea.setStyle("borderStyle","none");
+					textArea.setStyle("backgroundAlpha","0");
+					
+					textArea.text = obj["content"];
+					contentVbox.addChild(textArea);
+					
+					if(obj["imageurl"] != null && obj["imageurl"] != ""){
+						var imgage:Image = new Image();
+						imgage.height = desktop.height*0.2;
+						imgage.width = this.width*0.85;
+						imgage.source = obj["imageurl"];
+						contentVbox.addChild(imgage);
+					}
+					if(obj["videourl"] != null && obj["videourl"] != ""){
+						var videoLink:LinkButton = new LinkButton();
+						videoLink.toolTip = "打开视频教程";
+						videoLink.label = "视频教程";
+						videoLink.setStyle("color","0x0000CD");
+						videoLink.setStyle("icon",AssetsFileLib.openVideoIcon);
+						videoLink.data = obj["videourl"];
+						videoLink.addEventListener(MouseEvent.CLICK,openVideoHandler);
+						contentVbox.addChild(videoLink);
+					}
+					
+					var childrenArr:Array = obj["children"] as Array;
+					if(childrenArr != null){
+						for each(var sp:SimpleHashVO in childrenArr){
+							var childLink:LinkButton = new LinkButton();
+							childLink.setStyle("color","0x0000CD");
+							childLink.setStyle("icon",AssetsFileLib.redpointIcon);
+							childLink.label = sp.dataMap["name"];
+							childLink.data = sp.dataMap;
+							childLink.addEventListener(MouseEvent.CLICK,openChildHelpSubjectHander);
+							childrenVbox.addChild(childLink);
+						}
+					}
+				}
+			}
+			
+			private function searchHelpInfoHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				
+				var array:Array = event.result as Array;
+				
+				if(mainVbox.getChildren().length>0){
+					mainVbox.removeAllChildren();
+				}
+				mainVbox.addChild(searchVbox);
+				
+				if(searchItemVbox.getChildren().length >0){
+					searchItemVbox.removeAllChildren();
+				}
+				
+				if(array != null){
+					for each(var sh:SimpleHashVO in array){
+						var searchLink:LinkButton = new LinkButton();
+						searchLink.setStyle("color","0x0000CD");
+						searchLink.setStyle("icon",AssetsFileLib.redpointIcon);
+						searchLink.label = sh.dataMap["name"];
+						searchLink.data = sh.dataMap;
+						searchLink.addEventListener(MouseEvent.CLICK,openSearchItemHander);
+						searchItemVbox.addChild(searchLink);
+					}
+				}
+			}
+			
+			private function openVideoHandler(event:MouseEvent):void{
+				var tempLink:LinkButton = event.currentTarget as LinkButton;
+				PopUpManager.addPopUp(playerTw,this.root,false);
+				PopUpManager.centerPopUp(playerTw);
+//				playerTw.maximize();
+				if(videoPlay == null ){
+					videoPlay = new VideoPlayer();
+				}
+//				videoPlay.percentHeight = 100;
+//				videoPlay.percentWidth = 100;
+				if(playerTw.getChildren().length>0){
+					playerTw.removeAllChildren();
+				}
+				videoPlay.url = tempLink.data as String;
+				playerTw.addChild(videoPlay);
+				videoPlay.play();
+			}
+			
+			private function closePlayer(event:CloseEvent):void{
+				videoPlay.stop();
+				videoPlay.autoRepeat = false;
+				PopUpManager.removePopUp(playerTw);
+			}
+			
+			private function openChildHelpSubjectHander(event:MouseEvent):void{
+				var tempLink:LinkButton = event.currentTarget as LinkButton;
+				var tempObj:Object = tempLink.data;
+				this.goToHelpSubjectById(tempObj["id"]);
+			}
+			
+			private function openSearchItemHander(event:MouseEvent):void{
+				var tempLink:LinkButton = event.currentTarget as LinkButton;
+				var tempObj:Object = tempLink.data;
+				this.goToHelpSubjectById(tempObj["id"]);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("获取数据错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultDetail);
+			}
+			
+			protected function helpHomePageClickHandler(event:MouseEvent):void
+			{
+				goToHelpSubjectById(null);
+				
+			}
+			
+			protected function returnLastItemClickHandler(event:MouseEvent):void
+			{
+				goToHelpSubjectById(parentId);
+				
+			}
+			
+			protected function helpSetClickHandler(event:MouseEvent):void
+			{
+				PopUpManager.addPopUp(helpSetTw,this.root,true);
+				PopUpManager.centerPopUp(helpSetTw);
+				
+				if(HelpUtil.getInstance().getEventStatus()){
+					eventCb.selected = true;
+				}else{
+					eventCb.selected = false;
+				}
+				
+			}
+			
+			protected function helpSearchClickHandler(event:MouseEvent):void
+			{
+				OperatingTipUtil.startOperat("正在搜索....");
+				formService.searchHelpInfo(searchTxt.text);
+				
+			}
+			
+			public function goToHelpSubjectById(subjectId:String):void{
+				OperatingTipUtil.startOperat("正在打开主题....");
+				formService.getHelpInfo(subjectId);
+			}
+			
+			private  function close():void{
+				PopUpManager.removePopUp(helpSetTw);
+			}
+			
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				if(eventCb.selected){
+					HelpUtil.getInstance().changeEventStatus(true);
+				}else{
+					HelpUtil.getInstance().changeEventStatus(false);
+				}
+				
+				PopUpManager.removePopUp(helpSetTw);
+			}
+			
+			protected function searchTxt_keyUpHandler(event:KeyboardEvent):void
+			{
+				var textInput:TextInput = event.currentTarget as TextInput;
+				if(textInput.id == "searchTxt" && event.keyCode == Keyboard.ENTER){
+					helpSearchClickHandler(null);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5"  verticalAlign="top">
+		<mx:HBox width="100%" horizontalAlign="left" verticalAlign="middle" >
+			<mx:LinkButton icon="{AssetsFileLib.homepageIcon}" click="helpHomePageClickHandler(event)" toolTip="返回到主题首页" />
+			<mx:LinkButton icon="{AssetsFileLib.goLastItemIcon}" click="returnLastItemClickHandler(event)" toolTip="返回上级主题" />
+			<mx:LinkButton id="helpLink" icon="{AssetsFileLib.eventSetIcon}" click="helpSetClickHandler(event)" toolTip="帮助设置" />
+			<mx:HBox width="100%" horizontalAlign="right" verticalAlign="middle" >
+				<mx:TextInput id="searchTxt" toolTip="输入主题关键字" keyUp="searchTxt_keyUpHandler(event)" />
+				<mx:LinkButton icon="{AssetsFileLib.helpSearchIcon}" click="helpSearchClickHandler(event)" toolTip="搜索" />
+			</mx:HBox>
+		</mx:HBox>
+		<mx:VBox id="mainVbox" width="100%" height="100%" borderStyle="solid" >
+			
+		</mx:VBox>
+	</mx:VBox>
+</mx:TitleWindow>

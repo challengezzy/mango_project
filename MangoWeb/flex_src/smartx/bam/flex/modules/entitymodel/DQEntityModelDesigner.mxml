@@ -1,0 +1,1496 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:s="library://ns.adobe.com/flex/spark"
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:containers="net.brandonmeyer.containers.*"
+					   xmlns:ext="smartx.flex.components.core.ext.*"
+					   width="880" height="500" allowClose="true" allowDrag="true"
+					   allowResize="true" close="PopUpManager.removePopUp(this)"
+					   creationComplete="creationComplete()" layout="vertical" title="领域实体管理" 
+					   xmlns:common="smartx.bam.flex.modules.common.variableControl.*">
+	<fx:Declarations>
+		<mx:TitleWindow id="entityWindow" width="250" height="160"
+						close="PopUpManager.removePopUp(entityWindow)" showCloseButton="true">
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Label text="名称"/>
+				<mx:TextInput id="entityNameTxt" width="120"/>
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Label text="编码"/>
+				<mx:TextInput id="entityCodeTxt" width="120"/>
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="addEntityBtn_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(entityWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="contentXmlTw" width="800" height="500"
+						close="PopUpManager.removePopUp(contentXmlTw)" showCloseButton="true"
+						title="元数据">
+			<mx:TextArea id="contentXmlText" width="100%" height="100%" editable="false"/>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="relatonWindow" width="320" height="340"
+						close="PopUpManager.removePopUp(relatonWindow)" showCloseButton="true"
+						title="新增关系">
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					 paddingTop="5">
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="名称"/>
+					<mx:TextInput id="newRelationNameTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="编码"/>
+					<mx:TextInput id="newRelationCodeTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" text="描述"/>
+					<mx:TextInput id="newRelationDescTxt" width="75%" text=""/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label width="25%" color="blue" text="所属实体"/>
+					<mx:ComboBox id="newOwnerEntityCob" width="75%" dataProvider="{allNotAbstractEntities}"
+								 labelField="@name"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label width="25%" color="blue" text="目标实体"/>
+					<mx:ComboBox id="newGoalEntityCob" width="75%" dataProvider="{allNotAbstractEntities}"
+								 labelField="@name"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label width="25%" color="blue" text="读取语句"/>
+					<mx:TextArea id="newInputSqlTxt" width="75%" height="100"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="addNewRelation()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(relatonWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="userParamsWindow" width="1000" height="500"
+						close="PopUpManager.removePopUp(userParamsWindow)" showCloseButton="true" title="用户参数配置">
+			<common:SetVariablePanel id="userParamsPanel" width="100%" height="100%" confirmFun="{userParamsConfirmHandler}"
+									 needDefaultValue="false" cancelFun="{function ():void{PopUpManager.removePopUp(userParamsWindow)}}" />
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Menu;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.events.MenuEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.flex.collections.HashMap;
+			
+			import smartx.bam.flex.modules.common.variableControl.vo.VariableVo;
+			import smartx.bam.flex.modules.entitymodel.entitytab.AttributeTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.DQGisInfoTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.EntityRelationTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.MappingInfoTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.RelationTab;
+			import smartx.bam.flex.modules.entitymodel.entitytab.VirtualEntityTab;
+			import smartx.bam.flex.modules.entitymodel.utils.DQGeoServerConfigWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.bam.flex.vo.DQCConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.MetadataTempletUtilEvent;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			
+			[Bindable]
+			private var treeDataProvider:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var _contentXml:XML;
+			[Bindable]
+			private var operationList:ArrayCollection = new ArrayCollection();
+			
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			[Bindable]
+			public var debugMode:Boolean = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			//登入用户名
+			private var loginName:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME) as String;
+			
+			public var confirmFun:Function;
+			
+			public var saveFun:Function;
+			
+			public var saveNoAlertFun:Function;
+			
+			private var formService:RemoteObject;
+			[Bindable]
+			private var selectedItem:Object;
+			
+			private var menuid:String;
+			
+			public var entityModelCode:String;
+			//数据源名称
+			public var datasourceName:String;
+			[Bindable]
+			private var entitiesCache:HashMap = new HashMap();//所有非抽象实体对象集合(key:实体CODE,value:实体XML)
+			[Bindable]
+			private var originalEntityMt:XML;//实体原始元数据
+			[Bindable]
+			private var parentEntityCboDp:ArrayCollection = new ArrayCollection();//父实体集合
+			[Bindable]
+			private var allEntitiesCol:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var entitiesArr:ArrayCollection = new ArrayCollection();
+			
+			private var virtualEntitiesArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var relationsArr:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var rulesArr:ArrayCollection = new ArrayCollection();
+			
+			private var queryResultCol:ArrayCollection = new ArrayCollection();
+			
+			private var queryDatagridWindow:QueryDatagridWindow;
+			
+			private var sql:String;
+			
+			private var isQuery:Boolean = false;
+			
+			private var importFromRelation:ImportFromRelationDb = new ImportFromRelationDb();
+			//所有继承属性
+			private var allInheritAtt:ArrayCollection = new ArrayCollection();
+			//所有继承显示属性
+			private var allInheritDisplayAtt:ArrayCollection = new ArrayCollection();
+			//所有继承关系
+			private var allInheritRelation:ArrayCollection = new ArrayCollection();
+			
+			public var insertMode:Boolean;
+			
+			private var bamService:RemoteObject;
+			//所有非抽象实体
+			[Bindable]
+			private var allNotAbstractEntities:ArrayCollection = new ArrayCollection();
+			//所有属性（包括继承属性）
+			[Bindable]
+			internal var allAttributes:ArrayCollection = new ArrayCollection();
+			
+			private var attributeTab:AttributeTab = new AttributeTab();
+			
+			private var mappingTab:MappingInfoTab = new MappingInfoTab();
+			
+			private var relationTab:RelationTab = new RelationTab();
+			
+			private var entityRelationTab:EntityRelationTab = new EntityRelationTab();
+			
+			private var gisInfoTab:DQGisInfoTab = new DQGisInfoTab();
+			
+			private var virtualEntityTab:VirtualEntityTab = new VirtualEntityTab();
+			//hashmap(key:实体编码 value:实体对象),用于拼装树
+			private var entitiesArrCache:HashMap = new HashMap();
+			//是否编辑实体
+			private var isEditEntity:Boolean = false;
+			//调用方法次数索引
+			private var invokeMethodIndex:Number = 0;
+			//调用方法总次数
+			private var invokeMethodSum:Number = 0;
+			//元数据编码缓存 用于刷新元数据缓存（key:批次号，value:mtcode）
+			private var mtcodeCache:HashMap = new HashMap();
+			//所有关联实体XML（包括父实体、实体引用实体）
+			private var entitiesXml:XML;
+			//领域实体元数据在领域实体模型中的描述是否被更改标识
+			private var modelContentIsModify:Boolean = false;
+			//是否为保存操作
+			private var isSaveOperate:Boolean = false;
+			
+			private var geoserverConfig:DQGeoServerConfigWindow = new DQGeoServerConfigWindow();
+			
+			private function creationComplete():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取表结构错误！",SmartXMessage.MESSAGE_ERROR,"错误："+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.generateEntitySql.addEventListener(ResultEvent.RESULT,generateEntitySqlHandler);
+				bamService.generateEntitySql.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("生成SQL错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.generateEntitySqlOriginalData.addEventListener(ResultEvent.RESULT,generateEntitySqlOriginalDataHandler);
+				bamService.generateEntitySqlOriginalData.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("生成SQL错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.updateAtOnceMetadataTemplet.addEventListener(ResultEvent.RESULT,updateMetadataTempletHandler);
+				bamService.updateAtOnceMetadataTemplet.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("更新元数据时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+					invokeMethodIndex++;
+					if(invokeMethodSum == invokeMethodIndex)
+						OperatingTipUtil.endOperat();
+				});
+				
+				bamService.deleteAtOnceMetadataTemplet.addEventListener(ResultEvent.RESULT,function(event:ResultEvent):void{});
+				bamService.deleteAtOnceMetadataTemplet.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("删除元数据时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				bamService.getMetadataTempletContent.addEventListener(ResultEvent.RESULT,getMetadataTempletContentHandler);
+				bamService.getMetadataTempletContent.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取元数据时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+					invokeMethodIndex++;
+					if(invokeMethodSum == invokeMethodIndex)
+						OperatingTipUtil.endOperat();
+				});
+				
+				MetadataTempletUtil.getInstance().addEventListener(MetadataTempletUtilEvent.FLUSH_MTCODE_COMPLETE,mtFlushMtcodeCompleteHandler);
+				MetadataTempletUtil.getInstance().addEventListener(MetadataTempletUtilEvent.FLUSH_MTCODE_FAILED,mtFlushMtcodeFailedHandler);
+				
+				var operationMenu:Menu = operationButton.popUp as Menu;
+				operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+				
+				initButtons();
+				
+				if(_contentXml == null || _contentXml == ""){
+					_contentXml = <root>
+									 <entityModelCode>{entityModelCode}</entityModelCode>
+									 <datasource>{datasourceName}</datasource>
+									 <parameters />
+									 <entities />
+								  </root>;	
+				}else {
+					delete _contentXml.entityModelCode;
+					_contentXml.appendChild(<entityModelCode>{entityModelCode}</entityModelCode>);
+					delete _contentXml.datasource;
+					_contentXml.appendChild( <datasource>{datasourceName}</datasource>);
+					
+					if(_contentXml.geoServer.length() == 0)
+						_contentXml.appendChild(<geoServer />);
+				}
+				
+				refreshTree();
+			}
+			
+			private function getMetadataTempletContentHandler(event:ResultEvent):void{
+				invokeMethodIndex++;
+				var entityMt:MetadataTemplet = event.result as MetadataTemplet;
+				if(entityMt){
+					var code:String;
+					for each(var entityXml:XML in _contentXml.entities.entity){
+						if(entityXml.@isAbstract == "true")
+							continue;
+						else if(entityXml.@mtcode == entityMt.code){
+							code = entityXml.@code;
+							break;
+						}
+					}
+					entitiesCache.put(code,entityMt.contentXML);
+					//加载实体的时候会加载所有的父实体，如果获取元数据的实体为当前实体，则将元数据加至当前实体对象中
+					if(selectedItem && code == selectedItem.code){
+						selectedItem.content = entityMt.contentXML;
+						originalEntityMt = entityMt.contentXML.copy();//保留一份原始实体元数据
+					}
+				}
+				if(invokeMethodIndex == invokeMethodSum){
+					initEntity();
+					switchState();
+					OperatingTipUtil.endOperat();
+				}
+			}
+			
+			private function refreshTree():void{
+				treeDataProvider.removeAll();
+				entitiesArr.removeAll();
+				virtualEntitiesArr.removeAll();
+				relationsArr.removeAll();
+				rulesArr.removeAll();
+				allNotAbstractEntities.removeAll();
+				allEntitiesCol.removeAll();
+				
+				treeDataProvider.addItem({name:"实体",type:"parent",children:entitiesArr});
+				treeDataProvider.addItem({name:"虚拟实体",type:"parent",children:virtualEntitiesArr});
+				//treeDataProvider.addItem({name:"关系",type:"parent",children:relationsArr});
+				
+				//临时存放所有实体
+				var entitiesTempArr:ArrayCollection = new ArrayCollection();
+				//先加载所有的实体类
+				for each(var entity:XML in _contentXml.entities.entity){
+					allEntitiesCol.addItem(entity);
+					if(entity.@isAbstract == "false")
+						allNotAbstractEntities.addItem(entity);
+					
+					//content属性只有当实体为非抽象实体时，该属性才存在并存放实体元数据，modelContent属性存放该实体的描述信息
+					var entityObj:Object = {name:String(entity.@name),code:String(entity.@code),mtcode:String(entity.@mtcode),
+							type:entity.@type=="virtual"?"virtualEntity":(entity.@isAbstract=="true"?"abstractEntity":"entity"),
+							parentEntityCode:String(entity.@parentEntityCode),modelContent:entity};
+					
+					entitiesArrCache.put(String(entity.@code),entityObj);
+					entitiesTempArr.addItem(entityObj);
+				}
+				
+				//拼装树结构
+				for each(var entityData:Object in entitiesTempArr){
+					//判断是否有父实体，如果有则加到父实体对象下
+					if(entitiesArrCache.containsKey(String(entityData.parentEntityCode))){
+						var parentEntity:Object = entitiesArrCache.getValue(String(entityData.parentEntityCode));
+						if(parentEntity.hasOwnProperty("children")){
+							ArrayCollection(parentEntity.children).addItem(entityData)
+						}else{
+							var tempArr:ArrayCollection = new ArrayCollection();
+							tempArr.addItem(entityData);
+							parentEntity.children = tempArr;
+						}
+					}else{
+						if(entityData.type == "virtualEntity")
+							virtualEntitiesArr.addItem(entityData);
+						else
+							entitiesArr.addItem(entityData);
+					}
+				}
+				
+				expandAll();
+				//如果有选中项则选中
+				if(selectedItem)
+					selectItemByCode(selectedItem.code,treeDataProvider,false);
+			}
+			
+			private function initButtons():void{
+				operationList.addAll(new ArrayCollection([
+					{name:"新增抽象实体",id:"addAbstractEntity",icon:AssetsFileLib.listviewIcon},
+					{name:"新增虚拟实体",id:"addVirtualEntity",icon:AssetsFileLib.listviewIcon},
+					{name:"新增实体",id:"addEntity",icon:AssetsFileLib.listviewIcon},
+					//{name:"新增关系",id:"addRelation",icon:AssetsFileLib.relationIcon},
+					{name:"删除",id:"delete",icon:AssetsFileLib.delete2Icon}
+				]));
+			}
+			
+			private function operationButton_itemClickHandler(event:MenuEvent):void{
+				menuid = event.item["id"];
+				if(menuid == "addAbstractEntity"){
+					addEntityWindow("新增抽象实体");
+				}else if(menuid == "addEntity"){
+					addEntityWindow("新增实体");
+				}else if(menuid == "addVirtualEntity"){
+					addEntityWindow("新增虚拟实体");
+				}else if(menuid == "addRelation"){
+					PopUpManager.addPopUp(relatonWindow,this,true);
+					PopUpManager.centerPopUp(relatonWindow);
+					newRelationNameTxt.text = "";
+					newRelationCodeTxt.text = "";
+					newRelationDescTxt.text = "";
+				}else if(menuid == "delete"){
+					deleteHander();
+				}
+			}
+			
+			private function addEntityWindow(title:String=null):void{
+				PopUpManager.addPopUp(entityWindow,this,true);
+				PopUpManager.centerPopUp(entityWindow);
+				entityNameTxt.text = "";
+				entityCodeTxt.text = "";
+				entityWindow.title = title;
+			}
+			
+			private function addEntityBtn_confirmHandler():void{
+				var name:String = StringUtil.trim(entityNameTxt.text);
+				var code:String = StringUtil.trim(entityCodeTxt.text);
+				
+				if(name == ""){
+					SmartXMessage.show("名称不能为空！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				
+				if(code == ""){
+					SmartXMessage.show("编码不能为空！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				
+				if(menuid != "addGisApp" && entitiesArrCache.containsKey(code)){
+					SmartXMessage.show("该实体编码已经存在！",SmartXMessage.MESSAGE_ERROR);
+					return;
+				}
+				
+				OperatingTipUtil.startOperat("新增中...",this);
+				isEditEntity = false;
+				var content:XML;
+				var mtcode:String = assemblyEntityMtcode(code);				
+				if(menuid == "addAbstractEntity"){
+					_contentXml.entities[0].appendChild(<entity type="entity" name={name} code={code} isAbstract="true" />);
+					OperatingTipUtil.endOperat();
+				}else if(menuid == "addEntity"){
+					var haveParent:Boolean = false;
+					if(selectedItem && (selectedItem.type == "entity" || selectedItem.type == "abstractEntity"))
+						haveParent = true;
+					
+					_contentXml.entities[0].appendChild(<entity type="entity" name={name} code={code} isAbstract="false" 
+															parentEntityCode={haveParent?selectedItem.code:""} mtcode={mtcode} />);
+					content = <entity type="entity" name={name} code={code} entityModelCode={entityModelCode} isAbstract="false"
+								 parentEntityCode={haveParent?selectedItem.code:""} idAttributeName="" desc="" >
+									<attributes >
+										<displayAttributes />
+									</attributes>
+									<mappingInfo type="table">
+										<attributeMapping/>
+									</mappingInfo>
+									<relations />
+									<groupAttributes />
+							  </entity>;
+					
+					modelContentIsModify = true;
+					updateEntityMetadataTemplet([mtcode],[content.toXMLString()],[name]);
+				}else if(menuid == "addVirtualEntity"){
+					_contentXml.entities[0].appendChild(<entity type="virtual" name={name} code={code} mtcode={mtcode} />);
+					content = <entity type="virtual" name={name} code={code} entityModelCode={entityModelCode}
+								desc="">
+								<joinEntities />
+								<joinExpression />
+								<attributes >
+									<displayAttributes />
+								</attributes>
+								<relations />
+								<groupAttributes />
+							 </entity>;
+					modelContentIsModify = true;
+					updateEntityMetadataTemplet([mtcode],[content.toXMLString()],[name]);
+				}
+				
+				refreshTree();
+				PopUpManager.removePopUp(entityWindow);
+			}
+			
+			public function set contentXml(content:String):void{
+				this._contentXml = XML(content);
+			}
+			
+			public function get contentXml():String{
+				return _contentXml.toXMLString();
+			}
+			
+			public function get entityModelXml():XML{
+				return _contentXml;
+			}
+			
+			private function importFromRelationDs():void{
+				var newParentEntityDp:ArrayCollection = ObjectUtil.copy(allEntitiesCol) as ArrayCollection;
+				importFromRelation.parentEntityCboDp = newParentEntityDp;
+				importFromRelation.endpoint = endpoint;
+				importFromRelation.debugMode = debugMode;
+				importFromRelation.dataSourceName = datasourceName;
+				importFromRelation.confirmFun = importFromRelationConfirm;
+				PopUpManager.addPopUp(importFromRelation,this,true);
+				PopUpManager.centerPopUp(importFromRelation);
+				importFromRelation.showHandler();
+			}
+			
+			private function importFromRelationConfirm():void{
+				isEditEntity = false;
+				OperatingTipUtil.startOperat("导入中...",this,"导入成功！");
+				if(importFromRelation.getImportXml().length() == 0){
+					SmartXMessage.show("导入失败，没有可导入的实体！");
+					OperatingTipUtil.endOperat();
+				}else{
+					modelContentIsModify = true;
+					var importXmlList:XMLList = importFromRelation.getImportXml().entity;
+					var mtcodes:Array = [];
+					var names:Array = [];
+					var contents:Array = [];
+					for each(var importEntity:XML in importXmlList){
+						importEntity.@entityModelCode = entityModelCode;
+						EntityUtil.getNewEntityCode(importEntity,_contentXml.entities.entity);
+						var mtcode:String = assemblyEntityMtcode(String(importEntity.@code));
+						var entityXml:XML = <entity type='entity' isAbstract="false" name={importEntity.@name} code={importEntity.@code} 
+												mtcode={mtcode} parentEntityCode={importEntity.@parentEntityCode} />;
+						_contentXml.entities.appendChild(entityXml);
+						mtcodes.push(mtcode);
+						names.push(String(importEntity.@name));
+						contents.push(importEntity.toXMLString());
+					}
+					
+					updateEntityMetadataTemplet(mtcodes,contents,names,importXmlList.length());
+					
+					refreshTree();
+				}
+				PopUpManager.removePopUp(importFromRelation);
+			}
+			
+			private function iconFunction(item:Object):*{
+				switch(item.type){
+					case "abstractEntity":
+						return AssetsFileLib.listviewIcon;
+					case "entity":
+						return AssetsFileLib.listviewIcon;
+					case "virtualEntity":
+						return AssetsFileLib.listviewIcon;
+					case "relation":
+						return AssetsFileLib.relationIcon;
+				}
+			}
+			
+			private function switchState():void{
+				switch(selectedItem.type){
+					case "parent":
+						currentState = "normal";
+						break;
+					case "abstractEntity":
+						currentState = "abstractEntity";
+						changeAbstractEntityTab();
+						break;
+					case "entity":
+						currentState = "entity";
+						isGisEntity.selected = String(selectedItem.content.@isGis) == 'true'?true:false;
+						changeEntityTab();
+						infoBox_showHandler();
+						break;
+					case "virtualEntity":
+						currentState = "virtualEntity";
+						changeVirtualEntityTab();
+						infoBox_showHandler();
+						break;
+					case "relation":
+						currentState = "relation";
+						initEntityRelationTab();
+						break;
+					default:
+						currentState = "normal";
+						break;
+				}
+				callLater(function():void{
+					if(selectedItem.type == "entity"){
+						setParentEntityCboDp();
+						setPrimaryKeyAttName();
+						refreshGroupAttributeDg();	
+					}
+				});
+			}
+			
+			private function changeEntityTab():void{
+				clearTabs();
+				initAttributeTab();
+				initMappingTab();
+				initRelationTab();
+				
+				if(!mainTab.contains(attributeTab))
+					mainTab.addChild(attributeTab);
+				if(!mainTab.contains(mappingTab))
+					mainTab.addChild(mappingTab);
+				if(!mainTab.contains(relationTab))
+					mainTab.addChild(relationTab);
+				
+				attributeTab.showHandler();
+				if(mappingTab.isCreationComplete)
+					mappingTab.showHandler();
+				relationTab.showHandler();
+				isGisEntity_changeHandler(null);
+			}
+			
+			private function initAttributeTab():void{
+				attributeTab.contentXml = _contentXml;
+				attributeTab.selectedItem = selectedItem;
+				attributeTab.allInheritAtt = allInheritAtt;
+				attributeTab.allInheritDisplayAtt = allInheritDisplayAtt;
+				attributeTab.allEntityDp = allNotAbstractEntities;
+				attributeTab.onQueryFun = onQuery;
+			}
+			
+			private function initMappingTab():void{
+				mappingTab.contentXml = _contentXml;
+				mappingTab.selectedItem = selectedItem;
+				mappingTab.endpoint = endpoint;
+				mappingTab.datasourceName = datasourceName;
+				mappingTab.addEventListener(FlexEvent.CREATION_COMPLETE,mappingTab_creationCompleteHandler);
+			}
+			
+			private function mappingTab_creationCompleteHandler(event:FlexEvent):void{
+				mappingTab.showHandler();
+				mappingTab.removeEventListener(FlexEvent.CREATION_COMPLETE,mappingTab_creationCompleteHandler);
+			}
+			
+			private function initRelationTab():void{
+				relationTab.contentXml = _contentXml;
+				relationTab.selectedItem = selectedItem;
+				relationTab.allEntitiesCol = allNotAbstractEntities;
+				relationTab.refreshFun = refreshTree;
+				relationTab.allInheritRelation = allInheritRelation;
+				relationTab.endpoint = endpoint;
+			}
+			
+			private function initEntityRelationTab():void{
+				entityRelationTab.contentXml = _contentXml;
+				entityRelationTab.selectedItem = selectedItem;
+				entityRelationTab.refreshTree = refreshTree;
+				entityRelationTab.allEntitiesCol = allNotAbstractEntities;
+				entityRelationTab.deleteXmlNode = deleteXmlNode;
+				entityRelationTab.relationsArr = relationsArr;
+				entityRelationTab.selectItemByCode = selectItemByCode;
+				entityRelationTab.entitiesCache = entitiesCache;
+				entityRelationTab.endpoint = endpoint;
+				
+				if(!relationsTabNa.contains(entityRelationTab))
+					relationsTabNa.addChild(entityRelationTab);
+			}
+			
+			private function initVirtualEntityTab():void{
+				virtualEntityTab.contentXml = _contentXml;
+				virtualEntityTab.selectedItem = selectedItem;
+				virtualEntityTab.entityDataProvider = allNotAbstractEntities;
+			}
+			
+			private function changeAbstractEntityTab():void{
+				clearTabs();
+			}
+			
+			private function changeVirtualEntityTab():void{
+				clearTabs();
+				initRelationTab();
+				initVirtualEntityTab();
+				
+				if(!mainTab.contains(virtualEntityTab))
+					mainTab.addChild(virtualEntityTab);
+				if(!mainTab.contains(relationTab))
+					mainTab.addChild(relationTab);
+				
+				virtualEntityTab.showHandler();
+				relationTab.showHandler();
+			}
+			
+			private function clearTabs():void{
+				if(mainTab.contains(attributeTab))
+					mainTab.removeChild(attributeTab);
+				if(mainTab.contains(mappingTab))
+					mainTab.removeChild(mappingTab);
+				if(mainTab.contains(relationTab))
+					mainTab.removeChild(relationTab);
+				if(mainTab.contains(virtualEntityTab))
+					mainTab.removeChild(virtualEntityTab);
+				if(mainTab.contains(gisInfoTab))
+					mainTab.removeChild(gisInfoTab);
+			}
+			
+			private function deleteHander():void{
+				if(selectedItem == null)
+					return;
+				switch(selectedItem.type){
+					case "parent":
+						break;
+					case "abstractEntity":
+						SmartXMessage.show("是否删除该抽象实体及子实体？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "entity":
+						SmartXMessage.show("是否删除该实体及子实体？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "relation":
+						SmartXMessage.show("是否删除该关系？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "rule":
+						SmartXMessage.show("是否删除该规则？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+					case "virtualEntity":
+						SmartXMessage.show("是否删除该虚拟实体？",SmartXMessage.MESSAGE_CONFIRM,"",this,confirmHandler);
+						break;
+				}
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				if(Alert.YES == event.detail)
+					deleteXmlNode(selectedItem.modelContent);
+			}
+			
+			private function deleteXmlNode(node:XML):void{
+				if(node != null ){
+					if(node.name() == "entity" ){
+						//先删除子实体
+						deleteSubEntity(node);
+						//再删实体
+						CEPUtils.xmlDeleteNode(node);
+						if(node.@isAbstract == "false")
+							deleteEntityMt(String(node.@mtcode));
+						//保存领域实体元数据
+						saveNoAlertFun();
+					}else
+						CEPUtils.xmlDeleteNode(node);
+					refreshTree();
+					currentState = "normal";
+					selectedItem = null;
+				}
+			}
+			
+			private function deleteSubEntity(node:XML):void{
+				for each(var entity:XML in allEntitiesCol){
+					if(String(entity.@parentEntityCode) == String(node.@code)){
+						CEPUtils.xmlDeleteNode(entity);
+						if(entity.@isAbstract == "false")
+							deleteEntityMt(String(entity.@mtcode));
+						deleteSubEntity(entity);
+					}
+				}
+				
+			}
+			
+			private var lastSelectedItem:Object;
+			//是否同步加载实体元数据
+			private var isSyncLoadEntity:Boolean = false;
+			
+			private function entityModelTree_itemClickHandler(event:ListEvent):void{
+				isEditEntity = true;
+				lastSelectedItem = ObjectUtil.copy(selectedItem);
+				
+				//检查前一次的实体有无被修改，如被修改则提示用户是否保存
+				if(checkEntityIsModified()){
+					selectedItem = entityModelTree.selectedItem;
+					lastSelectedItem.mtcache = entitiesCache.getValue(lastSelectedItem.code);
+					/**
+					 * 需要同步加载（指必须等更新的实体元数据刷新完缓存后加载）
+					 * 否则会导致加载到缓存中的实体元数据不正确
+					 * 还有可能如果是父实体属性更改，而反映不到子实体中
+					 **/ 
+//					if(lastSelectedItem && (lastSelectedItem.code == selectedItem.code))
+						isSyncLoadEntity = true;
+					SmartXMessage.show("实体["+lastSelectedItem.name+"]已被更改，是否保存？",SmartXMessage.MESSAGE_CONFIRM
+										,"",this,entityModifyConfirmHandler);
+				}else{
+					lastSelectedItem = null;
+					selectedItem = entityModelTree.selectedItem;
+				}
+				
+				entitiesCache.clear();
+				
+				if(selectedItem.type == "entity" || selectedItem.type == "virtualEntity"){
+					if(!isSyncLoadEntity)
+						loadEntity();
+				}else
+					switchState();
+			}
+			
+			private function entityModifyConfirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					OperatingTipUtil.startOperat("保存中...",this,"保存成功！");
+					updateEntityMetadataTemplet([lastSelectedItem.mtcode],[XML(lastSelectedItem.content).toXMLString()],[lastSelectedItem.name]);
+				}else{
+					//取消操作，如果领域实体模型中的元数据有更改，则做回滚
+					if(modelContentIsModify){
+						var lastEntity:XML = _contentXml.entities.entity.(@code==lastSelectedItem.code)[0];
+						lastEntity.@name = lastSelectedItem.mtcache.@name;
+						lastEntity.@parentEntityCode = lastSelectedItem.mtcache.@parentEntityCode;
+						refreshTree();
+					}
+					syncLoadEntity();
+				}
+				lastSelectedItem = null;
+			}
+			
+			//初始化实体一些基本信息
+			private function initEntity():void{
+				entitiesXml = assemblyEntitiesXml();
+				allAttributes.removeAll();
+				//获取实体所有继承属性
+				allInheritAtt = EntityUtil.getInheritAttributes(selectedItem.content,entitiesXml);
+				allAttributes.addAll(allInheritAtt);
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					allAttributes.addItem(att);
+				}
+				//获取实体所有继承显示属性
+				allInheritDisplayAtt = EntityUtil.getInheritAttributes(selectedItem.content,entitiesXml,true);
+				//获取实体所有继承关系
+				allInheritRelation = EntityUtil.getAllInheritRelation(selectedItem.content,entitiesXml);
+			}
+			
+			//设置所有父实体集合（除当前实体的父实体）
+			private function setParentEntityCboDp():void{
+				parentEntityCboDp.removeAll();
+				var nullItem:XML = <entity name='' />;
+				parentEntityCboDp.addItem(nullItem);
+				for each(var entity:XML in allEntitiesCol){
+					if(String(entity.@code) == selectedItem.code)
+						continue;
+					parentEntityCboDp.addItem(entity);
+				}
+				parentEntityCbo.selectedItem = _contentXml.entities.entity.(@code==selectedItem.content.@parentEntityCode).length()==0
+					?nullItem:_contentXml.entities.entity.(@code==selectedItem.content.@parentEntityCode)[0];
+			}
+			
+			//设置主键属性
+			private function setPrimaryKeyAttName():void{
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					if(att.@name == selectedItem.content.@idAttributeName){
+						primaryKeyAttCbo.selectedItem = att;
+						break;
+					}else
+						primaryKeyAttCbo.selectedItem = null;
+				}
+			}
+			
+			private function showXml():void{
+				PopUpManager.addPopUp(contentXmlTw,this,true);
+				PopUpManager.centerPopUp(contentXmlTw);
+				contentXmlText.text = _contentXml.toXMLString();
+			}
+			
+			private function showEntityXml():void{
+				if(selectedItem != null){
+					PopUpManager.addPopUp(contentXmlTw,this,true);
+					PopUpManager.centerPopUp(contentXmlTw);
+					contentXmlText.text = selectedItem.content;
+				}
+			}
+			
+			protected function parentEntityCbo_changeHandler(event:ListEvent):void{
+				modelContentIsModify = true;
+				var item:Object = parentEntityCbo.selectedItem;
+				if(item.@name == ""){
+					selectedItem.content.@parentEntityCode = "";
+					selectedItem.modelContent.@parentEntityCode = "";
+				}else{
+					selectedItem.content.@parentEntityCode = item.@code;
+					selectedItem.modelContent.@parentEntityCode = item.@code;
+				}
+				refreshTree();
+			}
+			
+			private function expandAll():void{
+				for each(var item:Object in treeDataProvider){
+					entityModelTree.expandChildrenOf(item,true);
+				}
+			}
+			//实体名称是否被更新，如果有的话则刷新树
+			[Bindable]
+			private var isEntityNameChange:Boolean = false;
+			
+			protected function infoEntityNameTxt_changeHandler(event:Event):void{
+				modelContentIsModify = true;
+				if(String(selectedItem.content.@name) != infoEntityNameTxt.text){
+					isEntityNameChange = true;
+				}else
+					isEntityNameChange = false
+				selectedItem.content.@name = infoEntityNameTxt.text;
+				selectedItem.modelContent.@name = infoEntityNameTxt.text;
+			}
+			
+			protected function infoDescTxt_changeHandler(event:Event):void{
+				selectedItem.content.@desc = infoDescTxt.text;
+			}
+			
+			protected function primaryKeyAttCbo_changeHandler(event:ListEvent):void{
+				selectedItem.content.@idAttributeName = primaryKeyAttCbo.selectedItem.@name;
+			}
+			
+			protected function infoBox_showHandler():void{
+				if(primaryKeyAttCbo){
+					primaryKeyAttCbo.dataProvider = selectedItem.content.attributes.attribute;
+					setPrimaryKeyAttName();
+				}
+				initEntity();
+			}
+			
+			private function addNewRelation():void{
+				if(StringUtil.trim(newRelationCodeTxt.text) == ""){
+					SmartXMessage.show("编码不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(StringUtil.trim(newRelationNameTxt.text) == ""){
+					SmartXMessage.show("名称不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(isExistItem(newRelationCodeTxt.text,relationsArr)){
+					SmartXMessage.show("编码重复！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(newGoalEntityCob.selectedItem == null ){
+					SmartXMessage.show("目标实体不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(newOwnerEntityCob.selectedItem == null ){
+					SmartXMessage.show("所属实体不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(StringUtil.trim(newInputSqlTxt.text) == ""){
+					SmartXMessage.show("读取语句不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				OperatingTipUtil.startOperat("查询中...",this);
+				formService.getTableDataStructByDS(datasourceName,"select * from ("+newInputSqlTxt.text+") where 1=2");
+				
+			}
+			
+			private function isExistItem(code:String,itemsArr:ArrayCollection):Boolean{
+				var isExist:Boolean = false;
+				for each(var item:Object in itemsArr){
+					var itemCode:String = String(item.code);
+					if(itemCode != null && itemCode != "" && itemCode == code){
+						isExist = true;
+						break;
+					}
+				}
+				return isExist;
+			}
+			
+			private function selectItemByCode(code:String,itemsArr:ArrayCollection,isDispatchEvent:Boolean=true):void{
+				for each(var item:Object in itemsArr){
+					var itemCode:String = String(item.code);
+					if(itemCode != null && itemCode != "" && itemCode == code){
+						entityModelTree.selectedItem = item;
+						entityModelTree.scrollToIndex(entityModelTree.selectedIndex+1);
+						if(isDispatchEvent)
+							entityModelTree_itemClickHandler(null);
+						break;
+					}else if(item.hasOwnProperty("children"))
+						selectItemByCode(code,item.children,isDispatchEvent);
+				}
+			}
+			
+			private function onQuery():void{
+				isQuery = true;
+				getSQL();
+			}
+			
+			private function getSQL(ruleStr:String=null):void{
+				if(selectedItem && (selectedItem.type == "entity" || selectedItem.type == "virtualEntity")){
+					assemblyRefEntities();
+					bamService.generateEntitySql(XML(selectedItem.content).toXMLString(),entitiesXml.toXMLString(),ruleStr);
+				}
+			}
+			
+			private function showSql():void{
+				isQuery = false;
+				getSQL();
+			}
+			
+			private function generateEntitySqlHandler(event:ResultEvent):void{
+				sql = event.result as String;
+				if(isQuery){
+					bamService.generateEntitySqlOriginalData(XML(selectedItem.content).toXMLString(),entitiesXml.toXMLString(),null);
+				}else{
+					PopUpManager.addPopUp(contentXmlTw,this,true);
+					PopUpManager.centerPopUp(contentXmlTw);
+					contentXmlTw.title = "查看SQL";
+					contentXmlText.text = sql;
+				}
+			}
+			
+			private function generateEntitySqlOriginalDataHandler(event:ResultEvent):void{
+				
+				var countSQL:String = event.result as String;
+				
+				isQuery = false;
+				var entityXml:XML = selectedItem.content as XML;
+				var entityCode:String = String(entityXml.@code);
+				var sharedObjectCode:String = entityModelCode+"_"+entityCode;
+				queryDatagridWindow = new QueryDatagridWindow();
+				queryDatagridWindow.attributesXml = selectedItem.content.@type=="virtual"?selectedItem.content.attributes[0]
+					:EntityUtil.displayAttributeWrap(selectedItem.content,entitiesXml);
+				queryDatagridWindow.sharedObjectCode = sharedObjectCode;
+				queryDatagridWindow.sharedObjectSpaceName = BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_FILTERINFO;
+				queryDatagridWindow.sql = sql;
+				queryDatagridWindow.countSQL = countSQL;
+				queryDatagridWindow.dataSource = _contentXml.datasource;
+				queryDatagridWindow.debugMode = debugMode;
+				
+				desktop != null?PopUpManager.addPopUp(queryDatagridWindow,desktop,true)
+					:PopUpManager.addPopUp(queryDatagridWindow,this,true);
+				
+				PopUpManager.centerPopUp(queryDatagridWindow);
+				queryDatagridWindow.refresh();
+				
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				if(tableDataStruct.table_header.length < 2){
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("字段数量不能小于两个!");
+					return;
+				}
+				if(tableDataStruct.table_header[0].toString().toLowerCase() != 'fromid' 
+					|| tableDataStruct.table_header[1].toString().toLowerCase() != "toid"){
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("字段别名不正确，第一个字段应该为fromid,第二个字段应该为toid！");
+					return;
+				}
+				OperatingTipUtil.endOperat();
+				var tempRelationXML:XML = <relation />;
+				var entityXml:XML = newOwnerEntityCob.selectedItem as XML;
+				if(entityXml.relations.length() <= 0 ){
+					entityXml.appendChild(new XML("<relations />"));
+				}
+				
+				var goalEntityXml:XML = newGoalEntityCob.selectedItem as XML;
+				var goalEntityCode:String = "";
+				if(goalEntityXml != null ){
+					goalEntityCode = goalEntityXml.@code;
+				}
+				
+				tempRelationXML.@toEntityCode = goalEntityCode;
+				tempRelationXML.@name = newRelationNameTxt.text;
+				tempRelationXML.@code = newRelationCodeTxt.text;
+				tempRelationXML.@desc = newRelationDescTxt.text;
+				tempRelationXML.datasource = datasourceName;
+				tempRelationXML.fetchSQL = newInputSqlTxt.text;
+				
+				entityXml.relations.appendChild(tempRelationXML);
+				
+				refreshTree();
+				
+				selectItemByCode(newRelationCodeTxt.text,relationsArr);
+				
+				PopUpManager.removePopUp(relatonWindow);
+			}
+			
+			//更新领域实体元数据(支持批量更新)
+			private function updateEntityMetadataTemplet(mtcode:Array,content:Array,name:Array,batch:Number=1):void{
+				mtcodeCache.clear();
+				invokeMethodIndex = 0;
+				invokeMethodSum = batch;
+				for(var i:Number=0;i<batch;i++){
+					mtcodeCache.put(i,mtcode[i]);
+					bamService.updateAtOnceMetadataTemplet(mtcode[i],content[i],name[i],loginName,BAMConst.ENTITY_MT_TYPE);
+				}
+			}
+			
+			private function updateMetadataTempletHandler(event:ResultEvent):void{
+				/* if(!isEditEntity){//如果是新增
+					
+				} */
+				
+				//刷新元数据客户端缓存
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(mtcodeCache.getValue(invokeMethodIndex),endpoint);
+				invokeMethodIndex++;
+			}
+			
+			private function updateMetadataCompleteHandler():void{
+				OperatingTipUtil.endOperat(true);
+				if(selectedItem){
+					//如果是保存实体操作，则将更新后的元数据同步到缓存中
+					if(isSaveOperate){
+						var entityCode:String = selectedItem.code;
+						var entityMt:XML = selectedItem.content;
+						
+						originalEntityMt = entityMt.copy();
+					}else{
+						//如果领域实体模型元数据中的该实体描述被更改则更新领域实体模型元数据
+						if(modelContentIsModify)
+							saveNoAlertFun();
+						syncLoadEntity();
+					}
+				}
+				
+				modelContentIsModify = false;
+				isSaveOperate = false;
+			}
+			
+			private function mtFlushMtcodeCompleteHandler(event:MetadataTempletUtilEvent):void{
+				if(invokeMethodIndex == invokeMethodSum)
+					updateMetadataCompleteHandler();
+			}
+			
+			private function mtFlushMtcodeFailedHandler(event:MetadataTempletUtilEvent):void{
+				if(invokeMethodIndex == invokeMethodSum)
+					updateMetadataCompleteHandler();
+			}
+			
+			/**
+			 * 加载实体元数据
+			 **/ 
+			private function loadEntity():void{
+				OperatingTipUtil.startOperat("加载实体中...");
+				
+				var mtcode:String = selectedItem.mtcode;
+				if(mtcode == null || mtcode == ""){
+					SmartXMessage.show("元数据编码为空，加载实体失败！",SmartXMessage.MESSAGE_ERROR);
+					OperatingTipUtil.endOperat();
+				}else{
+					var allInheritEntity:ArrayCollection = EntityUtil.getAllInheritEntity(selectedItem.modelContent,_contentXml);
+					allInheritEntity.addItem(selectedItem.modelContent);
+					invokeMethodIndex = 0;
+					invokeMethodSum = allInheritEntity.length;
+					//加载实体和实体所有的父实体
+					for each(var entity:XML in allInheritEntity){
+						bamService.getMetadataTempletContent(String(entity.@mtcode));
+					}
+				}
+			}
+			
+			private function syncLoadEntity():void{
+				if(isSyncLoadEntity)
+					loadEntity();
+				isSyncLoadEntity = false;
+			}
+			
+			/**
+			 * 检查实体元数据是否有被更改过
+			 **/ 
+			private function checkEntityIsModified():Boolean{
+				var isModified:Boolean = false;
+				if(selectedItem && (selectedItem.type == "entity" || selectedItem.type == "virtualEntity" )){
+					var entityCode:String = selectedItem.code;
+					var entityMt:XML = selectedItem.content;//可能被修改的实体元数据
+					//与原始实体元数据做比较
+					if(entityMt && originalEntityMt){
+						if(entityMt.toXMLString() != originalEntityMt.toXMLString())
+							isModified = true;
+					}
+				}
+				
+				return isModified;
+			}
+			
+			/**
+			 * 保存时，如果当前的实体已经被更改，则自动保存
+			 **/ 
+			private function save():void{
+				isSaveOperate = true;
+				if(checkEntityIsModified()){
+//					isSyncLoadEntity = true;
+					updateEntityMetadataTemplet([selectedItem.mtcode],[XML(selectedItem.content).toXMLString()],[selectedItem.name]);
+				}
+				saveFun();
+			}
+			
+			/**
+			 * 拼装当前实体及父实体元数据
+			 **/ 
+			private function assemblyEntitiesXml():XML{
+				var wrapContentXml:XML = <root><entities /></root>;
+				//虚拟实体需要将所有引用到的实体元数据从缓存中读取并封装起来
+				if(selectedItem.type == "virtualEntity"){
+					var virtualEntityXml:XML = selectedItem.content;
+					for each(var joinEntity:XML in virtualEntityXml.joinEntities.joinEntity){
+						wrapContentXml.entities.appendChild(MetadataTempletUtil.getInstance().findMetadataTemplet(String(joinEntity.@mtcode)).contentXML);
+					}
+				}else{
+					for each(var key:String in entitiesCache.getKeys()){
+						wrapContentXml.entities.appendChild(entitiesCache.getValue(key));
+					}
+				}
+				
+				return wrapContentXml;
+			}
+			
+			private function assemblyRefEntities():void{
+				//获得所有的实体引用的实体
+				var allRefEntities:ArrayCollection = EntityUtil.getAllRefEntities(allAttributes,_contentXml);
+				
+				for each(var refEntityXml:XML in allRefEntities){
+					//判断在引用实体是否已存在于缓存
+					if(entitiesCache.containsKey(String(refEntityXml.@code)))
+						continue;
+					var entityMetadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance()
+																	.findMetadataTemplet(String(refEntityXml.@mtcode));
+					if(entityMetadataTemplet && entityMetadataTemplet.contentXML){
+						var flag:Boolean = false;//是否已存在该实体
+						for each(var e:XML in entitiesXml.entities.entity){
+							if(String(e.@code) == String(entityMetadataTemplet.contentXML.@code)){
+								flag = true;
+								break;
+							}
+						}
+						if(!flag)
+							entitiesXml.entities.appendChild(entityMetadataTemplet.contentXML);
+					}
+						
+				}
+			}
+			
+			/**
+			 * 拼装实体元数据编码，规则"MT_EN_"+"领域实体模型编码"+"_"+"实体编码"
+			 **/ 
+			private function assemblyEntityMtcode(entityCode:String):String{
+				return BAMConst.ENTITY_MT_PREFIX.concat(entityModelCode).concat("_").concat(entityCode);
+			}
+			
+			private function deleteEntityMt(mtcode:String):void{
+				bamService.deleteAtOnceMetadataTemplet(mtcode);
+			}
+			
+			private function userParametersConfig():void{
+				PopUpManager.addPopUp(userParamsWindow,this,true);
+				PopUpManager.centerPopUp(userParamsWindow);
+				var dataProvider:ArrayCollection = new ArrayCollection();
+				
+				for each(var paramXml:XML in _contentXml.parameters.parameter){
+					var variableVo:VariableVo = new VariableVo(String(paramXml.@name),String(paramXml.@controlType),String(paramXml.@alias),"",""
+											,String(paramXml.@refDefinition),String(paramXml.@isUseSynonyms)=="Y"?true:false,String(paramXml.@defineCbo));
+					dataProvider.addItem(variableVo);
+				}
+				userParamsPanel.refreshData(dataProvider);
+			}
+			
+			private function userParamsConfirmHandler():void{
+				delete _contentXml.parameters.*;
+				for each(var userParams:VariableVo in userParamsPanel.dataProvider){
+					var paramXml:XML = <parameter />;
+					paramXml.@name = userParams.name;
+					paramXml.@alias = userParams.label;
+					paramXml.@controlType = userParams.type;
+					paramXml.@isUseSynonyms = userParams.isUseSynonyms?"Y":"N";
+					paramXml.@defineCbo = userParams.defineCbo;
+					paramXml.@refDefinition = userParams.defineRefPanel;
+					_contentXml.parameters[0].appendChild(paramXml);
+				}
+				PopUpManager.removePopUp(userParamsWindow);
+			}
+			
+			private function addAuthAttribute():void{
+				selectedItem.content.groupAttributes[0].appendChild(<groupAttribute name="" parameter="" />);
+				refreshGroupAttributeDg();
+			}
+			
+			private function deleteAuthAttribute():void{
+				if(groupAttributeDg.selectedIndex > -1)
+					CEPUtils.xmlDeleteNode(XML(groupAttributeDg.selectedItem));
+				refreshGroupAttributeDg();
+			}
+			
+			private function refreshGroupAttributeDg():void{
+				groupAttributeDg.dataProvider = selectedItem.content.groupAttributes.groupAttribute
+				groupAttributeDg.invalidateList();
+			}
+			
+			private function isGisEntity_changeHandler(event:Event):void{
+				if(isGisEntity.selected){
+					selectedItem.content.@isGis = "true";
+					selectedItem.modelContent.@isGis = "true";
+					initGisTab();
+					if(!mainTab.contains(gisInfoTab))
+						mainTab.addChild(gisInfoTab);
+					if(gisInfoTab.isCreationComplete)
+						gisInfoTab.showHandler();
+					modelContentIsModify = true;
+				}else if(!isGisEntity.selected && mainTab.contains(gisInfoTab)){
+					mainTab.removeChild(gisInfoTab);
+					selectedItem.content.@isGis = "false";
+					selectedItem.modelContent.@isGis = "false";
+					modelContentIsModify = true;
+				}
+			}
+			
+			private function initGisTab():void{
+				gisInfoTab.selectedItem = selectedItem;
+				gisInfoTab.contentXml = _contentXml;
+				gisInfoTab.endpoint = endpoint;
+				gisInfoTab.allInheritAtt = allInheritAtt;
+				gisInfoTab.insertMode = insertMode;
+			}
+			
+			private function geoServerConfig():void{
+				geoserverConfig.geoServerXml = _contentXml.geoServer[0];
+				geoserverConfig.contentXml = _contentXml;
+				geoserverConfig.endpoint = endpoint;
+				PopUpManager.addPopUp(geoserverConfig,this,true);
+				PopUpManager.centerPopUp(geoserverConfig);
+				geoserverConfig.refresh();
+			}
+			
+			private function confirm():void{
+				if(checkEntityIsModified()){
+					SmartXMessage.show("实体已经更改，请先保存！");
+					return;
+				}
+				confirmFun();
+			}
+			
+		]]>
+	</fx:Script>
+	<containers:states>
+		<s:State name="normal"/>
+		<s:State name="entity"/>
+		<s:State name="abstractEntity"/>
+		<s:State name="virtualEntity"/>
+		<s:State name="relation"/>
+		<s:State name="rule"/>
+	</containers:states>
+	<mx:VBox width="100%" height="100%">
+		<mx:HDividedBox width="100%" height="100%">
+			<mx:VBox width="25%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5"
+					 paddingTop="5">
+				<mx:HBox id="treeButtonBox" width="100%" paddingBottom="5" paddingLeft="5"
+						 paddingRight="5" paddingTop="5">
+					<mx:PopUpMenuButton id="operationButton" label="操作" dataProvider="{operationList}"
+										 labelField="name" openAlways="true"/>
+					<mx:LinkButton click="importFromRelationDs()" icon="{AssetsFileLib.importIcon}"
+								   toolTip="从关系存储模型导入"/>
+					<mx:LinkButton click="userParametersConfig()" icon="{AssetsFileLib.usermgmtIcon}"
+								   toolTip="用户参数配置"/>
+					<mx:LinkButton click="geoServerConfig()" icon="{AssetsFileLib.gisIcon}"
+								   toolTip="GeoServer配置"/>
+					<mx:LinkButton visible="{debugMode}" click="showXml()"
+								   icon="{AssetsFileLib.viewIcon}" toolTip="查看XML"/>
+					<mx:LinkButton visible="{debugMode}" click="showEntityXml()"
+								   icon="{AssetsFileLib.browseIcon}" toolTip="预览当前节点XML"/>
+					<mx:LinkButton visible="{debugMode}" click="showSql()"
+								   icon="{AssetsFileLib.advancedqueryIcon}" toolTip="查看SQL"/>
+				</mx:HBox>
+				<ext:TreeWrapper id="entityModelTree" width="100%" height="100%" allowMultipleSelection="false" dataProvider="{treeDataProvider}"
+								 iconFunction="iconFunction" itemClick="entityModelTree_itemClickHandler(event)" labelField="name"/>
+			</mx:VBox>
+			<mx:VBox width="75%" height="100%">
+				<mx:TabNavigator id="mainTab" includeIn="abstractEntity,entity,virtualEntity"
+								 width="100%" height="100%" creationPolicy="all" paddingTop="3">
+					<mx:VBox width="100%" height="100%" label="基本信息" paddingBottom="5"
+							 paddingLeft="5" paddingRight="5" paddingTop="5" show.entity="infoBox_showHandler()" 
+							 show.virtualEntity="infoBox_showHandler()">
+						<mx:HBox width="100%">
+							<mx:Label width="25%" text="名称"/>
+							<mx:TextInput id="infoEntityNameTxt" width="50%"
+										  change="infoEntityNameTxt_changeHandler(event)"
+										  focusOut="{isEntityNameChange?refreshTree():null}"
+										  text="{selectedItem.modelContent.@name}"/>
+						</mx:HBox>
+						<mx:HBox width="100%">
+							<mx:Label width="25%" text="编码"/>
+							<mx:TextInput id="infoEntityCodeTxt" width="50%" editable="false"
+										  text="{selectedItem.modelContent.@code}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="abstractEntity,entity" width="100%">
+							<mx:Label width="25%" text="是否抽象"/>
+							<mx:CheckBox id="isAbstractChk" enabled="false"
+										 selected="{selectedItem.modelContent.@isAbstract=='true'?true:false}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity" width="100%">
+							<mx:Label width="25%" text="GIS实体"/>
+							<mx:CheckBox id="isGisEntity" change="isGisEntity_changeHandler(event)" />
+						</mx:HBox>
+						<mx:HBox includeIn="entity" width="100%">
+							<mx:Label width="25%" text="父实体"/>
+							<mx:ComboBox id="parentEntityCbo" width="50%"
+										 change="parentEntityCbo_changeHandler(event)"
+										 dataProvider="{parentEntityCboDp}" labelField="@name"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%">
+							<mx:Label width="25%" text="主键属性"/>
+							<mx:ComboBox id="primaryKeyAttCbo" width="50%"
+										 change="primaryKeyAttCbo_changeHandler(event)"
+										 dataProvider="{selectedItem.content.attributes.attribute}"
+										 labelField="@name"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%" height="35%">
+							<mx:Label width="25%" text="权限属性"/>
+							<mx:VBox width="50%" height="100%" >
+								<mx:HBox width="100%">
+									<mx:Button icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建权限属性" click="addAuthAttribute()"/>
+									<mx:Button icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除权限属性" click="deleteAuthAttribute()"/>
+								</mx:HBox>
+								<mx:DataGrid id="groupAttributeDg" width="100%" height="100%" editable="true" 
+											 dataProvider="{selectedItem.content.groupAttributes.groupAttribute}">
+									<mx:columns>
+										<mx:DataGridColumn headerText="权限属性" dataField="@name" >
+											<mx:itemEditor>
+												<fx:Component>
+													<mx:HBox horizontalAlign="center" width="100%" horizontalScrollPolicy="off">
+														<fx:Script>
+															<![CDATA[
+																import mx.events.ListEvent;
+																public function get text():String{
+																	return authAttCbo.selectedItem?authAttCbo.selectedItem.@name:"";
+																}
+																
+																override public function set data(value:Object):void{
+																	super.data = value;
+																	if(value != null){
+																		for each(var attribute:XML in outerDocument.allAttributes){
+																			if(String(attribute.@name) == String(data.@name)){
+																				authAttCbo.selectedItem = attribute;
+																				break;
+																			}else
+																				authAttCbo.selectedItem = null;
+																		}
+																	}
+																}
+																
+																private function authAttCbo_changeHandler(event:ListEvent):void{
+																	data.@name = text;
+																}
+																
+															]]>
+														</fx:Script>
+														<mx:ComboBox id="authAttCbo" width="100%" change="authAttCbo_changeHandler(event)" 
+																	 dataProvider="{outerDocument.allAttributes}" labelField="@name" />
+													</mx:HBox>
+												</fx:Component>
+											</mx:itemEditor>
+										</mx:DataGridColumn>
+										<mx:DataGridColumn headerText="权限属性值" dataField="@parameter" >
+											<mx:itemEditor>
+												<fx:Component>
+													<mx:HBox horizontalAlign="center" width="100%" horizontalScrollPolicy="off">
+														<fx:Script>
+															<![CDATA[
+																import mx.events.ListEvent;
+																public function get text():String{
+																	return authAttValueCbo.selectedItem?authAttValueCbo.selectedItem.@name:"";
+																}
+																
+																override public function set data(value:Object):void{
+																	super.data = value;
+																	if(value != null){
+																		for each(var parameter:XML in outerDocument.entityModelXml.parameters.parameter){
+																			if(String(parameter.@name) == String(data.@name)){
+																				authAttValueCbo.selectedItem = parameter;
+																				break;
+																			}else
+																				authAttValueCbo.selectedItem = null;
+																		}
+																	}
+																}
+																
+																private function authAttValueCbo_changeHandler(event:ListEvent):void{
+																	data.@parameter = text;
+																}
+																
+															]]>
+														</fx:Script>
+														<mx:ComboBox id="authAttValueCbo" width="100%" dataProvider="{outerDocument.entityModelXml.parameters.parameter}" 
+																	 labelField="@name" change="authAttValueCbo_changeHandler(event)" />
+													</mx:HBox>
+												</fx:Component>
+											</mx:itemEditor>
+										</mx:DataGridColumn>
+									</mx:columns>
+								</mx:DataGrid>
+							</mx:VBox>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%" height="25%">
+							<mx:Label width="25%" text="描述"/>
+							<mx:TextArea id="infoDescTxt" width="50%" height="100%"
+										 change="infoDescTxt_changeHandler(event)"
+										 text="{selectedItem.content.@desc}"/>
+						</mx:HBox>
+						<mx:HBox includeIn="entity,virtualEntity" width="100%"
+								 horizontalAlign="center">
+							<mx:Button label="实时查询" click="onQuery()"/>
+						</mx:HBox>
+					</mx:VBox>
+				</mx:TabNavigator>
+				<mx:TabNavigator id="relationsTabNa" includeIn="relation" width="100%" height="100%" creationPolicy="all"
+								 paddingTop="3" />
+			</mx:VBox>
+		</mx:HDividedBox>
+		<mx:HBox width="100%" horizontalAlign="right" paddingRight="5">
+			<mx:Button label="保存" click="save()" icon="{AssetsFileLib.saveIcon}"/>
+			<mx:Button label="确定" click="confirm()"/>
+			<mx:Button label="取消" click="PopUpManager.removePopUp(this);"/>
+		</mx:HBox>
+	</mx:VBox>
+</containers:SuperPanel>

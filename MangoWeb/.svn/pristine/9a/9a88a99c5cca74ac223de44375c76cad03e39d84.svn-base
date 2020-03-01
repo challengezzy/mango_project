@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" creationComplete="init()" 
+		   width="1000" height="500" xmlns:synonyms="smartx.bam.flex.modules.synonyms.*">
+	<fx:Declarations>
+		<mx:TitleWindow id="variableNameWindow" title="设置变量名" width="250" height="120" 
+						showCloseButton="true" close="PopUpManager.removePopUp(variableNameWindow)">
+			<mx:HBox width="100%" height="100%" horizontalAlign="center">
+				<mx:Label text="变量名" />
+				<mx:TextInput id="variableNameTxt" width="100" />
+			</mx:HBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="设置" click="setVar_clickHandler(event)"/>
+				<mx:Button label="取消" click="cancelVar_clickHandler(event)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			import mx.utils.StringUtil;
+			
+			import smartx.bam.flex.modules.common.variableControl.vo.VariableVo;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			public var dataProvider:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			public var confirmFun:Function;
+			[Bindable]
+			public var cancelFun:Function;
+			[Bindable]
+			internal var variableTypeDataProvider:ArrayCollection = new ArrayCollection([
+				{label:"文本框",value:BAMConst.VARIABLE_CONTROL_TEXTINPUT},
+				{label:"下拉框",value:BAMConst.VARIABLE_CONTROL_COMBOBOX},
+				{label:"参照",value:BAMConst.VARIABLE_CONTROL_REFPANEL}
+			]);
+			
+			public var isShowConfirmBtn:Boolean = true;
+			[Bindable]
+			public var needDefaultValue:Boolean = true;//是否需要设置默认值
+			
+			private function init():void{
+				if(!isShowConfirmBtn)
+					currentState = "plantMode";
+				else
+					currentState = "popUpMode";
+			}
+			
+			public function refreshData(dataProvider:ArrayCollection):void{
+				this.dataProvider = dataProvider;
+				variableDataGrid.invalidateList()
+			}
+			
+			private function addVariable():void{
+				if(!variableNameWindow.isPopUp){
+					PopUpManager.addPopUp(variableNameWindow,this,true);
+					PopUpManager.centerPopUp(variableNameWindow);
+				}
+			}
+			
+			private function delVariable():void{
+				if(variableDataGrid.selectedIndex < 0)
+					return;
+				var selectData:Object = variableDataGrid.selectedItem;
+				dataProvider.removeItemAt(dataProvider.getItemIndex(selectData));
+				variableDataGrid.invalidateList();
+			}
+			
+			private function setVar_clickHandler(event:MouseEvent):void{
+				if(variableNameTxt && StringUtil.trim(variableNameTxt.text) != ""){
+					var flag:Boolean = true;
+					for each(var temp:Object in dataProvider){
+						if(StringUtil.trim(temp.name) == variableNameTxt.text){
+							SmartXMessage.show("变量名不能重复!");
+							flag = false;
+							break;
+						}
+					}
+					if(flag){
+						var variableVo:VariableVo = new VariableVo(variableNameTxt.text);
+						dataProvider.addItem(variableVo);
+						variableDataGrid.invalidateList();
+						PopUpManager.removePopUp(variableNameWindow);
+					}
+				}else
+					SmartXMessage.show("变量名不能为空!");
+			}
+			
+			private function cancelVar_clickHandler(event:MouseEvent):void{
+				PopUpManager.removePopUp(variableNameWindow);
+			}
+			
+			private function typeLabelFun(item:Object, column:DataGridColumn):String{
+				for each(var data:Object in variableTypeDataProvider){
+					if(item.type == data.value)
+						return data.label;
+				}
+				return "";
+			}
+			
+			private function defineCboLabelFun(item:Object, column:DataGridColumn):String{
+				if(item is VariableVo){
+					var vari:VariableVo = item as VariableVo;
+					return vari.isUseSynonyms?vari.defineCbo.split("@@@")[0]:vari.defineCbo;
+				}
+				return "";
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox width="100%" id="buttonBox">
+		<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addVariable()"/>
+		<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delVariable()"/>
+	</mx:HBox>
+	<mx:DataGrid id="variableDataGrid" width="100%" height="100%" editable="true" dataProvider="{dataProvider}">
+		<mx:columns>
+			<mx:DataGridColumn headerText="变量名" editable="false" dataField="name" width="100"/>
+			<mx:DataGridColumn headerText="类型" editable="true" dataField="type" editorDataField="value" width="100" labelFunction="typeLabelFun">
+				<mx:itemEditor>
+					<fx:Component>
+						<mx:HBox width="100%" horizontalAlign="center" horizontalScrollPolicy="off">
+							<fx:Script>
+								<![CDATA[
+									import mx.collections.ArrayCollection;
+									import mx.events.ListEvent;
+									
+									import smartx.bam.flex.vo.BAMConst;
+									
+									public function get value():String{
+										return data.type;
+									}
+									
+									override public function set data(obj:Object):void{
+										super.data = obj;
+										setVariableType(obj.type);
+									}
+									
+									private function variableTypeCbo_changeHandler(event:ListEvent):void{
+										data.type = variableTypeCbo.selectedItem.value;
+										setVariableType(data.type);
+									}
+									
+									private function setVariableType(value:String):void{
+										if(value == BAMConst.VARIABLE_CONTROL_COMBOBOX){
+											variableTypeCbo.selectedIndex =  1;
+											outerDocument.helpLabel.text = "注：如下拉框不使用数据字典则说明中填写格式为   [显示名称@@值],[显示名称@@值]";
+										}
+										else if(value == BAMConst.VARIABLE_CONTROL_REFPANEL){
+											variableTypeCbo.selectedIndex =  2;
+											outerDocument.helpLabel.text = "注：参照说明为SQL，格式为\"select id,code,name from foo\"";
+										}
+										else if(value == BAMConst.VARIABLE_CONTROL_TEXTINPUT){
+											variableTypeCbo.selectedIndex = 0;
+											outerDocument.helpLabel.text = "";
+										}
+									}
+									
+								]]>
+							</fx:Script>
+							<mx:ComboBox id="variableTypeCbo" dataProvider="{outerDocument.variableTypeDataProvider}" 
+										 labelField="label" change="variableTypeCbo_changeHandler(event)" />
+						</mx:HBox>
+					</fx:Component>
+				</mx:itemEditor>
+			</mx:DataGridColumn>
+			<mx:DataGridColumn headerText="默认值" editable="true" dataField="defaultValue" visible="{needDefaultValue}" width="100"/>
+			<mx:DataGridColumn headerText="标签名" editable="true" dataField="label" width="100"/>
+			<mx:DataGridColumn headerText="下拉框是否使用同义词" editable="true" rendererIsEditor="true"
+							   dataField="isUseSynonyms" editorDataField="value" width="150">
+				<mx:itemRenderer>
+					<fx:Component>
+						<mx:HBox horizontalAlign="center" width="100%" 
+								 horizontalScrollPolicy="off" verticalScrollPolicy="off">
+							<fx:Script>
+								<![CDATA[
+									public function get value():String{
+										return data.isUseSynonyms;
+									}
+									
+									private function isUseSynonymsCheckBox_changeHandler():void{
+										data.isUseSynonyms=isUseSynonymsCheckBox.selected;
+										data.defineCbo = "";
+									}
+								]]>
+							</fx:Script>
+							<mx:CheckBox id="isUseSynonymsCheckBox" selected="{data.isUseSynonyms}"
+										 change="isUseSynonymsCheckBox_changeHandler()"/>
+						</mx:HBox>
+					</fx:Component>
+				</mx:itemRenderer>
+			</mx:DataGridColumn>
+			<mx:DataGridColumn headerText="下拉框说明" editable="true" width="200" dataField="defineCbo" 
+							   editorDataField="value" labelFunction="defineCboLabelFun">
+				<mx:itemEditor>
+					<fx:Component>
+						<mx:Canvas width="100%">
+							<fx:Script>
+								<![CDATA[
+									import mx.events.FlexEvent;
+									
+									import smartx.flex.components.event.UIComponentEvent;
+									import smartx.flex.components.vo.SimpleRefItemVO;
+									
+									public function get value():String{
+										if(currentState == "cboNoUseSynonyms")
+											return defineCboTxt.text;
+										else
+											return data.defineCbo;
+									}
+									
+									override public function set data(value:Object):void{
+										super.data = value;
+										if(value && value.isUseSynonyms)
+											currentState = "cboUseSynonyms";
+										else
+											currentState = "cboNoUseSynonyms";
+									}
+									
+									protected function sysnonymsRefInput_creationCompleteHandler(event:FlexEvent):void{
+										if(super.data){
+											var simpleRef:SimpleRefItemVO = new SimpleRefItemVO();
+											var defineCboStr:String = super.data.defineCbo;
+											if(defineCboStr.split("@@@").length >1){
+												simpleRef.name = defineCboStr.split("@@@")[0];
+												simpleRef.code = defineCboStr.split("@@@")[1];
+												sysnonymsRefInput.data = {defineCbo:simpleRef};
+											}else
+												sysnonymsRefInput.data = {defineCbo:simpleRef};
+										}
+										
+									}
+									
+									protected function defineCboTxt_creationCompleteHandler(event:FlexEvent):void{
+										if(super.data)
+											defineCboTxt.text = super.data.defineCbo;
+									}
+									
+									protected function sysnonymsRefInput_realValueChangeHandler(event:UIComponentEvent):void{
+										var simpleRefItemVO:SimpleRefItemVO = sysnonymsRefInput.value as SimpleRefItemVO;
+										if(simpleRefItemVO.name && simpleRefItemVO.code)
+											super.data.defineCbo = simpleRefItemVO.name.concat("@@@").concat(simpleRefItemVO.code);
+									}
+									
+								]]>
+							</fx:Script>
+							<mx:states>
+								<s:State name="cboNoUseSynonyms" />
+								<s:State name="cboUseSynonyms" />
+							</mx:states>
+							<synonyms:SynonymsRefInput id="sysnonymsRefInput" width="100%" dataGridItemkey="defineCbo" excludeFrom="cboNoUseSynonyms"
+													   creationComplete="sysnonymsRefInput_creationCompleteHandler(event)" 
+													   realValueChange="sysnonymsRefInput_realValueChangeHandler(event)"/>
+							<mx:TextInput id="defineCboTxt" width="100%" includeIn="cboNoUseSynonyms" 
+										  creationComplete="defineCboTxt_creationCompleteHandler(event)" />
+						</mx:Canvas>
+						
+					</fx:Component>
+				</mx:itemEditor>
+			</mx:DataGridColumn>
+			<mx:DataGridColumn headerText="参照说明" editable="true" dataField="defineRefPanel" width="200"/>
+			<mx:DataGridColumn headerText="默认显示名" editable="true" dataField="defaultValueLabel" width="100"/>
+		</mx:columns>
+	</mx:DataGrid>
+	<mx:Label id="helpLabel" color="red"/>
+	<mx:HBox width="100%" horizontalAlign="center" includeIn="popUpMode">
+		<mx:Button label="确定" click="confirmFun()"/>
+		<mx:Button label="取消" click="cancelFun()"/>
+	</mx:HBox>
+	<mx:states>
+		<s:State name="popUpMode" />
+		<s:State name="plantMode" />
+	</mx:states>
+</mx:VBox>

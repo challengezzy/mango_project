@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpPanel xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="300"
+		  backgroundColor="#828280" borderStyle="none" fontSize="12" fontFamily="Simsun" 
+		 xmlns:util="myreport.util.*" xmlns:myreport="myreport.*" xmlns:design="myreport.design.*">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.DisposeUtil;
+			import hlib.MsgUtil;
+			import hlib.UrlLoader;
+			
+			import mx.collections.ArrayCollection;
+
+			import myreport.design.DesignEvent;
+			import myreport.design.DesignPanel;
+			import myreport.design.FilterEditor;
+			import myreport.res.Asset;
+			
+			private static var g_Instance:ReportDesigner;
+			
+			public static function get Instance():ReportDesigner
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ReportDesigner();
+					g_Instance.initialize();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			
+			private var _Loader:UrlLoader;
+			protected var _TableData:ArrayCollection;
+			protected var _ParameterData:Object;
+			protected var _Filter:String;
+ 
+			public function Open(xml:XML):void
+			{
+				Load(xml, _TableData, _ParameterData);
+			}
+			/**
+			 * @param source: 支持XML对象、url路径或null值
+			 */ 
+			public function Load(source:Object, tableData:ArrayCollection, parameterData:Object):void
+			{
+				_TableData = tableData;
+				_ParameterData = parameterData;	
+				_Filter = null;
+				if (_Print)
+				{
+					if(_Print.OnZoom == null)
+					{
+						_Print.OnZoom = OnZoom;
+						_Print.OnGotoPage = OnGotoPage;
+						_Print.OnPrint = OnPrint;
+					}
+					_Print.Total = 0;
+					_Print.visible = false;
+				}
+				
+				_Design.selected = true;
+				_Preview.selected = false;
+				_S1.visible = false;
+				_S2.visible = false;
+				_FilterButton.visible = false;
+				Enabled = false;
+				
+				if (source is XML)
+				{
+					LoadStyle(XML(source));
+				}
+				else if (source != null)
+				{
+					_Loader = new UrlLoader();
+					_Loader.addEventListener(Event.COMPLETE, LoadCompleteHandler);
+					_Loader.Load(source.toString());
+					trace("加载：", source);
+				}
+				else
+				{
+					LoadStyle(null);
+				}
+			}
+			private function LoadCompleteHandler(event:Event):void
+			{
+				LoadStyle(XML(_Loader.Data));
+			}
+			private function LoadStyle(style:XML):void
+			{
+				Enabled = true;				
+				_DesignPanel.Load(style, _TableData, _ParameterData);
+				RefreshMainContent();
+			}
+			/**
+			 * @param source: 支持XML对象、url路径或null值
+			 */ 
+			public function Show(source:Object, tableData:ArrayCollection, parameterData:Dictionary):void
+			{
+				PopUp();
+
+				Load(source, tableData, parameterData);
+			}
+			
+			public function GetSettingXML():String
+			{
+				return _DesignPanel.GetSettingXML();
+			}
+ 
+			public function get TableData():ArrayCollection
+			{
+				return _TableData;
+			}
+			public function get ParameterData():Object
+			{
+				return _ParameterData;
+			}
+			private function Refresh():void
+			{
+				_DesignPanel.Refresh();
+				RefreshMainContent();
+			}
+			
+			private function Save():void
+			{
+				_DesignPanel.Save();
+				var event:DesignEvent = new DesignEvent(DesignEvent.SAVE);
+				dispatchEvent(event);
+			}
+			
+			private function OpenFile():void
+			{
+				var event:DesignEvent = new DesignEvent(DesignEvent.OPEN);
+				dispatchEvent(event);
+			}
+			
+			private function ShowProperties():void
+			{
+				_DesignPanel.ShowOrHideSidePanel();
+				_Properties.selected = _DesignPanel.SidePanelVisible;
+			}
+			
+			private function Design():void
+			{
+				if (_Design.selected)
+					return;
+				_Design.selected = true;
+				_Preview.selected = false;
+				RefreshMainContent();
+			}
+			
+			private function Preview():void
+			{
+				if (_Preview.selected)
+					return;
+				_Design.selected = false;
+				_Preview.selected = true;
+				RefreshMainContent();
+			}
+			
+			public function RefreshMainContent():void
+			{
+				if (_Design.selected)
+				{
+					_View.selectedIndex = 0;
+					_Print.visible = false;
+					_S1.visible = false;
+					_S2.visible = false;
+					_FilterButton.visible = false;
+					CustomPreviewToolBar.visible = false;
+				}
+				else
+				{
+					_View.selectedIndex = 1;
+					_Print.visible = true;
+					_S1.visible = true;
+					_S2.visible = true;
+					_FilterButton.visible = true;
+					CustomPreviewToolBar.visible = true;
+					_PreviewPanel.setFocus();
+					_PreviewPanel.Clear();
+					var table:ArrayCollection = myreport.ReportEngine.FilterTable(_TableData, _Filter);
+					ReportEngine.GeneratePagesAsync(_DesignPanel.Data, table, _ParameterData, 
+						function(pages:Array):void
+						{
+							_PreviewPanel.Pages = pages;
+							_Print.Total = _PreviewPanel.PageCount;
+						});
+				}
+			}
+			
+			public function set Enabled(value:Boolean):void
+			{
+				_Refresh.enabled = value;
+				_Save.enabled = value;
+				_Properties.enabled = value;
+				_Design.enabled = value;
+				_Preview.enabled = value;
+				_DesignPanel.visible = value;
+			}
+			
+			private function OnPrint(pageRange:String):void
+			{
+				var table:ArrayCollection = myreport.ReportEngine.FilterTable(_TableData, _Filter);
+				ReportEngine.PrintAsync(_DesignPanel.Data, table, _ParameterData, pageRange);
+			}
+			
+			private function OnGotoPage(pageNumber:int):void
+			{
+				_PreviewPanel.GotoPage(pageNumber);
+			}
+			
+			private function OnZoom(scale:Number):void
+			{
+				_PreviewPanel.Zoom(scale);
+			}
+			
+			public function About():void
+			{
+				_PreviewPanel.ShowAbout();
+			}
+			
+			protected override function OnClose():void
+			{
+				_PreviewPanel.Clear();
+			}
+	 
+			private function ShowFilterEditor():void
+			{
+				if(!_DesignPanel.Data)
+				{
+					MsgUtil.ShowInfo("尚未加载数据。");
+					return;
+				}
+				FilterEditor.Instance.Show(_DesignPanel.Data, _Filter, 
+					function(filter:String):void
+					{
+						_Filter = filter;
+						var table:ArrayCollection = myreport.ReportEngine.FilterTable(_TableData, _Filter);
+						ReportEngine.GeneratePagesAsync(_DesignPanel.Data, table, _ParameterData, 
+							function(pages:Array):void
+							{
+								_PreviewPanel.Pages = pages;
+								_Print.Total = _PreviewPanel.PageCount;
+							});
+						
+					});
+			}
+		]]>
+	</mx:Script>
+	
+	<util:ToolBar id="_Tool" height="30" width="100%" paddingLeft="8" paddingRight="8">
+		<util:ToolButton id="_Open" icon="{Asset.ICON_OPEN}" toolTip="打开" label="" width="23" click="OpenFile()"/>
+		<util:ToolButton id="_Refresh" icon="{Asset.ICON_REFRESH}" toolTip="刷新" label="" width="23" click="Refresh()"/>
+		<util:ToolButton id="_Save" icon="{Asset.ICON_SAVE}" toolTip="保存" label="" width="23" click="Save()"/>
+		<mx:VRule height="24"/>
+		<util:ToolButton id="_Properties" icon="{Asset.ICON_PROPERTIES}" toolTip="属性" label="属性" selected="true" click="ShowProperties()"/>
+		<util:ToolButton id="_Design" icon="{Asset.ICON_DESIGN}" toolTip="设计" label="设计" click="Design()"/>
+		<util:ToolButton id="_Preview" icon="{Asset.ICON_PREVIEW}" toolTip="预览" label="预览" click="Preview()"/>
+		<mx:VRule id="_S1" height="24"/>
+		<util:PrintToolBar id="_Print">
+		</util:PrintToolBar>
+		<mx:VRule id="_S2" height="24"/>
+		<util:ToolButton id="_FilterButton" icon="{Asset.ICON_FILTER}" toolTip="筛选" label="筛选" click="ShowFilterEditor()"/>
+		<mx:HBox id="CustomPreviewToolBar" verticalScrollPolicy="off" horizontalScrollPolicy="off" verticalAlign="middle">
+			
+		</mx:HBox>
+		<mx:Spacer width="100%"/>
+		<util:ToolButton icon="{Asset.ICON_HELP}" toolTip="关于MyReport" label="" click="About()" width="23"/>
+		<util:ToolButton icon="{Asset.ICON_CLOSE}" toolTip="关闭" label="" click="Close()" width="23"/>		
+	</util:ToolBar>	
+	<mx:ViewStack id="_View" y="31" width="100%" height="100%" creationPolicy="all">
+		<design:DesignPanel label="设计" id="_DesignPanel" width="100%" height="100%">
+			</design:DesignPanel>
+		<myreport:ReportViewPanel label="预览" id="_PreviewPanel" width="100%" height="100%">
+			</myreport:ReportViewPanel>
+	</mx:ViewStack>
+</util:PopUpPanel>

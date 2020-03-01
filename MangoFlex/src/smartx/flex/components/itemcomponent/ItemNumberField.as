@@ -1,0 +1,58 @@
+package smartx.flex.components.itemcomponent
+{
+	import mx.controls.TextInput;
+	import mx.utils.ObjectUtil;
+	
+	import smartx.flex.components.itemcomponent.ext.AdvTextInput;
+	import smartx.flex.components.util.CompareUtil;
+	import smartx.flex.components.vo.ItemVO;
+	import smartx.flex.components.vo.TempletItemVO;
+	
+	public class ItemNumberField extends ItemTextField
+	{
+		private var textInput:AdvTextInput;
+		
+		public function ItemNumberField(templetItemVO:TempletItemVO,showLabel:Boolean=true)
+		{
+			super(templetItemVO,showLabel);
+			textInput = input as AdvTextInput;
+			this.enableDetailEdit = false;
+			textInput.realTextInput.restrict = "0-9\-\.";
+		}
+		
+		public override function getQueryConditon(isPreciseQuery:Boolean=false):String{
+			if(textInput.text != null && textInput.text != ""){
+				return " and ("+templetItemVO.itemkey+" = '"+textInput.text+"') ";
+			}
+			return "";
+		}
+		
+		public override function getSortFunction(fieldName:String):Function{
+			return function(obj1:Object,obj2:Object):int{
+				if(obj1[fieldName] != null && obj2[fieldName] == null)
+					return -1;
+				if(obj1[fieldName] == null && obj2[fieldName] != null)
+					return 1;
+				if(obj1[fieldName] && obj2[fieldName]){
+					if(CompareUtil.hashTotalColumn(obj1)){
+						if(column){
+							return (column.sortDescending?-1:1)*1;
+						}else{
+							return 1;
+						}
+					}else if(CompareUtil.hashTotalColumn(obj2)){
+						if(column){
+							return (column.sortDescending?-1:1)*-1;
+						}else{
+							return -1;
+						}
+					}else{
+						return ObjectUtil.numericCompare(Number(obj1[fieldName]),Number(obj2[fieldName])); //数字比较
+					}
+				}
+				return 0;
+			}
+		}
+		
+	}
+}

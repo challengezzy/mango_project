@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="900" height="520" 
+				allowDrag="true" allowClose="true" allowMaximize="true" 
+				allowMinimize="true" allowResize="true" close="PopUpManager.removePopUp(this)" fontSize="12" 
+				xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+				xmlns:core="smartx.flex.components.core.*"
+				xmlns:fx="http://ns.adobe.com/mxml/2009"
+				xmlns:entity="smartx.bam.flex.modules.entitymodel.utils.*"
+				creationComplete="init()"
+				title="查询结果"
+				>
+	<fx:Declarations>
+		<SuperPanel id="olapPanel" width="800" height="500" allowClose="true" close="olapPanelCloseHandler()"
+							   allowDrag="true" allowMaximize="true" allowMinimize="true" allowResize="true" title="数据分析">
+			
+		</SuperPanel>
+		<viewStackEffects:CoverFlowPapervision3D id="effect"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.flexmonster.pivot.view.ViewType;
+			
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.bam.flex.vo.DQCConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.olap.BillPivotComponent;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			[Bindable]
+			public var attributesXml:XML;
+			
+			[Bindable]
+			public var sharedObjectCode:String;
+			
+			[Bindable]
+			public var sharedObjectSpaceName:String;
+			
+			[Bindable]
+			public var sql:String;
+			
+			[Bindable]
+			public var countSQL:String;
+			
+			[Bindable]
+			public var expFileName:String = "查询结果";
+			
+			[Bindable]
+			public var dataSource:String;
+			
+			[Bindable]
+			public var modelCode:String;
+			
+			[Bindable]
+			public var entityCode:String;
+			
+			[Bindable]
+			public var ruleCode:String;
+			
+			[Bindable]
+			public var debugMode:Boolean;
+			
+			private var pivot:BillPivotComponent;
+			
+			private var olapConfigurationSharedObject:SharedObject;
+			
+			[Bindable]
+			public var fieldNameMap:Object = {};
+			
+			private var ruleConfXml:XML = null;
+			
+			public function refresh():void{
+				listPanel.refresh();
+			}
+			
+			private function init():void{
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				formService.excelExport2.addEventListener(ResultEvent.RESULT,excelExport2Handler);					
+				formService.excelExport2.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("导出EXCEL时错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+//				bamService.generateEntitySqlOriginalDataByMtCode.addEventListener(ResultEvent.RESULT,generateEntitySqlOriginalDataByMtCodeHandler);					
+//				bamService.generateEntitySqlOriginalDataByMtCode.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+//					OperatingTipUtil.endOperat();
+//					SmartXMessage.show("获取SQL语句时错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+//				});
+				
+				var dataOverviewBtn:Object = {label:"数据概览",handler:dataOverviewBtn_clickHandler,icon:AssetsFileLib.advancedqueryIcon};
+				listPanel.operationList.addItem(dataOverviewBtn);
+				listPanel.rightClickMenuItems.push(dataOverviewBtn);
+				
+				var exportExcelBtn:Object = {label:"资源模式导出",handler:exportExcelHandler,icon:AssetsFileLib.exportExcelIcon};
+				
+				
+				for each(var att:XML in attributesXml.attribute){
+					fieldNameMap[String(att.@name)] = String(att.@label);
+					if(String(att.@type) == "DATE"){//如果是DATE类型
+						fieldNameMap[String(att.@name).concat("_YEAR")] = String(att.@label).concat("（年）");
+						fieldNameMap[String(att.@name).concat("_MONTH")] = String(att.@label).concat("（月）");
+						fieldNameMap[String(att.@name).concat("_DAY")] = String(att.@label).concat("（日）");
+					}
+				}
+				
+				this.ruleConfXml = this.getExportRuleConfig(ruleCode);
+				
+				if(ruleConfXml != null ){
+					listPanel.operationList.addItem(exportExcelBtn);
+					listPanel.rightClickMenuItems.push(exportExcelBtn);
+				}
+				
+			}
+			
+			private function dataOverviewBtn_clickHandler():void{
+				PopUpManager.addPopUp(olapPanel,this.root,true);
+				PopUpManager.centerPopUp(olapPanel);
+				olapPanel.removeAllChildren();
+				createPivotComponent();
+				if(!olapPanel.contains(pivot)){
+					olapPanel.addChild(pivot);
+				}
+				pivot.percentHeight = 100;
+				pivot.percentWidth = 100;
+				pivot.refreshData();
+			}
+			
+			private function exportExcelHandler():void{
+				var modelMtCode:String = BAMConst.ENTITY_MODEL_MT_PREFIX+modelCode;
+				var entityMtCode:String =BAMConst.ENTITY_MT_PREFIX+modelCode+"_"+entityCode;
+				var ruleMtCode:String = BAMConst.ENTITY_MT_RULE_PREFEX+ruleCode;
+//				OperatingTipUtil.startOperat("正在导出....");
+				if(ruleConfXml != null ){
+					var detailPk:String = String(ruleConfXml.@detailPk);
+					var xlsViewPk:String = String(ruleConfXml.@xlsViewPk);
+					var excelmtcode:String = String(ruleConfXml.@excelmtcode);
+					var fileName:String = String(ruleConfXml.@fileName);
+					OperatingTipUtil.startOperat("正在导出....");
+					formService.excelExport2(excelmtcode,sql,detailPk,xlsViewPk,fileName+".zip",dataSource);
+				}
+//				bamService.generateEntitySqlOriginalDataByMtCode(entityMtCode,modelMtCode,ruleMtCode,null);
+			}
+			
+			private  function excelExport2Handler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var fileUrl:String = event.result as String;				
+				navigateToURL(new URLRequest(encodeURI(fileUrl)));
+			}
+			
+//			private function generateEntitySqlOriginalDataByMtCodeHandler(event:ResultEvent):void{
+//				OperatingTipUtil.endOperat();
+//				var detailSql:String = event.result as String;
+//				if(ruleConfXml != null ){
+//					var detailPk:String = String(ruleConfXml.@detailPk);
+//					var xlsViewPk:String = String(ruleConfXml.@xlsViewPk);
+//					var excelmtcode:String = String(ruleConfXml.@excelmtcode);
+//					var fileName:String = String(ruleConfXml.@fileName);
+//					OperatingTipUtil.startOperat("正在导出....");
+//					formService.excelExport2(excelmtcode,detailSql,detailPk,xlsViewPk,fileName+".zip",dataSource);
+//				}
+//			}
+			
+			private function getExportRuleConfig(ruleCode:String):XML{
+				var ruleConfXml:XML = null;
+				var confTemplate:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(DQCConst.RULECHECK_EXCELEXPORT_CONFIG);
+				if(confTemplate != null ){
+					var contentXml:XML = confTemplate.contentXML;
+					if(contentXml != null ){
+						for each(var itemXml:XML in contentXml.DataExport){
+							var tempRuleCode:String = String(itemXml.@ruleCheckCode);
+							if(!BAMUtil.isEmpty(tempRuleCode) && !BAMUtil.isEmpty(ruleCode) && tempRuleCode == ruleCode ){
+								ruleConfXml = itemXml;
+								break;
+							}
+						}
+					}
+				}
+				return ruleConfXml;
+			}
+			
+			private function createPivotComponent():void{
+				pivot = new BillPivotComponent();
+				pivot.addEventListener(BillPivotComponent.BUILDPIVOTCOMPONENT_FINISH,buildPivotComponentFinsishHandler);
+				pivot.fieldNameMap = fieldNameMap;
+				pivot.datasource = dataSource;
+				var columnStr:String = "rownum 行号";
+				for each(var itemXml:XML in attributesXml.attribute){
+					var name:String = String(itemXml.@name);
+					if(String(itemXml.@category) == BAMConst.ENTITY_ATT_CATEGORY_DICT){
+						name = EntityUtil.getDictColumnStr(itemXml);
+					}
+					if(BAMUtil.isEmpty(columnStr)){
+						if(!BAMUtil.isEmpty(name)){
+							columnStr = name;
+						}
+					}else{
+						if(!BAMUtil.isEmpty(name)){
+							columnStr = columnStr+","+name;
+						}
+					}
+				}
+				if(BAMUtil.isEmpty(columnStr)){
+					columnStr = " * ";
+				}
+				pivot.sql = "select "+columnStr+" from ("+sql+")";
+				olapConfigurationSharedObject = SharedObject.getLocal(BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_OLAP_CONFIGURATION);
+				if(olapConfigurationSharedObject.data.hasOwnProperty(sharedObjectCode)){
+					var config:Object = olapConfigurationSharedObject.data[sharedObjectCode];
+					pivot.rows = config.rows;
+					pivot.columns = config.columns;
+					pivot.measures = config.measures;
+					pivot.pages = config.pages;
+					pivot.showFieldList = false;
+				}
+				pivot.viewType = ViewType.GRID;
+				pivot.configuratorButton = true;
+				pivot.styleSheetName = "styles/cherry.css" ;
+				pivot.endpoint = endpoint;
+			}
+			
+			private function buildPivotComponentFinsishHandler(event:Event):void{
+				var rows:Array = pivot.pivotComponent.getRows();
+				var columns:Array = pivot.pivotComponent.getColumns();
+				var measures:Array = pivot.pivotComponent.getMeasures();
+				var filters:Array = pivot.pivotComponent.getPages();
+				olapConfigurationSharedObject = SharedObject.getLocal(BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_OLAP_CONFIGURATION);
+				var config:Object;
+				if(measures.length > 0){
+					if(olapConfigurationSharedObject.data.hasOwnProperty(sharedObjectCode)){
+						config = olapConfigurationSharedObject.data[sharedObjectCode];
+						config.rows = rows;
+						config.columns = columns;
+						config.measures = measures;
+						config.pages = filters;
+					}else{
+						config = {rows:rows,columns:columns,measures:measures,pages:filters};
+						olapConfigurationSharedObject.data[sharedObjectCode] = config;
+					}
+				}
+			}
+			
+			private function olapPanelCloseHandler():void{
+				PopUpManager.removePopUp(olapPanel);
+				pivot.destroy();
+			}
+			
+		]]>
+	</fx:Script>
+		<entity:EntityModelListPanel width="{this.width}" height="100%" id="listPanel" attributesXml="{attributesXml}" sharedObjectCode="{sharedObjectCode}"
+									 isQueryAfterCompleted="false" isVisibleFilter="true" sql="{sql}" dataSource="{dataSource}" isCreationComplete="{true}"
+									 sharedObjectSpaceName="{sharedObjectSpaceName}" debugMode="{debugMode}"
+									 countSQL="{countSQL}" expFileName="{expFileName}"
+									 />
+</SuperPanel>

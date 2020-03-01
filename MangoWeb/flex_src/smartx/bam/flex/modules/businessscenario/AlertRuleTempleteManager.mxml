@@ -1,0 +1,637 @@
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="900" height="558" 
+			allowDrag="true" allowClose="true" allowMaximize="false" 
+			allowMinimize="true" allowResize="false" fontSize="12" close="onClose()"
+			xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+			xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+			xmlns:core="smartx.flex.components.core.*"
+			xmlns:fx="http://ns.adobe.com/mxml/2009"
+			xmlns:comm="smartx.bam.flex.modules.common.*"
+			title="规则模板设计"
+			>
+
+	<fx:Declarations>
+		
+		<mx:VBox id="funVbox" width="100%" height="100%">
+			<mx:HBox width="100%" height="100%">
+				<mx:FormItem label="选择字段:" >
+					<mx:ComboBox id="funFieldChosseCbb"/>
+				</mx:FormItem>
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%">
+				<mx:Button id="countBtn" label="COUNT(*)" toolTip="求记录"/>
+				<mx:Button id="avgBtn" label="AVG(*)" toolTip="平均值"/>
+				<mx:Button id="sumBtn" label="SUM(*)" toolTip="求和"/>
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%">
+				<mx:Button id="maxBtn" label="MAX(*)" toolTip="最大值"/>
+				<mx:Button id="minBtn" label="MIN(*)" toolTip="最小值"/>
+				<mx:Button id="varianceBtn" label="VARIANCE(*)" toolTip="协方差"/>
+			</mx:HBox>
+			<mx:HBox width="100%" height="100%">
+				<mx:Button id="stddevBtn" label="STDDEV(*)" toolTip="标准差"/>
+				<mx:Button id="medianBtn" label="MEDIAN(*)" toolTip="中位数"/>
+			</mx:HBox>
+		</mx:VBox>
+		
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.Canvas;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.effects.Effect;
+			import mx.effects.EffectInstance;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			
+			[Bindable]
+			public var scenarioId:String;
+			
+			[Bindable]
+			public var templateId:String;
+			
+			[Bindable]
+			public var isEdit:Boolean;
+			
+			[Bindable]
+			private var columns:Array = new Array();
+			
+			[Bindable]
+			private var currentSimpleHashVO:SimpleHashVO = new SimpleHashVO();
+			
+			private var datagrid:DataGrid = new DataGrid();
+			
+			private var templetVO:TempletVO; 
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private function init():void{
+//				if(templetCode == null)
+//					throw Error("元原模板编号不能为null");
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				formService = new RemoteObject(destination);
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint!=null){
+					formService.endpoint = endpoint;
+					bamService.endpoint = endpoint;
+				}
+				
+				formService.getSequenceNextValByDS.addEventListener(ResultEvent.RESULT,getSequenceNextValByDSHandler);
+				formService.getSequenceNextValByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getRuleTempleteFields.addEventListener(ResultEvent.RESULT,getRuleTempleteFieldsHandler);
+				bamService.getRuleTempleteFields.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getRuleTemplateParaNames.addEventListener(ResultEvent.RESULT,getRuleTemplateParaNamesHandler);
+				bamService.getRuleTemplateParaNames.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getRuleTemplateData.addEventListener(ResultEvent.RESULT,getRuleTemplateDataHandler);
+				bamService.getRuleTemplateData.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getRuleEventData.addEventListener(ResultEvent.RESULT,getRuleEventDataHandler);
+				bamService.getRuleEventData.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getRuleTemplateParas.addEventListener(ResultEvent.RESULT,getRuleTemplateParasHandler);
+				bamService.getRuleTemplateParas.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.saveOrupdateRuleTemplate.addEventListener(ResultEvent.RESULT,saveOrupdateRuleTemplateHandler);
+				bamService.saveOrupdateRuleTemplate.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.isExist.addEventListener(ResultEvent.RESULT,isExistHandler);
+				bamService.isExist.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				if(!isEdit){	
+					formService.getSequenceNextValByDS(null,"s_bam_ruletemplate");
+				}
+				
+				this.initData();
+				
+			}
+			
+			private function initData():void{
+				
+				var arrayCollection:ArrayCollection = new ArrayCollection();
+				var obj1:Object = new Object();
+				obj1["value"]="0";
+				obj1["valuecn"]="高";
+				arrayCollection.addItem(obj1);
+				
+				var obj2:Object = new Object();
+				obj2["value"]="1";
+				obj2["valuecn"]="一般";
+				arrayCollection.addItem(obj2);
+				
+				var obj3:Object = new Object();
+				obj3["value"]="2";
+				obj3["valuecn"]="低";
+				arrayCollection.addItem(obj3);
+				
+				paraCbb4.dataProvider = arrayCollection;
+				
+				bamService.getRuleTempleteFields(scenarioId);
+				bamService.getRuleEventData(scenarioId);
+				
+				bamService.getRuleTemplateParaNames(templateId);
+				bamService.getRuleTemplateParas(templateId);
+				bamService.getRuleTemplateData(templateId);
+				
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			private function getSequenceNextValByDSHandler(event:ResultEvent):void{
+				this.templateId = event.result as String;
+			}
+			
+			private function getRuleTemplateParasHandler(event:ResultEvent):void{
+				
+				var arrayCollection:ArrayCollection = new ArrayCollection();
+				
+				var cols:Array = new Array();
+				var column:DataGridColumn = new DataGridColumn();
+				column.headerText = "描述";
+				column.dataField = "description";
+				column.editable = false;
+				cols = cols.concat(column);
+				
+				var column2:DataGridColumn = new DataGridColumn();
+				column2.headerText = "参数名";
+				column2.dataField = "name";
+				column2.editable = false;
+				cols = cols.concat(column2);
+				
+				var array:Array = event.result as Array;
+				for each(var simpleVO:SimpleHashVO in array){
+					arrayCollection.addItem(simpleVO.dataMap);
+				}
+				
+				dgstep3.columns = cols;
+				dgstep3.dataProvider = arrayCollection;
+			}
+			
+			private function getRuleTempleteFieldsHandler(event:ResultEvent):void{
+				var arrayCollection:ArrayCollection = new ArrayCollection();
+				var array:Array = event.result as Array;
+				for each(var key:String in array){
+					arrayCollection.addItem(key);
+					
+					var colWidth:Number = 890/array.length;
+					if(colWidth<150){
+						colWidth = 150;
+					}
+					
+					var column:DataGridColumn = new DataGridColumn();
+					column.headerText = key;
+					column.dataField = key;
+					column.width = colWidth;
+					column.editable = false;
+					columns = columns.concat(column);
+				}
+				
+				funPanel.dataProvider=arrayCollection;
+				funPanel2.dataProvider=arrayCollection;
+				
+				fieldCbb.dataProvider = arrayCollection;
+				fieldCbb2.dataProvider = arrayCollection;
+				
+				fieldCbb.selectedItem = null;
+				fieldCbb2.selectedItem = null;
+				
+				fieldChosseCbb.dataProvider = arrayCollection;
+				fieldChosseCbb2.dataProvider = arrayCollection;
+				
+				fieldChosseCbb.selectedItem = null;
+				fieldChosseCbb2.selectedItem = null;
+				
+				datagrid.columns = columns;
+				datagrid.percentHeight = 100;
+				datagrid.width = 890;
+				datagrid.horizontalScrollPolicy = "on";
+				
+			}
+			
+			private function getRuleTemplateParaNamesHandler(event:ResultEvent):void{
+				var arrayCollection:ArrayCollection = new ArrayCollection();
+				var array:Array = event.result as Array;
+				for each(var para:String in array){
+					arrayCollection.addItem(para);
+				}
+				
+				paraCbb.dataProvider=arrayCollection;
+				paraCbb2.dataProvider=arrayCollection;
+				
+				paraCbb.selectedItem = null;
+				paraCbb2.selectedItem = null;
+			}
+			
+			private function getRuleTemplateDataHandler(event:ResultEvent):void{
+				var array:Array = event.result as Array;
+				for each(var simpleVO:SimpleHashVO in array){
+					
+					currentSimpleHashVO = simpleVO;
+					
+					var obj:Object = simpleVO.dataMap;
+					
+					funPanel.textArea.text = obj["condition"];
+					holdtimeText1.text = obj["holdsfor"];
+					
+					funPanel2.textArea.text = obj["resetcondition"];
+					holdtimeText2.text = obj["resetholdsfor"];
+					templatenameTxt.text = obj["name"];
+					templatecodeTxt.text = obj["code"];
+					
+					var showcondition:String = obj["showcondition"];
+					if(showcondition=="1"){
+						isshowConditionCHK.selected = true;
+					}else{
+						isshowConditionCHK.selected = false;
+					}
+					
+					subjectTa.text = obj["subject"];
+					contentTa.text = obj["body"];
+					
+					var severity:String = obj["severity"];
+					var arrayCollection:ArrayCollection = paraCbb4.dataProvider as ArrayCollection;
+					for each(var tempObj:Object in arrayCollection.toArray()){
+						if(tempObj["value"]==severity){
+							paraCbb4.selectedItem = tempObj;
+						}
+					}
+					
+				}
+			}
+			
+			private function getRuleEventDataHandler(event:ResultEvent):void{
+				var arrayCollection:ArrayCollection = new ArrayCollection();
+				var array:Array = event.result as Array;
+				for each(var simpleVO:SimpleHashVO in array){
+					arrayCollection.addItem(simpleVO.dataMap);
+				}
+				
+				datagrid.dataProvider = arrayCollection;
+				step1hbox.addChild(datagrid);
+
+			}
+			
+			private function onClose():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+
+//			protected function nextStepBtn1_clickHandler(event:MouseEvent):void{
+//				bamService.getRuleTemplateParaNames(templateId);
+//				templeteStack.selectedChild = step2;
+//			}
+
+
+//			protected function lastStepBtn2_clickHandler(event:MouseEvent):void
+//			{
+//				bamService.getRuleTemplateParaNames(templateId);
+//				templeteStack.selectedChild = step1;
+//			}
+
+
+//			protected function nextStepBtn2_clickHandler(event:MouseEvent):void
+//			{
+//				bamService.getRuleTemplateParas(templateId);
+//				templeteStack.selectedChild = step3;
+//			}
+
+
+//			protected function lastStepBtn3_clickHandler(event:MouseEvent):void
+//			{
+//				templeteStack.selectedChild = step2;
+//			}
+
+
+//			protected function nextStepBtn3_clickHandler(event:MouseEvent):void
+//			{
+//				templeteStack.selectedChild = step4;
+//			}
+//
+//
+//			protected function lastStepBtn4_clickHandler(event:MouseEvent):void
+//			{
+//				templeteStack.selectedChild = step3;
+//			}
+
+
+			protected function cancelButton_clickHandler(event:MouseEvent):void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function closeFunctionHander():void{
+				bamService.getRuleTemplateParaNames(templateId);
+				bamService.getRuleTemplateParas(templateId);
+			}
+			
+			protected function operatorBtn_clickHandler(event:MouseEvent):void{
+				
+				var btn:Button = event.currentTarget as Button;
+				var btnId:String = btn.id;
+			}
+			
+			private function saveOrupdate():void{
+				
+				var obj:Object = new Object();
+				
+				obj["id"] = this.templateId;
+				obj["businessscenarioid"] = this.scenarioId;
+				obj["name"] = templatenameTxt.text;
+				obj["code"] = templatecodeTxt.text;
+				obj["condition"] = funPanel.textArea.text;
+				obj["holdsfor"] = holdtimeText1.text;
+				obj["resetcondition"] = funPanel2.textArea.text;
+				obj["resetholdsfor"] = holdtimeText2.text;
+				obj["showcondition"] = isshowConditionCHK.selected?"1":"0";
+				obj["subject"] = subjectTa.text;
+				obj["body"] = contentTa.text;
+				
+				var temp:Object = paraCbb4.selectedItem;
+				if(temp != null){
+					obj["severity"] = temp["value"];
+				}else{
+					obj["severity"] = "1";
+				}
+				
+				bamService.saveOrupdateRuleTemplate(obj);
+				
+			}
+			
+			private function saveAndClose():void{
+				saveOrupdate();
+				PopUpManager.removePopUp(this);
+			}
+			
+			private function saveOrupdateRuleTemplateHandler(event:ResultEvent):void{
+				Alert.show("保存成功!", '提示');
+			}
+
+
+			protected function fieldCbb_changeHandler(event:ListEvent):void
+			{
+				funPanel.textArea.text = funPanel.textArea.text+" "+ String(fieldCbb.selectedItem);
+				fieldCbb.selectedItem = null;
+			}
+
+
+			protected function paraCbb_changeHandler(event:ListEvent):void
+			{
+				funPanel.textArea.text = funPanel.textArea.text+" {"+ String(paraCbb.selectedItem)+"}";
+				paraCbb.selectedItem = null;
+			}
+
+
+			protected function fieldCbb2_changeHandler(event:ListEvent):void
+			{
+				funPanel2.textArea.text = funPanel2.textArea.text+" "+ String(fieldCbb2.selectedItem);
+				fieldCbb2.selectedItem = null;
+			}
+
+
+			protected function paraCbb2_changeHandler(event:ListEvent):void
+			{
+				funPanel2.textArea.text = funPanel2.textArea.text+" {"+ String(paraCbb2.selectedItem)+"}";
+				paraCbb2.selectedItem = null;
+			}
+
+
+			protected function parasManagerHandler(event:MouseEvent):void
+			{
+				bamService.isExist(templateId);
+			}
+			
+			protected function isExistHandler(event:ResultEvent):void{
+				var isexist:Boolean = event.result as Boolean;
+				if(isexist){
+					
+					var rpm:RuleParaManager = new RuleParaManager();
+					rpm.templetCode = "T_BAM_RULETEMPLATEPARAMETER";
+					rpm.templeteId = templateId;
+					rpm.debugMode = debugMode;
+					rpm.editable = true;
+					rpm.endpoint = endpoint;
+					rpm.initQueryCondition = " RULETEMPLATEID="+templateId;
+					rpm.closeFunctionHander = closeFunctionHander;
+					
+					PopUpManager.addPopUp(rpm,this,true);
+					PopUpManager.centerPopUp(rpm);
+					
+				}else{
+					
+					Alert.show("新建规则模板时需要先保存规则模板才可以添加参数!","提示");
+					
+				}
+			}
+			
+			protected function fieldChosseCbb_changeHandler(event:ListEvent):void
+			{
+				subjectTa.text = subjectTa.text+" {"+ String(fieldChosseCbb.selectedItem)+"}";
+				fieldChosseCbb.selectedItem = null;
+			}
+
+			protected function fieldChosseCbb2_changeHandler(event:ListEvent):void
+			{
+				contentTa.text = contentTa.text+" {"+ String(fieldChosseCbb2.selectedItem)+"}";
+				fieldChosseCbb2.selectedItem = null;
+			}
+
+
+			protected function functionBtn1_clickHandler(event:MouseEvent):void
+			{
+				var cv:Canvas = new Canvas();
+				cv.height = 350;
+				cv.width = 300;
+				
+				cv.addChild(funVbox);
+				
+			}
+
+			protected function lastStepBtn_clickHandler(event:MouseEvent):void
+			{
+				if(step4 == templeteStack.selectedChild){
+					templeteStack.selectedChild = step3;
+					nextStepBtn.enabled = true;
+					lastStepBtn.enabled = true;
+				}else if(step3 == templeteStack.selectedChild){
+					templeteStack.selectedChild = step2;
+					nextStepBtn.enabled = true;
+					lastStepBtn.enabled = true;
+				}else if(step2 == templeteStack.selectedChild){
+					bamService.getRuleTemplateParaNames(templateId);
+					templeteStack.selectedChild = step1;
+					nextStepBtn.enabled = true;
+					lastStepBtn.enabled = false;
+				}
+				
+			}
+			
+			protected function nextStepBtn_clickHandler(event:MouseEvent):void
+			{
+				if(step1 == templeteStack.selectedChild){
+					bamService.getRuleTemplateParaNames(templateId);
+					templeteStack.selectedChild = step2;
+					nextStepBtn.enabled = true;
+					lastStepBtn.enabled = true;
+				}else if(step2 == templeteStack.selectedChild){
+					templeteStack.selectedChild = step3;
+					nextStepBtn.enabled = true;
+					lastStepBtn.enabled = true;
+				}else if(step3 == templeteStack.selectedChild){
+					templeteStack.selectedChild = step4;
+					nextStepBtn.enabled = false;
+					lastStepBtn.enabled = true;
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox label="" width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}" 
+			 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%" id="cardButtonBox">
+			<mx:Button id="saveAndReturnButton" label="保存并关闭" toolTip="保存当前模板内容并关闭窗口" 
+					   click="saveAndClose()" icon="{AssetsFileLib.savereturnIcon}" />
+			<mx:Button id="cardSaveButton" label="保存" toolTip="保存当前模板内容" click="saveOrupdate()" 
+					   icon="{AssetsFileLib.saveIcon}" />
+			<mx:Button id="cancelButton" label="关闭" toolTip="关闭窗口" click="cancelButton_clickHandler(event)" 
+					   icon="{AssetsFileLib.closeIcon}" />
+		</mx:HBox>
+		<mx:HBox id="step1hbox" width="100%" height="85"/>
+		<mx:ViewStack width="100%" height="100%" id="templeteStack" creationPolicy="all">
+			
+			<mx:VBox width="100%" height="100%" id="step1">
+				<mx:Label text="激活模板配置" fontSize="13" fontWeight="bold"/>
+				<mx:Label id="labels1" text="激活条件:" />
+				<comm:FunctionPanel id="funPanel" width="100%" height="100%"/>
+				<mx:HBox width="100%" >
+					<mx:FormItem label="字段:"  >
+						<mx:ComboBox id="fieldCbb" change="fieldCbb_changeHandler(event)" toolTip="选择一个事件中的字段,该字段将加入到激活条件内容中" />
+					</mx:FormItem>
+					<mx:FormItem label="参数:"  >
+						<mx:ComboBox id="paraCbb" change="paraCbb_changeHandler(event)" toolTip="选择一个参数字段,该字段将加入到激活条件内容中"/>
+					</mx:FormItem>
+					<mx:Button id="addParaBtn" label="参数管理" click="parasManagerHandler(event)" toolTip="单点进入对该模板所有的参数进行管理" />
+				</mx:HBox>
+
+				<mx:HBox width="100%" >
+					<mx:Label text="持续时间(秒):" /><mx:TextInput id="holdtimeText1" restrict="\-,0-9"/>
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:VBox width="100%" height="100%" id="step2" >
+				<mx:Label text="重置模板配置" fontSize="13" fontWeight="bold"/>
+				<mx:Label id="labels2" text="重置条件:" />
+				<comm:FunctionPanel id="funPanel2" width="100%" height="100%"/>
+				<mx:HBox width="100%" >
+					<mx:FormItem label="字段:" >
+						<mx:ComboBox id="fieldCbb2"  change="fieldCbb2_changeHandler(event)" toolTip="选择一个事件中的字段,该字段将加入到重置条件内容中" />
+					</mx:FormItem>
+					<mx:FormItem label="参数:" >
+						<mx:ComboBox id="paraCbb2"  change="paraCbb2_changeHandler(event)" toolTip="选择一个参数字段,该字段将加入到重置条件内容中" />
+					</mx:FormItem>
+					<mx:Button id="addParaBtn2" label="参数管理" click="parasManagerHandler(event)" />
+				</mx:HBox>
+				
+				<mx:HBox width="100%" >
+					<mx:Label text="重置持续时间(秒):" /><mx:TextInput id="holdtimeText2" restrict="\-,0-9" />
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:VBox width="100%" height="100%" id="step3" >
+				<mx:Label text="规则配置结果" fontSize="13" fontWeight="bold"/>
+				<mx:Label text="激活条件:" />
+				<mx:TextArea id="activateCdtTxt" width="100%" height="100%" text="{funPanel.textArea.text}" toolTip="告警激活条件" />
+				<mx:Label text="重置条件:" />
+				<mx:TextArea id="resetCdtTxt" width="100%" height="100%" text="{funPanel2.textArea.text}" toolTip="告警重置条件" />
+				<mx:Label text="所需参数:" />
+				<mx:DataGrid id ="dgstep3" width="100%" height="110"/>
+				<mx:HBox width="100%" >
+					<mx:Label text="模板名称:" />
+					<mx:TextInput id="templatenameTxt" text="{'name'+templateId}" toolTip="输入模板名称" />
+					<mx:Label text="模板编码:" />
+					<mx:TextInput id="templatecodeTxt"  text="{'code'+templateId}" toolTip="输入模板编码" />
+					<mx:FormItem label="是否向模板用户显示条件:">
+						<mx:CheckBox id="isshowConditionCHK" selected="true" />
+					</mx:FormItem>
+				</mx:HBox>
+			</mx:VBox>
+			
+			<mx:VBox width="100%" height="100%" id="step4" >
+				<mx:Label text="告警模板配置" fontSize="13" fontWeight="bold"/>
+				<mx:FormItem label="重要程度:" required="true" >
+					<mx:ComboBox id="paraCbb4" labelField="valuecn"/>
+				</mx:FormItem>
+				<mx:HBox width="100%" >
+					<mx:Label text="主题:" />
+					<mx:HBox width="100%" horizontalAlign="right">
+						<mx:FormItem label="选择字段:" >
+							<mx:ComboBox id="fieldChosseCbb" change="fieldChosseCbb_changeHandler(event)" 
+										 toolTip="可选择一个字段做为参数加入到主题中,发送消息时将自动解析该参数" />
+						</mx:FormItem>
+					</mx:HBox>
+				</mx:HBox>
+				<mx:TextArea id="subjectTa" width="100%" height="100%" toolTip="输入告警消息主题" />
+				<mx:HBox width="100%" >
+					<mx:Label text="内容:" />
+					<mx:HBox width="100%" horizontalAlign="right">
+						<mx:FormItem label="选择字段:" >
+							<mx:ComboBox id="fieldChosseCbb2" change="fieldChosseCbb2_changeHandler(event)" 
+										 toolTip="可选择一个字段做为参数加入到内容中,发送消息时将自动解析该参数"/>
+						</mx:FormItem>
+					</mx:HBox>
+				</mx:HBox>
+				<mx:TextArea id="contentTa" width="100%" height="100%" toolTip="输入告警消息内容" />
+			</mx:VBox>
+			
+		</mx:ViewStack>
+		
+		<mx:HBox width="100%" horizontalAlign="right" >
+			<mx:Button id="lastStepBtn"  label="上一步" toolTip="返回上一步操作" enabled="false" 
+					   click="lastStepBtn_clickHandler(event)" icon="{AssetsFileLib.laststepIcon}"/>
+			<mx:Button id="nextStepBtn" label="下一步" toolTip="进入下一步操作" click="nextStepBtn_clickHandler(event)" 
+					   icon="{AssetsFileLib.nextstepIcon}" />
+		</mx:HBox>
+	</mx:VBox>
+</SuperPanel>

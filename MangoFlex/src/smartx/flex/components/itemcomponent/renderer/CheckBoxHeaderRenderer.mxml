@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXDataGridItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	xmlns:c="components.*"
+	focusEnabled="false" autoDrawBackground="false"
+	creationComplete="init()" xmlns:renderer="smartx.flex.components.itemcomponent.renderer.*">
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.IList;
+			import mx.controls.listClasses.ListBase;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			
+			private var partiallySelected:Boolean;
+			
+			protected function cb_changeHandler(event:Event):void
+			{
+				var grid:ListBase= owner as ListBase;
+				if(grid.dataProvider == null)
+				{
+					cb.enabled = false;
+					return;
+				}				
+				if (!(cb.selected))
+				{
+					grid.selectedIndex = -1;
+				}
+				else
+				{
+					var n:int = grid.dataProvider.length;
+					var arr:Array = [];
+					for (var i:int = 0; i < n; i++)
+					{
+						arr.push(i);
+					}
+					grid.selectedIndices = arr;
+				}
+			}
+			
+			private function init():void
+			{
+				var grid:ListBase= owner as ListBase;
+				grid.addEventListener(ListEvent.CHANGE, changeHandler);
+				grid.addEventListener(FlexEvent.VALUE_COMMIT, changeHandler);
+				IList(grid.dataProvider).addEventListener(CollectionEvent.COLLECTION_CHANGE, changeHandler);
+				
+			}
+			
+			private function changeHandler(event:Event):void
+			{
+				var grid:ListBase= owner as ListBase;
+				var items:Array = grid.selectedItems;
+				var count:int = items ? items.length : 0;
+				var len:int = grid.dataProvider.length;
+				cb.selected = count > 0 && len == count;
+				cb.enabled = count >= 0 && len > 0;
+				cb.partial = count > 0;
+				grid.enabled = len > 0;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<renderer:TriStateCheckBox id="cb" 
+		horizontalCenter="0" verticalCenter="0"
+		change="cb_changeHandler(event)"/>
+</s:MXDataGridItemRenderer>

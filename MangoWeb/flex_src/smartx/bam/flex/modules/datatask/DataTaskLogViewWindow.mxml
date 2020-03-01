@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="400" height="300"
+				creationComplete="init()" showCloseButton="true" title="执行日志查看"
+				close="PopUpManager.removePopUp(this)" xmlns:core="smartx.flex.components.core.*"
+				>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			protected var formService:RemoteObject;
+			[Bindable]
+			protected var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			public var taskCategory:String = "0";//必填,类别
+			
+			[Bindable]
+			public var initCondition:String = "1=1";
+			
+			public var dataTaskTemplateId:String;//任务模板ID
+			
+			private function init():void{
+				this.height = screen.height - 50;
+				this.width =  screen.width*2/3;		
+				
+				if(dataTaskTemplateId != "" || dataTaskTemplateId != null)
+					initCondition = " TASKCATEGORY="+ taskCategory+" and datatasktempletid="+dataTaskTemplateId;
+				else
+					initCondition = " TASKCATEGORY="+ taskCategory;
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				formService.getMessageByTaskId.addEventListener(ResultEvent.RESULT,getMessageByTaskIdHandler);
+				formService.getMessageByTaskId.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				listPanel.dataGrid.addEventListener(ListEvent.ITEM_CLICK,listPanel_clickHandler);
+				listPanel.query();
+			}
+			
+			protected function listPanel_clickHandler(event:ListEvent):void
+			{
+				var item:Object = listPanel.getSelectedRowValue();
+				if(item != null ){
+					var curTaskInsId:String = item["ID"];
+					formService.getMessageByTaskId(curTaskInsId);
+					OperatingTipUtil.startOperat("查询中...");
+				}
+			}
+			
+			private function getMessageByTaskIdHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var msgArr:Array = event.result as Array;
+				if(msgArr != null && msgArr.length>0 ){
+					for each(var sp:SimpleHashVO in msgArr){
+						execLogArea.text = sp.dataMap["execlog"];
+					}
+				}
+			}
+		]]>
+	</fx:Script>
+   <mx:HBox width="100%" height="100%" paddingBottom="3" paddingLeft="5" paddingRight="5" paddingTop="3">
+	<mx:VDividedBox id="msgVbox" label="任务日志" width="100%" height="100%">
+		<core:BillListPanel
+			allowMultipleSelection="{false}"
+			initQueryCondition="{initCondition}"
+			destination="{GlobalConst.SERVICE_FORM}" endpoint="{endpoint}" templetCode="T_V_PUB_DATATASKHIS" 
+			id="listPanel" editable="false" width="100%" height="100%" 
+			showEditBox="false" showDataAfterInit="{false}"
+			isShowAlert = "{false}" 
+			/>
+		<mx:VBox height="100%" width="100%">
+			<mx:HRule width="100%" />
+			<mx:TextArea width="100%" height="100%" text="" id="execLogArea" editable="false"/>
+		</mx:VBox>
+	 </mx:VDividedBox>
+   </mx:HBox>
+</mx:TitleWindow>

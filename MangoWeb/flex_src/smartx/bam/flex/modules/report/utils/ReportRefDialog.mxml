@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" 
+				width="400" height="300" fontSize="12" showCloseButton="true"
+				close="PopUpManager.removePopUp(this)">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.vo.TableDataStruct;
+			[Bindable]
+			private var compareItems:ArrayCollection = new ArrayCollection (
+				[
+					{label:"like",data:"like"},
+					{label:"==",data:"=="},
+					{label:">",data:">"},
+					{label:">=",data:">="},
+					{label:"<",data:"<"},
+					{label:"<=",data:"<="},
+					{label:"<>",data:"<>"}
+				]
+			);
+			[Bindable]
+			private var dataList:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var headerItems:ArrayCollection = new ArrayCollection();
+			
+			private var parentRefPanel:ReportRefPanel;
+			public var closeByConfirm:Boolean = false;
+			private var tableDataStruct:TableDataStruct;
+			public var refPK:String;
+			public var refCode:String;
+			public var refName:String;
+			private var tableBody:Array;
+			
+			//add by caohenghui 2011-07-29 --start
+			[Bindable]
+			public var allowMultipleSelection:Boolean = false;
+			
+			public var seletedItemsArray:ArrayCollection = new ArrayCollection();
+			
+			public static const itemId:String = "id";
+			public static const itemCode:String = "code";
+			public static const itemName:String = "name";
+			//add by caohenghui 2011-07-29 --end
+			
+			public function init(parentRefPanel:ReportRefPanel):void{
+				this.parentRefPanel = parentRefPanel;
+				parentRefPanel.formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				parentRefPanel.formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+				var sql:String = "select * from ("+parentRefPanel.str_realsql+") where rownum <= 1000";//限制1000条
+				parentRefPanel.formService.getTableDataStructByDS(parentRefPanel.str_datasourcename,sql);
+			}
+			
+			public function init2(formService:RemoteObject,realsql:String,datasource:String):void{
+				formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+				var sql:String = "select * from ("+realsql+") where rownum <= 1000";//限制1000条
+				formService.getTableDataStructByDS(datasource,sql);
+			}
+			
+			public function init3(headers:Array,tableBody:Array):void{
+				initDataGrid(headers,tableBody);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				tableDataStruct = event.result as TableDataStruct;
+				initDataGrid(tableDataStruct.table_header,tableDataStruct.table_body);
+			}
+			
+			private function initDataGrid(headers:Array,tableBody:Array):void{
+				//初始化搜索框和表头
+				for each(var header:String in headers){
+					if(header.charAt(header.length-1)!="#"){
+						headerItems.addItem({label:header,data:header});
+						var column:DataGridColumn = new DataGridColumn(header);
+						dataGrid.columns = dataGrid.columns.concat(column);
+					}	
+				}
+				//初始化数据
+				for each(var strRow:Array in tableBody){
+					var temp:Object = new Object();
+					for(var i:int=0;i<strRow.length;i++){
+						temp[headers[i]] = strRow[i];
+					}
+					temp["strRow"] = strRow;
+					dataList.addItem(temp);
+				}
+				//设置过滤函数
+				dataList.filterFunction = searchFilter;
+			}
+			
+			private function searchFilter(item:Object):Boolean{
+				if(conditionBox.selectedIndex>=0 && keyInput.text != ""){
+					var searchName:String = conditionBox.selectedItem.data as String;
+					var compareType:String = compareBox.selectedItem.data as String;
+					var itemValue:String = item[searchName] as String;
+					if(compareType == "like"){
+						if(itemValue.indexOf(keyInput.text,0)>=0)
+							return true;
+					}
+					else if(compareType == "=="){
+						if(itemValue == keyInput.text)
+							return true;
+					}
+					else if(compareType == ">"){
+						if(itemValue > keyInput.text)
+							return true;
+					}
+					else if(compareType == ">="){
+						if(itemValue >= keyInput.text)
+							return true;
+					}
+					else if(compareType == "<"){
+						if(itemValue < keyInput.text)
+							return true;
+					}
+					else if(compareType == "<="){
+						if(itemValue <= keyInput.text)
+							return true;
+					}
+					else if(compareType == "<>"){
+						if(itemValue != keyInput.text)
+							return true;
+					}
+					return false;
+				}
+				return true;
+			}
+			
+			public function search():void{
+				dataList.refresh();
+			}
+			public function close(isConfirm:Boolean):void{
+				if(isConfirm){
+					if(allowMultipleSelection){
+						var array:Array = dataGrid.selectedItems;
+						if(array == null || array.length ==0 ){
+							Alert.show("请选择一行数据！","错误");
+							return;
+						}
+						seletedItemsArray.removeAll();
+						for each(var obj:Object in array){
+							
+							var item:Object = new Object();
+							
+							item[itemId] = obj["strRow"][0];
+							item[itemCode] = obj["strRow"][1];
+							item[itemName] = obj["strRow"][2];
+							
+							seletedItemsArray.addItem(item);
+						}
+					}else{
+						
+						if(dataGrid.selectedIndex<0){
+							Alert.show("请选择一行数据！","错误");
+							return;
+						}
+						refPK = dataGrid.selectedItem["strRow"][0];//tableBody[dataGrid.selectedIndex][0];
+						refCode = dataGrid.selectedItem["strRow"][1];//tableBody[dataGrid.selectedIndex][1];
+						refName = dataGrid.selectedItem["strRow"][2];//tableBody[dataGrid.selectedIndex][2];
+						
+					}
+				}
+				closeByConfirm = isConfirm;
+				PopUpManager.removePopUp(this);
+				dispatchEvent(new CloseEvent(CloseEvent.CLOSE));
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" horizontalAlign="center">
+		<mx:ComboBox width="150" id="conditionBox" dataProvider="{headerItems}"/>
+		<mx:ComboBox width="50" dataProvider="{compareItems}" id="compareBox"/>
+		<mx:TextInput width="95" id="keyInput" text="" keyUp="search()"/>
+	</mx:HBox>
+	<mx:Spacer height="3"/>
+	<mx:DataGrid width="100%" height="100%" id="dataGrid" dataProvider="{dataList}" doubleClickEnabled="true" doubleClick="close(true)" allowMultipleSelection="{allowMultipleSelection}" />
+	<mx:HBox width="100%" horizontalAlign="center">
+		<mx:Button label="确定" click="close(true)"/>
+		<mx:Button label="取消" click="close(false)"/>
+	</mx:HBox>
+	
+</mx:TitleWindow>

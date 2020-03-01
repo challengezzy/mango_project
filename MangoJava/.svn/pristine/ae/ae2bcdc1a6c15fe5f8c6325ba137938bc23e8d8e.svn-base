@@ -1,0 +1,105 @@
+package smartx.publics.datatask.cluster;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.log4j.Logger;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaLogger;
+
+/**
+ *@author zzy
+ *@date Jul 23, 2012
+ **/
+public class DataExtractUtil {
+	
+	private Logger logger = NovaLogger.getLogger(this.getClass());	
+	private CommDMO dmo = new CommDMO();
+	
+	private String INDEX_PREFIX = "I";//索引命名前缀
+	
+	//生成源表的临时HASHTABLE表名
+	public String getTempHashTableName(String toTable) throws Exception{
+		String mapTableName = "HT_" + toTable.toUpperCase();
+		if(mapTableName.length() > 27)
+			mapTableName = mapTableName.substring(0, 27);
+		
+		return mapTableName;
+	}
+	
+	/**
+	 * HASHTABLE表名生成，按照一定规则 H_加上表名，如果超过28位，则只截取前28位
+	 * @param toTable
+	 * @return
+	 * @throws Exception
+	 */
+	public String getHashTableName(String toTable) throws Exception{
+		String mapTableName = "H_" + toTable.toUpperCase();
+		if(mapTableName.length() > 27)
+			mapTableName = mapTableName.substring(0, 27);
+		
+		logger.info("【"+toTable+"】对应的HashValueMap表为【"+mapTableName+"】");
+		return mapTableName;
+	}
+	
+	public void createHashTable(String tods,String toTable,String pkColumns[],String pkColumntypes[],String tableName) throws Exception{
+		StringBuilder sb = new StringBuilder("create table ").append(tableName).append(" (contenthashvalue varchar2(127)");
+		for(int i=0;i<pkColumns.length;i++){
+			sb.append(",").append(pkColumns[i]).append(" ").append(pkColumntypes[i]);
+		}
+		sb.append(")");
+		//String buildTableSql = "create table " + tableName + "" + toPkColumn + " " + pkColumntype + ")";
+		dmo.executeUpdateByDS(tods, sb.toString());
+		logger.info("创建源数据的HashValueMap表【"+tableName+"】成功");
+	}
+	
+	//判断表在数据库中是否存在
+	public boolean isTableExists(String ds,String tableName) throws Exception{
+		String sql = "select 1 from user_tables t where table_name = ?";
+		HashVO[] vos = dmo.getHashVoArrayByDS(ds, sql, tableName);
+		if(vos.length > 0){//表存在
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	public void dropTable(String ds,String tableName) throws Exception{
+		String sql = "select 1 from user_tables t where table_name = ?";
+		HashVO[] vos = dmo.getHashVoArrayByDS(ds, sql, tableName);
+		if(vos.length > 0){//表存在
+			sql = "drop table " + tableName;
+			dmo.executeUpdateByDS(ds, sql);
+			
+		}
+	}
+	
+	public void addHashTableIndex(String tods,String hashTableName,String pkColumns[]) throws Exception{
+		List<String> sqls = new ArrayList<String>();
+		sqls.add("create index " + INDEX_PREFIX + hashTableName + " on " + hashTableName + " (CONTENTHASHVALUE)");
+		for(int i=0;i<pkColumns.length;i++){
+			sqls.add("create index " + INDEX_PREFIX + (i+1) + hashTableName + " on " + hashTableName + " ("+pkColumns[i]+")");
+		}
+		
+		dmo.executeBatchByDS(tods, sqls);
+		
+		dmo.executeUpdateByDS(tods, "ANALYZE TABLE "+hashTableName+" COMPUTE STATISTICS");
+		logger.info("对HashValueMap表【"+hashTableName+"】添加索引成功！");
+	}
+
+	//将临时HASHTABLE表，变为正式的HashTable表,重命名表和索引
+	public void updateHashValueTable(String tods,String tempHashTable,String hashTableName,String pkColumns[]) throws Exception{
+		List<String> sqls = new ArrayList<String>();
+		sqls.add("DROP TABLE "+ hashTableName);
+        sqls.add( "ALTER TABLE "+tempHashTable+" RENAME TO "+hashTableName);
+        
+        sqls.add( "ALTER INDEX " +INDEX_PREFIX+tempHashTable+" RENAME TO "+INDEX_PREFIX+hashTableName+"");
+        for(int i=0;i<pkColumns.length;i++){
+        	sqls.add( "ALTER INDEX " +INDEX_PREFIX +(i+1)+tempHashTable+" RENAME TO "+INDEX_PREFIX +(i+1)+hashTableName+"");
+        }
+        
+        dmo.executeBatchByDS(tods, sqls);
+	}
+}

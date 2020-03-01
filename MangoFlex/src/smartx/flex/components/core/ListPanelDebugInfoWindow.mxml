@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" fontSize="12" width="400" height="400" showCloseButton="true" layout="vertical" title="调试信息" close="{PopUpManager.removePopUp(this)}" initialize="init()">
+   	<mx:Script>
+        <![CDATA[
+        	import smartx.flex.components.event.BillListPanelEvent;
+        	import mx.managers.PopUpManager;
+        	internal var listPanel:BillListPanel;
+        	private function init():void{
+        		if(listPanel == null)
+        			throw new Error("必须指定listPanel属性");
+        		listPanel.addEventListener(BillListPanelEvent.QUERY_START,refresh);
+        		refresh(null);
+        	}
+        	
+        	private function refresh(event:BillListPanelEvent):void{
+        		queryStartTimestampText.text = String(listPanel.queryStartTimestamp);
+        		queryTimeText.text = listPanel.queryTime+"s";
+        		useCacheText.text = listPanel.useCache.toString();
+        		sqlText.text = listPanel.sql;
+        		templetName.text = listPanel.templetCode;
+        	}
+         ]]>
+    </mx:Script>
+   	<mx:HBox width="100%">
+   		<mx:Label text="元原模板编码："/>
+   		<mx:Text id="templetName" width="100%"/>
+   	</mx:HBox>
+   	<mx:HBox width="100%">
+   		<mx:Label text="上次查询时间："/>
+   		<mx:Text id="queryStartTimestampText" width="100%"/>
+   	</mx:HBox>
+   	<mx:HBox width="100%">
+   		<mx:Label text="上次查询耗时："/>
+   		<mx:Text id="queryTimeText" width="100%"/>
+   	</mx:HBox>
+   	<mx:HBox width="100%">
+   		<mx:Label text="是否使用缓存："/>
+   		<mx:Text id="useCacheText" width="100%"/>
+   	</mx:HBox>
+   	<mx:HBox width="100%">
+   		<mx:Label text="SQL语句："/>
+   		<mx:Text id="sqlText" width="100%"/>
+   	</mx:HBox>
+</mx:TitleWindow>
+

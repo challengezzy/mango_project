@@ -1,0 +1,151 @@
+/**************************************************************************
+ * $RCSfile: DataBatchDefine.java,v $  $Revision: 1.3 $  $Date: 2007/08/20 02:49:15 $
+ ***************************************************************************/
+package smartx.publics.databatch.bs;
+
+import java.util.List;
+import java.io.Serializable;
+
+/**
+ * <p>Title: 上传配置文件定义bean</p>
+ * <p>Description: NOVA </p>
+ * <p>Copyright: Copyright (c) 2007</p>
+ * <p>Company: Gxlu inc., rm2 </p>
+ * @author Yang Huan
+ * @version 1.0
+ */
+public class  DataBatchDefine implements Serializable
+{
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 4111406825716513123L;
+	
+	private String		tableName;
+	private boolean		hasTitle;
+	private int			colCount;
+	private String  	showMessage;
+  	
+	private String[]	columnName;
+	private int[]		columnNum;
+	private String[]	type;
+	private boolean[]	isConstraint;
+	private List		function;
+	private List		formula;
+	
+	public DataBatchDefine()
+	{
+		this.tableName = null;
+		this.hasTitle = true;
+		this.colCount = 0;
+		this.showMessage = null;
+		
+		this.columnName = null;
+		this.columnNum = null;
+		this.type = null;
+		this.isConstraint = null;
+		this.function = null;
+		this.formula = null;
+	}
+    
+	public DataBatchDefine(String in_tableName)
+	{
+		this();
+		setTableName(in_tableName);
+	}
+	
+	public void setTableName(String in_tableName){
+		this.tableName = in_tableName;
+	}
+	
+	public void setHasTitle(boolean in_hastitle){
+		this.hasTitle = in_hastitle;
+	}
+	
+	public void setColCount(int in_colCount){
+		this.colCount = in_colCount;
+	}
+	
+	public void setShowMessage(String in_showMessage){
+		this.showMessage = in_showMessage;
+	}
+	
+	public void setColumnName(String[] in_columnName){
+		this.columnName = in_columnName;
+	}
+	
+	public void setColumnNum(int[] in_columnNum){
+		this.columnNum = in_columnNum;
+	}
+	
+	public void setType(String[] in_type){
+		this.type = in_type;
+	}
+	
+	public void setIsConstraint(boolean[] in_isConstraint){
+		this.isConstraint = in_isConstraint;
+	}
+	
+	public void setFunction(List in_function){
+		this.function = in_function;
+	}
+	
+	public void setFormula(List in_formula){
+		this.formula = in_formula;
+	}
+	
+	public String getTableName(){
+		return this.tableName;
+	}
+	
+	public boolean hasTitle(){
+		return  this.hasTitle;
+	}
+	
+	public int getColCount(){
+		return  this.colCount;
+	}
+	
+	public String getShowMessage(){
+		return this.showMessage;
+	}
+	
+	public String[] getColumnName(){
+		return this.columnName;
+	}
+	
+	public int[] getColumnNum(){
+		return this.columnNum;
+	}
+	
+	public String[] getType(){
+		return this.type;
+	}
+	
+	public boolean[] getIsConstraint(){
+		return this.isConstraint;
+	}
+	
+	public List getFunction(){
+		return this.function;
+	}
+	
+	public List getFormula(){
+		return this.formula;
+	}
+	
+}
+
+/************************************************************************
+ * $RCSfile: DataBatchDefine.java,v $  $Revision: 1.3 $  $Date: 2007/08/20 02:49:15 $
+ * $Log: DataBatchDefine.java,v $
+ * Revision 1.3  2007/08/20 02:49:15  yanghuan
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/08/17 06:22:42  yanghuan
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/08/15 01:53:58  yanghuan
+ * *** empty log message ***
+ *
+ *************************************************************************/

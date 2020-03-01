@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   creationComplete="module1_creationCompleteHandler(event)"
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%" xmlns:olap="smartx.flex.components.core.olap.*">
+	<fx:Script>
+		<![CDATA[
+			import com.flexmonster.pivot.view.ViewType;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			protected function module1_creationCompleteHandler(event:FlexEvent):void
+			{
+				var fieldNameMap:Object = new Object();
+				fieldNameMap["年"] = "年";
+				fieldNameMap["月"] = "月";
+				fieldNameMap["日"] = "日";
+				
+				fieldNameMap["操作"] = "操作";
+				fieldNameMap["操作者"] = "操作者";
+				fieldNameMap["操作次数"] = "操作次数";
+				
+				fieldNameMap["操作日期"] = "D+操作日期";
+				fieldNameMap["数值"] = "n+数值";
+				
+				//var sql:String = "select substr(actiondate,1,4)||'年' 年,substr(actiondate,5,2)||'月' 月,substr(actiondate,7,2)||'日' 日,t.source 操作者,t.operation 操作,count(1) 操作次数 from (select l.*, to_char(l.time, 'yyyymmdd') actiondate from pub_log l) t group by actiondate, source, operation order by actiondate"
+				var sql:String = "select actiondate 操作日期,t.source 操作者,t.operation 操作,1 数值,count(1) 操作次数 "
+						+"  from (select l.*, to_char(l.time, 'MM/DD/YYYY') actiondate from pub_log l) t"
+						+" group by actiondate, source, operation order by actiondate";
+				
+				pivotComponent.sql = sql;
+				pivotComponent.fieldNameMap = fieldNameMap;
+				pivotComponent.pages = new ArrayCollection().toArray();
+				pivotComponent.refreshData();
+				
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<olap:BillPivotComponent
+		 id="pivotComponent"
+		 width="100%"
+		 height="100%"
+		 rows="{[{uniqueName: '[操作者].[操作者]'}]}"
+		 columns="{[{uniqueName: '[操作日期].[操作日期]'},{uniqueName: '[Measures]'}]}"
+		 measures="{[{uniqueName:'[Measures].[操作次数]',aggregation:'SUM'}]}"
+		 viewType="{ViewType.GRID}"
+		 chartType="pie"
+		 configuratorButton="true"
+		 styleSheetName="styles/cherry.css"
+		 />
+</mx:Module>

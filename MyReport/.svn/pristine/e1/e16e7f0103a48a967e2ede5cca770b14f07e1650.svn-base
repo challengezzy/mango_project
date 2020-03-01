@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="100%">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import myreport.data.chart.ChartData;
+			private var _Data:ChartData;
+			private var _Source:ArrayCollection;
+			public function set Data(value:ChartData):void
+			{
+				_Data = value;
+				_Source = new ArrayCollection();
+				for each(var c:uint in _Data.Colors)
+				{
+					_Source.addItem({Value:c});
+				}
+				_Colors.dataProvider = _Source;
+ 
+			}
+			private function IndexColumnFunc(item:Object, column:DataGridColumn):String
+			{
+				var values:ArrayCollection = _Colors.dataProvider as ArrayCollection;
+				if(!values)
+					return "";
+				var index:int = values.getItemIndex(item)+1;
+				return index.toString();
+			}
+			
+			private function ColorSelectionChanged():void
+			{
+				_Delete.enabled =
+					_MoveUp.enabled = 
+					_MoveDown.enabled = 
+					_Colors.selectedItem!=null;
+ 
+			}
+			public function SetValues():void
+			{
+				_Data.Colors = new Array();
+				for each(var item:Object in _Source)
+				{
+					_Data.Colors.push(item.Value);
+				}
+			}
+			private function AddValue():void
+			{
+				var values:ArrayCollection = _Colors.dataProvider as ArrayCollection;
+				if(values)
+					values.addItem({Value:_Color.selectedColor});
+			}
+			private function DeleteValue():void
+			{
+				if(!_Colors.selectedItem)
+					return;
+				var values:ArrayCollection = _Colors.dataProvider as ArrayCollection;
+				var index:int = values.getItemIndex(_Colors.selectedItem);
+				if(index>=0)
+					values.removeItemAt(index);
+			}
+			private function MoveUp():void
+			{
+				if(!_Colors.selectedItem)
+					return;
+				
+				var values:ArrayCollection = _Colors.dataProvider as ArrayCollection;
+				var index:int = values.getItemIndex(_Colors.selectedItem);
+				if(index>0)
+				{
+					var item:Object = values[index-1];
+					values.setItemAt(_Colors.selectedItem, index-1);
+					values.setItemAt(item, index);
+					_Colors.selectedItem = values[index-1];
+				}
+			}
+			private function MoveDown():void
+			{
+				if(!_Colors.selectedItem)
+					return;
+				
+				var values:ArrayCollection = _Colors.dataProvider as ArrayCollection;
+				var index:int = values.getItemIndex(_Colors.selectedItem);
+				if(index<values.length - 1)
+				{
+					var item:Object = values[index+1];
+					values.setItemAt(_Colors.selectedItem, index+1);
+					values.setItemAt(item, index);
+					_Colors.selectedItem = values[index+1];
+				}
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" horizontalAlign="right" verticalAlign="middle">
+		<mx:Label text="请选择颜色："/>
+		<mx:ColorPicker id="_Color"/>	
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:DataGrid id="_Colors" width="100%" height="100%" change="ColorSelectionChanged()">
+		<mx:columns>
+			<mx:DataGridColumn width="36" headerText="序号" editable="false" sortable="false" labelFunction="IndexColumnFunc"/>
+			<mx:DataGridColumn headerText="颜色" sortable="false" itemRenderer="myreport.design.chart.ColorItemRender"/>
+		</mx:columns>
+	</mx:DataGrid>
+	<mx:VBox>
+		<mx:Button label="添加" click="AddValue()"/>
+		<mx:Button id="_Delete" label="删除" click="DeleteValue()"/>
+		<mx:Button id="_MoveUp" label="上移" click="MoveUp()"/>
+		<mx:Button id="_MoveDown" label="下移" click="MoveDown()"/>
+	</mx:VBox>	
+	</mx:HBox>
+
+</mx:VBox>

@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		   initialize="init()" label="{titleName}" >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.events.ListEvent;
+			import mx.events.ResizeEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			
+			[Bindable]
+			private var titleName:String;
+			
+			[Bindable]
+			private var columns:Array = new Array();
+			
+			[Bindable]
+			public var mtcode:String;
+			
+			[Bindable]
+			public var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			public var deskTopFrame:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var metadataTemplet:MetadataTemplet;
+			
+			private var userMetadataTemplet:MetadataTemplet;
+			
+			private var destination:String = "smartXBAMService";
+			
+			private var bamService:RemoteObject;
+			
+			private var tableName:String;
+			
+			private var columnNubmer:int;
+			
+			private var refreshInterval:uint;
+			
+			private var orderByColumn:String;
+			
+			private var timer:Timer;
+			
+			private var username:String;
+			
+			private function init():void{		
+				if(mtcode ==null){
+					throw Error("元原数据模板编号不能为null");
+				}
+				username = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME) as String;
+				metadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+				
+				userMetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet("MT_ACCOUNTSET_"+username);
+				
+				var contentXml:XML = metadataTemplet.contentXML;
+				
+				var xmlList:XMLList = contentXml.columns;
+				
+				tableName = xmlList.@table;
+				titleName = xmlList.@title;
+				var rownumb:String = xmlList.@columnnumber;
+				var refreshInt:String = xmlList.@refreshinterval;
+				
+				if(refreshInt == null ||refreshInt==""){
+					refreshInterval=120000;
+				}else{
+					refreshInterval = parseInt(refreshInt);
+				}
+				
+				if(rownumb == null ||rownumb==""){
+					columnNubmer=20;
+				}else{
+					columnNubmer = parseInt(rownumb);
+				}
+				
+				
+				if(userMetadataTemplet !=null){
+					var userContentXml:XML = userMetadataTemplet.contentXML;
+					if(userContentXml !=null){
+						refreshInt = userContentXml["dashbord-refresh-interval"];
+						if(refreshInt.match("[0-9].*")){
+							refreshInterval = parseInt(refreshInt);
+						}
+						var col:String = userContentXml["alert-row-count"];
+						if(col.match("[0-9].*")){
+							columnNubmer = parseInt(col);
+						}
+					}
+				}
+				
+				
+				orderByColumn =xmlList.@orderByColumn;
+				
+				for each(var xml:XML in contentXml.columns.column){
+					var column:DataGridColumn = new DataGridColumn();
+					column.headerText = xml.@label;
+					column.dataField = String(xml.@datafield).toLowerCase();
+					column.editable = false;
+					columns = this.columns.concat(column);
+				}
+				
+				bamService = new RemoteObject(destination);
+				bamService.endpoint = endpoint;
+				
+				bamService.getPageDataGridVOS.addEventListener(ResultEvent.RESULT,getPageDataGridVOSHandler);
+				bamService.getPageDataGridVOS.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getMenuIdbyMenuCode.addEventListener(ResultEvent.RESULT,getMenuIdbyMenuCodeHandler);
+				bamService.getMenuIdbyMenuCode.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.getPageDataGridVOS(tableName,String(columnNubmer),orderByColumn,username);
+				
+				timer = new Timer(refreshInterval);
+				timer.addEventListener(TimerEvent.TIMER,timerHandler);
+				timer.start();
+				
+			}
+			private function getPageDataGridVOSHandler(event:ResultEvent):void{
+				var arrayCollection:ArrayCollection = new ArrayCollection();
+				var array:Array = event.result as Array;
+				for each(var simpleVO:SimpleHashVO in array){
+					arrayCollection.addItem(simpleVO.dataMap);
+				}
+				pageDataGrid.dataProvider=arrayCollection;
+				//	pageDataGrid.invalidateDisplayList();
+				
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			public function refresh():void{
+				bamService.getPageDataGridVOS(tableName,String(columnNubmer),orderByColumn,username);
+			}
+			
+			public function startAutoRefresh():void{
+				if(timer && !timer.running){
+					timer.start();
+					Alert.show("自动刷新【任务信息】已启动","提示");
+				}
+			}
+			
+			public function stopAutoRefresh():void{
+				if(timer && timer.running){
+					timer.stop();
+					Alert.show("自动刷新【任务信息】已停止","提示");
+				}
+			}
+			
+			public function startAutoRefreshNoAlert():void{
+				if(timer && !timer.running){
+					timer.start();
+				}
+			}
+			
+			public function stopAutoRefreshNoAlert():void{
+				if(timer && timer.running){
+					timer.stop();
+				}
+			}
+			
+			private function timerHandler(event:TimerEvent):void{
+				if(timer && timer.running){
+					refresh();
+				}
+			}
+			
+			public function openTaskManagerPanel():void{
+				bamService.getMenuIdbyMenuCode("MENU_TASKMANAGEMENT");
+			}
+			
+			private function getMenuIdbyMenuCodeHandler(event:ResultEvent):void{
+				var menuId:int = event.result as int;
+				if(deskTopFrame != null){
+					deskTopFrame.openMenuFrame(menuId);		
+				}
+			}
+			
+			public function isRunning():Boolean{
+				return timer.running;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%">
+		<!--<util:PageDataGrid id="pageDataGrid" mygridcolumns="{columns}" width="100%" height="100%"/>-->
+		<mx:DataGrid id="pageDataGrid" columns="{columns}" width="100%" height="100%">
+		</mx:DataGrid>
+	</mx:VBox>
+</mx:Canvas>

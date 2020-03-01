@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:containers="flexlib.containers.*" 
+				creationComplete="init()"
+				rollOut="doZoom(event)" rollOver="doZoom(event)"
+				mouseUpEffect="{effect}"
+				scaleX="1" scaleY="1"
+				mouseOver="canvas1_mouseOverHandler(event)" mouseOut="canvas1_mouseOutHandler(event)"
+			 	toolTip="{labelName}" >
+	<fx:Declarations>
+		<mx:Zoom id="zoomAll" zoomWidthTo="1.05" zoomHeightTo="1.05" zoomWidthFrom="1" zoomHeightFrom="1"  />
+	</fx:Declarations>
+	<fx:Metadata>		       
+		[Event(name='itemClick',type='mx.events.MenuEvent')]
+	</fx:Metadata>
+	<fx:Style>
+		@namespace util "smartx.flex.components.util.*";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace ns1 "flexlib.containers.*";
+		@namespace ns2 "com.esri.solutions.flexviewer.components.*";
+		@namespace portal "smartx.flex.components.basic.portal.*";
+		@namespace controls "flexlib.controls.*";
+		.menuLabelColor
+		{
+			color:#ffffff;
+		}
+	</fx:Style>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Menu;
+			import mx.core.UIComponent;
+			import mx.effects.Effect;
+			import mx.effects.Glow;
+			import mx.effects.Rotate;
+			import mx.events.MenuEvent;
+			
+			[Bindable]
+			public var dataMenuCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			public var imageUrl:String;
+			
+			[Bindable]
+			public var imageLabelColor:String;
+			
+			[Bindable]
+			public var labelName:String;
+			
+			[Bindable]
+			public var menuLabelField:String
+			
+			[Bindable]
+			public var menuItem:Object;
+			
+			[Bindable]
+			public var openMenuHandler:Function = function(menuId:int,dataValue:Object=null):void{
+				
+			};
+			
+			private var menu:Menu;
+			
+			[Bindable]
+			private var effect:Glow;
+			
+			private var isOpening:Boolean = false;
+			
+			
+			private function init():void{
+				
+				effect = new Glow();
+				effect.color = 0xFFFFFF;
+				effect.alphaFrom = 1;
+				effect.alphaTo = 0;
+				effect.blurXFrom = 0;
+				effect.blurXTo = 100;
+				effect.blurYFrom = 0;
+				effect.blurYTo = 100;
+				
+				if(dataMenuCol != null ){
+					menu = Menu.createMenu(this,dataMenuCol,true);
+					menu.addEventListener(MenuEvent.ITEM_CLICK,menuItemClickHandler);
+					menu.addEventListener(MouseEvent.MOUSE_OVER,menuItemMouseOverHandler);
+					menu.setStyle("fontSize",12);
+					menu.labelField = menuLabelField;
+				}
+			}
+			
+			protected function image_clickHandler(event:MouseEvent):void{
+				clickMenuRoot();
+			}
+			
+			protected function label_clickHandler(event:MouseEvent):void{
+				clickMenuRoot();
+			}
+			
+			private function clickMenuRoot():void{
+				if(!isOpening){
+					isOpening = true;
+					if(dataMenuCol == null || dataMenuCol.length < 0 ){
+						dispatchEvent(new MenuEvent(MenuEvent.ITEM_CLICK,false,true,null,null,menuItem));
+					}else{
+						if(menu != null){
+							menu.hide();
+							menu.dataProvider = dataMenuCol;
+							var point:Point = new Point(0,this.height);
+							point = localToGlobal(point);  
+							var xx:Number = point.x;
+							var yy:Number = point.y;
+							menu.show(xx,yy);
+						}
+					}
+					isOpening = false;
+				}
+
+			}
+			
+			private function menuItemClickHandler(event:MenuEvent):void{
+				dispatchEvent(event);
+			}
+			
+			private function menuItemMouseOverHandler(event:MouseEvent):void{
+				
+			}
+			
+			protected function imgBox_mouseOverHandler(event:MouseEvent):void
+			{
+				// TODO Auto-generated method stub
+				
+			}
+			
+			protected function canvas1_mouseOverHandler(event:MouseEvent):void
+			{
+				sprite.graphics.clear();
+				sprite.graphics.beginFill(0x0099CC,0.3);
+				sprite.graphics.drawRect(0,0,this.width,this.height);
+				sprite.graphics.endFill();
+			}
+			
+			protected function canvas1_mouseOutHandler(event:MouseEvent):void
+			{
+				sprite.graphics.clear();
+			}
+			
+			protected function sprite_clickHandler(event:MouseEvent):void
+			{
+				clickMenuRoot();
+			}
+			
+			protected function imgBox_clickHandler(event:MouseEvent):void{
+				clickMenuRoot();
+			}
+			
+			private function doZoom(event:MouseEvent):void {
+				if (zoomAll.isPlaying) {
+					zoomAll.reverse();
+				}
+				else {
+					zoomAll.play([event.target], event.type == MouseEvent.ROLL_OUT ? true : false);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:UIComponent id="sprite" buttonMode="true" click="sprite_clickHandler(event)" toolTip="{labelName}"/>
+		<mx:VBox id="imgBox" width="100%" height="100%" horizontalAlign="center" verticalAlign="middle" click="imgBox_clickHandler(event)" mouseOver="imgBox_mouseOverHandler(event)" >
+			<mx:Image source="{imageUrl}" buttonMode="true" horizontalAlign="center" click="image_clickHandler(event)" toolTip="{labelName}" />
+			<mx:Label text="{labelName}" styleName="menuLabelColor" fontSize="12" height="20" width="100%" buttonMode="true" textAlign="center" click="label_clickHandler(event)" toolTip="{labelName}" />
+		</mx:VBox>
+</mx:Canvas>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>  
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"   
+			   xmlns:s="library://ns.adobe.com/flex/spark"   
+			   xmlns:mx="library://ns.adobe.com/flex/mx">  
+	
+	<s:layout>  
+		<s:VerticalLayout paddingTop="5" paddingBottom="5" paddingLeft="5" paddingRight="5" gap="5"   
+						  horizontalAlign="center" verticalAlign="middle"/>  
+	</s:layout>  
+	
+	
+	<fx:Script>  
+		<![CDATA[  
+			import mx.collections.ArrayCollection;  
+			import mx.events.FlexEvent;  
+			
+			import vos.TestVO;  
+			[Bindable]  
+			private var dp:ArrayCollection;  
+			
+			
+			private function createData():void  
+			{  
+				dp = new ArrayCollection();  
+				for (var i:int = 0; i < 10; i++)   
+				{  
+					var t:TestVO = new TestVO();  
+					t.id = String(i);  
+					t.label = "label" + i;  
+					t.icon = "assets/icons/" + i + ".png";  
+					t.selected = (Math.random() > .5) ? true : false;  
+					
+					dp.addItem(t);  
+				}  
+				
+			}  
+			
+			private function deleteData():void  
+			{  
+				for (var i:int = dp.length - 1; i >= 0; i--)   
+				{  
+					var t:TestVO = dp.getItemAt(i) as TestVO;  
+					if(t.selected)  
+						dp.removeItemAt(i);  
+				}  
+				
+			}  
+			
+			public function selectAll(event:MouseEvent):void  
+			{  
+				var cb:mx.controls.CheckBox = event.currentTarget as mx.controls.CheckBox;  
+				
+				if(!dp)  
+				{  
+					//还没数据的时候，你就别选中了，没用  
+					cb.selected = false;  
+					return;  
+				}  
+				
+				for each (var t:TestVO in dp)   
+				{  
+					t.selected = cb.selected;  
+				}  
+			}  
+		]]>  
+	</fx:Script>  
+	
+	<fx:Declarations>  
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->  
+		<!--
+		几个可能有疑问的地方： 
+		selected="@{data.selected}" "@"的作用是双向绑定，当data.selected改变时，checkbox的selected也随之改变，反之亦然。
+		[Transient] 作用是指定接下来的字段在序列化的时候可以忽略。比如与后台交互的时候，后台vo不需要selected这个字段，加上它就行了（不加可能会导致警告）。
+		例子里的CheckBox没有居中，如果要让它居中可以给它包上一个居中的容器
+		-->
+	</fx:Declarations>  
+	
+	<mx:DataGrid id="dg" width="400" height="300" dataProvider="{dp}">  
+		<mx:columns>  
+			<mx:DataGridColumn width="20" sortable="false">  
+				<mx:headerRenderer>  
+					<fx:Component>  
+						<mx:CheckBox click="outerDocument.selectAll(event)"/>  
+					</fx:Component>  
+				</mx:headerRenderer>  
+				<mx:itemRenderer>  
+					<fx:Component>  
+						<mx:CheckBox selected="@{data.selected}"/>  
+					</fx:Component>  
+				</mx:itemRenderer>  
+			</mx:DataGridColumn>  
+			<mx:DataGridColumn dataField="label"/>  
+			<mx:DataGridColumn dataField="icon"/>  
+		</mx:columns>  
+	</mx:DataGrid>  
+	<s:HGroup>  
+		<s:Button label="create data" click="createData()"/>  
+		<s:Button label="delete selected data" click="deleteData()"/>  
+	</s:HGroup>  
+</s:Application>

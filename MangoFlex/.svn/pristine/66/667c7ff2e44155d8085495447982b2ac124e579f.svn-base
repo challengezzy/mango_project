@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	fontSize="12"
+	title="修改密码"
+	horizontalCenter="true"
+	verticalCenter="true"
+	width="400"
+	height="300"
+	>
+	<mx:Script>
+		<![CDATA[
+			import mx.containers.Box;
+			import mx.controls.Alert;
+			import mx.controls.PopUpButton;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.ResultEvent;
+			
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			private var loginName:Object = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME);
+			
+			private var loginId:Object = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID);
+			[Bindable]
+			public var endpoint:String;
+			public function setState(isAdmin:Boolean):void
+			{
+				if(isAdmin)
+					this.currentState = "manager";
+				else
+					this.currentState = "";
+			}
+			//重置
+			private function reset(event:MouseEvent):void
+			{
+				newPwdId.text = "";
+				validatePwdId.text="";
+			}
+			
+			public function setLoginProperty(name:String,id:String):void
+			{
+				this.loginName = name;
+				this.loginId = id;
+			}
+			
+			//修改密码
+			private function modify(event:MouseEvent):void
+			{
+				var newPwd:String = newPwdId.text;
+				var validatePwd:String = validatePwdId.text;
+				if(newPwd != validatePwd)
+				{
+					Alert.show("新密码和确认密码不符合,请核实","error");
+					return;
+				}
+				nds.executeUpdateByDS(ClientEnviorment.DATASOURCE_USERMGMT,"update pub_user set pwd='"+TempletDataUtil.generatePassword(loginName.toString(),newPwd)+"' where id="+loginId);
+			}
+			
+			//修改管理员密码
+			private function modifyAdmin(event:MouseEvent):void
+			{
+				var newPwd:String = newPwdId.text;
+				var validatePwd:String = validatePwdId.text;
+				var newPwdAdmin:String = newPwdAdminId.text;
+				var validateAdminPwd:String = validateAdminPwdId.text;
+				if(newPwd != validatePwd)
+				{
+					Alert.show("新密码和确认密码不符合,请核实","error");
+					return;
+				}
+				if(newPwdAdmin != validateAdminPwd)
+				{
+					Alert.show("新管理员密码和确认密码不符合,请核实","error");
+					return;
+				}
+				nds.executeUpdateByDS(ClientEnviorment.DATASOURCE_USERMGMT,"update pub_user set pwd='"+TempletDataUtil.generatePassword(loginName.toString(),newPwd)+"',adminpwd='"+TempletDataUtil.generatePassword(loginName.toString(),newPwdAdmin)+"' where id="+loginId);
+			}
+			
+			private function resultEventHandle(event:ResultEvent):void
+			{
+				var count:int = parseInt(event.result.toString());
+				if(count > 0)
+				{
+					Alert.show("修改成功!","success");			
+				}else
+					Alert.show("修改失败!","fail");
+			}
+			
+			private function close():void
+			{
+				PopUpManager.removePopUp(this);
+			}
+		]]>
+	</mx:Script>
+	<mx:states>
+		<mx:State name="manager">
+			<mx:SetProperty target="{pwdAdminVbox}" name="visible" value="true" />
+			<mx:SetProperty target="{validatePwdAdminVbox}" name="visible" value="true" />
+			<mx:SetEventHandler handlerFunction="modifyAdmin" target="{modifyBtn}" name="click" />
+		</mx:State>
+	</mx:states>
+	<mx:RemoteObject id="nds" destination="{GlobalConst.SERVICE_FORM}" endpoint="{endpoint}" showBusyCursor="true"  >
+		<mx:method name="executeUpdateByDS" result="resultEventHandle(event)" />	
+	</mx:RemoteObject>
+	<mx:VBox width="100%" height="100%" horizontalGap="5" horizontalCenter="true" verticalCenter="true">
+		<mx:Text/>
+		<mx:HBox width="100%"  horizontalCenter="true" verticalCenter="true" verticalGap="10" horizontalAlign="center">
+			<mx:Label text="            用户名"  horizontalCenter="true"/>			<mx:TextInput name="loginName" editable="false" text="{loginName}" horizontalCenter="true"/>
+		</mx:HBox>
+		<mx:HBox width="100%"  horizontalCenter="true" verticalCenter="true" verticalGap="10" horizontalAlign="center">
+			<mx:Label text="            新密码" />			<mx:TextInput id="newPwdId" name="newPwd" displayAsPassword="true"/>
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalCenter="true" verticalCenter="true" verticalGap="10" horizontalAlign="center">
+			<mx:Label text="         确认密码"/>			<mx:TextInput id="validatePwdId" name="validatePwd" displayAsPassword="true"/>
+		</mx:HBox>
+		<mx:HBox id="pwdAdminVbox" width="100%" verticalCenter="true" horizontalCenter="true" verticalGap="10" visible="false" horizontalAlign="center">
+			<mx:Label text="   新管理员密码" />			<mx:TextInput id="newPwdAdminId" name="newAdminPwd" displayAsPassword="true"/>
+		</mx:HBox>
+		<mx:HBox id="validatePwdAdminVbox" verticalCenter="true" width="100%" horizontalCenter="true" verticalGap="10" visible="false" horizontalAlign="center">
+			<mx:Label text="确认管理员密码"/>			<mx:TextInput id="validateAdminPwdId" name="validateAdminPwd" displayAsPassword="true"/>
+		</mx:HBox>
+		<mx:HBox width="100%" verticalGap="10" horizontalAlign="center">
+			<mx:Button label="修改" id="modifyBtn" click="modify(event)"/>
+			<mx:Button label="重置" click="reset(event)"/>
+			<mx:Button label="关闭" click="close()" />
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

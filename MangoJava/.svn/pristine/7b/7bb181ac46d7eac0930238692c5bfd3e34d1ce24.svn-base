@@ -1,0 +1,281 @@
+package smartx.framework.common.bs.dbaccess;
+
+import java.io.*;
+import java.util.*;
+
+import java.sql.SQLException;
+
+import smartx.framework.common.bs.NovaDBConnection;
+import smartx.framework.common.bs.dbaccess.ifc.DBErrExplainerIFC;
+
+public class SybaseDatabaseInfo implements DatabaseInfo {
+
+	public int getDatabaseType() {
+		return DBInfoConst.DATABASE_TYPE_SYBASE;
+	}
+
+	public String getJDBCDriverName() {
+		return "com.sybase.jdbc2.jdbc.SybDriver";
+	}
+
+	public String getDatabaseURL(String host, String port, String sid) {
+		return "jdbc:sybase:Tds:" + host + ":" + port;
+	}
+
+	public String to_char(String numFldName) {
+		return "convert(varchar(30)," + numFldName + ")";
+	}
+
+	// format 0-时间格式(YYYYMMDD HH24:MI:SS) 1-YYYY-MM-DD HH24:MI:SS 其他-普通字符串
+	public String to_char(String numFldName, byte format) {
+		if (format == 0) {
+			return "convert(varchar(10)," + numFldName + ",112)+" + "' '"
+					+ "+convert(varchar(10)," + numFldName + ",108)";
+		} else if (format == 1) {
+			return "substring(convert(varchar(10)," + numFldName
+					+ ",112),1,4)+" + "'-'" + "+substring(convert(varchar(10),"
+					+ numFldName + ",112),5,2)+" + "'-'"
+					+ "+substring(convert(varchar(10)," + numFldName
+					+ ",112),7,2)+" + "' '" + "+convert(varchar(10),"
+					+ numFldName + ",108)";
+		} else {
+			return "convert(varchar(30)," + numFldName + ")";
+		}
+	}
+
+	public String to_date(String charVal) {
+		return "convert(datetime, '" + charVal + "')";
+	}
+
+	public String to_date(String charVal, byte format) {
+		if (format == 0) {
+			return "convert(datetime, '" + charVal + "')";
+		} else if (format == 1) {
+			return "convert(datetime,substring('" + charVal + "',1,4)"
+					+ "+substring('" + charVal + "',6,2)" + "+substring('"
+					+ charVal + "',9,2)+" + "substring('" + charVal
+					+ "',11,9))";
+		} else {
+			return "convert(datetime, '" + charVal + "')";
+		}
+	}
+
+	public String nvl() {
+		return "isnull";
+	}
+
+	public String leftJoin(String rightFld) {
+		return " *= " + rightFld;
+	}
+
+	public String rightJoin(String rightFld) {
+		return " =* " + rightFld;
+	}
+
+	public String getSysdate() {
+		return "select getdate() SYSDATE ";
+	}
+
+	// get Database system datetime
+	// flag true-return "SYSDATE" false-return "SELECT SYSDATE....."
+	public String getSysdate(boolean flag) {
+		if (flag) {
+			return "getdate()";
+		} else {
+			return "select getdate() SYSDATE";
+		}
+	}
+
+	public String getSeqNextval(String tabName) {
+		return new Long(this.getIdBySequence(tabName)).toString();
+	}
+
+	public long getIdBySequence(String tabName) {
+		// return 1000; //Call Stored procedure(Sybase)
+		long lIdVal = -1;
+
+		return lIdVal;
+	}
+
+//	private Vector getUniqueTableAndColumns(String errMsg, int beginIndex,
+//			DatabaseSession session) throws Exception {
+//		int aEnd = beginIndex;
+//		int zEnd = 0;
+//		aEnd = errMsg.indexOf('\'', aEnd);
+//		zEnd = errMsg.indexOf('\'', aEnd + 1);
+//		String tableName = errMsg.substring(aEnd + 1, zEnd);
+//		aEnd = errMsg.indexOf('\'', zEnd + 1);
+//		zEnd = errMsg.indexOf('\'', aEnd + 1);
+//		String constraintName = errMsg.substring(aEnd + 1, zEnd);
+//		return getUniqueTableAndColumns(tableName, constraintName, session);
+//	}
+//
+//	private Vector getUniqueTableAndColumns(String errMsg, int beginIndex) {
+//		int aEnd = beginIndex;
+//		int zEnd = 0;
+//		aEnd = errMsg.indexOf('\'', aEnd);
+//		zEnd = errMsg.indexOf('\'', aEnd + 1);
+//		String tableName = errMsg.substring(aEnd + 1, zEnd);
+//		aEnd = errMsg.indexOf('\'', zEnd + 1);
+//		zEnd = errMsg.indexOf('\'', aEnd + 1);
+//		String columns = errMsg.substring(aEnd + 1, zEnd);
+//		Vector result = null;
+//		if (columns != null && columns.length() > 0) {
+//			result = new Vector();
+//			result.add(new Integer(
+//					DBInfoConst.DATABASE_ERROR_CODE_UNIQUE_CONSTRAINT));
+//			result.add(tableName);
+//			StringTokenizer tokens = new StringTokenizer(columns, ",");
+//			while (tokens.hasMoreTokens()) {
+//				result.add(tokens.nextToken().trim());
+//			}
+//		}
+//		return result;
+//	}
+//
+//	private Vector getForeignKeyTableAndColumns(String errMsg, int beginIndex,
+//			DatabaseSession session) throws Exception {
+//		int aEnd = beginIndex;
+//		int zEnd = 0;
+//		aEnd = errMsg.indexOf('\'', aEnd);
+//		zEnd = errMsg.indexOf('\'', aEnd + 1);
+//		String dbName = errMsg.substring(aEnd + 1, zEnd);
+//		aEnd = errMsg.indexOf('\'', zEnd + 1);
+//		zEnd = errMsg.indexOf('\'', aEnd + 1);
+//		String tableName = errMsg.substring(aEnd + 1, zEnd);
+//		aEnd = errMsg.indexOf('\'', zEnd + 1);
+//		zEnd = errMsg.indexOf('\'', aEnd + 1);
+//		String constraintName = errMsg.substring(aEnd + 1, zEnd);
+//		return getForeignKeyTableAndColumns(dbName, tableName, constraintName,
+//				session);
+//
+//	}
+//
+//	private Vector getUniqueTableAndColumns(String tableName,String constraintName) throws Exception {
+//		Vector result = null;
+//		StoredProcedureCall spCall = new StoredProcedureCall();
+//		spCall.setProcedureName("getIndexColumns");
+//		spCall.addNamedArgument("tableName");
+//		spCall.addNamedArgument("indexName");
+//
+//		ValueReadQuery query = new ValueReadQuery();
+//		query.setCall(spCall);
+//		query.addArgument("tableName");
+//		query.addArgument("indexName");
+//
+//		Vector spArgs = new Vector();
+//		spArgs.addElement(tableName);
+//		spArgs.addElement(constraintName);
+//		String columns = (String) session.executeQuery(query, spArgs);
+//		if (columns != null && columns.length() > 0) {
+//			result = new Vector();
+//			result.add(new Integer(
+//					DBInfoConst.DATABASE_ERROR_CODE_UNIQUE_CONSTRAINT));
+//			result.add(tableName);
+//			StringTokenizer tokens = new StringTokenizer(columns, ",");
+//			while (tokens.hasMoreTokens()) {
+//				result.add(tokens.nextToken().trim());
+//			}
+//		}
+//		return result;
+//	}
+//
+//	private Vector getForeignKeyTableAndColumns(String dbName,
+//			String tableName, String constraintName, DatabaseSession session)
+//			throws Exception {
+//		Vector result = null;
+//		StringBuffer s = new StringBuffer();
+//		s.append(" exec getForeignKeyTabAndCols ");
+//		s.append("'" + dbName + "', ");
+//		s.append("'" + tableName + "',");
+//		s.append("'" + constraintName + "'");
+//
+//		System.out.println("The sql is " + s.toString());
+//
+//		Vector values = session.executeSQL(s.toString());
+//		if (values == null || values.size() == 0) {
+//			System.out.println("can't get error info according to sql:"
+//					+ s.toString());
+//			return null;
+//		} else {
+//			System.out.println("the size of result is " + values.size());
+//		}
+//		result = new Vector();
+//		DatabaseRow row = (DatabaseRow) values.elementAt(0);
+//		result.add(new Integer(
+//				DBInfoConst.DATABASE_ERROR_CODE_FOREIGNKEY_CONSTRAINT));
+//		result.add(row.get("tableName"));
+//		String columns = (String) row.get("columeNames");
+//		if (columns != null && columns.length() > 0) {
+//			StringTokenizer tokens = new StringTokenizer(columns, ",");
+//			while (tokens.hasMoreTokens()) {
+//				result.add(tokens.nextToken().trim());
+//			}
+//		}
+//		return result;
+//	}
+
+	public String getBackupCommand() {
+		String command;
+		if (File.separator.compareTo("/") == 0) {
+			command = "sh ./dumpdb.sh ";
+		} else {
+			command = "cmd /c dumpdb.bat ";
+		}
+		return command;
+	}
+
+	//
+	public String subString(String chaVal, int start, int len) {
+		return "substring(" + chaVal + "," + Integer.toString(start) + ","
+				+ Integer.toString(len) + ")";
+	}
+
+	// date sub
+	public String subDate(String toDate, String fromDate) {
+		return "DATEDIFF(dd," + fromDate + "," + toDate + ")";
+	}
+
+	// date sub
+	// format 0-天 1-小时 2-分钟 3-秒 其他-天
+	public String subDate(String toDate, String fromDate, byte format) {
+		if (format == 0) {
+			return "DATEDIFF(dd," + fromDate + "," + toDate + ")";
+		} else if (format == 1) {
+			return "DATEDIFF(hh," + fromDate + "," + toDate + ")";
+		} else if (format == 2) {
+			return "DATEDIFF(mi," + fromDate + "," + toDate + ")";
+		} else if (format == 3) {
+			return "DATEDIFF(ss," + fromDate + "," + toDate + ")";
+		} else {
+			return "DATEDIFF(dd," + fromDate + "," + toDate + ")";
+		}
+	}
+
+	// proccess dual(oracle)
+	public String getDual() {
+		return "";
+	}
+
+	public boolean isSPNONExistedErr(int errorNum) {
+		if (errorNum == 2812) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	private DBErrExplainer dbErrExplainer;
+
+	public DBErrExplainerIFC getDBErrExplainer() {
+		if (dbErrExplainer == null) {
+			dbErrExplainer = new DBErrExplainer();
+		}
+		return dbErrExplainer;
+	}
+
+	public Vector getErrDesc(SQLException dbException, NovaDBConnection session) {
+		return null;
+	}
+
+}

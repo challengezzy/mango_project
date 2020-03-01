@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="400" height="250"
+	showCloseButton="true" close="PopUpManager.removePopUp(this)" title="导入元原模板"
+	creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.Datasource;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Bindable]
+			public var confirmFunction:Function;
+			
+			[Bindable]
+			private var datasources:ArrayCollection = new ArrayCollection();
+			
+			private var tableNameRefPanel:ItemRefPanel;
+			internal var tableName:String;
+			
+			public var destination:String = GlobalConst.SERVICE_FORM;
+		    public var endpoint:String;
+			
+			private function init():void{
+				datasources = ClientEnviorment.getInstance().getNova2ConfigDatasources();
+				datasourceChange();
+			}
+			
+			private function datasourceChange():void{ 
+				if(tableNameRefPanel!=null)
+					tableNameItem.removeChild(tableNameRefPanel);
+				var datasource:Datasource = datasouceInput.selectedItem as Datasource;
+				
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="tablename";
+				templetItemVO.itemkey="tablename";
+				templetItemVO.refdesc="select table_name value#,1 code#,table_name 名称 from user_tables union select view_name value#,1 code#,view_name 名称 from user_views;ds="+datasource.name;
+				tableNameRefPanel = new ItemRefPanel(templetItemVO,destination,endpoint,false,false);
+				tableNameRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(tableNameRefPanel.returnVO != null){
+						tableName = tableNameRefPanel.stringValue;
+						templetCodeInput.text = templetNameInput.text = "T_"+tableName;
+					}
+				});
+				tableNameItem.addChild(tableNameRefPanel);
+			}
+		]]>
+	</mx:Script>
+	<mx:Form>
+		<mx:FormItem label="数据源" required="true">
+			<mx:ComboBox id="datasouceInput" dataProvider="{datasources}" labelField="name" change="datasourceChange()"/>
+		</mx:FormItem>
+		<mx:FormItem label="关联表" id="tableNameItem" required="true"/>
+		<mx:FormItem label="模板编码" required="true">
+			<mx:TextInput id="templetCodeInput" width="200" borderStyle="solid"/>
+		</mx:FormItem>
+		<mx:FormItem label="模板名称" required="true">
+			<mx:TextInput id="templetNameInput" width="200" borderStyle="solid"/>
+		</mx:FormItem>
+	</mx:Form>
+	<mx:ControlBar horizontalAlign="center">
+		<mx:Button label="导入" click="confirmFunction()"/>
+		<mx:Button label="取消" click="PopUpManager.removePopUp(this)"/>
+	</mx:ControlBar>
+</mx:TitleWindow>

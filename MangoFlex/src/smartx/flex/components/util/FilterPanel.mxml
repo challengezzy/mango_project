@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				layout="vertical"
+				width="800" height="380" xmlns:containers="flexlib.containers.*" 
+				close="close()" showCloseButton="true" title="过滤器设置"
+				creationComplete="init()">
+	<fx:Declarations>
+
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.effects.Effect;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.BillListPanel;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.ext.BillListOrderByPanel;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			private var filterInfo:SharedObject;
+			
+			protected var formService:RemoteObject;
+			
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			public var templeteCode:String;
+			
+			[Bindable]
+			public var templetVO:TempletVO;
+			
+			[Bindable]
+			public var switchEffect:Effect;
+			
+			[Bindable]
+			public var billListPanel:BillListPanel;
+			
+			[Bindable]
+			private var filterXml:XML;
+			
+			[Bindable]
+			private var tempFilterXml:XML;
+			
+			[Bindable]
+			private var allFieldsCol:ArrayCollection = new ArrayCollection();
+			
+			//add by zhangzz 2013-02-05 begin
+			private var billListOrderByPanel:BillListOrderByPanel = new BillListOrderByPanel();
+			[Bindable]
+			private var orderByInfo:String;
+			
+			public var deskTopFrame:DeskTopFrame;
+			
+			private var orderInfoSo:Object;
+			//add by zhangzz 2013-02-05 end
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				filterInfo = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_FILTERINFO);
+				var filterObj:Object = filterInfo.data.filters[templeteCode];
+				if(filterObj != null && filterObj is XML){
+					filterXml = filterObj as XML;
+				}else{
+					filterXml = new XML("<root><filterInfo templeteCode='".concat(templeteCode+"'></filterInfo></root>"));
+				}
+				
+				orderInfoSo = filterInfo.data.orderInfo[templeteCode];
+				if(orderInfoSo)
+					orderByInfo = orderInfoSo.info;
+
+				
+				if(templetVO != null ){
+					
+					for each(var itemVO:TempletItemVO in templetVO.itemVos){
+						
+						var tempObj:Object = new Object();
+						tempObj["fieldName"] = itemVO.itemkey;
+						tempObj["fieldType"] = itemVO.savedcolumndatatype==null ?"varchar2" :itemVO.savedcolumndatatype;
+						tempObj["fieldLabel"] = itemVO.itemname;
+						
+						var columnType:String = itemVO.itemtype;
+						tempObj["fieldColumnType"] = columnType;
+						if(columnType == "下拉框"){
+							tempObj["columnDesc"] = itemVO.comboxdesc;
+						}else if(columnType == "参照"){
+							tempObj["columnDesc"] = itemVO.refdesc;
+						}else{
+							tempObj["columnDesc"] = "";
+						}
+						var isVirtualColumn:String = itemVO.extattr02;
+						var isShowInList:Boolean = itemVO.listisshowable;
+						if((isVirtualColumn == null || isVirtualColumn =="" || isVirtualColumn.toUpperCase() =="N") && isShowInList ){
+							allFieldsCol.addItem(tempObj);
+						}
+						
+					}
+					
+				}
+				
+				refreshItems();
+				
+			}
+			
+			
+			private function faultHander(event:FaultEvent):void{
+				SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,
+					"错误详情:"+event.fault.faultString);
+			}
+			
+			
+			private function add():void{
+				var tempColumn:String ="";
+				if(allFieldsCol.length > 0){
+					var obj:Object = allFieldsCol.getItemAt(0);
+					tempColumn = obj["fieldName"] as String;
+				}
+				
+				var itemXml:XML = <item isAdd="true" type="equalValue" column="" logicalOperator="AND" relationalOperator="=" value="" />;
+				itemXml.@column = tempColumn;
+				tempFilterXml.filterInfo.appendChild(itemXml);
+				
+				var fiip:FilterItemInputPanel = new FilterItemInputPanel();
+				fiip.itemXml = itemXml;
+				fiip.allFieldsCol = allFieldsCol;
+				fiip.flp = this;
+				fiip.formService = formService;
+				itemsVbox.addChild(fiip);
+				
+			}
+			
+			private function refreshItems():void{
+				itemsVbox.removeAllChildren();
+				tempFilterXml = new XML(filterXml.toString());
+				for each( var itemXml:XML in tempFilterXml.filterInfo.item){
+					var fiip:FilterItemInputPanel = new FilterItemInputPanel();
+					fiip.itemXml = itemXml;
+					fiip.allFieldsCol = allFieldsCol;
+					fiip.flp = this;
+					fiip.formService = formService;
+					itemsVbox.addChild(fiip);
+				}
+			}
+			
+			protected function submitBtn_clickHandler(event:MouseEvent):void
+			{
+				if(!hasNullValueItem(tempFilterXml)){
+					filterInfo.data.filters[templeteCode] = tempFilterXml;
+					close();
+					billListPanel.simpleQuery(billListPanel.simpleQueryTextInput.text);
+				}else{
+					SmartXMessage.show("存在未填写数值的过滤项,请填写完整!",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			private function hasNullValueItem(filterXml:XML):Boolean{
+				var flag:Boolean = false;
+				for each( var itemXml:XML in filterXml.filterInfo.item){
+					var value:String = itemXml.@value;
+					if(value==null||qs.utils.StringUtils.trim(value)==""){
+						flag = true;
+						break;
+					}
+				}
+				return flag
+			}
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			public function remove(dis:DisplayObject):void{
+				itemsVbox.removeChild(dis);
+			}
+			
+			private function orderby():void{
+				billListOrderByPanel.templetVo = templetVO;
+				billListOrderByPanel.templeteCode = templeteCode;
+				billListOrderByPanel.confirmFun = function():void{
+					orderByInfo = filterInfo.data.orderInfo[templeteCode].info;
+				}
+				if(orderInfoSo){
+					billListOrderByPanel.itemListDp = orderInfoSo.itemList;
+					billListOrderByPanel.orderByListDp = orderInfoSo.orderByList;
+				}
+				
+				PopUpManager.addPopUp(billListOrderByPanel,deskTopFrame,false);
+				PopUpManager.centerPopUp(billListOrderByPanel);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" id="cardBox" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%" horizontalAlign="left" >
+			<mx:LinkButton icon="{AssetsFileLib.addIcon}" toolTip="增加" width="20" height="20" click="add()"/>
+			<mx:Label width="100%" color="blue" text="{orderByInfo}" toolTip="{orderByInfo}" textAlign="right" />
+			<mx:LinkButton icon="{AssetsFileLib.orderbyIcon}" toolTip="排序" width="20" height="20" click="orderby()"/>
+		</mx:HBox>
+		<mx:HRule width="100%" />
+		<mx:VBox width="100%" height="100%" id="itemsVbox" />
+		<mx:HRule width="100%" />
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom" >
+			<mx:Button id="submitBtn" label="确定" icon="{AssetsFileLib.okIcon}" click="submitBtn_clickHandler(event)" />
+			<mx:Button id="cancelBtn" label="取消" icon="{AssetsFileLib.closeIcon}" click="close()" />
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

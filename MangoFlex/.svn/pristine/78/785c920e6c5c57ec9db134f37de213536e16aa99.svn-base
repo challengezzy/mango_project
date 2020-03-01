@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Button;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.FlexEvent;
+			
+			import smartx.flex.components.styletemplate.ext.DebugUtil;
+			import smartx.flex.components.styletemplate.ext.ListEmbedButtonGroupComponent;
+			import smartx.flex.components.styletemplate.ifc.ListButtonListener;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			public var metadataTemplet:MetadataTemplet;
+			public var endpoint:String;
+			private var listenerMap:Hashtable = new Hashtable();
+			private var iconComponentArray:Array = [];
+			
+			private function init():void{
+				if(metadataTemplet == null)
+					throw new Error("元数据模板不能为空");
+				var xml:XML = metadataTemplet.contentXML;
+				var styletemplate:StyleTemplate01 = new StyleTemplate01();
+				if(xml.templetCode.length() == 0)
+					throw new Error("templetCode不能为空");
+				styletemplate.templetCode = xml.templetCode;
+				styletemplate.editable = false;
+				if(endpoint != null)
+					styletemplate.endpoint = endpoint;
+				if(xml.editable.length() > 0)
+					styletemplate.editable = xml.editable=="true"?true:false;
+				styletemplate.percentWidth = 100;
+				if(xml.percentWidth.length() > 0 && String(xml.percentWidth) != "" )
+					styletemplate.percentWidth = xml.percentWidth;
+				styletemplate.percentHeight = 100;
+				if(xml.percentHeight.length() > 0 && String(xml.percentHeight) != "" )
+					styletemplate.percentHeight = xml.percentHeight;
+				if(xml.endpoint.length() > 0)
+					styletemplate.endpoint = xml.endpoint;
+				if(xml.debugMode.length() > 0)
+					styletemplate.debugMode = xml.debugMode=="true"?true:false;
+				if(xml.width.length() > 0 && String(xml.width) != "" )
+					styletemplate.width = xml.width;
+				if(xml.height.length() > 0 && String(xml.height) != "" )
+					styletemplate.height = xml.height;
+				
+				if(xml.isShowAlert.length() > 0)
+					styletemplate.isShowAlert = xml.isShowAlert =="false"?false:true;
+				
+				if(xml.firstAutoQuery.length() > 0)
+					styletemplate.showDataAfterInit = xml.firstAutoQuery =="true"?true:false;
+				
+				if(xml.allowMultipleSelection.length() > 0)
+					styletemplate.allowMultipleSelection = xml.allowMultipleSelection =="true"?true:false;
+				
+				if(xml.initQueryCondition.length() > 0 && String(xml.initQueryCondition) != "")
+					styletemplate.initQueryCondition = xml.initQueryCondition;
+				
+				if(xml.showOperationButtonType.length() > 0 && String(xml.showOperationButtonType) != "")
+					styletemplate.showOperationButtonType = xml.showOperationButtonType;
+				
+				if(xml.perPageSize.length() > 0 && String(xml.perPageSize) != "")
+					styletemplate.pageSize = xml.perPageSize;
+				
+				//add by xuzhilin 20130129
+				if(xml.doubleClickHandler.length()>0 && String(xml.doubleClickHandler)!=""){
+					var classRef:Class = getDefinitionByName(String(xml.doubleClickHandler)) as Class;
+					var handler:ListButtonListener = new classRef();
+					styletemplate.doubleClickHandler = handler;
+				}
+				
+				if(xml.interceptors.length()>0){
+					if(xml.interceptors.bfIncList.length() > 0)
+						styletemplate.bfIncList = xml.interceptors.bfIncList;
+					if(xml.interceptors.afIncList.length() > 0)
+						styletemplate.afIncList = xml.interceptors.afIncList;
+					if(xml.interceptors.clientBfIncList.length() > 0)
+						styletemplate.clientBfIncList = xml.interceptors.clientBfIncList;
+					if(xml.interceptors.clientAfIncList.length() > 0)
+						styletemplate.clientAfIncList = xml.interceptors.clientAfIncList;
+				}
+				
+				if(xml.embedButton.length() > 0 && xml.embedButton.button.length() > 0){
+					//自定义操作按钮组
+					var listEmbedBtnGroupFactory:ClassFactory = new ClassFactory(ListEmbedButtonGroupComponent);
+					
+					var embedBtnGroupDgc:DataGridColumn = new DataGridColumn("自定义操作");
+					embedBtnGroupDgc.editable = false;
+					embedBtnGroupDgc.itemRenderer = listEmbedBtnGroupFactory;
+					
+					styletemplate.customDefineDataGridColumns = [embedBtnGroupDgc];
+				}
+				
+				styletemplate.beforeInitFun = function ():void{
+					if(xml.embedButton.length() > 0 && xml.embedButton.button.length() > 0)
+						listEmbedBtnGroupFactory.properties = {contentXml:xml,billListPanel:styletemplate.listPanel};
+					
+					if(xml.customListButton.button.length()>0 && styletemplate.editable){
+						styletemplate.operationList.addItem({type:"separator"});
+					}
+					//自定义列表按钮
+					for each(var buttonXML:XML in xml.customListButton.button){
+						var obj:* = new Object();
+						obj.id = String(buttonXML.@id);
+						obj.label = String(buttonXML.@label);
+						obj.toolTip = String(buttonXML.@toolTip);
+						if(buttonXML.@rightClick=="false")
+							obj.rightClick = false;
+						else
+							obj.rightClick = true;
+						
+						var btn:Button = new Button();
+						btn.id = String(buttonXML.@id);
+						btn.label = String(buttonXML.@label);
+						btn.toolTip = String(buttonXML.@toolTip);
+						var iconUrl:String = buttonXML.@icon;
+						if(iconUrl != null && iconUrl != ""){
+							var icon:Class = IconUtility.getClass(btn,iconUrl,16,16);
+							btn.setStyle("icon",icon);
+							iconComponentArray.push(btn);
+						}
+						
+						var listeners:Array = [];
+						for each(var listener:XML in buttonXML.listeners.listener){
+							var classReference:Class = getDefinitionByName(listener) as Class;
+							var listenerClass:ListButtonListener = new classReference() as ListButtonListener;
+							listeners.push(listenerClass);
+						}
+						
+						listenerMap.add(obj.id,listeners);
+						
+						obj.handler = function():void{
+							var array:Array = listenerMap.find(this.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						};
+						styletemplate.operationList.addItem(obj);
+						
+						btn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var array:Array = listenerMap.find(event.target.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						});
+						styletemplate.operationList.addItem(btn);
+					}
+				};
+				
+				this.addChild(styletemplate);
+				
+				if(styletemplate.debugMode){
+					//如果调试模式，添加一个编辑元数据模板的按钮
+					DebugUtil.generateDebugButton(this,metadataTemplet.id);
+					
+				}
+				
+				/* callLater(function():void{
+					if(xml.customListButton.button.length()>0 && styletemplate.editable){
+						styletemplate.operationList.addItem({type:"separator"});
+					}
+					//自定义列表按钮
+					for each(var buttonXML:XML in xml.customListButton.button){
+						var obj:* = new Object();
+						obj.id = String(buttonXML.@id);
+						obj.label = String(buttonXML.@label);
+						obj.toolTip = String(buttonXML.@toolTip);
+						if(buttonXML.@rightClick=="false")
+							obj.rightClick = false;
+						else
+							obj.rightClick = true;
+						
+						var btn:Button = new Button();
+						btn.id = String(buttonXML.@id);
+						btn.label = String(buttonXML.@label);
+						btn.toolTip = String(buttonXML.@toolTip);
+						var iconUrl:String = buttonXML.@icon;
+						if(iconUrl != null && iconUrl != ""){
+							var icon:Class = IconUtility.getClass(btn,iconUrl,16,16);
+							btn.setStyle("icon",icon);
+							iconComponentArray.push(btn);
+						}
+						
+						var listeners:Array = [];
+						for each(var listener:XML in buttonXML.listeners.listener){
+							var classReference:Class = getDefinitionByName(listener) as Class;
+							var listenerClass:ListButtonListener = new classReference() as ListButtonListener;
+							listeners.push(listenerClass);
+						}
+						
+						listenerMap.add(obj.id,listeners);
+						
+						obj.handler = function():void{
+							var array:Array = listenerMap.find(this.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						};
+						styletemplate.operationList.addItem(obj);
+						
+						btn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+							var array:Array = listenerMap.find(event.target.id) as Array;
+							if(array != null){
+								for each(var temp:ListButtonListener in array){
+									temp.buttonClick(styletemplate.listPanel);
+								}
+							}	
+						});
+						styletemplate.operationList.addItem(btn);
+					}
+				}); */
+			}
+			
+			public function destroy():void{
+				for each (var obj:* in iconComponentArray){
+					IconUtility.destroy(obj);
+				}
+				iconComponentArray = null;
+				removeAllChildren();
+			}
+		]]>
+	</fx:Script>
+</mx:Canvas>

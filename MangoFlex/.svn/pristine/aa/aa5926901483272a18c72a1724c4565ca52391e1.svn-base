@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%"
+	creationComplete="init()" xmlns:portal="smartx.flex.components.basic.portal.*" label="欢迎使用" 
+	xmlns:util="smartx.flex.components.util.*"
+	xmlns:qs="qs.controls.*" xmlns:containers="flexlib.mdi.containers.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.esria.samples.dashboard.events.LayoutChangeEvent;
+			import com.esria.samples.dashboard.managers.PodLayoutManager;
+			import com.esria.samples.dashboard.managers.StateManager;
+			import com.esria.samples.dashboard.view.Pod;
+			
+			import flexlib.mdi.events.MDIWindowEvent;
+			
+			import mx.containers.HBox;
+			import mx.containers.TitleWindow;
+			import mx.containers.VBox;
+			import mx.events.FlexEvent;
+			import mx.events.ResizeEvent;
+			import mx.modules.ModuleLoader;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.basic.LoginInfoVO;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			[Bindable]
+			public var desktopFrame:DeskTopFrame;
+			
+			[Binbable]
+			public var menuType:String;
+			
+			private var userInfoWin:TitleWindow;
+			private var miniUserInfoWin:TitleWindow;
+			private var dateFieldWin:TitleWindow;
+			private var historyWin:TitleWindow;
+			private var messageWindow:TitleWindow;
+			private var messageWindow2:TitleWindow;
+			
+			
+			//[Bindable] public var images:Array = ["smartx/flex/components/assets/images/21.png","smartx/flex/components/assets/images/eye.png"];
+			private function init():void{				
+				var userId:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID));
+				
+				if(mainBox.getChildren().length>0){
+					mainBox.removeAllChildren();
+				}
+				
+				var userInfoPod:UserInfoPod = new UserInfoPod();
+				userInfoPod.endpoint = desktopFrame.endpoint;
+				userInfoPod.deskTopFrame = desktopFrame;
+				userInfoPod.userId = userId;
+				
+				userInfoWin = new TitleWindow();
+				userInfoWin.title= "用户信息";
+				userInfoWin.percentHeight = 100;
+				userInfoWin.percentWidth = 100;
+				userInfoWin.addChild(userInfoPod);
+				//迷你用户信息
+				var miniUserInfoPod:MiniUserInfoPod = new MiniUserInfoPod();
+				miniUserInfoPod.endpoint = desktopFrame.endpoint;
+				miniUserInfoPod.deskTopFrame = desktopFrame;
+				miniUserInfoPod.userId = userId;
+				
+				miniUserInfoWin = new TitleWindow();
+				miniUserInfoWin.title= "用户信息";
+				miniUserInfoWin.percentWidth = 100;
+				miniUserInfoWin.addChild(miniUserInfoPod);
+				
+				var dateFieldPod:DateFieldPod = new DateFieldPod();
+				dateFieldPod.endpoint = desktopFrame.endpoint;
+				dateFieldPod.deskTopFrame = desktopFrame;
+				dateFieldWin = new TitleWindow();
+				dateFieldWin.title= "日历";
+				dateFieldWin.percentWidth = 100;
+				dateFieldWin.addChild(dateFieldPod);
+				
+				
+				var userHistoryPod:UserHistoryPod = new UserHistoryPod();
+				userHistoryPod.endpoint = desktopFrame.endpoint;
+				userHistoryPod.deskTopFrame = desktopFrame;
+				userHistoryPod.userId = userId;
+				historyWin = new TitleWindow();
+				historyWin.title= "访问历史";
+				historyWin.percentWidth = 100;
+				historyWin.addChild(userHistoryPod);
+
+				var loader:ModuleLoader = new ModuleLoader();
+				loader.url = "smartx/flex/modules/basic/mt/styletemplate/StyleTemplate02Frame.swf?mtcode=MT_PUB_MESSAGES_VIEW";
+				loader.percentHeight = 100;
+				loader.percentWidth = 100;
+				
+				messageWindow = new TitleWindow();
+				messageWindow.title= "公告信息";
+				messageWindow.percentHeight = 100;
+				messageWindow.percentWidth = 100;
+				messageWindow.addChild(loader);
+				
+				//新版公告消息
+				var messagePod:MessagePod = new MessagePod();
+				var  loginInfoVO:LoginInfoVO =  ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_INFOVO) as LoginInfoVO;
+				
+				messagePod.endpoint = desktopFrame.endpoint;
+				messagePod.deskTopFrame = desktopFrame;
+				messagePod.userId = userId;
+				messagePod.dispatchtype = loginInfoVO.dispatchtype;
+	
+			 
+				messageWindow2 = new TitleWindow();
+				messageWindow2.title= "公告信息";
+				messageWindow2.percentWidth = 100;
+				messageWindow2.addChild(messagePod);
+				
+				var util:MetadataTempletUtil = MetadataTempletUtil.getInstance();
+				var templet:MetadataTemplet = util.findMetadataTemplet(GlobalConst.MTCODE_SYSTEMCONFIG);
+				var systemXML:XML = templet.contentXML;
+				var enableUserInfoPod:String = systemXML.enableUserInfoPod;
+				var enableCalendarPod:String = systemXML.enableCalendarPod
+				var enableMessageWindowPod:String = systemXML.enableMessageWindowPod;
+				var messagePageSize:String = systemXML.messagePageSize;
+				var enableHistoryWindowPod:String = systemXML.enableHistoryWindowPod;
+				
+				if(menuType != null && menuType.toLowerCase() == GlobalConst.MENU_TYPE_BIGIMAGE.toLowerCase()){
+					var vBox:VBox = new VBox();
+					vBox.percentHeight = 100;
+					vBox.percentWidth = 90;
+					vBox.setStyle("verticalGap",10);
+					
+					mainBox.addChild(vBox);
+					vBox.addEventListener(FlexEvent.CREATION_COMPLETE,function(e:Event):void{
+						var vBox:VBox = e.target as VBox;
+
+						if(enableUserInfoPod!="false")
+							vBox.addChild(miniUserInfoWin);
+						
+						if(enableCalendarPod != "false"){
+							vBox.addChild(dateFieldWin);
+						}
+						
+						userHistoryPod.maxRows = 7;//大图标模式，最多显示7条访问记录
+						if(messagePageSize != null){
+							messagePod.pageSize = Number(messagePageSize);
+						}
+						else
+							messagePod.pageSize = 1; //大图标模式一次最多显一条
+						messagePod.messageBox.maxHeight = 450;
+						if(enableMessageWindowPod != "false")
+							vBox.addChild(messageWindow2);
+						if(enableHistoryWindowPod != "false")
+							vBox.addChild(historyWin);
+					});
+					
+				}else{
+					var leftBox:VBox = new VBox();
+					leftBox.percentHeight = 100;
+					leftBox.percentWidth = 40;
+					if(enableUserInfoPod!="false")
+						leftBox.addChild(userInfoWin);
+					if(enableHistoryWindowPod != "false")
+						leftBox.addChild(historyWin);
+					
+					var rightBox:VBox = new VBox();
+					rightBox.percentHeight = 100;
+					rightBox.percentWidth = 60;
+					
+					messageWindow2.percentHeight = 100;
+					if(messagePageSize != null){
+						messagePod.pageSize = Number(messagePageSize);
+					}
+					else
+						messagePod.pageSize = 10; //大图标模式一次最多显一条
+					
+					if(enableMessageWindowPod != "false")
+						rightBox.addChild(messageWindow2);
+					if(enableUserInfoPod!="false" || enableHistoryWindowPod != "false")
+						mainBox.addChild(leftBox);
+					if(enableMessageWindowPod != "false")
+						mainBox.addChild(rightBox);
+				}
+			}
+		]]>
+	</mx:Script>
+	<mx:HDividedBox id="mainBox" width="100%" height="100%">
+	</mx:HDividedBox>
+	
+	<!--
+	<qs:DragTile id="cmp" width="100%" height="100%" 
+				dragEnter="event.target.allowDrag(event);"
+				dragOver='event.target.showDragFeedback(event,event.shiftKey? "copy":"move")'
+				dataProvider="{images}"
+				>
+				
+				<qs:itemRenderer>
+					<mx:Component id="imageRenderer">
+						<qs:BitmapTile />
+					</mx:Component>
+				</qs:itemRenderer>
+				
+	</qs:DragTile>
+	-->
+	<!--<containers:MDICanvas id="canvas" height="100%" width="100%"/> -->
+		<!--
+	<portal:NovaUserHistoryNavigator deskTopFrame="{desktopFrame}" width="100%" height="100%"/>
+	-->
+</mx:HBox>

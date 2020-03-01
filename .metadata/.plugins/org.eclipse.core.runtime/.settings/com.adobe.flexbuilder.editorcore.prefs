@@ -1,0 +1,6 @@
+#Wed Oct 08 17:35:00 CST 2014
+eclipse.preferences.version=1
+activeViewIDs3=org.eclipse.jdt.ui.PackageExplorer,com.adobe.flexbuilder.mxml.editor.design.internal.errors.view.DesignModeProblemsView
+activeViewIDs2=org.eclipse.jdt.ui.PackageExplorer
+autoViewIDs=com.adobe.flexbuilder.mxml.editor.states.StatesViewer\=design-mxml\=0\=true,com.adobe.flexbuilder.mxml.editor.components.ComponentsView\=design-mxml\=0\=true,com.adobe.flexbuilder.mxml.editor.inspector.view.PropertiesView\=design-mxml;design-css\=0\=true,com.adobe.flexbuilder.as.editor.asdocviewer\=code\=0\=false,com.adobe.flexbuilder.mxml.editor.AppearanceView\=design-mxml\=1\=false
+enableDV=false

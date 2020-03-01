@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="MangoAsset" basedir="." default="buildSwc">
+	<property environment="env" />
+	<property name="src_dir" value="../src" />
+	<!-- 配置SmartXFlex工程绝对路径,需要修改 D:\hudson\jobs\Mango\workspace\MangoAsset  -->
+	<property name="project_root" value="D:/hudson/jobs/Mango/workspace/MangoAsset" />
+	<property name="deploy_dir" value="../swc" />
+	<property name="libs_dir" value="../lib" />
+	<property name="swc_file" value="MangoAsset.swc" />
+	<property name="application.locale" value="zh_CN" />
+	<property name="FLEX_HOME" value="${env.FLEX_HOME}" />
+	<property name="ANT_HOME" value="${env.ANT_HOME}" />
+	<taskdef resource="flexTasks.tasks"
+	         classpath="${FLEX_HOME}/ant/lib/flexTasks.jar" />
+	<taskdef resource="net/sf/antcontrib/antlib.xml">
+		<classpath>
+			<pathelement location="${ANT_HOME}/lib/ant-contrib-1.0b3.jar" />
+		</classpath>
+	</taskdef>
+	<target name="init">
+		<delete dir="${deploy_dir}" />
+		<mkdir dir="${deploy_dir}" />
+		<delete file="../lib/assets.swc" />
+	</target>
+	<target name="buildAssetsSwc" depends="init">
+		<fileset id="assets.flex"
+		         dir="${src_dir}"
+		         includes="**/*.gif,**/*.jpg,**/*.png,**/*.swf,**/*.css,**/*.TTF,**/*.jpeg,**/*.xml" />
+		<pathconvert pathsep=" "
+		             property="assets.flex.output"
+		             refid="assets.flex"
+		             dirsep="/">
+			<map from="${src_dir}" to="" />
+		</pathconvert>
+		<!--
+		<echo message="...Resources being considered..." />
+		<var name="filelist" value="" />
+		<var name="prefixfilelist" value="-include-file" />
+		<for list="${assets.flex.output}" delimiter=" " param="asset">
+			<sequential>
+				<echo>Asset:  @{asset}</echo>
+				<var name="filelist_tmp" value="${filelist}" />
+				<var name="filelist" unset="true" />
+				<var name="filelist"
+				     value="${filelist_tmp} ${prefixfilelist} @{asset} '@{asset}'" />
+			</sequential>
+		</for>
+		-->
+		<echo message="-output '${basedir}/lib/assets.swc' ${filelist}" />
+		<!--exec executable="${FLEX_HOME}/bin/compc.exe" failonerror="true">
+				<arg line="-output '../lib/assets.swc' ${filelist}" />
+			</exec-->
+		<compc output="../lib/assets.swc">
+			<include-file name="global.css"
+			              path="${project_root}/src/smartx/flex/components/assets/css/global.css" />
+
+			<include-file name="messenger.css"
+			              path="${project_root}/src/smartx/flex/components/assets/css/messenger.css" />
+
+			<include-file name="messenger.swf"
+			              path="${project_root}/src/smartx/flex/components/assets/css/messenger.swf" />
+
+			<include-file name="SparkWebSkin.css"
+			              path="${project_root}/src/smartx/flex/components/assets/css/SparkWebSkin.css" />
+
+			<include-file name="Red_glow.swf"
+			              path="${project_root}/src/smartx/flex/components/assets/flash/Red_glow.swf" />
+
+			<include-file name="arial.ttf"
+			              path="${project_root}/src/smartx/flex/components/assets/font/arial.ttf" />
+
+			<include-file name="add.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/add.png" />
+
+			<include-file name="addadd.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/addadd.png" />
+
+			<include-file name="advancedquery.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/advancedquery.png" />
+
+			<include-file name="alert.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/alert.png" />
+
+			<include-file name="bigbook.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/bigbook.png" />
+
+			<include-file name="browse.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/browse.png" />
+
+			<include-file name="calendar.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/calendar.png" />
+
+			<include-file name="palette-icon-aggregate32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-aggregate32x32.png" />
+
+			<include-file name="palette-icon-bsort32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-bsort32x32.png" />
+
+			<include-file name="palette-icon-drools32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-drools32x32.png" />
+
+			<include-file name="palette-icon-errorinput32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-errorinput32x32.png" />
+
+			<include-file name="palette-icon-erroroutput32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-erroroutput32x32.png" />
+
+			<include-file name="palette-icon-externalprocess32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-externalprocess32x32.png" />
+
+			<include-file name="palette-icon-extpt32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-extpt32x32.png" />
+
+			<include-file name="palette-icon-fieldserializer32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-fieldserializer32x32.png" />
+
+			<include-file name="palette-icon-filter32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-filter32x32.png" />
+
+			<include-file name="palette-icon-gather32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-gather32x32.png" />
+
+			<include-file name="palette-icon-heartbeat32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-heartbeat32x32.png" />
+
+			<include-file name="palette-icon-input32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-input32x32.png" />
+
+			<include-file name="palette-icon-iterate32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-iterate32x32.png" />
+
+			<include-file name="palette-icon-java32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-java32x32.png" />
+
+			<include-file name="palette-icon-join32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-join32x32.png" />
+
+			<include-file name="palette-icon-jtable32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-jtable32x32.png" />
+
+			<include-file name="palette-icon-lock32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-lock32x32.png" />
+
+			<include-file name="palette-icon-lockset32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-lockset32x32.png" />
+
+			<include-file name="palette-icon-map32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-map32x32.png" />
+
+			<include-file name="palette-icon-materializedwindow32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-materializedwindow32x32.png" />
+
+			<include-file name="palette-icon-merge32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-merge32x32.png" />
+
+			<include-file name="palette-icon-metronome32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-metronome32x32.png" />
+
+			<include-file name="palette-icon-module32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-module32x32.png" />
+
+			<include-file name="palette-icon-NBinputadapter32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-NBinputadapter32x32.png" />
+
+			<include-file name="palette-icon-NBoutputadapter32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-NBoutputadapter32x32.png" />
+
+			<include-file name="palette-icon-output32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-output32x32.png" />
+
+			<include-file name="palette-icon-palette-icon-aggregate32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-palette-icon-aggregate32x32.png" />
+
+			<include-file name="palette-icon-pattern32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-pattern32x32.png" />
+
+			<include-file name="palette-icon-qtable32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-qtable32x32.png" />
+
+			<include-file name="palette-icon-query32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-query32x32.png" />
+
+			<include-file name="palette-icon-sbadmin32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-sbadmin32x32.png" />
+
+			<include-file name="palette-icon-sequence32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-sequence32x32.png" />
+
+			<include-file name="palette-icon-split32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-split32x32.png" />
+
+			<include-file name="palette-icon-union32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-union32x32.png" />
+
+			<include-file name="palette-icon-unlock32x32.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/cep/palette-icon-unlock32x32.png" />
+
+			<include-file name="chat.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/chat.png" />
+
+			<include-file name="clear.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/clear.gif" />
+
+			<include-file name="clientenv.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/clientenv.png" />
+
+			<include-file name="close.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/close.png" />
+
+			<include-file name="debug.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/debug.png" />
+
+			<include-file name="delete.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/delete.gif" />
+
+			<include-file name="delete2.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/delete2.png" />
+
+			<include-file name="deploy.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/deploy.png" />
+
+			<include-file name="design.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/design.png" />
+
+			<include-file name="editing.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/editing.png" />
+
+			<include-file name="edittext.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/edittext.png" />
+
+			<include-file name="eventDragImage.svg"
+			              path="${project_root}/src/smartx/flex/components/assets/images/eventDragImage.svg" />
+
+			<include-file name="exit.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/exit.png" />
+
+			<include-file name="export.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/export.png" />
+
+			<include-file name="eye.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/eye.png" />
+
+			<include-file name="handle.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/handle.png" />
+
+			<include-file name="hideOrShow.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/hideOrShow.png" />
+
+			<include-file name="homepage.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/homepage.png" />
+
+			<include-file name="import.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/import.png" />
+
+			<include-file name="info.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/info.png" />
+
+			<include-file name="insert.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/insert.gif" />
+
+			<include-file name="line.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/line.png" />
+
+			<include-file name="listview.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/listview.png" />
+
+			<include-file name="littleArrow.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/littleArrow.png" />
+
+			<include-file name="adpwd.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/adpwd.gif" />
+
+			<include-file name="button.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/button.gif" />
+
+			<include-file name="earth.jpg"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/earth.jpg" />
+
+			<include-file name="icon.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/icon.gif" />
+
+			<include-file name="login.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/login.gif" />
+
+			<include-file name="loginbg.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/loginbg.gif" />
+
+			<include-file name="main.GIF"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/main.GIF" />
+
+			<include-file name="pwd.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/pwd.gif" />
+
+			<include-file name="title-bg.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/title-bg.gif" />
+
+			<include-file name="title-logo.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/title-logo.gif" />
+
+			<include-file name="title-text.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/title-text.gif" />
+
+			<include-file name="user.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/logo/user.gif" />
+
+			<include-file name="minuse.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/minuse.png" />
+
+			<include-file name="modifyPwd.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/modifyPwd.png" />
+
+			<include-file name="new.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/new.png" />
+
+			<include-file name="Bar_Chart.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/Bar_Chart.png" />
+
+			<include-file name="file_csv.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/file_csv.png" />
+
+			<include-file name="file_htm.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/file_htm.png" />
+
+			<include-file name="file_pdf.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/file_pdf.png" />
+
+			<include-file name="file_png.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/file_png.png" />
+
+			<include-file name="file_save.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/file_save.png" />
+
+			<include-file name="file_xls.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/file_xls.png" />
+
+			<include-file name="Line_Chart.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/Line_Chart.png" />
+
+			<include-file name="Pie_Chart.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/Pie_Chart.png" />
+
+			<include-file name="printer.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/printer.png" />
+
+			<include-file name="scatter.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/scatter.png" />
+
+			<include-file name="Table.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/olap/Table.png" />
+
+			<include-file name="open.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/open.png" />
+
+			<include-file name="pageFirst.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/pageFirst.png" />
+
+			<include-file name="pageJump.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/pageJump.png" />
+
+			<include-file name="pageLast.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/pageLast.png" />
+
+			<include-file name="pageNext.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/pageNext.png" />
+
+			<include-file name="pagePrev.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/pagePrev.png" />
+
+			<include-file name="passed.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/passed.png" />
+
+			<include-file name="question.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/question.png" />
+
+			<include-file name="quicQuery.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/quicQuery.png" />
+
+			<include-file name="redpoint.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/redpoint.png" />
+
+			<include-file name="refresh.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/refresh.png" />
+
+			<include-file name="refsearch.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/refsearch.gif" />
+
+			<include-file name="relogin.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/relogin.png" />
+
+			<include-file name="return.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/return.png" />
+
+			<include-file name="save.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/save.png" />
+
+			<include-file name="savereturn.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/savereturn.png" />
+
+			<include-file name="serverenv.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/serverenv.png" />
+
+			<include-file name="set.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/set.png" />
+
+			<include-file name="start.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/start.png" />
+
+			<include-file name="stop.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/stop.png" />
+
+			<include-file name="style.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/style.png" />
+
+			<include-file name="submit.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/submit.png" />
+
+			<include-file name="switch.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/switch.png" />
+
+			<include-file name="template.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/template.png" />
+
+			<include-file name="upload.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/upload.png" />
+
+			<include-file name="usermgmt.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/usermgmt.gif" />
+
+			<include-file name="userpermission.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/userpermission.gif" />
+
+			<include-file name="view.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/view.png" />
+
+			<include-file name="warning.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/warning.png" />
+
+			<include-file name="wjx.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/wjx.png" />
+
+			<include-file name="activity_exception.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/activity_exception.gif" />
+
+			<include-file name="activity_passed.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/activity_passed.gif" />
+
+			<include-file name="activity_processing.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/activity_processing.gif" />
+
+			<include-file name="activity_wait.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/activity_wait.gif" />
+
+			<include-file name="end.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/end.gif" />
+
+			<include-file name="start.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/start.gif" />
+
+			<include-file name="workflow12.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/workflow12.gif" />
+
+			<include-file name="workflow13.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/workflow13.gif" />
+
+			<include-file name="workflow14.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/workflow14.gif" />
+
+			<include-file name="workflow2.jpg"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/workflow2.jpg" />
+
+			<include-file name="workflow6.jpg"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workflow/workflow6.jpg" />
+
+			<include-file name="workpositionmgmt.gif"
+			              path="${project_root}/src/smartx/flex/components/assets/images/workpositionmgmt.gif" />
+
+			<include-file name="zoomin.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/zoomin.png" />
+
+			<include-file name="zoomout.png"
+			              path="${project_root}/src/smartx/flex/components/assets/images/zoomout.png" />
+			
+			<include-file name="error.png"  path="${project_root}/src/smartx/flex/components/assets/images/error.png" />
+				
+			<include-file name="confirm.png" path="${project_root}/src/smartx/flex/components/assets/images/confirm.png" />
+
+
+		</compc>
+	</target>
+	<target name="buildSwc" depends="buildAssetsSwc">
+		<fileset dir="${src_dir}" id="src.files">
+			<include name="**/**" />
+		</fileset>
+		<pathconvert property="evaFramework_classes"
+		             pathsep=" "
+		             dirsep="."
+		             refid="src.files">
+			<!--<map from="/" to="/" />-->
+			<map from="${project_root}/src/" to="" />
+			<mapper>
+				<chainedmapper>
+					<globmapper from="*.as" to="*" />
+				</chainedmapper>
+				<chainedmapper>
+					<globmapper from="*.mxml" to="*" />
+				</chainedmapper>
+			</mapper>
+		</pathconvert>
+		<echo message="${evaFramework_classes}" />
+		<compc output="${deploy_dir}/${swc_file}"
+		       optimize="true"
+		       incremental="true"
+		       benchmark="true"
+		       fork="true"
+		       include-classes="${evaFramework_classes}"
+		       strict="true"
+		       debug="false"
+		       as3="true"
+		       actionscript-file-encoding="utf-8"
+		       allow-source-path-overlap="true"
+		       use-resource-bundle-metadata="true"
+		       keep-all-type-selectors="true"
+		       maxmemory="256m">
+			<source-path path-element="${src_dir}" />
+			<!-- The Flex 4 default theme is Spark. -->
+			<theme dir="${FLEX_HOME}/frameworks/themes/Halo" append="true">
+				<include name="halo.swc" />
+			</theme>
+			<external-library-path dir="${FLEX_HOME}/frameworks/libs"
+			                       append="true">
+				<include name="*.swc" />
+				<include name="/air/*.swc" />
+				<include name="/locale/${application.locale}/*.swc" />
+			</external-library-path>
+			<library-path dir="${libs_dir}" append="true">
+				<include name="**/**" />
+			</library-path>
+		</compc>
+		<echo message="-- Deletes cache file --" />
+		<delete>
+			<fileset dir="${deploy_dir}"
+			         includes="${swc_file}.cache"
+			         defaultexcludes="false" />
+		</delete>
+		<delete file="../lib/assets.swc" />
+	</target>
+</project>

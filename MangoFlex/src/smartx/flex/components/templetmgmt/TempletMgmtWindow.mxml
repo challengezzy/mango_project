@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="vertical" width="100%" height="100%" close="PopUpManager.removePopUp(this)" 
+	xmlns:templetmgmt="smartx.flex.components.templetmgmt.*" xmlns:components="smartx.flex.components.*"
+		title="{'编辑元原模板['+templetCode+']'}"
+		allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true" xmlns:core="smartx.flex.components.core.*" >
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var endpoint:String;
+		]]>
+	</mx:Script>
+	<core:BillTempletPanel templetCode="{templetCode}" debugMode="{debugMode}" width="100%" height="100%"
+						   endpoint="{endpoint}"/>
+</SuperPanel>

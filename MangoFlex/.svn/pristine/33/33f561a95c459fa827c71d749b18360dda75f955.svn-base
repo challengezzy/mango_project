@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="net.brandonmeyer.containers.*" layout="vertical" width="450" height="300"
+					   title="排序设置" allowClose="true" allowDrag="true" close="PopUpManager.removePopUp(this)"
+					   creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			public var templetVo:TempletVO;
+			
+			public var templeteCode:String;
+			
+			public var confirmFun:Function;
+			
+			private var filterInfo:SharedObject;
+			//可被排序的字段集合
+			[Bindable]
+			public var itemListDp:ArrayCollection = new ArrayCollection();
+			//已经排序的字段集合
+			[Bindable]
+			public var orderByListDp:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				initItem();
+				filterInfo = SharedObject.getLocal(GlobalConst.KEYNAME_SHAREDOBJECT_FILTERINFO);
+				
+			}
+			
+			private function orderbyTypeLabelFun(item:Object, column:DataGridColumn):String{
+				if(item.orderType == "desc")
+					return "降序";
+				else if(item.orderType == "asc")
+					return "升序";
+				else
+					return "";
+			}
+			
+			private function getOrderBySql():String{
+				if(orderByListDp.length == 0)
+					return "";
+				var sql:String = "order by ";
+				for each(var orderBy:Object in orderByListDp){
+					sql = sql.concat(orderBy.itemKey).concat(" ").concat(orderBy.orderType).concat(",");
+				}
+				sql = sql.substring(0,sql.length -1 );
+				return sql;
+			}
+			
+			private function getOrderByInfo():String{
+				if(orderByListDp.length == 0)
+					return "";
+					
+				var ascInfo:String = "";
+				var descInfo:String = "";
+				var info:String = "";
+				
+				for each(var orderBy:Object in orderByListDp){
+					if(orderBy.orderType == "asc")
+						ascInfo = ascInfo.concat(orderBy.itemName).concat("（↑），");
+					else
+						descInfo = descInfo.concat(orderBy.itemName).concat("（↓），");
+				}
+				
+				info = ascInfo.substring(0,ascInfo.length-1)
+					.concat(" ").concat(descInfo.substring(0,descInfo.length-1));
+				
+				return info;
+			}
+			
+			/**
+			 * 初始化需排序字段
+			 **/ 
+			private function initItem():void{
+				for each(var itemVO:TempletItemVO in templetVo.itemVos){
+					if(!itemVO.listisshowable)//如果列表不显示，则不做排序
+						continue;
+					var item:Object = {itemName:itemVO.itemname,itemKey:itemVO.itemkey,orderType:"asc"};
+					itemListDp.addItem(item);
+				}
+			}
+			
+			private function assignSingleItemOrder():void{
+				if(itemListDg.selectedIndex < 0)
+					return;
+				var selectedItems:Array = itemListDg.selectedItems;
+				for each(var selectedItem:Object in selectedItems){
+					orderByListDp.addItem(selectedItem);//添加至排序字段
+					itemListDp.removeItemAt(itemListDg.selectedIndex);//将被排序中的字段删除
+				}
+			}
+			
+			private function retrieveSingleItemOrder():void{
+				if(orderByListDg.selectedIndex < 0)
+					return;
+				var selectedItems:Array = orderByListDg.selectedItems;
+				for each(var selectedItem:Object in selectedItems){
+					itemListDp.addItem(selectedItem);
+					orderByListDp.removeItemAt(orderByListDg.selectedIndex);
+				}
+			}
+			
+			private function assignWholeItemOrder():void{
+				orderByListDp.addAll(itemListDp);
+				itemListDp.removeAll();
+			}
+			
+			private function retrieveWholeItemOrder():void{
+				itemListDp.addAll(orderByListDp);
+				orderByListDp.removeAll();
+			}
+			
+			private function confirm():void{
+				if(filterInfo.data.orderInfo[templeteCode] == null)
+					filterInfo.data.orderInfo[templeteCode] = {};
+				filterInfo.data.orderInfo[templeteCode].itemList = itemListDp;
+				filterInfo.data.orderInfo[templeteCode].orderByList = orderByListDp;
+				filterInfo.data.orderInfo[templeteCode].sql = getOrderBySql();
+				filterInfo.data.orderInfo[templeteCode].info = getOrderByInfo();
+				confirmFun();
+				PopUpManager.removePopUp(this);
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%" height="100%">
+			<mx:List id="itemListDg" height="100%" width="40%" dataProvider="{itemListDp}" labelField="itemName" allowMultipleSelection="true"/>
+			<mx:VBox width="20%" height="100%" verticalAlign="middle">
+				<mx:Button label=">" width="100" click="assignSingleItemOrder()"/>
+				<mx:Button label="&lt;" width="100" click="retrieveSingleItemOrder()" />
+				<mx:Button label=">>" width="100" click="assignWholeItemOrder()" />
+				<mx:Button label="&lt;&lt;" width="100" click="retrieveWholeItemOrder()"/>
+			</mx:VBox>
+			<mx:DataGrid id="orderByListDg" width="40%" height="100%" editable="true" dataProvider="{orderByListDp}" allowMultipleSelection="true"
+						 draggableColumns="false" dragEnabled="true" dragMoveEnabled="true" dropEnabled="true">
+				<mx:columns>
+					<mx:DataGridColumn headerText="排序字段" dataField="itemName" editable="false" />
+					<mx:DataGridColumn headerText="排序方式" dataField="orderType" labelFunction="orderbyTypeLabelFun">
+						<mx:itemEditor>
+							<fx:Component>
+								<mx:HBox width="100%" horizontalAlign="center">
+									<fx:Script>
+										<![CDATA[
+											import mx.events.ListEvent;
+											
+											public function get text():String{
+												return typeCbox.selectedItem.data;
+											}
+											
+											override public function set data(value:Object):void{
+												super.data = value;
+												if(value != null){
+													if(data.orderType == "desc")
+														typeCbox.selectedIndex = 1;
+												}
+											}
+										]]>
+									</fx:Script>
+									<mx:ComboBox id="typeCbox" width="100%" labelField="name" 
+												 dataProvider="{[{name:'升序',data:'asc'},{name:'降序',data:'desc'}]}" />
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemEditor>
+					</mx:DataGridColumn>
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom" >
+			<mx:Button id="submitBtn" label="确定" icon="{AssetsFileLib.okIcon}" click="confirm()" />
+			<mx:Button id="cancelBtn" label="取消" icon="{AssetsFileLib.closeIcon}" click="PopUpManager.removePopUp(this)" />
+		</mx:HBox>
+	</mx:VBox>
+</containers:SuperPanel>

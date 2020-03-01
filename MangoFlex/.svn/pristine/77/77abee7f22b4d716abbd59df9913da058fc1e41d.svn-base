@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:pivot="com.flexmonster.pivot.*"
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%"
+		   initialize="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.flexmonster.pivot.FlexPivotComponent;
+			import com.flexmonster.pivot.data.consts.DataSourceType;
+			import com.flexmonster.pivot.events.PivotEvent;
+			import com.flexmonster.pivot.model.export.ExportType;
+			import com.flexmonster.pivot.model.report.vo.ReportValueObject;
+			import com.flexmonster.pivot.view.ViewType;
+			import com.flexmonster.pivot.view.charts.ChartType;
+			import com.flexmonster.pivot.vo.ConnectionParams;
+			import com.flexmonster.pivot.vo.ExportOptions;
+			import com.flexmonster.pivot.vo.FormatValueObject;
+			import com.flexmonster.pivot.vo.OptionsValueObject;
+			import com.jaspersoft.reports.model.impl.Report;
+			
+			import mx.events.MenuEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public static const BUILDPIVOTCOMPONENT_FINISH:String = "buildPivotcomponent_Finish";
+			
+			public var mode:String = GlobalConst.MODE_PIVOTCOMPONENT_SQL;
+			public var sql:String;
+			public var datasource:String;
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			private var webrootUrl:String =  ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_WEBROOT) as String;
+			public var endpoint:String;
+			private var formService:RemoteObject;
+			
+			private var clientEnv:ClientEnviorment =  ClientEnviorment.getInstance();
+			
+			private var tempdir:String = "tempdata/";
+			
+			public var swfFilePath:String = "olap/";
+			public var localSettingsURL:String = "local.chinese.xml";
+			
+			public var pivotComponent:FlexPivotComponent;
+			
+			public var rows:*;
+			public var measures:*;
+			public var columns:*;
+			public var pages:*;
+			public var viewType:String = ViewType.GRID;
+			public var showFieldList:Boolean = true;
+			public var configUrl:String;
+			public var autoLoad:Boolean = true;
+			public var chartType:String;
+			public var styleSheetName:String;
+			public var configuratorButton : Boolean = true;
+			public var showToolBar:Boolean = true;
+			
+			public var xmlaUrl:String;
+			public var cubeName:String;
+			public var dataSourceInfo:String;
+			public var catalog:String;
+			
+			private var csvFileName:String;
+			private var rowsTotal:int = 0;
+			public var fieldNameMap:Object;//字段名称映射
+			
+			private var optionsObj:OptionsValueObject;
+			private var reportObj:ReportValueObject;
+			
+			
+			private function init():void{
+				formService = new RemoteObject(destination);
+				endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+				webrootUrl =  ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_WEBROOT) as String;
+				
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				formService.generateCSVFile.addEventListener(ResultEvent.RESULT,generateCSVFileHandler);
+				formService.generateCSVFile.addEventListener(FaultEvent.FAULT,faultHandler);
+				if(!showToolBar)
+					mainBox.removeChild(toolBar);
+								
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				dispatchEvent(new Event(BillPivotComponent.BUILDPIVOTCOMPONENT_FINISH));
+				SmartXMessage.show("生成CSV文件异常",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+			private function generateCSVFileHandler(event:ResultEvent):void{
+				var dataMap:Object = event.result;
+				rowsTotal = dataMap[GlobalConst.DATA_ROWCOUNT] as int;				
+				csvFileName= dataMap["FILENAME"] as String;
+				buildPivotComponent();
+			}
+			
+			
+			private function buildPivotComponent():void{
+				//先清楚原对象，重新构建
+				if(pivotComponent != null) {
+					pivotComponent.clear();
+					//pivotComponent.maxDecimalPlaces = 2; //小数点后保留2位,不足位不需要补零
+					
+					//var formatObj:FormatValueObject = pivotComponent.getFormat("");
+					//formatObj.maxDecimalPlaces = 2;
+					reportObj = pivotComponent.getReport();
+					optionsObj = pivotComponent.getOptions();
+					
+					reportObj.localSettingsUrl = localSettingsURL;
+					if(rows != null)
+						reportObj.rows = rows;
+					if(columns != null)
+						reportObj.columns = columns;
+					if(measures != null)
+						reportObj.measures = measures;
+					if(pages != null)
+						reportObj.pages = pages;
+					
+					reportObj.viewType = viewType;
+					if(chartType != null)
+						reportObj.chartType = chartType;
+					
+					
+					//reportObj.showFieldsList = showFieldList;
+					if(styleSheetName != null)
+						reportObj.styleSheetName = styleSheetName;
+					reportObj.configuratorButton = configuratorButton;
+					
+					if(mode == GlobalConst.MODE_PIVOTCOMPONENT_SQL){
+						pivotComponent.setReport(reportObj);
+					}else if(mode == GlobalConst.MODE_PIVOTCOMPONENT_MONDRIAN){
+						reportObj.proxyUrl = xmlaUrl;
+						reportObj.cube = cubeName;
+						reportObj.dataSourceInfo = dataSourceInfo;
+						reportObj.catalog = catalog;
+						
+						pivotComponent.setReport(reportObj);
+					}
+				}else{
+					pivotComponent = PivotComponentFactory.getPivotComponent();
+					//监听组件是否加载完成
+					pivotComponent.addEventListener("creationComplete",pivotCreationCompleteHandler);
+					pivotComponent.addEventListener("renderComplete",renderCompleteHandler);
+					pivotComponent.addEventListener("updateComplete",updateCompleteHandler);
+
+					//pivotComponent.maxDecimalPlaces = 2; //小数点后保留2位,不足位不需要补零
+					
+					//pivotComponent.setFormat(2,"maxDecimalPlaces");
+					
+					//代码转移	
+				}
+				mainBox.addChildAt(pivotComponent,0);
+				//代码转移
+			}
+			
+			//Dispatched when pivot is created and is ready to receive data
+			private function pivotCreationCompleteHandler(event:Event):void{
+				trace("--------pivotCreationComplete--------");
+				reportObj = pivotComponent.getReport();
+				optionsObj = pivotComponent.getOptions();
+				
+				reportObj.localSettingsUrl = localSettingsURL;
+				if(rows != null)
+					reportObj.rows =  rows;
+				if(columns != null)
+					reportObj.columns = columns;
+				if(measures != null)
+					reportObj.measures = measures;
+				if(pages != null)
+					reportObj.pages = pages;
+				
+				reportObj.viewType = viewType;
+				if(chartType != null)
+					reportObj.chartType = chartType;
+				
+				
+				//reportObj.showFieldsList = showFieldList;
+				if(styleSheetName != null)
+					reportObj.styleSheetName = styleSheetName;
+				reportObj.configuratorButton = configuratorButton;
+				
+				if(mode == GlobalConst.MODE_PIVOTCOMPONENT_SQL){
+					//
+					
+				}else if(mode == GlobalConst.MODE_PIVOTCOMPONENT_CONFIGFILE){
+					pivotComponent.configUrl = configUrl;
+					
+				}else if(mode == GlobalConst.MODE_PIVOTCOMPONENT_MONDRIAN){
+					
+					reportObj.proxyUrl = xmlaUrl;
+					reportObj.cube = cubeName;
+					reportObj.dataSourceInfo = dataSourceInfo;
+					reportObj.catalog = catalog;
+				}
+				
+				reportObj.dataSourceType = DataSourceType.CSV;
+				reportObj.filename = webrootUrl + swfFilePath+tempdir + csvFileName;
+				pivotComponent.setReport(reportObj);
+				//重新设置文件路径
+				if(mode == GlobalConst.MODE_PIVOTCOMPONENT_SQL){
+					//经过调试，文件类型的URL在 reportvalueobject中指定
+					//pivotComponent.load(swfFilePath+tempdir + csvFileName);
+//					pivotComponent.load(null);
+//					var connectionParams:ConnectionParams = new ConnectionParams();
+//					connectionParams.dataSourceType = DataSourceType.CSV; 
+//					connectionParams.filename = webrootUrl + swfFilePath+tempdir + csvFileName;//"http://localhost:8181/SmartXWeb/"
+//					pivotComponent.connectTo(connectionParams);
+
+					
+					//pivotComponent.filename = tempdir + csvFileName;
+				}else if(mode == GlobalConst.MODE_PIVOTCOMPONENT_CONFIGFILE){
+					pivotComponent.configUrl = configUrl;
+				}
+				
+				//pivotComponent.setReport(reportObj);
+				//load() API call has been split to load() and open() methods. 
+				//Now load() works only with URLs. To open local report file use open().
+				//pivotComponent.open();
+				//数据为空时，直接报告渲染完成
+				if(mode== GlobalConst.MODE_PIVOTCOMPONENT_SQL && rowsTotal == 0){
+					trace("--------根据sql查询到0条数据--------");
+					dispatchEvent(new Event(BillPivotComponent.BUILDPIVOTCOMPONENT_FINISH));
+					SmartXMessage.show("根据当前条件查询到0条数据!",SmartXMessage.MESSAGE_WARN,"查询SQL:\n" + sql);
+				}
+				
+			}
+			
+			private function updateCompleteHandler(event:Event):void{
+				trace("--------updateComplete--------");
+				dispatchEvent(new Event(BillPivotComponent.BUILDPIVOTCOMPONENT_FINISH));
+			}
+			
+			
+			//组件渲染完成 Dispatched when the rendering of pivot grid or chart has been finished
+			private function renderCompleteHandler(event:Event):void{
+				//renderComplete event has been removed in version 1.6.
+				trace("--------renderComplete--------");
+				
+			}
+			
+
+			protected function viewTypeButton_itemClickHandler(event:MenuEvent):void
+			{
+				var item:Object = event.item;
+				var id:* = item.bid;
+				if(id == "tableItem"){
+					pivotComponent.showGrid();
+				}
+				else if(id == "barItem"){
+					pivotComponent.showCharts(ChartType.BAR);
+				}
+				else if(id == "lineItem"){
+					pivotComponent.showCharts(ChartType.LINE);
+				}
+				else if(id == "pieItem"){
+					pivotComponent.showCharts(ChartType.PIE);
+				}
+				else if(id == "scatterItem"){
+					pivotComponent.showCharts(ChartType.SCATTER);
+				}
+			}
+
+
+			protected function exportButton_itemClickHandler(event:MenuEvent):void
+			{
+				var item:Object = event.item;
+				var id:* = item.bid;
+				if(id == "htmlItem"){
+					var exportOptions:ExportOptions = new ExportOptions();; 
+					exportOptions.htmlTemplateURL = 'styles/misc/export.html'; 
+					pivotComponent.export(ExportType.HTML, exportOptions);
+				}
+				else if(id == "csvItem"){
+					pivotComponent.export(ExportType.CSV);
+				}
+				else if(id == "pdfItem"){
+					pivotComponent.export(ExportType.PDF);
+				}
+				else if(id == "xlsItem"){
+					pivotComponent.export(ExportType.EXCEL);
+				}
+				else if(id == "imageItem"){
+					pivotComponent.export(ExportType.IMAGE);
+				}
+				else if(id == "printItem"){
+					pivotComponent.print();
+				}
+			}
+			
+			//数据刷新
+			public function refreshData():void{
+				if(mode == GlobalConst.MODE_PIVOTCOMPONENT_SQL){
+					formService.generateCSVFile(datasource,sql,swfFilePath + tempdir, fieldNameMap,"utf-8");
+				}
+				else{
+					buildPivotComponent();
+				}
+			}
+			
+			//清楚数据
+			public function destroy():void{
+				if(pivotComponent != null){
+					pivotComponent.clear();
+					
+					PivotComponentFactory.releasePivot(pivotComponent);
+					
+					removeAllElements()
+					removeAllChildren();
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" id="mainBox">
+		<mx:HBox height="27" width="100%" id="toolBar" verticalAlign="middle">
+			<mx:PopUpMenuButton id="viewTypeButton" label="显示类型" labelField="label" 
+								icon="{AssetsFileLib.TableIcon}"
+								itemClick="viewTypeButton_itemClickHandler(event)">
+				<mx:dataProvider>
+					<fx:Array>
+						<fx:Object label="表格" icon="{AssetsFileLib.TableIcon}"
+								   bid="tableItem"/>
+						<fx:Object label="柱状图" icon="{AssetsFileLib.Bar_ChartIcon}"
+								   bid="barItem"/>
+						<fx:Object label="折线图" icon="{AssetsFileLib.Line_ChartIcon}"
+								   bid="lineItem"/>
+						<fx:Object label="饼图" icon="{AssetsFileLib.Pie_ChartIcon}"
+								   bid="pieItem"/>
+						<fx:Object label="分布图" icon="{AssetsFileLib.scatterIcon}"
+								   bid="scatterItem"/>
+					</fx:Array>
+				</mx:dataProvider>
+			</mx:PopUpMenuButton>
+			<mx:PopUpMenuButton id="exportButton" label="导出"
+								icon="{AssetsFileLib.printerIcon}"
+								itemClick="exportButton_itemClickHandler(event)">
+				<mx:dataProvider>
+					<fx:Array>
+						<fx:Object label="导出网页" icon="{AssetsFileLib.file_htmIcon}"
+								   bid="htmlItem"/>
+						<fx:Object label="导出CSV" icon="{AssetsFileLib.file_csvIcon}"
+								   bid="csvItem"/>
+						<fx:Object label="导出PDF" icon="{AssetsFileLib.file_pdfIcon}"
+								   bid="pdfItem"/>
+						<fx:Object label="导出EXCEL" icon="{AssetsFileLib.file_xlsIcon}"
+								   bid="xlsItem"/>
+						<fx:Object label="导出图片" icon="{AssetsFileLib.file_pngIcon}"
+								   bid="imageItem"/>
+						<fx:Object label="打印" icon="{AssetsFileLib.printerIcon}"
+								   bid="printItem"/>
+					</fx:Array>
+				</mx:dataProvider>
+			</mx:PopUpMenuButton>
+		</mx:HBox>
+	</mx:VBox>	
+</mx:Canvas>

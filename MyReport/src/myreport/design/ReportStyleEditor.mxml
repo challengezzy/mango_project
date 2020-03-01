@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 width="200" height="100%" creationComplete="Init()" fontFamily="Simsun" fontSize="12"
+		 horizontalAlign="center" verticalGap="4">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.report.Define;
+			import myreport.data.report.ReportSettings;
+			private static var g_Instance:ReportStyleEditor;
+			
+			public static function get Instance():ReportStyleEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ReportStyleEditor();
+					g_Instance.initialize();
+					g_Instance.percentHeight = 100;
+					g_Instance.percentWidth = 100;
+				}
+				return g_Instance;
+			}
+			
+			private var _Data:ReportSettings;
+			private function Init():void
+			{
+				_PageNumberFormat.dataProvider = DesignUtil.GetPageNumberFormatSource();
+				if(_Data)
+					Refresh();
+			}
+			public function set Data(value:Object):void
+			{
+				_Data = value as ReportSettings;
+				Refresh();
+			}
+			
+			public function Refresh():void
+			{
+				_Size.selectedIndex = -1;
+				_Width.text = _Data.PageWidth.toString();
+				_Height.text = _Data.PageHeight.toString();
+				_MarginLeft.text = _Data.LeftMargin.toString();
+				_MarginRight.text = _Data.RightMargin.toString();
+				_MarginTop.text = _Data.TopMargin.toString();
+				_MarginBottom.text = _Data.BottomMargin.toString();
+				_PageHeaderRepeat.selected = _Data.PageHeaderRepeat;
+				_PageFooterRepeat.selected = _Data.PageFooterRepeat;
+				_TableHeaderRepeat.selected = _Data.TableHeaderRepeat;
+				_TableFooterRepeat.selected = _Data.TableFooterRepeat;
+ 
+				_ShowPageNumber.selected = _Data.ShowPageNumber;
+				_CanGrow.selected = _Data.CanGrow;
+				_AutoWidth.selected = _Data.AutoWidth;
+				_AdjustPrintDirection.selected = _Data.AdjustPrintDirection;
+				_FitToPrintSize.selected = _Data.FitToPrintSize;
+				_PageFooterShowAtEnd.selected = _Data.PageFooterShowAtEnd;
+				
+				_PageNumberFormat.selectedIndex = -1;
+				_PageNumberFormat.text = _Data.PageNumberFormat;
+			}
+			
+			private function OnEdit(event:Event):void
+			{
+				if (event.currentTarget == _TableHeaderRepeat)
+				{
+					EditProperty(Define.PRO_TABLE_HEADER_REPEAT, _TableHeaderRepeat.selected);
+				}
+				else if (event.currentTarget == _TableFooterRepeat)
+				{
+					EditProperty(Define.PRO_TABLE_FOOTER_REPEAT, _TableFooterRepeat.selected);
+				}
+		 
+				else if (event.currentTarget == _PageHeaderRepeat)
+				{
+					EditProperty(Define.PRO_PAGE_HEADER_REPEAT, _PageHeaderRepeat.selected);
+				}
+				else if (event.currentTarget == _PageFooterRepeat)
+				{
+					EditProperty(Define.PRO_PAGE_FOOTER_REPEAT, _PageFooterRepeat.selected);
+				}
+				else if (event.currentTarget == _ShowPageNumber)
+				{
+					EditProperty(Define.PRO_SHOW_PAGE_NUMBER, _ShowPageNumber.selected);
+				}
+				else if(event.currentTarget == _CanGrow)
+				{
+					EditProperty(Define.PRO_CAN_GROW, _CanGrow.selected);
+				}
+				else if(event.currentTarget == _AutoWidth)
+				{
+					EditProperty(Define.PRO_AUTO_WIDTH, _AutoWidth.selected);
+				}
+				else if(event.currentTarget == _AdjustPrintDirection)
+				{
+					EditProperty(Define.PRO_ADJUST_PRINT_DIRECTION, _AdjustPrintDirection.selected);
+				}
+				else if(event.currentTarget == _FitToPrintSize)
+				{
+					EditProperty(Define.PRO_FIT_TO_PRINT_SIZE, _FitToPrintSize.selected);
+				}
+				else if(event.currentTarget == _PageFooterShowAtEnd)
+				{
+					EditProperty(Define.PRO_PAGE_FOOTER_SHOW_AT_END, _PageFooterShowAtEnd.selected);
+				}
+				else if (event.currentTarget is TextInput)
+				{
+					var value:Number = Number(event.currentTarget.text);
+					if (isNaN(value))
+						return;
+					if (event.currentTarget == _Width)
+					{
+						EditProperty(Define.PRO_PAGE_WIDTH, value);
+ 
+					}
+					else if (event.currentTarget == _Height)
+					{
+						EditProperty(Define.PRO_PAGE_HEIGHT, value);
+					}
+					else if (event.currentTarget == _MarginLeft)
+					{
+						EditProperty(Define.PRO_MARGIN_LEFT, value);
+ 
+					}
+					else if (event.currentTarget == _MarginRight)
+					{
+						EditProperty(Define.PRO_MARGIN_RIGHT, value);
+ 
+					}
+					else if (event.currentTarget == _MarginTop)
+					{
+						EditProperty(Define.PRO_MARGIN_TOP, value);
+	 
+					}
+					else if (event.currentTarget == _MarginBottom)
+					{
+						EditProperty(Define.PRO_MARGIN_BOTTOM, value);
+					}
+				}
+				else if (event.currentTarget == _Size)
+				{
+					if (_Size.selectedIndex < 0)
+						return;
+					var txt:String = String(_Size.selectedItem);
+					txt = txt.substring(txt.indexOf("(") + 1, txt.indexOf(")"));
+					var tokens:Array = txt.split(" x ");
+					var pageWidth:Number = Number(tokens[0]);
+					var pageHeight:Number = Number(tokens[1]);
+					_Width.text = pageWidth.toString();
+					_Height.text = pageHeight.toString();
+					EditProperty(Define.PRO_PAGE_WIDTH, pageWidth);
+					EditProperty(Define.PRO_PAGE_HEIGHT, pageHeight);
+				}
+				else if(event.currentTarget == _PageNumberFormat)
+				{
+					EditProperty(Define.PRO_PAGE_NUMBER_FORMAT , _PageNumberFormat.text);
+					
+				}
+			}
+			
+			private function ItemChanged(event:Event):void
+			{
+				if (event.currentTarget != _PageNumberFormat || _PageNumberFormat.selectedItem == null)
+					return;
+				_PageNumberFormat.text = _PageNumberFormat.selectedItem.data;
+				_PageNumberFormat.selectedIndex = -1;
+				OnEdit(event);
+			}
+			
+			private function EditProperty(target:Object, value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_PROPERTY, true);
+				e.Target = target;
+				e.Value = value;
+				dispatchEvent(e);
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="常用大小"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:ComboBox id="_Size" width="80%" selectedIndex="-1" change="OnEdit(event)">
+		<mx:dataProvider>
+			<mx:ArrayCollection>
+				<mx:String>A4(21 x 29.7)</mx:String>
+				<mx:String>A4-横(29.7 x 21)</mx:String>
+				<mx:String>16开(18.4 x 26)</mx:String>
+				<mx:String>16开-横(26 x 18.4)</mx:String>
+				<mx:String>32开(13 x 18.4)</mx:String>
+				<mx:String>32开-横(18.4 x 13)</mx:String>
+				<mx:String>大32开(14 x 20.3)</mx:String>
+				<mx:String>大32开-横(20.3 x 14)</mx:String>
+				<mx:String>滚筒75mm(7.5 x 25)</mx:String>
+			</mx:ArrayCollection>
+		</mx:dataProvider>
+	</mx:ComboBox>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="大小(单位：cm)"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:Grid verticalGap="3">
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="宽"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_Width" enter="OnEdit(event)" focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="高"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_Height" enter="OnEdit(event)"
+							 focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="边距(单位：cm)"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:Grid verticalGap="3">
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="左"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_MarginLeft" enter="OnEdit(event)"
+							 focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="右"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_MarginRight" enter="OnEdit(event)"
+							 focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="上"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_MarginTop" enter="OnEdit(event)"
+							 focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="下"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_MarginBottom" enter="OnEdit(event)"
+							 focusOut="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="其他"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:CheckBox label="报表头重复" width="100" id="_PageHeaderRepeat" change="OnEdit(event)"/>
+	<mx:CheckBox label="报表尾重复" width="100" id="_PageFooterRepeat" change="OnEdit(event)"/>
+	<mx:CheckBox label="表格头重复" width="100" id="_TableHeaderRepeat" change="OnEdit(event)"/>
+	<mx:CheckBox label="表格尾重复" width="100" id="_TableFooterRepeat" change="OnEdit(event)"/>
+ 
+	<mx:CheckBox label="显示页码" width="100" id="_ShowPageNumber" change="OnEdit(event)"/>
+	<mx:ComboBox id="_PageNumberFormat" width="80%" editable="true" cornerRadius="0" enter="OnEdit(event)"
+				 focusOut="OnEdit(event)" change="ItemChanged(event)" fontWeight="normal"
+				 paddingLeft="0" labelField="label">
+	</mx:ComboBox>
+	<mx:CheckBox label="报表尾显示在页底" id="_PageFooterShowAtEnd" change="OnEdit(event)"/>
+	<mx:CheckBox label="报表高度自动递增" id="_CanGrow" change="OnEdit(event)"/>
+	<mx:CheckBox label="报表宽度自动递增" id="_AutoWidth" change="OnEdit(event)"/>
+	<mx:CheckBox label="适应打印机方向" id="_AdjustPrintDirection" change="OnEdit(event)"/>
+	<mx:CheckBox label="适应打印大小" id="_FitToPrintSize" change="OnEdit(event)"/>
+</mx:VBox>

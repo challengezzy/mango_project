@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="300" height="120" creationComplete="init()" title="附件上传" >
+	
+	<fx:Metadata>		       
+		[Event(name='loadDataSuccessful',type='smartx.flex.components.event.BasicEvent')]
+	</fx:Metadata>
+	
+	<fx:Script>   
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+						
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			private var formService:RemoteObject;
+			private var endpoint:String  = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			
+			private var fileReference:FileReference = new FileReference();
+			
+			[Bindable]
+			public var tableName:String;
+			[Bindable]
+			public var keyColumn:String;
+			[Bindable]
+			public var keyValue:String;
+			
+			protected function init():void{
+				formService = new RemoteObject(destination);
+				if(endpoint != null)
+					formService.endpoint = endpoint;				
+				formService.uploadAttachFile.addEventListener(ResultEvent.RESULT,uploadAttachFileOKHandler);
+				formService.uploadAttachFile.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				//选择文件后，加载文件
+				fileReference.addEventListener(Event.SELECT, selectHandler);
+			}
+			
+			private function selectHandler(event:Event):void {
+				fileReference.load();  //加载文件
+				fileNameField.text = fileReference.name;
+			}
+			
+			protected function btnBrows_clickHandler(event:MouseEvent):void{
+				fileReference.browse();
+			}
+			protected function btnUpload_clickHandler(event:MouseEvent):void{
+				if(fileReference.data != null){
+					OperatingTipUtil.startOperat("上传中....",null);
+					formService.uploadAttachFile(fileReference.data,fileNameField.text,tableName,keyColumn,keyValue);
+				}else{
+					SmartXMessage.show("没有选择上传的文件",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			protected function uploadAttachFileOKHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				
+				PopUpManager.removePopUp(this);
+				dispatchEvent(new BasicEvent(BasicEvent.LOADDATA_SUCCESSFUL));
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("附件上传失败",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+			}
+			
+		]]>   
+	</fx:Script>       
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+		<mx:HBox width="100%" height="100%" horizontalAlign="left">
+			<mx:Label text="文件:" />
+			<mx:TextInput id="fileNameField" width="150" editable="false"/>
+			<mx:Button id="btnBrows" click="btnBrows_clickHandler(event)" x="57" y="60" icon="{AssetsFileLib.browseIcon}" toolTip="选择文件" />
+		</mx:HBox>
+		<mx:HBox width="100%" height="100%" horizontalAlign="center">
+			<mx:Button id="btnUpload" click="btnUpload_clickHandler(event)" label="确定" x="145" y="60" icon="{AssetsFileLib.uploadIcon}" />
+			<mx:Button id="cancelButton" label="取消" click="PopUpManager.removePopUp(this)" icon="{AssetsFileLib.closeIcon}" />
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

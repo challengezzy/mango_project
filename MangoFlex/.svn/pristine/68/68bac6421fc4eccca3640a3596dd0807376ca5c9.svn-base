@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="350" height="136" title="提示">
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			[Bindable]
+			public var text:String = "";
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" verticalAlign="middle">
+		<mx:Image source="{AssetsFileLib.alertIcon}" width="50" height="50"/>
+		<mx:Label text="{text}" fontSize="14" fontWeight="bold" fontFamily="Verdana"/>
+	</mx:HBox>
+	<mx:ControlBar horizontalAlign="center">
+		<mx:Button label="确定"  click="PopUpManager.removePopUp(this)"/>
+	</mx:ControlBar>
+</mx:TitleWindow>

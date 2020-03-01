@@ -1,0 +1,29 @@
+package smartx.framework.common.job.bs;
+
+public class JobConst {
+	/**
+	 * 数字的初始值
+	 */
+	public final static long NULL_LONG_FIELD = -2147483648;
+
+	public final static int NULL_NUMERICAL_FIELD = -1;
+
+	public final static byte NULL_BYTE_FIELD = -128;
+
+	public final static byte NOT_NULL_FIELD = 99;
+
+	public final static float NOT_NULL_FLOAT = 0;
+
+	public final static double NOT_NULL_DOUBLE = 0.0;
+
+	/** JOB的状态 */
+	public final static byte JOB_STATUS_INUSE = 1;// 使用
+
+	public final static byte JOB_STATUS_NOUUSE = 2;// 不使用
+
+	public final static byte JOB_STATUS_PAUSE = 3;// 暂停
+
+	public final static byte JOB_STATUS_FINISHED = 4;// 已完成
+
+	public static final String job_parameter_key = "jobId";
+}

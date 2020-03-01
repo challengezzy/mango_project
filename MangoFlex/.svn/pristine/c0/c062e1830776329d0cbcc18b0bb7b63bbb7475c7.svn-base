@@ -1,0 +1,797 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   width="100%" height="100%" xmlns:ns1="flexlib.containers.*" creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:Tile width="100%" height="100%" id="controlTile" minHeight="180"
+				 verticalAlign="top" horizontalAlign="left" 
+				 paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20" 
+				 borderStyle="none"/>
+		<mx:VBox height="100%" id="controlBox" 
+				 verticalAlign="top" horizontalAlign="left" 
+				 paddingTop="20" paddingBottom="20" paddingLeft="50" paddingRight="20" 
+				 borderStyle="none"/>
+	</fx:Declarations>
+	<fx:Metadata>		       
+	    [Event(name='save',type='smartx.flex.components.event.BillCardPanelEvent')]
+	    [Event(name='insert',type='smartx.flex.components.event.BillCardPanelEvent')]
+	    [Event(name='saveSuccessful',type='smartx.flex.components.event.BillCardPanelEvent')]
+		[Event(name='initComplete',type='smartx.flex.components.event.BillCardPanelEvent')]
+		[Event(name='deleteSuccessful',type='smartx.flex.components.event.BillCardPanelEvent')]
+		[Event(name='setDataValueComplete',type='smartx.flex.components.event.BillCardPanelEvent')]
+		[Event(name='operationFailed',type='smartx.flex.components.event.BillCardPanelEvent')]
+	</fx:Metadata>
+	 <fx:Script>
+	        <![CDATA[
+				import com.siloon.plugin.rightClick.RightClickManager;
+				
+				import mx.collections.ArrayCollection;
+				import mx.containers.Tile;
+				import mx.containers.VBox;
+				import mx.controls.Menu;
+				import mx.core.Container;
+				import mx.core.IFlexDisplayObject;
+				import mx.core.UIComponent;
+				import mx.events.MenuEvent;
+				import mx.managers.PopUpManager;
+				import mx.managers.ToolTipManager;
+				import mx.rpc.events.FaultEvent;
+				import mx.rpc.events.ResultEvent;
+				import mx.rpc.remoting.mxml.RemoteObject;
+				import mx.utils.ObjectUtil;
+				import mx.validators.Validator;
+				
+				import smartx.flex.components.basic.ClientEnviorment;
+				import smartx.flex.components.core.ext.DataValidator;
+				import smartx.flex.components.event.BillCardPanelEvent;
+				import smartx.flex.components.event.UIComponentEvent;
+				import smartx.flex.components.itemcomponent.ItemComboBox;
+				import smartx.flex.components.itemcomponent.ItemDateTimeField;
+				import smartx.flex.components.itemcomponent.ItemListPanel;
+				import smartx.flex.components.itemcomponent.ItemNumberField;
+				import smartx.flex.components.itemcomponent.ItemPasswordField;
+				import smartx.flex.components.itemcomponent.ItemRefPanel;
+				import smartx.flex.components.itemcomponent.ItemTextAreaField;
+				import smartx.flex.components.itemcomponent.ItemTextField;
+				import smartx.flex.components.itemcomponent.ItemUIComponent;
+				import smartx.flex.components.itemcomponent.ItemUIComponentBuilder;
+				import smartx.flex.components.templetmgmt.TempletMgmtWindow;
+				import smartx.flex.components.util.LoadingWindow;
+				import smartx.flex.components.util.OperatingTipUtil;
+				import smartx.flex.components.util.SmartXMessage;
+				import smartx.flex.components.util.TempletDataUtil;
+				import smartx.flex.components.util.TempletGroupPanel;
+				import smartx.flex.components.util.ViewSingleRecordWindow;
+				import smartx.flex.components.util.script.ScriptEvent;
+				import smartx.flex.components.util.script.ScriptExecutor;
+				import smartx.flex.components.util.script.ScriptExecutorFactory;
+				import smartx.flex.components.vo.BillListPanelVO;
+				import smartx.flex.components.vo.GlobalConst;
+				import smartx.flex.components.vo.TempletItemGroupVO;
+				import smartx.flex.components.vo.TempletItemVO;
+				import smartx.flex.components.vo.TempletVO;
+	        	
+	        	
+	            private var templetVO:TempletVO;
+		        public var templetCode:String;
+		        public var destination:String = GlobalConst.SERVICE_FORM;
+		        public var endpoint:String;
+		        private var formService:RemoteObject;
+		        private var dataValue:Object ;
+		        public var controlArray:Array = new Array();
+		        private var _editable:Boolean = true;
+		        private var _insertMode:Boolean = false;
+		        public var initQueryCondition:String;
+		        private var queryCondition:String;
+		        [Bindable]
+		        public var title:String;
+		        [Bindable]
+		        public var showButtonBar:Boolean = true;
+		        [Bindable]
+		        public var debugMode:Boolean = false;
+		        [Bindable]
+		        private var rightClickMenu:Menu;
+				
+				[Bindable]
+				public var isLinkage:Boolean = false;
+		        
+		        public var showInitingWindow:Boolean = true;
+				
+				public var showLoadingWindow:Boolean = true;
+				public var loadingWindow:IFlexDisplayObject;
+		        
+		        private var newId:Number = -1;
+		        
+		        private var dataValidators:ArrayCollection = new ArrayCollection();
+				
+				private var controlsArray:Array = new Array();
+				
+				//add by zhangzz 20110323
+				/** 是否显示保存成功提示框 */
+				public var isShowAlert:Boolean = true;
+				
+				public var layoutType:String = GlobalConst.LAYOUTTYPE_BILLCARDPANEL_VBOX;
+				
+				private const MIN_CONTROL_WIDTH_WHEN_VBOX:int = 300;
+				private const MIN_CONTROL_WIDTH_WHEN_TILE:int = 170;
+				
+				private var controlContainer:Container;
+				
+				public var defaultItemUIComponentLabelWidth:int = 200;
+				
+				//add by zhangzz 20110402 begin
+				[Bindable]
+				public var insertBfInterceptor:String;
+				[Bindable]
+				public var insertAfInterceptor:String;
+				[Bindable]
+				public var updateBfInterceptor:String;
+				[Bindable]
+				public var updateAfInterceptor:String;
+				//add by zhangzz 20110402 end
+				//add by zhangzz 20110411 begin
+				[Bindable]
+				public var deleteBfInterceptor:String;
+				[Bindable]
+				public var deleteAfInterceptor:String;
+				//add by zhangzz 20110411 end
+				
+				[Bindable]
+				public var clientInsertBfIncCard:String;
+				[Bindable]
+				public var clientInsertAfIncCard:String;
+				[Bindable]
+				public var clientUpdateBfIncCard:String;
+				[Bindable]
+				public var clientUpdateAfIncCard:String;
+				[Bindable]
+				public var clientDeleteBfIncCard:String;
+				[Bindable]
+				public var clientDeleteAfIncCard:String;
+				
+				public var isInitCompleted:Boolean = false;
+				
+				private var clientEnviorment:Object = new Object();
+		        
+	        	public function init():void{
+	        		if(templetCode == null)
+		        		throw Error("元原模板编号不能为null");
+		        	//弹出开始初始化的框
+		        	if(showInitingWindow)
+						OperatingTipUtil.startOperat("正在初始化……",this);
+		        	//添加右键菜单
+		        	RightClickManager.regist();
+		        	this.addEventListener(RightClickManager.RIGHT_CLICK,onRightMouseClick);
+					
+					initControlContainer();
+		        	
+		        	formService = new RemoteObject(destination);
+		        	if(endpoint!=null)
+		        		formService.endpoint = endpoint;
+		            formService.getBillListPanelVO.addEventListener(ResultEvent.RESULT,getBillListPanelVOResultHandler);
+	    			formService.getBillListPanelVO.addEventListener(FaultEvent.FAULT,faultHandler);
+		        	formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+		        	formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+					formService.updateDataByTempletVOContainIct.addEventListener(ResultEvent.RESULT,updateHandler);
+					formService.updateDataByTempletVOContainIct.addEventListener(FaultEvent.FAULT,faultHandler);
+					formService.insertDataByTempletVOContainIct.addEventListener(ResultEvent.RESULT,updateHandler);
+					formService.insertDataByTempletVOContainIct.addEventListener(FaultEvent.FAULT,faultHandler);
+		        	formService.getSequenceNextValByDS.addEventListener(ResultEvent.RESULT,getSeqHandler);
+		        	formService.getSequenceNextValByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+					//add by zhangzz 20110411 start
+					formService.deleteDataByTempletVOContainIct.addEventListener(ResultEvent.RESULT,deleteHandler);
+					formService.deleteDataByTempletVOContainIct.addEventListener(FaultEvent.FAULT,faultHandler);
+					//add by zhangzz 20110411 end
+					formService.updateBatchData.addEventListener(ResultEvent.RESULT,updateHandler);
+					formService.updateBatchData.addEventListener(FaultEvent.FAULT,faultHandler);
+					//add by caohenghui 20110809 --start
+					searchStringClientEnviorment();
+					//add by caohenghui 20110809 --end
+					
+					templetVO = TempletDataUtil.findTempletVO(templetCode);
+					if(templetVO == null)//还没缓存过
+		        		formService.getTempletVO(templetCode,clientEnviorment);
+					else
+						initByTempletVO();
+	        	}
+				
+				
+				private function searchStringClientEnviorment():void{
+					var clientTemp:ClientEnviorment = ClientEnviorment.getInstance();
+					if(clientTemp == null){
+						return;
+					}
+					var map:Object = clientTemp.getVarMap();
+					if(map == null){
+						return;
+					}
+					var objInfo:Object = ObjectUtil.getClassInfo(map);
+					var fieldNameArray:Array = objInfo["properties"] as Array;
+					for each(var qName:QName in fieldNameArray){
+						var tempValue:Object = map[qName.localName];
+						if(tempValue==null){
+							continue;
+						}
+						if(tempValue is String){
+							clientEnviorment[qName.localName] = tempValue;
+						}
+					}
+				}
+				
+				private function initControlContainer():void{
+					if(layoutType == GlobalConst.LAYOUTTYPE_BILLCARDPANEL_TILE){
+						cardPanel.addChild(controlTile);
+						controlContainer = controlTile;
+						
+					}
+					else{
+						//defaultItemUIComponentLabelWidth = 200;
+						cardPanel.addChild(controlBox);
+						controlContainer = controlBox;
+					}
+					
+				}
+	        	
+	        	private function onRightMouseClick(event:MouseEvent):void{
+		       		if(rightClickMenu != null)
+		       			rightClickMenu.hide();
+		       		
+		       		var menuItems:Array = new Array();
+		       		if(debugMode){
+		       			menuItems.push({label:"查看数据库记录",keyname:"showRecord"});
+		       			menuItems.push({label:"编辑元原模板",keyname:"editTemplet"});
+		       		}
+		       		
+		       		rightClickMenu = Menu.createMenu(this,menuItems,true);
+		       		rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,handleRightMenuClicked);
+		       		rightClickMenu.setStyle("fontSize",12);
+		       		var point:Point = new Point(mouseX,mouseY);
+      				point = localToGlobal(point);  
+					var xx:Number = point.x;
+					var yy:Number = point.y;
+					if(xx + rightClickMenu.width > this.stage.width)
+						xx = this.stage.width - rightClickMenu.width - 1;
+					if(yy + rightClickMenu.height > this.stage.height)
+						yy = this.stage.height - rightClickMenu.height-1;
+					rightClickMenu.show(xx,yy); 
+
+		       	}
+		       	
+		       	private function handleRightMenuClicked(event:MenuEvent):void{
+		       		var item:Object = event.item;
+		       		if(item == null)
+		       			return;
+		       		if(item.keyname == "showRecord"){
+		       			var o:Object = dataValue;
+		       			if(o == null){
+							SmartXMessage.show("没有选择任何记录");
+		       				return;
+		       			}
+		       			var pkName:String = templetVO.pkname;
+		       			if(pkName == null){
+							SmartXMessage.show("没有设置主键");
+		       				return;
+		       			}
+		       			var pkValue:String = o[pkName];
+		       			var tableName:String = templetVO.tablename;
+		       			var sql:String = "select * from "+tableName+" where "+pkName+"='"+pkValue+"'";
+		       			var window:ViewSingleRecordWindow = new ViewSingleRecordWindow();
+		       			window.destination = this.destination;
+						window.endpoint = this.endpoint;
+		       			window.sql = sql;
+						window.datasource = templetVO.datasourcename;
+		       			PopUpManager.addPopUp(window,this,false);
+		       			PopUpManager.centerPopUp(window);
+		       		}
+		       		else if(item.keyname == "editTemplet"){
+		       			var templetWindow:TempletMgmtWindow = new TempletMgmtWindow();
+		       			templetWindow.templetCode = templetCode;
+		       			templetWindow.debugMode = debugMode;
+		       			templetWindow.height = 768;
+		  				templetWindow.width = 1024;
+						templetWindow.endpoint = endpoint;
+		       			PopUpManager.addPopUp(templetWindow,this,false);
+		       			PopUpManager.centerPopUp(templetWindow);
+		       		}
+		       	}
+	        	
+	        	private function getTempletVOHandler(event:ResultEvent):void{
+		        	templetVO = event.result as TempletVO;
+					TempletDataUtil.putTempletVO(templetVO);
+					initByTempletVO();
+		        }
+				
+				private function initByTempletVO():void{
+					initControls();
+					isInitCompleted = true;
+					dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.INITCOMPLETE));
+				}
+		        
+		        private function getSeqHandler(event:ResultEvent):void{
+		        	var newIdStr:String = event.result as String;
+		        	newId = parseInt(newIdStr);
+					dataValue[templetVO.pkname] = newId;
+					dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.SETSEQ_COMPLETE));
+		        }
+		        
+		        private function faultHandler(event:FaultEvent):void{
+					 endSave();
+					 SmartXMessage.show('Error',SmartXMessage.MESSAGE_ERROR,event.fault.faultString,this);
+					 dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.OPERATION_FAILED));
+		       	}
+		       	
+		       	private function initControls():void{
+		       		 //title = templetVO.templetname;
+		       		 //先初始化分组
+		       		 var groupMap:Object = new Object();
+		       		 for each(var groupVO:TempletItemGroupVO in templetVO.itemGroups){
+		       		 	var groupPanel:TempletGroupPanel = new TempletGroupPanel();
+						groupPanel.layoutType = layoutType;
+		       		 	groupPanel.label = groupVO.name;
+		       		 	if(groupVO.isExpand){
+		       		 		groupPanel.opened = true;
+		       		 	}
+		       		 	else
+		       		 		groupPanel.opened = false;
+		       		 	if(groupVO.isShow){
+		       		 		cardPanel.addChild(groupPanel);
+		       		 	}
+		       		 	groupMap[groupVO.id] = groupPanel;
+		       		 }
+					 controlsArray = new Array();
+		       		 for each(var itemVO:TempletItemVO in templetVO.itemVos){
+		       		 	if(!itemVO.cardisshowable)
+			       	  		continue;
+			       	  	var itemtype:String = itemVO.itemtype;
+			       	  	var temp:ItemUIComponent = ItemUIComponentBuilder.getBuilder().getComponent(
+							GlobalConst.ITEMCOMPONENTMODE_CARD,
+							itemVO,
+							formService.destination,
+							formService.endpoint,
+							dataValue
+							);
+						if(temp == null)
+							continue;
+						temp.setNameLabelWitdh(defaultItemUIComponentLabelWidth);
+			       	  	temp.toolTip = itemVO.itemname;
+			       	  	if(debugMode)
+			       	  		temp.toolTip += "["+itemVO.itemkey+"]";
+			       	  	//设置宽度，不小于常量
+						var minWidth:int = MIN_CONTROL_WIDTH_WHEN_VBOX;
+						if(layoutType == GlobalConst.LAYOUTTYPE_BILLCARDPANEL_TILE)
+							minWidth = MIN_CONTROL_WIDTH_WHEN_TILE;
+			       	  	if(itemVO.cardwidth > minWidth)
+			       	  		temp.setInputWidth(itemVO.cardwidth);
+			       	  	else
+			       	  		temp.setInputWidth(minWidth);
+						
+						//add by xuzhilin 20110420 多行文本框使用扩展属性01作为高度字段
+						if(temp is ItemTextAreaField && itemVO.extattr01 != null){
+							var thisHeight:Number = parseInt(itemVO.extattr01);
+							if(!isNaN(thisHeight)){
+								var textArea:ItemTextAreaField = temp as ItemTextAreaField;
+								textArea.setTextInputHeight(thisHeight);
+							}
+						}
+						
+						if(temp is ItemListPanel && !isNaN(temp.height)){
+							var listpanel:ItemListPanel = temp as ItemListPanel;
+								listpanel.height=temp.height;
+						}
+			       	  		
+			       	  	if(itemVO.isMustInput){
+			       	  		//必输条件
+			       	  		temp.setNameLabelColor("blue");
+			       	  	}	
+			       	  			       	  	
+			       	  	//是否可编辑
+			       	  	if(editable && (itemVO.cardiseditable == "1" 
+			       	  	|| (itemVO.cardiseditable == "2" && insertMode) || (itemVO.cardiseditable == "3" && !insertMode)) ){
+			       	  		temp.editable = true;
+			       	  		temp.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,realValueChange);
+			       	  	}
+			       	  	else
+			       	  		temp.editable = false;
+			       	  	
+						controlArray.push(temp);
+						//判断是否属于某个分组
+						if(itemVO.itemGroup == null)
+							controlContainer.addChild(temp);
+						else{
+							var myGroupPanel:TempletGroupPanel = groupMap[itemVO.itemGroup.id];
+							callLater(addGroupPanel,[myGroupPanel,temp]);
+						}
+						
+						temp.controlsArray = controlsArray;
+						controlsArray.push(temp);
+		       		 }
+		       		 this.validateNow();
+		       		 
+		       		 //隐藏初始化等待框
+			       	 if(showInitingWindow)
+						 OperatingTipUtil.endOperat();
+		       	}
+				
+				private function addGroupPanel(groupPanel:TempletGroupPanel,component:ItemUIComponent):void{
+					groupPanel.addControl(component);
+				}
+		       	
+		       	private function realValueChange(event:UIComponentEvent):void{
+		       		var component:ItemUIComponent = event.target as ItemUIComponent;
+		       		if(dataValue != null)
+		       			dataValue[component.templetItemVO.itemkey] = component.realValue;
+					
+					if(isLinkage){
+						for each(var temp:ItemUIComponent in controlArray){
+							if(temp is ItemRefPanel){
+								//是参照框，则刷新一把
+								var refPanel:ItemRefPanel = temp as ItemRefPanel;
+								refPanel.reInit(dataValue);
+							}
+						}
+					}
+					
+		       	}
+		       	
+		       	public function setDataValue(dataValue:Object):void{
+		       		this.dataValue = dataValue;
+		       		for each(var temp:ItemUIComponent in controlArray){
+		       			temp.data = dataValue;
+		       			if(temp is ItemRefPanel){
+		       				//是参照框，则刷新一把
+		       				var refPanel:ItemRefPanel = temp as ItemRefPanel;
+		       				refPanel.reInit(dataValue);
+		       			}else if(temp is ItemListPanel){
+							var listPanel:ItemListPanel = temp as ItemListPanel;
+							listPanel.reInit(dataValue);
+						}
+		       		}
+		       		this.validateNow();
+		       	}
+		       	
+		       	private function getBillListPanelVOResultHandler(event:ResultEvent):void { 
+	   	  			var billListPanelVO:BillListPanelVO = event.result as BillListPanelVO;
+	   	  			if(billListPanelVO.tableDataRowCount <= 1){
+						var temp:Object = null;
+						if(billListPanelVO.tableDataRowCount == 0){
+							temp = new Object();
+						}else{
+							temp = billListPanelVO.tableDataValues.getItemAt(0);
+						}
+						setDataValue(temp);
+						dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.SETDATAVALUE_COMPLETE));
+					}else{
+						throw new Error("获取Card数据失败，返回了["+billListPanelVO.tableDataRowCount+"]条记录");
+					}
+	   			}
+	       
+	       		public function setDataValueByQuery():void{
+		        	//只取一条
+			       	queryCondition = " rownum=1 ";
+		        	if(initQueryCondition != null && initQueryCondition != "")
+		        		queryCondition = queryCondition.concat(" AND "+initQueryCondition);
+		        	formService.getBillListPanelVO(templetCode,queryCondition,clientEnviorment);
+		        }
+				
+				public function refresh(queryCondition:String):void{
+					formService.getBillListPanelVO(templetCode,queryCondition,clientEnviorment);
+				}
+		        
+		        
+		        public function validateData():Boolean{
+		        	//必输项检查
+		        	var isValid:Boolean = true;
+		        	var errorStr:String = "";
+		        	for each(var temp:ItemUIComponent in controlArray){
+		        		if(!temp.templetItemVO.isMustInput || !temp.editable)
+		        			continue;
+		        		if(temp.realValue == null){
+		        			isValid = false;
+		        			errorStr += "["+temp.templetItemVO.itemname+"]为必输项\n"
+		        		}
+		        	}
+		        	if(!isValid){
+						SmartXMessage.show("提交检查错误",SmartXMessage.MESSAGE_ERROR,errorStr,this);
+		        		return false;
+		        	}
+		        	return true;
+		        }
+		        
+		        public function save():void{
+					var islist:Boolean=false;
+					for each(var temp:ItemUIComponent in controlArray){
+						if(temp is ItemListPanel){
+							islist=true;
+							break;
+						}
+					}
+					if(islist){
+						this.savenew();
+					}else {
+						this.saveold();
+					}
+		        }
+		        
+				private  function saveold():void{
+					if(!validateData())
+						return;
+					for each(var dataValidator:DataValidator in dataValidators){
+						if(!dataValidator.validateData(this))
+							return;
+					}
+					
+					try{
+						if(!insertMode){
+							if(dataValue == null)
+								throw new Error("没有设置任何数据");
+							startSave();
+							ClientEnviorment.getInstance().execInterceptor(clientUpdateBfIncCard,this);
+							formService.updateDataByTempletVOContainIct(templetVO,dataValue,updateBfInterceptor,updateAfInterceptor);
+							dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.SAVE));
+						}
+						else{
+							//插入模式
+							insert();
+						}
+					}catch(e:Error){
+						SmartXMessage.show("保存失败",SmartXMessage.MESSAGE_ERROR);
+						endSave();
+					}
+				}
+				
+				private  function savenew():void{
+					//保存，两个分别保存card和子表修改
+					var dataValueList:Array = new Array();
+					//先处理card
+					if(!validateData())
+						return;
+					for each(var dataValidator:DataValidator in dataValidators){
+						if(!dataValidator.validateData(this))
+							return;
+					}
+					var saveDataValue:Object = this.dataValue;
+					if(saveDataValue != null)
+						dataValueList.push(saveDataValue);
+					//处理child
+					for each(var temp:ItemUIComponent in controlArray){
+						if(temp is ItemListPanel){
+							var t:ItemListPanel=temp as ItemListPanel;
+							var childPanel:BillListPanel=t.getbilllist();
+							var forienKey:String=t.forienKey; 
+							var datavaluelist:Array=t.getdataValueList();
+							
+							if(childPanel.datasourceName != this.datasourceName){
+								SmartXMessage.show("子表数据源与主表不同，无法保存");
+								return;
+							}
+							
+							//刷新子表的外键值，指向主键
+							var insertObjects:Array = childPanel.dataObjectsWaitingForInsert;
+							for each(var insertObject:Object in insertObjects){
+								insertObject[forienKey] = dataValue[templetVO.pkname];
+							}
+							
+							if(!childPanel.validateData())//校验子模板
+								return;
+							
+							var saveDataValues:Array = childPanel.getSaveDataValueList();
+							if(saveDataValues != null){
+								for each(var tempDataValue:Object in saveDataValues){
+									dataValueList.push(tempDataValue);
+								}
+							}
+							if(datavaluelist!=null){
+								for each(var tempDataValue:Object in datavaluelist){
+									dataValueList.push(tempDataValue);
+								}
+							}
+						}
+					}
+
+					if(dataValueList.length>0){
+						if(!insertMode){
+							if(dataValue == null)
+								throw new Error("没有设置任何数据");
+							startSave();
+							ClientEnviorment.getInstance().execInterceptor(clientUpdateBfIncCard,this);
+							formService.updateBatchData(dataValueList,updateBfInterceptor,updateAfInterceptor);
+							dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.SAVE));
+						}else {
+							startSave();
+							ClientEnviorment.getInstance().execInterceptor(clientInsertBfIncCard,this);
+							formService.updateBatchData(dataValueList,insertBfInterceptor,insertAfInterceptor);
+							dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.INSERT));
+						}
+						
+					}
+					else
+						SmartXMessage.show("无需保存");
+					
+				}
+		        private function insert():void{
+		        	if(!validateData())
+						return;
+					if(dataValue == null)
+						throw new Error("没有设置任何数据");
+					//把主键id赋值进去
+					if(templetVO.pkname == null){
+						throw new Error("没有指定主键名，无法insert");
+					}
+					if(newId < 0)
+						throw new Error("没有成功得到主键值，无法插入");
+					//dataValue[templetVO.pkname] = newId;
+					startSave();
+					ClientEnviorment.getInstance().execInterceptor(clientInsertBfIncCard,this);
+					formService.insertDataByTempletVOContainIct(templetVO,dataValue,insertBfInterceptor,insertAfInterceptor);
+		        	dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.INSERT));
+		        	
+		        }
+		        
+		        private function updateHandler(event:ResultEvent):void{
+		        	//var r:int = event.result as int;
+					if(!insertMode){
+						ClientEnviorment.getInstance().execInterceptor(clientUpdateAfIncCard,this);
+					}else{
+						ClientEnviorment.getInstance().execInterceptor(clientInsertAfIncCard,this);
+					}
+					endSave();
+					if(isShowAlert)
+		        		SmartXMessage.show("保存成功!");
+		        	dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.SAVESUCCESSFUL));
+		        }
+		        
+		        public function refreshControlEditStatus():void{
+		        	//重新设置一下各控件的编辑状态
+		        	for each(var temp:ItemUIComponent in controlArray){
+		        		var itemVO:TempletItemVO = temp.templetItemVO;
+		        			//是否可编辑
+			       	  	if(editable && (itemVO.cardiseditable == "1" 
+			       	  	|| (itemVO.cardiseditable == "2" && insertMode) || (itemVO.cardiseditable == "3" && !insertMode)) ){
+			       	  		temp.editable = true;
+			       	  		temp.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,realValueChange);
+			       	  	}
+			       	  	else
+			       	  		temp.editable = false;
+		        	}
+		        }
+		        //新增记录时赋默认值
+		        private function setDefaultValue():void{
+		        	for each(var itemVO:TempletItemVO in templetVO.itemVos){
+		        		if(itemVO.defaultvalueformula != null && itemVO.defaultvalueformula != ""){
+		        			//通过脚本解析器，获取默认值
+		        			var executor:ScriptExecutor = ScriptExecutorFactory.createNewExecutor();
+		        			executor.registorVarMap(dataValue);//将当前记录的字段值都作为脚本执行器的环境变量
+		        			//这里有个小trick，如果脚本中已还有输出语句，则认为是用户自己控制输出，否则认为这个公式只是一个表达式，我们帮他在外面套一层输出
+		        			if(itemVO.defaultvalueformula.indexOf("sysOutput")>=0)
+		        				executor.scriptText = itemVO.defaultvalueformula;
+		        			else
+		        				executor.scriptText = "sysOutput("+itemVO.defaultvalueformula+");";
+		        			//标识executor处理的itemkey
+		        			executor.registorVar("itemKey",itemVO.itemkey);
+		        			executor.addEventListener(ScriptEvent.OUTPUT_VALUE,function(event:ScriptEvent):void{
+		        				var returnValue:String = String(event.outputValue);
+		        				var exec:ScriptExecutor = event.target as ScriptExecutor;
+		        				if(exec == null)
+		        					return;
+		        				var itemKey:String = String(exec.getVar("itemKey"));
+		        				TempletDataUtil.setTempletValue(itemKey,returnValue,dataValue,templetVO,null,destination,endpoint);
+		        				setDataValue(dataValue);
+		        			});
+		        			executor.execute();
+		        		}
+		        	}
+		        }
+		        
+		        public function get insertMode():Boolean{
+		        	return _insertMode;
+		        }
+		        
+		        public function set insertMode(insertMode:Boolean):void{
+		        	if(insertMode && !editable)
+		        		throw new Error("非编辑状态不能设置插入模式"); 
+		        	_insertMode = insertMode;
+		        	
+		        	refreshControlEditStatus();
+		        	if(insertMode){
+		        		if(templetVO.pksequencename == null){
+							SmartXMessage.show("没有指定主键序列名，无法进入insert模式");
+		        			return;
+		        		}	
+		        		setDefaultValue();//设置默认值
+		        		formService.getSequenceNextValByDS(templetVO.datasourcename,templetVO.pksequencename);
+		        	}
+		        	setDataValue(dataValue);
+		        }
+		        
+		        public function get editable():Boolean{
+		        	return _editable;
+		        }
+		        
+		        public function set editable(editable:Boolean):void{
+		        	_editable = editable;
+		        	refreshControlEditStatus();
+		        }
+		        
+		        public function get datasourceName():String{
+		        	return templetVO.datasourcename;
+		        }
+		        
+		        public function get primaryKey():String{
+		        	return templetVO.pkname;
+		        }
+		        
+		        public function get primaryKeyValue():String{
+		        	return dataValue[templetVO.pkname];
+		        }
+		        
+		        public function getDataValue():Object{
+					if(insertMode)
+						dataValue[GlobalConst.KEYNAME_MODIFYFLAG] = "insert";
+					else
+						dataValue[GlobalConst.KEYNAME_MODIFYFLAG] = "update";
+					dataValue[GlobalConst.KEYNAME_TEMPLETCODE] = templetCode;
+		        	return dataValue;
+		        }
+		        
+		        public function addDataValidator(dataValidator:DataValidator):void{
+		        	dataValidators.addItem(dataValidator);
+		        }
+		        
+		        public function removeDataValidator(dataValidator:DataValidator):void{
+		        	dataValidators.removeItemAt(dataValidators.getItemIndex(dataValidator));
+		        }
+		        
+		        public function getDataValidators():ArrayCollection{
+		        	return dataValidators;
+		        }
+				
+				public function enterInsertMode():void{
+					setDataValue(new Object());
+					insertMode = true;
+				}
+				
+				public function getTempletVO():TempletVO{
+					return templetVO;
+				}
+				//add by zhangzz 20110411 start
+				//删除当前数据
+				public function deleteData():void{
+					if(dataValue == null)
+						throw new Error("没有设置任何数据");
+					//把主键id赋值进去
+					if(templetVO.pkname == null){
+						throw new Error("没有指定主键名，无法delete");
+					}
+					ClientEnviorment.getInstance().execInterceptor(clientDeleteBfIncCard,this);
+					formService.deleteDataByTempletVOContainIct(templetVO,dataValue,deleteBfInterceptor,deleteAfInterceptor);
+				}
+				
+				private function deleteHandler(event:ResultEvent):void{
+					ClientEnviorment.getInstance().execInterceptor(clientDeleteAfIncCard,this);
+					if(isShowAlert)
+						SmartXMessage.show("删除成功!");
+					dispatchEvent(new BillCardPanelEvent(BillCardPanelEvent.DELETESUCCESSFUL));
+				}
+				//add by zhangzz 20110411 end
+				
+				public function getNewId():Number{
+					return newId;
+				}
+				
+				private function startSave():void{
+					if(showLoadingWindow)
+						OperatingTipUtil.startOperat("正在保存……",this);
+				}
+				
+				private function endSave():void{
+					if(showLoadingWindow)
+						OperatingTipUtil.endOperat();
+				}
+				
+	        ]]>
+	 </fx:Script>
+	<mx:VBox width="100%" height="100%" id="cardPanel" borderStyle="solid" fontSize="12" horizontalAlign="left">
+		<!--<mx:Tile width="100%" height="100%" id="controlTile" verticalAlign="middle" horizontalAlign="left" paddingTop="20" paddingBottom="20" paddingLeft="20" paddingRight="20" borderStyle="solid"/>-->
+	</mx:VBox>
+</mx:Canvas>

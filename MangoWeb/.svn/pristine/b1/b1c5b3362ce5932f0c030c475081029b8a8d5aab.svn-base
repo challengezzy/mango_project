@@ -1,0 +1,695 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:ct="smartx.bam.flex.modules.synonyms.*"
+				layout="vertical"
+				width="550" height="480" xmlns:containers="flexlib.containers.*" 
+				close="PopUpManager.removePopUp(this)" showCloseButton="true" title="高级属性设置"
+				creationComplete="init()">
+	
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.adobe.utils.StringUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.modules.common.RefListPanel;
+			import smartx.bam.flex.modules.synonyms.SynonymsRefInput;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			[Bindable]
+			private var contentXml:XML;
+			[Bindable]
+			public var confirmFunc:Function;
+			
+			[Bindable]
+			public var dataValue:Object;
+			
+			[Bindable]
+			public var bcp:BillCardPanel;
+			
+			[Bindable]
+			private var analyzerTypeCol:ArrayCollection = new ArrayCollection();
+			
+			protected var bvNameRefPanel:ItemRefPanel;
+			//关系型数据源参照
+			protected var relationDSRefPanel:ItemRefPanel;
+			//查询视图参照
+			protected var queryViewRefPanel:ItemRefPanel;
+			
+			//系统字典参照
+			protected var sysdicRefPanel:ItemRefPanel;
+			
+			protected var destination:String = GlobalConst.SERVICE_FORM;
+			
+			protected var destination_bam:String = BAMConst.BAM_Service;
+			
+			protected var rpc:RemoteObject;
+			
+			protected var formService:RemoteObject;
+			
+			protected var endpoint:String;
+			
+			protected var bvWindow:String;
+			
+			protected var bvName:String;
+			
+			protected var tableName:String;
+			//所选数据表的数据结构
+			protected var tableDataStruct:TableDataStruct;
+			//判断关联表是否发生了变化
+			protected var isTableChanged:Boolean = false;
+			/**
+			 * EPL and sql 
+			 * */
+			protected var sql:String;
+			
+			private var queryViewDs:String;
+			
+			private var queryViewCode:String;
+			
+			private var queryViewName:String;
+			
+			private var code:String;
+			
+			[Bindable]
+			private var colProvider:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var dsProvider:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var refProvider:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var refHeadProvider:Array = new Array();
+			
+			[Bindable]
+			private var isVisible:Boolean = false;
+			
+			[Bindable]
+			private var currentType:String;
+			
+			[Bindable]
+			private var currentNameSpace:String;
+			
+			[Bindable]
+			private var dataGridItemkey:String = "ItemKey";
+			
+			[Bindable]
+			private var isAnalyzeOnQuery:Boolean = true;
+			
+			[Bindable]
+			private var isAnalyzeInJob:Boolean = false;
+			
+			[Bindable]
+			private var isShowJobInfo:Boolean = false;
+			
+			[Bindable]
+			private var analyzeProvider:ArrayCollection = new ArrayCollection(
+				[
+					{label:"字符分析器",data:"StringAnalyzer"},
+					{label:"数字分析器",data:"NumberAnalyzer"},
+					{label:"布尔分析器",data:"BooleanAnalyzer"},
+					{label:"时间分析器",data:"DateAnalyzer"},
+					{label:"值分析器",data:"ValueAnalyzer"},
+					{label:"周期分析器",data:"WeekDayAnalyzer"},
+					{label:"匹配分析器",data:"MatchAnalyzer"}
+				]
+			);
+			
+			[Bindable]
+			private var typeProvider:ArrayCollection = new ArrayCollection(
+				[
+					{label:"业务视图",data:"BUSINESSVIEW"},
+					{label:"查询视图",data:"QUERYVIEW"}
+				]
+			);
+			
+			public function getContentXml():String{
+				showXml();
+				return contentXml.toXMLString();
+			}
+			
+			private function init():void{
+				
+				if(endpoint == null)
+					endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				rpc = new RemoteObject(destination_bam);
+				rpc.endpoint = endpoint;
+				
+				formService = new RemoteObject(destination);
+				formService.endpoint = endpoint;
+				
+				initEditInfo();
+				generalForm_creationCompleteHandler();
+				
+				rpc.getTableStructByName.addEventListener(ResultEvent.RESULT,getTableStructByNameHandler);
+				rpc.getTableStructByName.addEventListener(FaultEvent.FAULT,faultHander);
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,faultHander);
+				
+			}
+			
+			private function initEditInfo():void{
+				
+				var metaStr:String = dataValue["METADATA"] as String;
+				if(metaStr != null ){
+					
+					dsProvider.removeAll();
+					contentXml = new XML(metaStr);
+					
+					for each(var dsXml:XML in contentXml.datasources.datasource){
+						var dsObj:Object = new Object();
+						var name:String = dsXml.@name;
+						var code:String = dsXml.@code;
+						var type:String = dsXml.@type;
+						dsObj["name"] = name;
+						dsObj["code"] = code;
+						dsObj["type"] = type;
+						if(type!=null && type.toUpperCase() == "BUSINESSVIEW"){
+							dsObj["typecn"] = "业务视图";
+						}else if(type!=null && type.toUpperCase() == "QUERYVIEW"){
+							dsObj["typecn"] = "查询视图";
+						}
+						
+						dsProvider.addItem(dsObj);
+					}
+					
+					var analyzerType:String = contentXml.analyzer.@type;
+					if(analyzerType.toLowerCase()=="StringAnalyzer".toLowerCase()){
+						analyzeTypeCob.selectedIndex = 0;
+					}else if(analyzerType.toLowerCase()=="NumberAnalyzer".toLowerCase()){
+						analyzeTypeCob.selectedIndex = 1;
+					}else if(analyzerType.toLowerCase()=="BooleanAnalyzer".toLowerCase()){
+						analyzeTypeCob.selectedIndex = 2;
+					}else if(analyzerType.toLowerCase()=="DateAnalyzer".toLowerCase()){
+						analyzeTypeCob.selectedIndex = 3;
+					}else if(analyzerType.toLowerCase()=="ValueAnalyzer".toLowerCase()){
+						analyzeTypeCob.selectedIndex = 4;
+					}else if(analyzerType.toLowerCase() =="WeekDayAnalyzer".toLowerCase()){
+						analyzeTypeCob.selectedIndex = 5;
+					}else if(analyzerType.toLowerCase() =="MatchAnalyzer".toLowerCase()){
+						analyzeTypeCob.selectedIndex = 6;
+						isVisible = true;
+					}
+					
+					var analyzeOnQuery:String = contentXml.analyzer.@analyzeOnQuery;
+					if(analyzeOnQuery !=null && analyzeOnQuery != "" && analyzeOnQuery.toLowerCase() == "true"){
+						isAnalyzeOnQuery = true;
+					}else{
+						isAnalyzeOnQuery = false;
+					}
+					
+					var analyzeInJob:String = contentXml.analyzer.@analyzeInJob;
+					var analyzeJobExp:String = contentXml.analyzer.@analyzeJobExp;
+					if(analyzeInJob !=null && analyzeInJob != "" && analyzeInJob.toLowerCase() == "true"){
+						isAnalyzeInJob = true;
+						isShowJobInfo = true;
+						jobTimeText.text = analyzeJobExp;
+					}
+					
+					var inputColumns:String = contentXml.analyzer.@inputColumns;
+					var colArray:Array = inputColumns.split(",");
+					for each(var item:Object in colArray){
+						var obj:Object = new Object();
+						var valueTemp:String = item as String;
+						var tempArr:Array = valueTemp.split(":");
+						if(tempArr != null && tempArr.length>0){
+							obj["nameSpace"] = tempArr[0] as String;
+							obj["fieldName"] = tempArr[1] as String;
+							colProvider.addItem(obj);
+						}
+					}
+					
+					var synonymyCN:String = contentXml.analyzer.@synonymyCN;
+					var synonymyEN:String = contentXml.analyzer.@synonymyEN;
+					var spvo:SimpleRefItemVO = new SimpleRefItemVO();
+						spvo.name = synonymyCN;
+						spvo.code = synonymyEN;
+					var objItme:Object = new Object();
+					objItme[dataGridItemkey] = spvo;
+					fieldInputRef.data = objItme;
+					
+				}
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var dataValues:* = event.result as Array;
+				for each(var vo:SimpleHashVO in dataValues){
+					var dsType:String = vo.dataMap["type"] as String;
+					code = vo.dataMap["code"] as String;
+					if(dsType == "BUSINESSVIEW"){
+						var ds:String = GlobalConst.CEP_DATASOURCE_PREFIX + GlobalConst.DEFAULTPROVIDERNAME_CEP;
+						bvWindow = vo.dataMap["streamwindowname"] as String;
+						rpc.getTableStructByName(ds,"select * from "+bvWindow+" where 1=2");
+					}else if(dsType == "QUERYVIEW"){
+						var queryViewDs:String = vo.dataMap["datasourcename"] as String;
+						tableName = vo.dataMap["sql"] as String;
+						rpc.getTableStructByName(queryViewDs, "select * from ("+tableName+") where 1=2");
+					}
+				}
+			}
+			
+			private function faultHander(event:FaultEvent):void{
+				SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,
+					"错误详情:"+event.fault.faultString);
+			}
+			
+			protected function showXml():void{
+				
+				contentXml = new XML("<root><datasources/></root>");
+				
+				for each(var obj:Object in dsProvider){
+					
+					var datasourceXml:XML = new XML("<datasource />");
+					
+					var name:String = obj["name"] as String;
+					var code:String = obj["code"] as String;
+					var type:String = obj["type"] as String;
+					
+					datasourceXml.@name = name;
+					datasourceXml.@code = code;
+					datasourceXml.@type = type;
+					
+					contentXml.datasources.appendChild(datasourceXml);
+				}
+				
+				var colStr:String = new String("");
+				var i:int = 1;
+				for each(var item:Object in colProvider){
+					var nameSpace:String = item["nameSpace"] as String;
+					var fieldName:String = item["fieldName"] as String;
+					var col:String = nameSpace+":"+fieldName;
+					if(i==colProvider.length){
+						colStr = colStr+col;
+					}else{
+						colStr = colStr+col+",";
+					}
+					i++;
+				}
+				var anaType:Object = analyzeTypeCob.selectedItem;
+				var analyzerType:String = anaType["data"] as String;
+				
+				var analyzerXml:XML = new XML("<analyzer />");
+				analyzerXml.@inputColumns = colStr;
+				analyzerXml.@type = analyzerType;
+				
+				var synonymyCN:String = "";
+				var synonymyEN:String = "";
+				var objSyn:Object = fieldInputRef.value;
+				if(objSyn != null && isVisible == true){
+					var spvo:SimpleRefItemVO = objSyn as SimpleRefItemVO;
+					synonymyCN = spvo.name;
+					synonymyEN = spvo.code;
+				}
+				analyzerXml.@synonymyCN = synonymyCN;
+				analyzerXml.@synonymyEN = synonymyEN;
+				
+				if(isAnalyzeOnQueryCB.selected){
+					analyzerXml.@analyzeOnQuery = "true";
+				}else{
+					analyzerXml.@analyzeOnQuery = "false";
+				}
+				
+				if(isAnalyzeInJobCB.selected){
+					analyzerXml.@analyzeInJob = "true";
+				}else{
+					analyzerXml.@analyzeInJob = "false";
+				}
+				analyzerXml.@analyzeJobExp = jobTimeText.text;
+				
+				contentXml.appendChild(analyzerXml);
+				
+				mtcodeText.text = contentXml.toString();
+				
+			}
+			
+			protected function getTableStructByNameHandler(event:ResultEvent):void{
+				
+				tableDataStruct = event.result as TableDataStruct;
+				refProvider.removeAll();
+				for(var i:int = 0;i<tableDataStruct.table_header.length;i++){
+					var tempObj:Object = new Object();
+					tempObj["fieldName"] = tableDataStruct.table_header[i] as String;
+					tempObj["fieldType"] = tableDataStruct.table_body_type[i] as String;
+					tempObj["nameSpace"] = currentNameSpace;
+					
+					refProvider.addItem(tempObj);
+				}
+				
+				showFieldPanel();
+			}
+			
+			protected function generalForm_creationCompleteHandler():void{
+				
+				var col1:DataGridColumn = new DataGridColumn();
+				col1.headerText="字段名称";
+				col1.dataField="fieldName";
+				
+				var col2:DataGridColumn = new DataGridColumn();
+				col2.headerText="字段类型";
+				col2.dataField="fieldType";
+				
+				refHeadProvider.push(col1);
+				refHeadProvider.push(col2);
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void
+			{
+				var dsItem:Object = dsDataGrid.selectedItem;
+				if(dsItem == null ){
+					SmartXMessage.show("请选择一个数据源!");
+				}else{
+					
+					var code:String = dsItem["code"] as String;
+					var type:String = dsItem["type"] as String;
+					
+					currentType = type;
+					currentNameSpace = type+"."+code;
+					
+					if(type.toUpperCase() == "BUSINESSVIEW"){
+						formService.getSimpleHashVoArrayByDS(null,"select CODE,STREAMWINDOWNAME,NAME,'BUSINESSVIEW' TYPE from bam_businessview where code='"+code+"'");
+						
+					}else if(type.toUpperCase() == "QUERYVIEW"){
+						formService.getSimpleHashVoArrayByDS(null,"select CODE,DATASOURCENAME,TO_CHAR(SQL) SQL,NAME,'QUERYVIEW' TYPE from bam_queryview where code='"+code+"'");
+					}
+				}
+				
+			}
+			
+			private function showFieldPanel():void{
+				
+				var dialog:RefListPanel = new RefListPanel();
+				dialog.dataList = getDataProvider();
+				dialog.headerItems = refHeadProvider;
+				dialog.title = "选择字段";
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						
+						for each(var item:Object in dialog.seletedItemsArray){
+							var fieldName:String = item["fieldName"] as String;
+							var nameSpace:String = item["nameSpace"] as String;
+							if(!isContains(fieldName,nameSpace)){
+								var itemTemp:Object = new Object();
+								itemTemp["fieldName"] = fieldName;
+								itemTemp["nameSpace"] = nameSpace;
+								colProvider.addItem(itemTemp);
+							}
+						}
+						
+						colDataGrid.invalidateList();
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+				
+			}
+			
+			private function isContains(fieldName:String,nameSpace:String):Boolean{
+				var isCon:Boolean = false;
+				for each(var item:Object in colProvider){
+					var tempFieldName:String = item["fieldName"] as String;
+					var tempNameSpace:String = item["nameSpace"] as String;
+					if((fieldName != null && fieldName.toLowerCase() == tempFieldName.toLowerCase())
+					  && (nameSpace != null && nameSpace.toLowerCase() == tempNameSpace.toLowerCase())){
+						isCon = true;
+						break;
+					}
+				}
+				return isCon;
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				var array:Array = colDataGrid.selectedIndices;
+				if(array == null || array.length ==0 ){
+					Alert.show("请选择一行数据！","错误");
+					return;
+				}
+				
+				for each(var item:Object in array){
+					var index:int = item as int;
+					colProvider.removeItemAt(index);
+				}
+				
+				colDataGrid.invalidateList();
+				
+			}
+			
+			private function getDataProvider():ArrayCollection{
+				
+				var dp:ArrayCollection = new ArrayCollection();
+				var analyzerItem:Object = analyzeTypeCob.selectedItem;
+				var analyzerType:String = analyzerItem["data"] as String;
+				
+				if(analyzerType == "StringAnalyzer"){
+					
+					for each(var objStr:Object in refProvider){
+						var fieldTypeStr:String = objStr["fieldType"] as String;
+						if(fieldTypeStr.toLowerCase()=="string"||fieldTypeStr.toLowerCase()=="varchar"||fieldTypeStr.toLowerCase()=="varchar2"){
+							dp.addItem(objStr);
+						}
+					}
+				}else if(analyzerType == "NumberAnalyzer"){
+					
+					for each(var objNum:Object in refProvider){
+						var fieldTypeNum:String = objNum["fieldType"] as String;
+						if(fieldTypeNum.toLowerCase()=="number"||fieldTypeNum.toLowerCase()=="int"||fieldTypeNum.toLowerCase()=="integer"||fieldTypeNum.toLowerCase()=="float"||fieldTypeNum.toLowerCase()=="double"){
+							dp.addItem(objNum);
+						}
+					}
+				}else if(analyzerType == "BooleanAnalyzer"){
+					
+					for each(var objBool:Object in refProvider){
+						var fieldTypeBool:String = objBool["fieldType"] as String;
+						if(fieldTypeBool.toLowerCase()=="boolean"||fieldTypeBool.toLowerCase()=="bool"){
+							dp.addItem(objBool);
+						}
+					}
+					
+				}else if(analyzerType == "DateAnalyzer" || analyzerType == "WeekDayAnalyzer" ){
+					
+					for each(var objDate:Object in refProvider){
+						var fieldTypeDate:String = objDate["fieldType"] as String;
+						if(fieldTypeDate.toLowerCase()=="date"||fieldTypeDate.toLowerCase()=="timestamp"){
+							dp.addItem(objDate);
+						}
+					}
+				}else if(analyzerType == "ValueAnalyzer" || analyzerType == "MatchAnalyzer" ){
+					for each(var objValue:Object in refProvider){
+						dp.addItem(objValue);
+					}
+				}
+				
+				return dp;
+			}
+			
+			protected function analyzeTypeCob_changeHandler(event:ListEvent):void
+			{
+				colProvider.removeAll();
+				var item:Object = analyzeTypeCob.selectedItem;
+				var value:String = item["data"] as String;
+				if(value=="MatchAnalyzer"){
+					isVisible = true;
+				}else{
+					isVisible = false;
+				}
+			}
+			
+			protected function submitBtn_clickHandler(event:MouseEvent):void
+			{
+				dataValue["METADATA"] = getContentXml();
+				
+				bcp.setDataValue(dataValue);
+				
+				close();
+				
+			}
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			protected function addDsBtn_clickHandler(event:MouseEvent):void
+			{
+				var item:Object = dataSourcetypeCbo.selectedItem;
+				var value:String = item["data"] as String;
+				if(value == "BUSINESSVIEW"){//业务视图
+					var dialog:RefDialog = new RefDialog();
+					dialog.init2(formService,"select code id#,streamwindowname code#,name 名称 from bam_businessview ",null);
+					dialog.title = "选择业务视图";
+					dialog.allowMultipleSelection = true;
+					dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+						if(dialog.closeByConfirm){
+							
+							for each(var item:Object in dialog.seletedItemsArray){
+								var dsObj:Object = new Object();
+								dsObj["type"] = value;
+								dsObj["typecn"] = "业务视图";
+								dsObj["name"] = item[RefDialog.itemName];
+								dsObj["code"] = item[RefDialog.itemId];
+								dsProvider.addItem(dsObj);
+							}
+							dsDataGrid.invalidateList();
+						}
+					});
+					PopUpManager.addPopUp(dialog,this,true);
+					PopUpManager.centerPopUp(dialog);
+					
+				}else if(value == "QUERYVIEW"){//查询视图
+					var dialog2:RefDialog = new RefDialog();
+					dialog2.init2(formService,"select id as id#,code as code#,name 名称 from V_BAM_QUERYVIEW_REF ",null);
+					dialog2.title = "选择查询视图";
+					dialog2.allowMultipleSelection = true;
+					dialog2.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+						if(dialog2.closeByConfirm){
+
+							for each(var item:Object in dialog2.seletedItemsArray){
+								var dsObj:Object = new Object();
+								dsObj["type"] = value;
+								dsObj["typecn"] = "查询视图";
+								dsObj["name"] = item[RefDialog.itemName];
+								dsObj["code"] = item[RefDialog.itemId];
+								dsProvider.addItem(dsObj);
+							}
+							
+							dsDataGrid.invalidateList();
+							
+						}
+					});
+					PopUpManager.addPopUp(dialog2,this,true);
+					PopUpManager.centerPopUp(dialog2);
+				}else{
+					SmartXMessage.show("请选择一种数据类型!");
+				}
+				
+			}
+			
+			protected function musDsBtn_clickHandler(event:MouseEvent):void
+			{
+				var obj:Object = dsDataGrid.selectedItem;
+
+				var type:String = obj["type"] as String;
+				var code:String = obj["code"] as String;
+				var tempNamespace:String = type+"."+code;
+				
+				for each(var colObj:Object in colProvider){
+					var nameSpace:String = colObj["nameSpace"] as String;
+					if(nameSpace != null && tempNamespace==nameSpace){
+						var index:int = colProvider.getItemIndex(colObj);
+						colProvider.removeItemAt(index);
+					}
+				}
+				var indexOfDs:int = dsProvider.getItemIndex(obj);
+				dsProvider.removeItemAt(indexOfDs);
+				
+				dsDataGrid.invalidateList();
+				colDataGrid.invalidateList();
+				
+			}
+			
+			protected function isAnalyzeInJobCB_clickHandler(event:MouseEvent):void
+			{
+				if(isAnalyzeInJobCB.selected){
+					isShowJobInfo = true;
+				}else{
+					isShowJobInfo = false;
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:TabNavigator width="100%" height="100%" creationPolicy="all">
+			
+			<mx:VBox id="generalVBox" width="100%" height="100%" label="通用">
+				
+				<mx:HBox width="100%" >
+					<mx:Label text="分析器:" /><mx:ComboBox id="analyzeTypeCob" labelField="label" change="analyzeTypeCob_changeHandler(event)" dataProvider="{analyzeProvider}" />
+					<mx:FormItem label="字典值:" required="true" id="matchFieldName" visible="{isVisible}">
+						<ct:SynonymsRefInput id="fieldInputRef" dataGridItemkey="{dataGridItemkey}" />
+					</mx:FormItem>
+				</mx:HBox>
+				
+				<mx:HBox width="100%" paddingLeft="5" paddingRight="5">
+					<mx:CheckBox id="isAnalyzeOnQueryCB" label="是否查询时分析" selected="{isAnalyzeOnQuery}" />
+					<mx:CheckBox id="isAnalyzeInJobCB" label="是否后台进行分析" selected="{isAnalyzeInJob}" click="isAnalyzeInJobCB_clickHandler(event)" />
+					<mx:Label text="JOB表达式:" visible="{isShowJobInfo}" />
+					<mx:TextInput id="jobTimeText" width="100" visible="{isShowJobInfo}" text="0/30 * * * * ?" toolTip="默认表达式为30秒时间间隔" />
+				</mx:HBox>
+				
+				<mx:HBox width="100%">
+					<mx:Label text="数据源:   " />
+					<mx:Label text="数据源类型:" />
+					<mx:ComboBox id="dataSourcetypeCbo" labelField="label" dataProvider="{typeProvider}" />
+					<mx:LinkButton id="addDsBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="添加数据源" 
+								   click="addDsBtn_clickHandler(event)"/>
+					<mx:LinkButton id="musDsBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除数据源" 
+								   click="musDsBtn_clickHandler(event)"/>
+				</mx:HBox>
+				<mx:DataGrid id="dsDataGrid" width="100%" height="100%" editable="false" dataProvider="{dsProvider}" allowMultipleSelection="false" >
+					<mx:columns>
+						<mx:DataGridColumn headerText="数据源类型" editable="false" dataField="typecn" />
+						<mx:DataGridColumn headerText="数据源名称" editable="false" dataField="name" />
+						<mx:DataGridColumn headerText="数据源编码" editable="false" dataField="code" />
+					</mx:columns>	
+				</mx:DataGrid>
+				
+				<mx:HBox width="100%" >
+					<mx:Label text="数据字段:" />
+					<mx:LinkButton id="addBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+								   toolTip="添加字段" click="addBtn_clickHandler(event)"/>
+					<mx:LinkButton id="musBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+								   toolTip="删除字段" click="musBtn_clickHandler(event)"/>
+				</mx:HBox>
+				<mx:DataGrid id="colDataGrid" width="100%" height="100%" editable="false" dataProvider="{colProvider}" allowMultipleSelection="true" >
+					<mx:columns>
+						<mx:DataGridColumn headerText="字段名称" editable="false" dataField="fieldName" />
+						<mx:DataGridColumn headerText="命名空间" editable="false" dataField="nameSpace" />
+					</mx:columns>	
+				</mx:DataGrid>
+				
+			</mx:VBox>
+			
+			<!--<mx:VBox id="setVBox" width="100%" height="100%" label="设置" />-->
+			
+			<mx:VBox id="mtcodeVBox" width="100%" height="100%" label="元数据" show="showXml()">
+				<mx:TextArea id="mtcodeText" width="100%" height="100%" editable="false"/>
+			</mx:VBox>
+			
+		</mx:TabNavigator>
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button id="submitBtn" label="确定" click="submitBtn_clickHandler(event)"/>
+			<mx:Button label="取消" click="close()"/>
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

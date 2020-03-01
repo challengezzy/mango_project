@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!-- 报表数据根节点 -->
+<ReportData>
+	<!-- 参数节点 -->
+	<Parameters>
+		<Set name="Param1" type="String">Hello world</Set>
+		<Set name="Param2" type="Number">123.456</Set>
+		<Set name="Param3" type="Date">2010-10-10 23:59:59</Set>
+		<!-- 需要外部加载的图片，路径相对于MyReport组件入口文件或使用绝对路径 -->
+		<Set name="Param4" type="Image" url="true">res/image1.png</Set>
+		<!-- 需要外部加载的XML，路径相对于MyReport组件入口文件或使用绝对路径，一般用于加载子报表样式 -->
+		<Set name="Param5" type="XML" url="true">res/style.xml</Set>
+	</Parameters>
+	<!-- 表格节点 -->
+	<Table>
+		<!-- 行节点 -->
+		<Row>
+			<Set name="Field1" type="String">Hello world</Set>
+			<Set name="Field2" type="Number">123.456</Set>
+			<Set name="Field3" type="Date">2010-10-10 23:59:59</Set>
+			<!-- 可以嵌套Table节点，一般用于子表数据 -->
+			<Set name="Field6" type="Table">
+				<Table />
+			</Set>
+		</Row>
+		<Row>
+			<Set name="Field1" type="String">Hello world</Set>
+			<Set name="Field2" type="Number">123.456</Set>
+			<Set name="Field3" type="Date">2010-10-10 23:59:59</Set>
+			<Set name="Field6" type="Table">
+				<Table />
+			</Set>
+		</Row>
+	</Table>
+</ReportData>

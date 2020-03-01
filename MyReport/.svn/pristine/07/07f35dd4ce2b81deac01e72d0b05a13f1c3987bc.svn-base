@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:util="myreport.util.*"
+				  fontSize="12" fontFamily="Simsun" width="288" height="240" title="添加序列"
+			   close="Close()" layout="vertical">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.MsgUtil;
+			
+			import mx.collections.ArrayCollection;
+			
+			import myreport.data.report.ReportSettings;
+			
+			private static var g_Instance:NewSeriesForm;
+			
+			public static function get Instance():NewSeriesForm
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new NewSeriesForm();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			 
+			private var _Callback:Function;
+			/** 
+			 * @param callback: function(name:String):void
+			 */
+			public function Show(name:String, callback:Function):void
+			{
+			 
+				_Callback = callback;
+				
+				PopUp();
+ 
+				_Name.text = name;
+				
+			}
+			
+			private function Confirm():void
+			{
+				var n:String = _Name.text;
+				if(!n)
+				{
+					hlib.MsgUtil.ShowInfo("请输入名称！");
+					return;
+				}
+				if (_Callback != null)
+				{
+					_Callback(n);
+				}
+				Close();
+			}
+ 
+		]]>
+	</mx:Script>
+    <mx:VBox width="100%" height="100%" paddingTop="32" paddingLeft="32" verticalAlign="top">
+		<mx:Label text="序列名称"/>
+		<mx:TextInput id="_Name" width="160"/>
+	</mx:VBox>
+	
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

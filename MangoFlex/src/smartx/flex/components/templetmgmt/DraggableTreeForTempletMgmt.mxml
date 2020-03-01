@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Tree xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%"
+	dragEnabled="true"
+	dragMoveEnabled="true"
+	dropEnabled="true"
+	allowMultipleSelection="true">
+	<mx:Metadata>		       
+	    [Event(name='dropFinished',type='smartx.flex.components.templetmgmt.DropTreeEvent')]
+	</mx:Metadata>
+	<mx:Script>
+				<![CDATA[
+					import mx.events.DropdownEvent;
+				    import mx.collections.ICollectionView;   
+				    import mx.collections.IViewCursor;   
+				    import mx.controls.Tree;   
+				    import mx.core.mx_internal;   
+				    import mx.events.DragEvent;   
+				    import mx.managers.DragManager;   
+				    use namespace mx_internal; //命名空间
+					/**  
+			         *  @private  
+			         *  Returns the stack of parents from a child item.  
+			         */  
+			        private function getParentStack(item:Object):Array {   
+			            var stack:Array = [];   
+			            if (item == null)   
+			                return stack;   
+			  
+			            var parent:* = getParentItem(item);   
+			            while (parent) {   
+			                stack.push(parent);   
+			                parent = getParentItem(parent);   
+			            }   
+			            return stack;   
+			        }   
+			        override protected function dragDropHandler(event:DragEvent):void {   
+			           if (event.isDefaultPrevented())
+				            return;
+				
+				        hideDropFeedback(event);
+				
+						if (event.dragSource.hasFormat("treeItems"))
+						{
+				        	var items:Array = event.dragSource.dataForFormat("treeItems") as Array;
+				        	var i:int;
+				        	var n:int;
+				            	
+							// if we're moving to ourselves, we need to treat it specially and check for "parent" 
+							// problems where we could recurse forever.
+							if (event.action == DragManager.MOVE && dragMoveEnabled)
+							{
+								if (event.dragInitiator == this)
+								{
+									// If we're dropping onto ourselves or a child of a descendant then dont actually drop
+									
+									calculateDropIndex(event);
+													
+									// If we did start this drag op then we need to remove first
+									var index:int;
+									var parent:*;
+									var parentItem:*;
+									var dropIndex:int = _dropData.index;
+				                
+									//get ancestors of the drop target item
+									var dropParentStack:Array = getParentStack(_dropData.parent);
+									dropParentStack.unshift(_dropData.parent);
+				                
+									n = items.length;
+									for (i = 0; i < n; i++) 
+									{ 
+										if(items[i].type != "TempletItemVO" && items[i].type != "TempletItemGroupVO")//只有属性和分组可移动
+											continue;
+										parent = getParentItem(items[i]);
+										index = getChildIndexInParent(parent, items[i]);
+										//check ancestors of the dropTarget if the item matches, we're invalid
+				                    
+										for each (parentItem in dropParentStack)
+										{ 
+											//we dont want to drop into one of our own sets of children
+											if (items[i] === parentItem)
+												return;
+										}
+										var parentObject:* = _dropData.parent;
+										if(items[i].type == "TempletItemVO"){
+											//属性的父节点只能是模板或者分组
+											if(parentObject == null || (parentObject.type != "TempletVO"  && parentObject.type != "TempletItemGroupVO"))//非法拖动，还原
+												continue;
+										}
+										else if(items[i].type == "TempletItemGroupVO"){
+											//分组的父节点只能是模板
+											if(parentObject == null || parentObject.type != "TempletVO")
+												continue;
+										}
+				                    
+										//we remove before we add due to the behavior 
+										//of structures with parent pointers like e4x
+										removeChildItem(parent, items[i], index);
+				                    
+										//is the removed item before the drop location?
+										// then we need to shift the dropIndex accordingly
+										if (parent == _dropData.parent && index < _dropData.index)
+				                        	dropIndex--;
+				                    
+										addChildItem(_dropData.parent, items[i], dropIndex);
+										dispatchEvent(new DropTreeEvent(DropTreeEvent.DROP_FINISHED,items[i],_dropData.parent));
+									}
+				                
+									return;
+								}
+							}
+						}
+						lastDragEvent = null;
+			        }   
+			        /**  
+			         *  @private  
+			         *  Finds the index distance between a parent and child  
+			         */  
+			        private function getChildIndexInParent(parent:Object,child:Object):int {   
+			            var index:int = 0;   
+			            if (!parent) {   
+			                var cursor:IViewCursor = ICollectionView(iterator.view).createCursor();   
+			                while (!cursor.afterLast) {   
+			                    if (child === cursor.current)   
+			                        break;   
+			                    index++;   
+			                    cursor.moveNext();   
+			                }   
+			            } else {   
+			                if (parent != null && _dataDescriptor.isBranch(parent,iterator.view) && _dataDescriptor.hasChildren(parent,   
+			                    iterator.view)) {   
+			                    var children:ICollectionView = getChildren(parent,iterator.view);   
+			                    if (children.contains(child)) {   
+			                        cursor = children.createCursor();   
+			                        while (!cursor.afterLast) {   
+			                            if (child === cursor.current)   
+			                                break;   
+			                            cursor.moveNext();   
+			                            index++;   
+			                        }   
+			  
+			                    } else {   
+			                        //throw new Error("Parent item does not contain specified child: " + itemToUID(child));   
+			                    }   
+			                }   
+			            }   
+			            return index;   
+			        }   
+				]]>
+			</mx:Script>
+</mx:Tree>

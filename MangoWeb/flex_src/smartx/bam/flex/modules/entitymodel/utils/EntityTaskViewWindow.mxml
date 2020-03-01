@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				layout="vertical" width="370" height="130"
+				showCloseButton="true" title="派生规则任务" 
+				close="close()" creationComplete="init()" >
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var taskViewSQL:String = "SELECT DT.ID,DT.CODE,DT.NAME,DT.MTCODE,MT.CONTENT,DT.CRONEXPRESSION " +
+				"FROM PUB_DATATASK_TEMPLET DT,PUB_METADATA_TEMPLET MT WHERE DT.MTCODE = MT.CODE";
+			
+			private var taskSQL:String;
+			
+			private var bamService:RemoteObject;
+			
+			private var formService:RemoteObject;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			private var loginName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME));
+			[Bindable]
+			private var toolTipStr:String;//提示信息
+			
+			private var taskTempletXml:XML;//任务模板XML
+			
+			private var mtCode:String;//元数据编码
+			
+			private var codeDesc:String;//不同调度类型的编码描述
+			[Bindable]
+			public var entityModelCode:String;//领域实体模型编码
+			[Bindable]
+			public var entityCode:String;//实体编码
+			[Bindable]
+			public var taskCode:String;//任务编码
+			
+			public var entityTaskType:String;//实体任务调度类型（规则、纬度、指标、GIS）
+			
+			public var content:XML;//不同调度类型的XML(ruleXml,dimensionXml,cubeXml)
+			
+			public var dataTaskDesc:String;//数据任务子任务描述
+			
+			public var code:String;//数据任务子任务编码
+			[Bindable]
+			public var tempContent:XML;
+			[Bindable]
+			public var saveNoAlertFun:Function;
+			
+			private function init():void{
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint != null ){
+					bamService.endpoint = endpoint;
+					formService.endpoint = endpoint;
+				}
+				
+				bamService.updateTaskMetaDatabyCode.addEventListener(ResultEvent.RESULT,updateTaskMetaDatabyCodeHandler);
+				bamService.updateTaskMetaDatabyCode.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("任务模板创建失败!",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				setVariableByDataTaskType();
+				formService.getSimpleHashVoArrayByDS(null,taskViewSQL+" AND DT.CODE='"+taskCode+"'");
+			}
+			
+			private function updateTaskMetaDatabyCodeHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("操作已成功",SmartXMessage.MESSAGE_INFO);
+				content.@taskCode = "";
+				if(entityTaskType == BAMConst.ENTITY_DATATASK_DIMENSION){
+					tempContent.@taskCode = "";
+					saveNoAlertFun();
+				}else if(entityTaskType == BAMConst.ENTITY_DATATASK_CUBE)
+					saveNoAlertFun();
+				close();
+			}
+			
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var temArr:Array = event.result as Array;
+				var selectItem:Object = null;
+				for each(var sp:SimpleHashVO in temArr){
+					selectItem = sp.dataMap;
+					taskNameTxt.text = selectItem["name"] as String;
+					taskExpTxt.text = selectItem["cronexpression"] as String;
+					mtCode = selectItem["mtcode"] as String;
+					taskTempletXml = new XML(selectItem["content"]);
+				}
+				
+			}
+			
+			protected function delTaskBtn_clickHandler(event:MouseEvent):void{
+				if(taskTempletXml != null ){
+					var xml:XML = entityTaskType == BAMConst.ENTITY_DATATASK_DIMENSION?getCustomTaskXmlDimension():getCustomTaskXml();
+					if(xml != null)
+						CEPUtils.xmlDeleteNode(xml);
+					
+					OperatingTipUtil.startOperat("正在删除....",this);
+					bamService.updateTaskMetaDatabyCode(mtCode,taskTempletXml.toXMLString(),null,null,entityTaskType);
+				}else{
+					SmartXMessage.show("任务模板元数据为空,无法删除任务!",SmartXMessage.MESSAGE_WARN);
+				}
+				
+			}
+			
+			protected function addTaskBtn_clickHandler(event:MouseEvent):void{
+				var dataTaskWindow:EntityTaskWindow = new EntityTaskWindow();
+				dataTaskWindow.entityModelCode = entityModelCode;
+				dataTaskWindow.entityCode = entityCode;
+				dataTaskWindow.loginName = loginName;
+				dataTaskWindow.endpoint = endpoint;
+				dataTaskWindow.code = code;
+				dataTaskWindow.codeDesc = codeDesc;
+				dataTaskWindow.taskCode = taskCode;
+				dataTaskWindow.content = content;
+				dataTaskWindow.dataTaskDesc = dataTaskDesc;
+				dataTaskWindow.taskSQL = taskSQL;
+				dataTaskWindow.entityTaskType = entityTaskType;
+				dataTaskWindow.tempContent = tempContent;
+				dataTaskWindow.saveNoAlertFun = saveNoAlertFun;
+				
+				if(desktop != null)
+					PopUpManager.addPopUp(dataTaskWindow,desktop,true);
+				else
+					PopUpManager.addPopUp(dataTaskWindow,this,true);
+				
+				PopUpManager.centerPopUp(dataTaskWindow); 
+				close();
+			}
+			
+			private function getCustomTaskXml():XML{
+				var xml:XML;
+				if(taskTempletXml != null ){
+					for each(var customTaskXml:XML in taskTempletXml.datatask.custom_task ){
+						var tempModelCode:String = String(customTaskXml.modelCode);
+						var tempEntityCode:String = String(customTaskXml.entityCode);
+						var tempCode:String = String(customTaskXml[codeDesc]);
+						if(!BAMUtil.isEmpty(tempModelCode) && !BAMUtil.isEmpty(tempEntityCode)
+							&& !BAMUtil.isEmpty(tempCode) && tempModelCode == entityModelCode 
+							&& tempEntityCode == entityCode && tempCode == code){
+							xml = customTaskXml;
+						}
+					}
+				}
+				return xml;
+			}
+			
+			private function getCustomTaskXmlDimension():XML{
+				var xml:XML;
+				if(taskTempletXml != null ){
+					for each(var customTaskXml:XML in taskTempletXml.datatask.custom_task ){
+						var tempModelCode:String = String(customTaskXml.modelCode);
+						var tempCode:String = String(customTaskXml[codeDesc]);
+						if(!BAMUtil.isEmpty(tempModelCode) && !BAMUtil.isEmpty(tempCode) 
+							&& tempModelCode == entityModelCode && tempCode == code){
+							xml = customTaskXml;
+						}
+					}
+				}
+				return xml;
+			}
+			
+			private function close():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+			//根据不同类型设置变量
+			private function setVariableByDataTaskType():void{
+				if(entityTaskType == BAMConst.ENTITY_DATATASK_RULE){
+					taskSQL = "SELECT DT.ID,DT.CODE,DT.NAME,DT.MTCODE,MT.CONTENT,DT.CRONEXPRESSION " +
+						"FROM PUB_DATATASK_TEMPLET DT,PUB_METADATA_TEMPLET MT WHERE DT.MTCODE = MT.CODE AND DT.CODE LIKE 'ENTITY_RULE%'";
+					toolTipStr = "规则";
+					codeDesc = "ruleCode";
+				}else if(entityTaskType == BAMConst.ENTITY_DATATASK_DIMENSION){
+					taskSQL = "SELECT DT.ID,DT.CODE,DT.NAME,DT.MTCODE,MT.CONTENT,DT.CRONEXPRESSION " +
+						"FROM PUB_DATATASK_TEMPLET DT,PUB_METADATA_TEMPLET MT WHERE DT.MTCODE = MT.CODE AND DT.CODE LIKE 'ENTITY_DIMENSION%'";
+					toolTipStr = "维度";
+					codeDesc = "dimensionCode";
+				}else if(entityTaskType == BAMConst.ENTITY_DATATASK_CUBE){
+					taskSQL = "SELECT DT.ID,DT.CODE,DT.NAME,DT.MTCODE,MT.CONTENT,DT.CRONEXPRESSION " +
+						"FROM PUB_DATATASK_TEMPLET DT,PUB_METADATA_TEMPLET MT WHERE DT.MTCODE = MT.CODE AND DT.CODE LIKE 'ENTITY_CUBE%'";
+					toolTipStr = "指标";
+					codeDesc = "cubeCode";
+				}else if(entityTaskType == BAMConst.ENTITY_DATATASK_GIS){
+					taskSQL = "SELECT DT.ID,DT.CODE,DT.NAME,DT.MTCODE,MT.CONTENT,DT.CRONEXPRESSION " +
+						"FROM PUB_DATATASK_TEMPLET DT,PUB_METADATA_TEMPLET MT WHERE DT.MTCODE = MT.CODE AND DT.CODE LIKE 'ENTITY_GIS%'";
+					toolTipStr = "GIS信息";
+					codeDesc = "gisCode";
+				}
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%" height="100%" horizontalAlign="left" >
+			<mx:Label text="任务模板:" width="30%" /><mx:Label id="taskNameTxt" width="70%" color="blue" />
+		</mx:HBox>
+		<mx:HBox width="100%" height="100%" horizontalAlign="left" >
+			<mx:Label text="调度表达式:" width="30%" /><mx:Label id="taskExpTxt" width="70%" color="blue" />
+		</mx:HBox>
+		<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+			<mx:Button id="addTaskBtn" label="任务调度" toolTip="将此{toolTipStr}做为子任务项添加到该任务模板中" click="addTaskBtn_clickHandler(event)" />
+			<mx:Button id="delTaskBtn" label="取消调度" toolTip="将此{toolTipStr}产生的子任务项从该任务模板中删除" click="delTaskBtn_clickHandler(event)" />
+			<mx:Button label="关闭窗口"  click="close()" />
+		</mx:HBox>
+	</mx:VBox>
+</mx:TitleWindow>

@@ -1,0 +1,1360 @@
+/**
+ * 
+ */
+
+package smartx.bam.bs;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+
+import smartx.bam.bs.accountset.AccountSettingService;
+import smartx.bam.bs.avmanager.AnalyzerJobService;
+import smartx.bam.bs.bvmanager.BusinessViewManager;
+import smartx.bam.bs.bvmanager.BvSmartXCepListener;
+import smartx.bam.bs.common.ExamineChartService;
+import smartx.bam.bs.common.MetadataTempletManager;
+import smartx.bam.bs.dashboard.DashboardManager;
+import smartx.bam.bs.dashboardobj.DashboardObjManager;
+import smartx.bam.bs.dataprofile.AnalyzerSetTaskService;
+import smartx.bam.bs.entitymodel.CreateEntityDataTaskService;
+import smartx.bam.bs.entitymodel.EntityCubeService;
+import smartx.bam.bs.entitymodel.EntityDashbordService;
+import smartx.bam.bs.entitymodel.EntityDataViewerService;
+import smartx.bam.bs.entitymodel.EntityDimensionService;
+import smartx.bam.bs.entitymodel.EntityModelManager;
+import smartx.bam.bs.entitymodel.EntityRuleRealTimeStatisticsService;
+import smartx.bam.bs.eventsource.EventSourceAdapter;
+import smartx.bam.bs.eventsource.EventSourceManager;
+import smartx.bam.bs.qvmanager.QueryViewManager;
+import smartx.bam.bs.report.ReportService;
+import smartx.bam.bs.scenariomnager.CopyService;
+import smartx.bam.bs.scenariomnager.RuleTempleteManager;
+import smartx.bam.bs.scenariomnager.ScenarioManager;
+import smartx.bam.bs.systemsetting.SysSettingManager;
+import smartx.bam.bs.task.TaskManager;
+import smartx.bam.bs.userlibmanage.JarFileManageService;
+import smartx.bam.bs.workspace.WorkspaceManager;
+import smartx.bam.initdsfactory.DataSourceInitFactory;
+import smartx.bam.vo.DatabaseConst;
+import smartx.bam.vo.SysConst;
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.bs.dbaccess.dsmgr.DataSourceManager;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.common.vo.SimpleHashVO;
+import smartx.framework.metadata.bs.NovaServerEnvironment;
+import smartx.framework.metadata.vo.TableDataStruct;
+import smartx.publics.cep.bs.StreamModuleDeploymentManager;
+import smartx.publics.cep.bs.service.SmartXCEPService;
+import smartx.publics.datatask.CommTaskManager;
+import smartx.publics.datatask.DataTaskExecThread;
+import smartx.publics.metadata.bs.service.SmartXMetadataTempletService;
+import smartx.publics.metadata.vo.MetadataTemplet;
+
+/**
+ * @author sky Description
+ */
+public class BamService {
+	protected Logger logger = NovaLogger.getLogger(this.getClass());
+
+	private static boolean isInit = false;
+
+	private final String MODULE_HEAD = "rule_";
+	
+	private SmartXCEPService smartXCEPService;
+
+	private EventSourceManager eventSourceManager;
+
+	private BusinessViewManager businessViewManager;
+
+	private ScenarioManager scenarioManager;
+
+	private DashboardObjManager dashBoardObjectManager;
+
+	private AccountSettingService accountSettingService;
+	
+	private RuleTempleteManager rtm;
+	
+	private JarFileManageService jfms;
+	
+	private CopyService cs;
+	
+	private TaskManager taskManager;
+	
+	private QueryViewManager qvManager;
+	
+	private DashboardManager dashboardManager;
+	
+//	private AnalyzeViewManager analyzerViewManager;
+	
+	private WorkspaceManager workspaceManager;
+	
+	private AnalyzerJobService analyzerJobService;
+	
+	private EntityModelManager entityModelManager;
+	
+	private EntityRuleRealTimeStatisticsService erriss;
+	
+	private EntityDataViewerService edvs;
+	
+	private EntityDashbordService eds;
+	
+	private EntityDimensionService dimensionService;
+	
+	private EntityCubeService ecs;
+	
+	private ReportService rs;
+	
+	private MetadataTempletManager mtm;
+	
+	private CreateEntityDataTaskService cedts;
+	
+	private ExamineChartService excs;
+	
+	private static boolean isStartCepService = false;//是否启用CEP服务
+	
+	static{
+		String isStartCepServiceStr = String.valueOf(NovaServerEnvironment.getInstance().get(SysConst.PARA_CEP_SERVICE));
+		if(isStartCepServiceStr != null && !"".equals(isStartCepServiceStr))
+			isStartCepService = ("false".equals(isStartCepServiceStr.toLowerCase()))?false:true;
+		else
+			isStartCepService = true;
+		//如果没有启用cep服务，则自动初始化关系型数据源
+		if(isStartCepService)
+			SmartXCEPService.addSmartXCepListener(new BvSmartXCepListener());
+		else{
+			DataSourceInitFactory dataSourceInitFactory = new DataSourceInitFactory();
+			dataSourceInitFactory.getDefaultConfiguration();
+		}
+	}
+
+	public BamService() {
+		initManagers();
+		if (isInit)
+			return;
+		isInit = true;
+		initEventSource();
+		if(isStartCepService)
+			addScenarioStatementListener();
+	}
+	
+	private void initManagers(){
+		if(isStartCepService)
+			smartXCEPService = new SmartXCEPService();
+		eventSourceManager = new EventSourceManager();
+		businessViewManager = new BusinessViewManager();
+		scenarioManager = new ScenarioManager(smartXCEPService);
+		dashBoardObjectManager = new DashboardObjManager();
+		accountSettingService = new AccountSettingService();
+		rtm = new RuleTempleteManager(smartXCEPService);
+		jfms = new JarFileManageService();
+		cs = new CopyService(smartXCEPService);
+		taskManager = new TaskManager();
+		qvManager = new QueryViewManager();
+		dashboardManager = new DashboardManager();
+//		analyzerViewManager = new AnalyzeViewManager();
+		workspaceManager = new WorkspaceManager(smartXCEPService,dashBoardObjectManager,dashboardManager);
+		analyzerJobService = new AnalyzerJobService();
+//		cerdts = new CreateEntityRuleDataTaskService();
+		entityModelManager = new EntityModelManager();
+		erriss = new EntityRuleRealTimeStatisticsService();
+		edvs = new EntityDataViewerService();
+		eds = new EntityDashbordService();
+		dimensionService = new EntityDimensionService();
+		ecs = new EntityCubeService();
+		rs = new ReportService();
+		mtm = new MetadataTempletManager();
+		cedts = new CreateEntityDataTaskService();
+		excs = new ExamineChartService();
+	}
+
+	private void initEventSource() {
+		logger.debug("初始化EventSource服务");
+		HashVO[] vos = null;
+		CommDMO dmo = new CommDMO();
+		String sql = "select b.adaptorclass,b.configuration,b.status from bam_eventdatasource b";
+		try {
+			String adaptorClass = null;
+			String configurtion = null;
+			Document doc = null;
+			vos = dmo.getHashVoArrayByDS(null, sql);
+			for (HashVO vo : vos) {
+				adaptorClass = vo.getStringValue("adaptorclass");
+				configurtion = vo.getStringValue("configuration");
+				// 如果状态为启动，则启动该事件源
+				if (vo.getIntegerValue("status").intValue() == SysConst.STARTED) {
+					if (configurtion != null && !"".equals(configurtion.trim()))
+						doc = DocumentHelper.parseText(configurtion);
+					Object adapter = Class.forName(adaptorClass).newInstance();
+					if (adapter instanceof EventSourceAdapter) {
+						((EventSourceAdapter) adapter).start(doc);
+						EventSourceManager.eventSourceObjs.put(adaptorClass,
+								adapter);
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("初始化EventSource服务失败", e);
+		} finally {
+			dmo.releaseContext(null);
+		}
+		logger.debug("初始化EventSource完毕！");
+	}
+
+	private void addScenarioStatementListener() {
+		CommDMO dmo = new CommDMO();
+		try {
+			String searchSQL = "select * from bam_rule";
+			HashVO[] rules = dmo.getHashVoArrayByDS(
+					DatabaseConst.DATASOURCE_DEFAULT, searchSQL);
+			for (HashVO rule : rules) {
+				String ruleCode = rule.getStringValue("CODE");
+				searchSQL = "SELECT PCS.NAME,PCS.PROVIDERNAME FROM PUB_CEP_STREAMMODULE PCS WHERE PCS.NAME=? AND PCS.STATUS=?";
+				HashVO[] modules = dmo.getHashVoArrayByDS(
+						DatabaseConst.DATASOURCE_DEFAULT, searchSQL,
+						MODULE_HEAD + ruleCode,
+						SysConst.PUB_CEP_STREAMMODULE_STATUS_START);
+
+				for (HashVO module : modules) {
+					String providerName = module.getStringValue("PROVIDERNAME");
+					String moduleName = module.getStringValue("NAME");
+
+					scenarioManager.addStatementListener(providerName,
+							moduleName, ruleCode);
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error("", e);
+		} finally {
+			dmo.releaseContext(null);
+		}
+
+	}
+
+	/**
+	 * 启动事件源
+	 * 
+	 * @param className
+	 * @param config
+	 * @throws Exception
+	 */
+	public void startEventSource(String className, String config)
+			throws Exception {
+		try {
+			eventSourceManager.start(className, config);
+		} catch (Exception e) {
+			logger.error("启动事件源失败！", e);
+			throw e;
+		}
+
+	}
+
+	/**
+	 * 停止事件源
+	 * 
+	 * @param className
+	 * @throws Exception
+	 */
+	public void stopEventSource(String className) throws Exception {
+		try {
+			eventSourceManager.stop(className);
+		} catch (Exception e) {
+			logger.error("停止事件源失败！", e);
+			throw e;
+		}
+	}
+
+	/**
+	 * 启动业务视图
+	 * 
+	 * @param code
+	 * @throws Exception
+	 */
+	public void startBusinessView(String code) throws Exception {
+		try {
+			businessViewManager.startBusinessView(code);
+		} catch (Exception e) {
+			logger.error("启动业务视图失败", e);
+			throw e;
+		}
+	}
+
+	/**
+	 * 停止业务视图
+	 * 
+	 * @param code
+	 * @throws Exception
+	 */
+	public void stopBusinessView(String code) throws Exception {
+		try {
+			businessViewManager.stopBusinessView(code);
+		} catch (Exception e) {
+			logger.error("停止业务视图失败", e);
+			throw e;
+		}
+	}
+
+	/**
+	 * 重新发布流模块
+	 * 
+	 * @param providerName
+	 * @param moduleName
+	 * @throws Exception
+	 */
+	public void redeployBusinessView(String providerName, String moduleName)
+			throws Exception {
+		try {
+			businessViewManager.redeployStreamModule(providerName, moduleName);
+		} catch (Exception e) {
+			logger.error("重新发布流模块", e);
+			throw e;
+		}
+	}
+
+	public void startBusinessScenario(String ruleCode) throws Exception {
+		try {
+			scenarioManager.start(ruleCode);
+		} catch (Exception e) {
+			logger.error("启动规则模块失败", e);
+			throw e;
+		}
+	}
+
+	public void stopBusinessScenario(String ruleCode) throws Exception {
+		try {
+			scenarioManager.stop(ruleCode);
+		} catch (Exception e) {
+			logger.error("停止规则模块失败", e);
+			throw e;
+		}
+	}
+
+	/**
+	 * 根据code获得dashboardobject的mtcode
+	 * 
+	 * @param code
+	 */
+	public Map<String, Object> getMtCodeByCode(String code, String config)
+			throws Exception {
+		try {
+			return dashBoardObjectManager.getMtCodeByCode(code, config);
+		} catch (Exception e) {
+			logger.error("根据编码获得仪表盘对象元数据编码错误!", e);
+			throw e;
+		}
+	}
+
+	/**
+	 * 通过元数据编码获取图表数据
+	 * 
+	 * @param mtcode
+	 * @return
+	 */
+	public Map<String, Map<String, Object>[]> getChartData(String mtcode,
+			String providerName,String chartType,String id,String filter,String accessFiler) throws Exception {
+		try {
+			return dashBoardObjectManager.getChartData(mtcode, providerName,chartType,id,filter,accessFiler);
+		} catch (Exception e) {
+			logger.error("通过元数据编码获取图表数据错误!", e);
+			throw e;
+		}
+
+	}
+	
+	public Map<String, Map<String, Object>[]> getChartDataByMtContent(String mtContent,
+			String providerName,String chartType,String id,String filter,String accessFiler) throws Exception {
+		try {
+			return dashBoardObjectManager.getChartDataByMtContent(mtContent, providerName,chartType,id,filter,accessFiler);
+		} catch (Exception e) {
+			logger.error("通过元数据获取图表数据错误!", e);
+			throw e;
+		}
+
+	}
+	
+	/**
+	 * 解析图表元数据转换为EPL(SQL)语句
+	 * @param doc
+	 * @param chartType
+	 * @param filter
+	 * @return
+	 */
+	public String parseChartXmlToEpl(String contentXml,String filter) throws Exception
+	{
+		try {
+			Document doc = DocumentHelper.parseText( contentXml );
+			return dashBoardObjectManager.parseChartXmlToEpl(doc, filter);
+		} catch (Exception e) {
+			logger.error("解析图表元数据转换为EPL(SQL)语句错误!", e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 重启业务视图容器
+	 * 
+	 * @param providername
+	 */
+	public void restartProvider(String providername) throws Exception {
+		try {
+			// 初始化所有的CEP服务
+			smartXCEPService.reInited();
+			// 初始化所有的事件源
+			initEventSource();
+
+		} catch (Exception e) {
+			logger.error("重启业务视图容器错误!", e);
+			throw e;
+		}
+	}
+
+	/**
+	 * 通过系统参数查询对应的值
+	 * 
+	 * @param key
+	 * @return
+	 * @throws Exception
+	 */
+	public String findSysSettingByKey(String key) throws Exception {
+		try {
+			return SysSettingManager.getInstance().findSysSettingByKey(key);
+		} catch (Exception e) {
+			logger.error("通过系统参数查询对应的值错误!", e);
+			throw e;
+		}
+	}
+
+	/**
+	 * 刷新系统参数
+	 */
+	public void refreshSysSettingCache() throws Exception {
+		SysSettingManager.getInstance().refreshCache();
+	}
+
+	public void dealAccountSetting(Map<String, Object> map) throws Exception {
+		accountSettingService.dealAcccountAttribute(map);
+	}
+
+	public SimpleHashVO[] getAttributeSimpleHashVo(String ds, String userName)
+			throws Exception {
+		return accountSettingService.getAttributeSimpleHashVo(ds, userName);
+	}
+
+	public SimpleHashVO[] getPageDataGridVOS(String tableName, String rowNum,
+			String orderByColomn,String userName) throws Exception {
+
+		if (StringUtil.isEmpty(tableName) || StringUtil.isEmpty(orderByColomn)) {
+			return null;
+		}
+
+		CommDMO dmo = new CommDMO();
+		if (!StringUtil.isNumber(rowNum)) {
+			rowNum = "10";
+		}
+	
+		String sql = "select * from ( "
+			+ "select * from " + tableName + "  where USERNAME = '" + userName + "' order by " + orderByColomn + " desc "
+			+ " ) where rownum <= " + rowNum;
+
+		try {
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql);
+			SimpleHashVO[] result = new SimpleHashVO[vos.length];
+			for (int i = 0; i < vos.length; i++) {
+				SimpleHashVO vo = new SimpleHashVO(vos[i]);
+				result[i] = vo;
+			}
+			return result;
+		} finally {
+			dmo.releaseContext(null);
+		}
+	}
+	
+	public int getMenuIdbyMenuCode(String menuCode){
+		CommDMO dmo = new CommDMO();
+		int menuId= -1;
+		try{
+			String searchSQL="select * from pub_menu where name=?";
+			
+			HashVO[] temp = dmo.getHashVoArrayByDS(null, searchSQL,menuCode);
+			
+			if(temp !=null && temp.length>0){
+				menuId = temp[0].getIntegerValue("ID");
+			}
+			
+		}catch(Exception e){
+			logger.debug("无法根据菜单编码找到ID",e);
+		}finally{
+			dmo.releaseContext(null);
+		}
+		return menuId;
+	}
+	
+	/**
+	 * 查询所有JDBC关系型数据源名称
+	 * @return
+	 * @throws Exception
+	 */
+	public String[] queryAllRelationDsName() throws Exception
+	{
+		try {
+			return DataSourceManager.getDataSources();
+		} catch (Exception e) {
+			logger.error("查询所有JDBC关系型数据源名称错误!", e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 查询表字段名称及类型
+	 * @param datasourceName
+	 * @param tableName
+	 * @return
+	 * @throws Exception
+	 */
+	public TableDataStruct getTableStructByName(String datasourceName,
+			String tableName) throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			if (datasourceName == null) {
+				datasourceName = NovaServerEnvironment.getInstance().getDefaultDataSourceName();
+			}
+			String sql = "";
+			if(datasourceName.startsWith( StreamModuleDeploymentManager.JDBC_DATASOURCE_PREFIX )){
+				if(tableName.startsWith("select "))//已经是SELECT的形式了
+					sql = tableName;
+				else
+					sql = "select * from " + tableName + " where 1=2 ";
+				
+			}else
+				sql = "select * from ( " + tableName + " ) where 1=2 ";
+			
+			return  dmo.getTableDataStructByDS(datasourceName, sql);
+		} catch (Exception e) {
+			logger.error("查询表字段名称及类型错误!", e);
+			throw e;
+		}finally{
+			dmo.releaseContext(datasourceName);
+		}
+	}
+	
+	/**
+	 * 获取总记录数
+	 * @param datasource
+	 * @param sql
+	 * @return
+	 * @throws Exception
+	 */
+	public int getRowCount(String datasource,String sql) throws Exception{
+		CommDMO commDMO = new CommDMO();
+		try{
+			HashVO[] hashVOs = commDMO.getHashVoArrayByDS(datasource, "select count(*) rowcount from (" + sql + ") t");
+			return hashVOs[0].getIntegerValue("rowcount").intValue();
+		}finally{
+			commDMO.releaseContext(datasource);
+		}        
+	}
+	
+	/**
+	 * 获取告警和任务总数
+	 * @param datassource
+	 * @param sqlMap
+	 * @return
+	 * @throws Exception
+	 */
+	public Map<String, Integer> getAlertAndTaskCount(String datasource,Map<String,String> sqlMap) throws Exception{
+		Map<String, Integer> result = new HashMap<String, Integer>();
+		int alertNum =  getRowCount(datasource, (String)sqlMap.get(SysConst.MAPKEY_ALERT) );
+		int taskNum =  getRowCount(datasource, (String)sqlMap.get(SysConst.MAPKEY_TASK) );
+		
+		result.put(SysConst.MAPKEY_ALERT, alertNum );
+		result.put(SysConst.MAPKEY_TASK, taskNum );
+		
+		return result;
+	}
+	
+	/**
+	 * 更新任务备注信息
+	 * @param datasourceName
+	 * @param comment
+	 * @param taskId
+	 * @return
+	 * @throws Exception
+	 */
+	public int updateTaskComment(String datasourceName, String comment,String taskId) throws Exception{
+		
+		return taskManager.updateTaskComment(datasourceName, comment, taskId);
+
+	}
+	
+	/**
+	 * 保存任务观察者信息
+	 * @param datasourceName
+	 * @param taskId
+	 * @param users
+	 * @return
+	 * @throws Exception
+	 */
+	public int[] saveTaskWatcher(String datasourceName,String taskId, String[] users) throws Exception{
+
+
+		return taskManager.saveTaskWatcher(datasourceName, taskId, users);
+	}
+	
+	/**
+	 * 为此任务发送邮件给相关用户
+	 * @param taskId
+	 * @param subject
+	 * @param body
+	 */
+	public void sendTaskInfoEmail(String taskId,String subject,String body){
+		taskManager.sendTaskInfoEmail(taskId, subject, body);
+	}
+	
+	public String[] getRuleTempleteFields(String scenarioId) throws Exception {
+		try{
+			return rtm.getRuleTempleteFields(scenarioId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public String[] getRuleTemplateParaNames(String templeteId) throws Exception{
+		try{
+			return rtm.getRuleTemplateParaNames(templeteId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public SimpleHashVO[] getRuleEventData(String scenarioId) throws Exception{
+		try{
+			return rtm.getRuleEventData(scenarioId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public SimpleHashVO[] getRuleTemplateData(String templeteId) throws Exception{
+		try{
+			return rtm.getRuleTemplateData(templeteId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public SimpleHashVO[] getRuleTemplateParas(String templeteId) throws Exception{
+		try{
+			return rtm.getRuleTemplateParas(templeteId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void saveOrupdateRuleTemplate(Map<String,String> map) throws Exception{
+		try{
+			rtm.saveOrupdateRuleTemplate(map);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public boolean isExist(String templeteId) throws Exception{
+		try{
+			return rtm.isExist(templeteId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void deleteRuleTemplete(String templeteId) throws Exception{
+		try{
+			rtm.deleteRuleTemplete(templeteId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void createRuleByTemplete(String templeteId,String operator,String businessruleId,Map<String, String> dataValue,Map<String,String> dataType,Map<String,String> dataInfo,boolean isEdit)throws Exception{
+		try{
+			rtm.createRuleByTemplete(templeteId, operator, businessruleId, dataValue, dataType,dataInfo,isEdit);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public SimpleHashVO[] getParaInfo(String templeteId,String businessruleId,boolean isEdit)throws Exception{
+		try{
+			return rtm.getParaInfo(templeteId, businessruleId, isEdit);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public SimpleHashVO[] getCondition(String templeteId) throws Exception{
+		try{
+			return rtm.getCondition(templeteId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public SimpleHashVO[] getRuleInfoByBusinessruleId(String businessruleId) throws Exception {
+		try{
+			return rtm.getRuleInfoByBusinessruleId(businessruleId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void uploadJarFile(byte[] content,Map<String,String> fileInfo) throws Exception{
+		try{
+			jfms.uploadJarFile(content, fileInfo);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void deleteJarFile(String Id,String filePath) throws Exception{
+		try{
+			jfms.deleteJarFile(Id, filePath);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void copyAlertType(Map<String,Object> dataValue) throws Exception{
+		try{
+			cs.copyAlertType(dataValue);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void copyAlertRule(Map<String,Object> dataValue) throws Exception{
+		try{
+			cs.copyAlertRule(dataValue);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 查询所有有依赖的业务视图编码
+	 * @param sql
+	 * @return
+	 */
+	public Map<String,String> queryAllDependBv(String code) throws Exception{
+		try{
+			return qvManager.queryAllDependBv(code);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 复制查询视图
+	 * 
+	 * @param data
+	 * @throws Exception
+	 */
+	public void copyQueryView(Map<String, Object> dataValue) throws Exception{
+		try{
+			qvManager.copyQueryView(dataValue);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 复制仪表盘对象
+	 * 
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void copyDashboardObj(Map<String, Object> dataValue)	throws Exception {
+		try{
+			dashBoardObjectManager.copyDashboardObj(dataValue);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 复制仪表盘
+	 * 
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void copyDashboard(Map<String, Object> dataValue) throws Exception {
+		try{
+			dashboardManager.copyDashboard(dataValue);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 复制业务视图
+	 * 
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void copyBusinessView(Map<String, Object> dataValue)	throws Exception {
+		try{
+			businessViewManager.copyBusinessView(dataValue);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 所有工作集的元数据
+	 * @return
+	 * @throws Exception
+	 */
+	public Map<String,String> getAllWorkspaceMetadata(String owner) throws Exception{
+		try{
+			return workspaceManager.getAllWorkspaceMetadata(owner);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+
+	/**
+	 * 更新工作集
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void updateWorkspace(Map<String,Object> dataValue) throws Exception{
+		try{
+			workspaceManager.updateWorkspace(dataValue);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 删除工作集
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void delWorkspace(String code,String metadata) throws Exception{
+		try{
+			workspaceManager.delWorkspace(code,metadata);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据不同类型删除相关的关联表
+	 * 
+	 * @param type
+	 *            类型
+	 * @param code
+	 *            编码
+	 * @throws Exception
+	 */
+	public void delRalateTableByType(String type, String code,String name) throws Exception {
+		try{
+			workspaceManager.delRalateTableByType(type,code,name);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void stopAnalyzerJobByName(String jobName) throws Exception{
+		try{
+			analyzerJobService.stopAnalyzerJobByName(jobName);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void startAnalyzerJobByName(String jobName,String jobExp) throws Exception{
+		try{
+			analyzerJobService.startAnalyzerJobByName(jobName,jobExp);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void saveEntityRuleTask(Map<String,String> taskInfo,String dataTaskType) throws Exception{
+		try{
+			cedts.saveEntityTaskTemplet(taskInfo,dataTaskType);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void updateTaskMetaDatabyCode(String mtCode,String content,String oldMtCode,String oldContent,String dataTaskType) throws Exception {
+		try{
+			cedts.updateTaskMetaDatabyCode(mtCode, content, oldMtCode, oldContent);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void editTaskTemplet(String id,String name,String code,String exp,String roundTask,String dataTaskType,String type) throws Exception{
+		try{
+			cedts.editTaskTemplet(id, name, code, exp,roundTask,type);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void deleteTaskTemplete(String code,String mtcode) throws Exception{
+		try{
+			cedts.deleteTaskTemplete(code,mtcode);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void stopTaskByTempletId(String templeteId) throws Exception{
+		try{
+			cedts.stopTaskByTempletId(templeteId);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public void updateMetaData(Map[] maps,String dataTaskType) throws Exception{
+		try{
+			cedts.updateMetaData(maps);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void dealRealTimeStatistics(String modelContent,String  modelCode,String  entityCode,String  ruleCode,String taskName,DataTaskExecThread mainThread) throws Exception{
+		try{
+			erriss.dealRealTimeStatistics(modelContent, modelCode, entityCode, ruleCode,StringUtil.getTimestampMill(),taskName,mainThread);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> analyseEntityRule(Map[] rules) throws Exception {
+		try{
+			return erriss.analyseEntityRule(rules);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> analyseHisEntityRule(Map[] rules) throws Exception {
+		try{
+			return erriss.analyseHisEntityRule(rules);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> analyseHisEntityByBatchNo(Map[] rules) throws Exception {
+		try{
+			return erriss.analyseHisEntityByBatchNo(rules);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> analyseEntity(Map[] rules) throws Exception {
+		try{
+			return erriss.analyseEntity(rules);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> analyseEntityByBatchNo(Map[] rules) throws Exception {
+		try{
+			return erriss.analyseEntityByBatchNo(rules);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public String saveEntityViewer(Map<String,String> map) throws Exception{
+		try{
+			return edvs.saveEntityViewer(map);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void updateEntityViewer(Map<String,String> map) throws Exception{
+		try{
+			edvs.updateEntityViewer(map);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void deleteEntityViewer(Map<String,String> map) throws Exception{
+		try{
+			edvs.deleteEntityViewer(map);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public String saveEntityDashbord(Map<String,String> map) throws Exception {
+		try{
+			return eds.saveEntityDashbord(map);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void updateEntityDashbord(Map<String,String> map) throws Exception {
+		try{
+			eds.updateEntityDashbord(map);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void deleteEntityDashbord(Map<String,String> map) throws Exception {
+		try{
+			eds.deleteEntityDashbord(map);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public String createEntityDimensionTable(String dimensionXml,String dwdatasource) throws Exception{
+		try{
+			return dimensionService.createEntityDimensionTable(dimensionXml, dwdatasource);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public String createSynonymsDimensionTable(String dwdatasource) throws Exception{
+		try{
+			return dimensionService.createSynonymsDimensionTable(dwdatasource);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public String dealDimension(String modelContent,String modelCode,String dimensionCode) throws Exception {
+		try{
+			return dimensionService.dealDimension(modelContent, modelCode, dimensionCode);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void deleteBatchEntityData(String entity,String content,Map<String,Object> dataValue) throws Exception{
+		try{
+			entityModelManager.deleteBatchEntityData(entity, content, dataValue);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void dealCube(String modelCode,String entityCode,String cubeCode) throws Exception {
+		try{
+			ecs.dealCube(modelCode, entityCode, cubeCode);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public Map[] getReportComponentHashVO(String sql) throws Exception{
+		try{
+			return rs.getReportComponentHashVO(sql);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public String onReportQuery(String taskCode,Map<String,String> map) throws Exception {
+		try{
+			return rs.onReportQuery(taskCode, map);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public Map<String,String> getReportMetaDateContent(String mtCode) throws Exception {
+		try{
+			return rs.getReportMetaDateContent(mtCode);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public Map<String,String> getDashboard(String sql) throws Exception {
+		CommDMO dmo = new CommDMO();
+		Map<String,String> map = null;
+		try{
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql);
+			if(vos != null && vos.length>0){
+				String[] keys = vos[0].getKeys();
+				map = new HashMap<String,String>();
+				for(String key : keys){
+					map.put(key.toUpperCase(), vos[0].getStringValue(key));
+				}
+			}
+		}catch(Exception e){
+			throw e;
+		}finally{
+			dmo.releaseContext(null);
+		}
+		return map;
+	}
+	
+	/**
+	 * 添加一个循环数据任务
+	 * @param name
+	 * @param code
+	 * @param cronexpression
+	 * @param content
+	 * @param isExecNow
+	 * @throws Exception
+	 */
+	public void addDataTask(String name,String code,String cronexpression,String content,boolean isExecNow) throws Exception{
+		AnalyzerSetTaskService.getInstance().addDataTask(name, code, cronexpression, content,isExecNow);
+	}
+	
+	/**
+	 * 新建或更新元数据模板并提交
+	 * 
+	 * @param mtcode
+	 * @param content
+	 * @throws Exception
+	 */
+	public void updateAtOnceMetadataTemplet(String mtcode, String content,
+			String name, String owner, String type) throws Exception {
+		try{
+			mtm.updateAtOnceMetadataTemplet(mtcode, content, name, owner, type);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据MTCODE删除元数据模板
+	 * 
+	 * @param mtcode
+	 * @throws Exception
+	 */
+	public void deleteAtOnceMetadataTemplet(String mtcode) throws Exception {
+		try{
+			mtm.deleteAtOnceMetadataTemplet(mtcode);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 获取元数据
+	 * @param mtcode
+	 * @return
+	 * @throws Exception
+	 */
+	public MetadataTemplet getMetadataTempletContent(String mtcode) throws Exception{
+		try{
+			return mtm.getMetadataTempletContent(mtcode);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public String addAndStartTask(String taskTempletId,String taskName, String taskContent,Map<String, String> paramMap) throws Exception{
+		try{
+			return CommTaskManager.getInstance().addAndStartTask(taskTempletId, taskName, taskContent, paramMap);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 生成显示属性的SQL并包含查询条件
+	 * @param entity
+	 * @param content
+	 * @param condition
+	 * @param rule
+	 * @return
+	 * @throws Exception
+	 */
+	public String generateDisplayEntitySqlContainCondition(String entity, String content, String rule ,String condition) 
+			throws Exception{
+		try{
+			return entityModelManager.generateDisplayEntitySqlContainCondition(entity, content, rule, condition);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public String generateDisplayEntitySqlContainConditionByMtCode(String entityMtCode,String modelMtCode
+																	,String ruleMtCode,String condition,String datasource)
+			throws Exception{
+		
+		try{
+			return entityModelManager.generateDisplayEntitySqlContainConditionByMtCode(entityMtCode, modelMtCode, ruleMtCode, condition,datasource);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 生成实体SQL
+	 * 
+	 * @param entity
+	 *            实体
+	 * @param content
+	 *            元数据XML
+	 * @return
+	 * @throws Exception
+	 */
+	public String generateEntitySql(String entity, String content,String rule)
+			throws Exception {
+		try{
+			return entityModelManager.generateEntitySql(entity, content,rule);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public String generateEntitySqlOriginalData(String entity, String content,String rule)
+	throws Exception {
+		try{
+			return entityModelManager.generateEntitySqlOriginalData(entity, content,rule);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	/**通过MTCODE解析SQL
+	 * @param entityMtCode 实体MTCODE
+	 * @param modelMtCode 模型MTCODE
+	 * @param ruleMtCode 规则MTCODE
+	 * @param datasource 数据源
+	 * @return 返回SQL语句
+	 * @throws Exception
+	 */
+	public String generateEntitySqlByMtCode(String entityMtCode,String modelMtCode,String ruleMtCode,String datasource)
+			throws Exception {
+		try{
+			return entityModelManager.generateEntitySqlByMtCode(entityMtCode, modelMtCode, ruleMtCode, datasource);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public String generateEntitySqlOriginalDataByMtCode(String entityMtCode,
+			String modelMtCode, String ruleMtCode, String datasource)
+			throws Exception {
+		try {
+			return entityModelManager.generateEntitySqlOriginalDataByMtCode(
+					entityMtCode, modelMtCode, ruleMtCode, datasource);
+		} catch (Exception e) {
+			throw e;
+		}
+	}
+	
+	/**
+	 * 通过MTCODE生成实体SQL查询总数（使用原始SQL）
+	 * @param entityMtCode
+	 * @param modelMtCode
+	 * @param ruleMtCode
+	 * @param condition
+	 * @param datasource
+	 * @return
+	 * @throws Exception
+	 */
+	public int generateOriginalEntitySqlCountByMtCode(String entityMtCode
+			,String modelMtCode,String ruleMtCode,String condition,String datasource) throws Exception{
+		try{
+			return entityModelManager.generateOriginalEntitySqlCountByMtCode(entityMtCode, modelMtCode, ruleMtCode, condition, datasource);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> getGroupUserData(String groupValue) throws Exception {
+		try{
+			return excs.getGroupUserData(groupValue);
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> getProvinceData() throws  Exception {
+		try{
+			return excs.getProvinceData();
+		}catch(Exception e){
+			throw e;
+		}
+	}
+	
+	public void saveOrUpdateMetadataTemplet(Map<String,Object> templet) throws Exception{
+		SmartXMetadataTempletService smts = new SmartXMetadataTempletService();
+		smts.saveOrUpdateMetadataTemplet(templet);
+	}
+	
+//	public DataTaskLog getTaskLog(String taskId) throws Exception {
+//		try{
+//			return MessagePushService.getInstance().getMessageByTaskId(taskId);
+//		}catch(Exception e){
+//			throw e;
+//		}
+//	}
+	
+}

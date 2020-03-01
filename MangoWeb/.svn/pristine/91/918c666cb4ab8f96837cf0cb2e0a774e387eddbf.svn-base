@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:DQTaskDesigner xmlns:fx="http://ns.adobe.com/mxml/2009"
+					   xmlns:designer="smartx.bam.flex.modules.entitymodel.*"
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:containers="net.brandonmeyer.containers.*"
+				title="规则任务管理" creationComplete="init()">
+	<fx:Declarations>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.core.ScrollPolicy;
+			import mx.effects.Effect;
+			import mx.managers.PopUpManager;
+			import mx.messaging.events.MessageEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.MetadataTempletUtilEvent;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			public var entityModelCode:String;
+			
+			public var entityCode:String;
+			
+			public var ruleCode:String;
+			
+			private var oldTaskTempletXml:XML;
+			
+			private function init():void{
+				initChooseSubTaskAdvList();
+			}
+			
+			/**
+			 * 初始化子任务选择列表
+			 **/ 
+			private function initChooseSubTaskAdvList():void{
+				choosePanelTitle = "规则选择";
+				var dgColumn:DataGridColumn = new DataGridColumn();
+				dgColumn.dataField = "name";
+				dgColumn.headerText = "规则名称";
+				chooseSubTaskAdvListColumnArr.push(dgColumn);
+				
+				chooseSubTaskAdvQueryColumns.push("name");
+				
+				chooseSubTaskAdvQuerySql = "select name,code,mtcode,entitycode,entitymodelcode from dq_entity_rule";
+				
+			}
+			
+			private function getCustomTaskXml(taskXml:XML):XML{
+				var xml:XML;
+				if(taskXml != null ){
+					for each(var customTaskXml:XML in taskXml.datatask.custom_task ){
+						var tempModelCode:String = String(customTaskXml.modelCode);
+						var tempEntityCode:String = String(customTaskXml.entityCode);
+						var tempCode:String = String(customTaskXml["ruleCode"]);
+						if(!BAMUtil.isEmpty(tempModelCode) && !BAMUtil.isEmpty(tempEntityCode)
+							&& !BAMUtil.isEmpty(tempCode) && tempModelCode == entityModelCode 
+							&& tempEntityCode == entityCode && tempCode == ruleCode){
+							xml = customTaskXml;
+						}
+					}
+				}
+				return xml;
+			}
+			
+			override protected function delSubTaskHandler():void
+			{
+				var item:Object = subItemList.selectedItem;
+				if(item == null){
+					SmartXMessage.show("需要选中一条记录");
+					return;
+				}
+				
+				updatedMtObjArr = new Array();
+				flushedMtCodeArr = new Array();
+				
+				var xml:XML = item as XML;
+				
+				if(xml != null){
+					
+					var tempRuleCode:String = String(xml["ruleCode"]);
+					var tempRuleMtCode:String = BAMConst.ENTITY_MT_RULE_PREFEX.concat(tempRuleCode);
+					
+					var tempRule:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(tempRuleMtCode);
+					if(tempRule != null ){
+						var ruleXml:XML = tempRule.contentXML;
+						ruleXml.@taskCode = "";
+						
+						var oldRule:Object = new Object();
+						oldRule["mtcode"] = tempRuleMtCode;
+						oldRule["content"] = ruleXml.toXMLString();
+						updatedMtObjArr.push(oldRule);
+						flushedMtCodeArr.push(tempRuleMtCode);
+					}
+					
+					CEPUtils.xmlDeleteNode(xml);
+				}
+				
+				var taskObj:Object = new Object();
+				taskObj["mtcode"] = currentTaskMtCode;
+				taskObj["content"] = currentTaskTempletXml.toXMLString();
+				updatedMtObjArr.push(taskObj);
+				flushedMtCodeArr.push(currentTaskMtCode);
+				
+				OperatingTipUtil.startOperat("正在删除....",this);
+				bamService.updateMetaData(updatedMtObjArr,super.taskCategory);
+					
+			}
+			
+			override protected function subTaskConfirmHandler():void
+			{
+				var itemsArr:Array = chooseSubTaskAdvList.getSelectedRowValues();
+				if(itemsArr == null || itemsArr.length == 0){
+					SmartXMessage.show("需要选中一条或多条记录!");
+					return;
+				}
+				
+				updatedMtObjArr = new Array();
+				flushedMtCodeArr = new Array();
+				
+				var taskItem:Object = templeteList.selectedItem;
+				var taskName:String = taskItem["name"];
+				
+				if(currentTaskTempletXml != null ){
+					
+					for each(var item:Object in itemsArr){
+						
+						this.entityModelCode = item["entitymodelcode"];
+						this.entityCode = item["entitycode"];
+						this.ruleCode = item["code"];
+						
+						var xml:XML = getCustomTaskXml(currentTaskTempletXml);
+						if(xml != null)
+							CEPUtils.xmlDeleteNode(xml);
+						
+						var customXml:XML = new XML("<custom_task />");
+						customXml.@hasChildren = "false";
+						customXml.@name = item["name"];
+						customXml.@implclass = "smartx.bam.bs.entitymodel.EntityRuleDataTaskImpl";
+						customXml.modelCode = item["entitymodelcode"];
+						customXml.entityCode = item["entitycode"];
+						customXml.@desc = item["name"];
+						customXml["ruleCode"] = item["code"];
+						customXml["taskName"] = taskName;
+						currentTaskTempletXml.datatask.appendChild(customXml);
+						
+//						var oldTaskCode:String;
+//						var tempRule:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(item["mtcode"]);
+//						if(tempRule != null ){
+//							var ruleXml:XML = tempRule.contentXML;
+//							oldTaskCode = String(ruleXml.@taskCode);
+//							var oldTaskObj:Object = this.getTaskObjByCode(oldTaskCode);
+//							
+//							ruleXml.@taskCode = currentTaskCode;
+//							var oldRule:Object = new Object();
+//							oldRule["mtcode"] = item["mtcode"];
+//							oldRule["content"] = ruleXml.toXMLString();
+//							this.updatedMtObjArr.push(oldRule);
+//							this.flushedMtCodeArr.push(item["mtcode"]);
+//							
+//							if(oldTaskObj != null && oldTaskCode != currentTaskCode){
+//								oldTaskTempletXml = new XML(oldTaskObj["content"]);
+//								if(oldTaskTempletXml != null ){
+//									var oldXml:XML = getCustomTaskXml(oldTaskTempletXml);
+//									if(oldXml != null ){
+//										CEPUtils.xmlDeleteNode(oldXml);
+//									}
+//									
+//									var oldTask:Object = new Object();
+//									oldTask["mtcode"] = oldTaskObj["mtcode"];
+//									oldTask["content"] = oldTaskTempletXml.toXMLString();
+//									this.updatedMtObjArr.push(oldTask);
+//									this.flushedMtCodeArr.push(oldTaskObj["mtcode"]);
+//								}
+//							}
+//						}
+						
+						var taskObj:Object = new Object();
+						taskObj["mtcode"] = currentTaskMtCode;
+						taskObj["content"] = currentTaskTempletXml.toXMLString();
+						this.updatedMtObjArr.push(taskObj);
+						this.flushedMtCodeArr.push(currentTaskMtCode);
+						
+					}
+					
+					PopUpManager.removePopUp(chooseSubTaskPanel);
+					
+					OperatingTipUtil.startOperat("正在保存....",this);
+					bamService.updateMetaData(updatedMtObjArr,super.taskCategory);
+				}
+				
+			}
+			
+		]]>
+	</fx:Script>
+</designer:DQTaskDesigner>

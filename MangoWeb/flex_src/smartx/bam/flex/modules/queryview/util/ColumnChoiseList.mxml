@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Box xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark" 
+		xmlns:mx="library://ns.adobe.com/flex/mx" width="400" height="300">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			[Bindable]
+			public var columnsListData:ArrayCollection;//可选择列
+			
+			[Bindable]
+			public var allowMultipleSelection:Boolean = false;//单选还是多选
+			
+		]]>
+	</fx:Script>
+	
+	<mx:Label text="列字段选择:" width="100%"/>
+	<mx:List id="columnsList" width="100%" height="100%" dataProvider="{columnsListData}" allowMultipleSelection="{allowMultipleSelection}"
+			 toolTip="选择一个字段进行设置">
+		
+	</mx:List>
+</mx:Box>

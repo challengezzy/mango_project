@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item value="273" key="DIALOG_WIDTH"/>
+		<item value="337" key="DIALOG_Y_ORIGIN"/>
+		<item value="399" key="DIALOG_HEIGHT"/>
+		<item value="954" key="DIALOG_X_ORIGIN"/>
+		<item value="1|微软雅黑|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|微软雅黑" key="DIALOG_FONT_NAME"/>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item value="true" key="wrap"/>
+		<item value="false" key="isRegEx"/>
+		<item value="false" key="casesensitive"/>
+		<item value="false" key="incremental"/>
+		<item value="true" key="wholeword"/>
+		<item value="groupByColumn" key="selection"/>
+		<list key="findhistory">
+			<item value="groupbycolumn"/>
+			<item value="groupby"/>
+			<item value="parseVariable"/>
+			<item value="getSimpleHashVoArrayByDS"/>
+			<item value="getQueryViewSqlHandler"/>
+			<item value="GenericObjectPool"/>
+			<item value="SysConst"/>
+			<item value="imgUrl"/>
+		</list>
+		<list key="replacehistory">
+			<item value="Sys"/>
+			<item value="sourcePath=&quot;flex_src/smartx"/>
+			<item value="smartx.flex.collections"/>
+			<item value="MangoWeb"/>
+			<item value="apms140819"/>
+			<item value="APMS14"/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.GotoLineAction$GotoLineDialog_dialogBounds">
+		<item value="234" key="DIALOG_Y_ORIGIN"/>
+		<item value="452" key="DIALOG_X_ORIGIN"/>
+	</section>
+</section>

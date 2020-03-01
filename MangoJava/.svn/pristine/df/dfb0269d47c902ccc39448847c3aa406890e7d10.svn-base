@@ -1,0 +1,313 @@
+/**************************************************************************
+ * $RCSfile: TempletModifyBillCard.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:16 $
+ **************************************************************************/
+package smartx.framework.metadata.ui;
+
+import java.util.*;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+import javax.swing.border.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.metadata.ui.componentscard.*;
+import smartx.framework.metadata.vo.*;
+
+
+public class TempletModifyBillCard extends JPanel {
+    private static final long serialVersionUID = 1L;
+
+    Vector v_compents = new Vector();
+
+    String str_templetcode = null;
+
+    Pub_Templet_1VO templetVO = null;
+
+    Pub_Templet_1_ItemVO[] templetItemVOs = null;
+
+    MouseListener labelistener = null;
+
+    Border redborder = BorderFactory.createLineBorder(Color.red);
+
+    Border emptyborder = BorderFactory.createEmptyBorder();
+
+    TempletModify modify = null;
+
+    JLabel prelabel = null;
+
+    private TempletModifyBillCard() {
+    }
+
+    public TempletModifyBillCard(TempletModify parent, String _templetcode) {
+        this.modify = parent;
+        this.str_templetcode = _templetcode;
+        try {
+            templetVO = UIUtil.getPub_Templet_1VO(str_templetcode);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } // 取得单据模板VO
+        templetItemVOs = templetVO.getItemVos(); // 各项
+        initialize();
+    }
+
+    /**
+     * 初始化页面
+     *
+     */
+    private void initialize() {
+        this.setLayout(new BorderLayout());
+        JScrollPane scrollPanel = new JScrollPane(getMainPanel());
+        scrollPanel.setBackground(Color.WHITE); //
+
+        addLabelActionListener(); // 为所有的JLABEL添加鼠标监听事件.
+        TitledBorder border = BorderFactory.createTitledBorder("[" + templetVO.getTempletname() + "]");
+        border.setTitleFont(new Font("宋体", Font.PLAIN, 12));
+        border.setTitleColor(Color.BLUE); //
+        scrollPanel.setBorder(border); //
+
+        this.add(scrollPanel, BorderLayout.CENTER);
+        this.validate();
+        this.updateUI();
+    }
+
+    public void refresh(Pub_Templet_1VO _templetvo, String vo) {
+        this.removeAll();
+        v_compents.removeAllElements();
+        this.templetVO = _templetvo;
+        templetItemVOs = templetVO.getItemVos(); // 各项
+        initialize();
+        if (this.getCompentByKey(vo) != null) {
+            if (this.getCompentByKey(vo).getLabel() != null) {
+                this.getCompentByKey(vo).getLabel().setBorder(BorderFactory.createLineBorder(Color.red));
+                this.getCompentByKey(vo).getLabel().updateUI();
+            }
+        }
+    }
+
+    public void refresh() {
+        v_compents.removeAllElements();
+        this.removeAll();
+        initialize();
+    }
+
+    public void refresh(String vo) {
+
+        this.removeAll();
+        v_compents.removeAllElements();
+        initialize();
+        if (this.getCompentByKey(vo).getLabel() != null) {
+            this.getCompentByKey(vo).getLabel().setBorder(BorderFactory.createLineBorder(Color.red));
+        }
+    }
+
+    private JPanel getMainPanel() {
+        JPanel mainPanel = new JPanel();
+        int li_height = getCardPaneHeight();
+
+        mainPanel.setPreferredSize(new Dimension(510, li_height)); //
+        mainPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        mainPanel.setToolTipText("模板编码[" + templetVO.getTempletcode().toLowerCase() + "],模板名称[" +
+                                 templetVO.getTablename().toLowerCase() + "],对应表名[" +
+                                 templetVO.getTablename().toLowerCase() + "]");
+        templetItemVOs = reOrderItems();
+        for (int i = 0; i < templetItemVOs.length; i++) {
+            String str_type = templetItemVOs[i].getItemtype();
+            if (str_type.equals("文本框")) {
+                TextFieldPanel panel = new TextFieldPanel(templetItemVOs[i]);
+                // if (templetItemVOs[i].isPrimaryKey())
+                // { // 如果是主键
+                // panel.setEditable(false);
+                // panel.setEnabled(false);
+                // panel.setValue("主键自动增长");
+                // }
+                mainPanel.add(panel); //
+                v_compents.add(panel); // 数据中也加入
+            } else if (str_type.equals("数字框")) {
+                NumberFieldPanel panel = new NumberFieldPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("密码框")) {
+                PasswordFieldPanel panel = new PasswordFieldPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("下拉框")) {
+                ComBoxPanel panel = new ComBoxPanel(templetItemVOs[i]);
+                v_compents.add(panel);
+            } else if (str_type.equals("参照")) {
+                UIRefPanel panel = new UIRefPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("多行文本框")) {
+                TextAreaPanel panel = new TextAreaPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("日历")) {
+                UIDateTimePanel panel = new UIDateTimePanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("文件选择框")) {
+                UIFilePathPanel panel = new UIFilePathPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("颜色")) {
+                UIColorPanel panel = new UIColorPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("大文本框")) {
+                UITextAreaPanel panel = new UITextAreaPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("计算器")) {
+                // JPanel panel = new UICalculatorPanel(templetItemVOs[i]);
+                // mainPanel.add(panel);
+                // v_compents.add(panel);
+            } else if (str_type.equals("时间")) {
+                UITimeSetPanel panel = new UITimeSetPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else if (str_type.equals("勾选框")) {
+                UICheckBoxPanel panel = new UICheckBoxPanel(templetItemVOs[i]);
+                mainPanel.add(panel); //
+                v_compents.add(panel);
+            } else {
+
+            }
+
+        }
+
+        return mainPanel;
+    }
+
+    private Pub_Templet_1_ItemVO[] reOrderItems() {
+        Pub_Templet_1_ItemVO[] items = new Pub_Templet_1_ItemVO[templetItemVOs.length];
+        ArrayList temp = new ArrayList();
+        for (int i = 0; i < templetItemVOs.length; i++) {
+            temp.add(templetItemVOs[i]);
+        }
+        for (int i = 0; i < templetItemVOs.length; i++) {
+            int min = ( (Pub_Templet_1_ItemVO) temp.get(0)).getShoworder().intValue();
+            int pos = 0;
+            for (int j = 1; j < temp.size(); j++) {
+                if ( ( (Pub_Templet_1_ItemVO) temp.get(j)).getShoworder().intValue() < min) {
+                    min = ( (Pub_Templet_1_ItemVO) temp.get(j)).getShoworder().intValue();
+                    pos = j;
+                }
+            }
+            items[i] = ( (Pub_Templet_1_ItemVO) temp.get(pos));
+            temp.remove(pos);
+        }
+        return items;
+    }
+
+    private class MouseListener extends MouseAdapter {
+        public void mouseClicked(MouseEvent e) { // 鼠标点击事件监听器.....
+            if (e.getSource() instanceof JLabel) {
+
+                if (prelabel != null) {
+                    prelabel.setBorder(BorderFactory.createEmptyBorder());
+                }
+
+                JLabel label = (JLabel) e.getSource();
+                label.setBorder(BorderFactory.createLineBorder(Color.red));
+                INovaCompent p = (INovaCompent) label.getParent();
+                Pub_Templet_1_ItemVO selectedvo = getItemVO(p.getKey());
+                if (prelabel != null) {
+                    modify.saveChange();
+                }
+                modify.setOKButtonEnable(true);
+                modify.setAPPLYButtonEnable(true);
+                modify.refreshItemTable(selectedvo.getItemkey().trim());
+                prelabel = label;
+            }
+        }
+    }
+
+    private void addLabelActionListener() {
+        if (labelistener == null) {
+            labelistener = new MouseListener();
+        }
+        for (int i = 0; i < v_compents.size(); i++) {
+            INovaCompent item = (INovaCompent) v_compents.get(i);
+            item.getLabel().addMouseListener(labelistener);
+        }
+    }
+
+    private int getCardPaneHeight() {
+        int li_height = 0;
+        int li_textareacount = 0;
+        for (int i = 0; i < templetItemVOs.length; i++) {
+            if (templetItemVOs[i].getItemtype().equals("多行文本框")) {
+                li_height = li_height + 80;
+                li_textareacount++;
+            } else {
+                li_height = li_height + 23;
+            }
+        }
+        return li_height / 2; // + li_textareacount * 60;
+    }
+
+    public void reset() {
+        INovaCompent[] compents = (INovaCompent[]) v_compents.toArray(new INovaCompent[0]);
+        for (int i = 0; i < compents.length; i++) {
+            compents[i].reset(); // 设置值
+        }
+    }
+
+    public void setEditable(boolean _bo) {
+        INovaCompent[] compents = (INovaCompent[]) v_compents.toArray(new INovaCompent[0]);
+        for (int i = 0; i < compents.length; i++) {
+            compents[i].setEditable(_bo); // 设置值
+        }
+    }
+
+    public Pub_Templet_1_ItemVO getItemVO(String key) {
+        for (int i = 0; i < templetItemVOs.length; i++) {
+            if (templetItemVOs[i].getItemkey().equals(key)) {
+                return templetItemVOs[i];
+            }
+        }
+        return null;
+    }
+
+    public INovaCompent[] getAllCompents() {
+        return (INovaCompent[]) v_compents.toArray(new INovaCompent[0]);
+    }
+
+    public INovaCompent getCompentByIndex(int _index) {
+        String key = templetItemVOs[_index].getItemkey();
+        return getCompentByKey(key);
+    }
+
+    public INovaCompent getCompentByKey(String _key) {
+        INovaCompent[] compents = (INovaCompent[]) v_compents.toArray(new INovaCompent[0]);
+        for (int i = 0; i < compents.length; i++) {
+            if (compents[i].getKey().equalsIgnoreCase(_key)) {
+                return compents[i];
+            }
+        }
+        return null;
+    }
+
+    public Pub_Templet_1VO getTempletVO() {
+        return this.templetVO;
+    }
+}
+/**************************************************************************
+ * $RCSfile: TempletModifyBillCard.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:16 $
+ *
+ * $Log: TempletModifyBillCard.java,v $
+ * Revision 1.2  2007/05/31 07:38:16  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:01:36  qilin
+ * no message
+ *
+ * Revision 1.3  2007/03/02 05:28:05  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 04:56:14  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:util="myreport.util.*"
+				layout="vertical" showCloseButton="true"
+				fontSize="12" fontFamily="Simsun" width="600" height="466" title="表达式编辑器" 
+			   creationComplete="Init()" close="Close()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+ 
+			import myreport.data.report.ReportSettings;
+			import myreport.res.Asset;
+			
+			private static var g_Instance:ExpressionEditor;
+			public static function get Instance():ExpressionEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ExpressionEditor();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			private var _Groups:ArrayCollection;
+			
+			private function Init():void
+			{
+			}
+ 
+			private function GetGroups():ArrayCollection
+			{
+				if(!_Groups)
+				{
+					_Groups = new ArrayCollection();
+					
+					var group:Object;
+					var list:ArrayCollection;
+					
+					group = {};
+					group["Name"] = "报表参数";
+					group["Value"] = new ArrayCollection();
+					_Groups.addItem(group);
+					
+					group = {};
+					group["Name"] = "表格字段";
+					group["Value"] = new ArrayCollection();
+					_Groups.addItem(group);
+					
+					var xml:XML = Asset.LoadXML(Asset.XML_OPERATION_AND_FUNCTION);
+					for each(var groupXML:XML in xml.Group)
+					{
+						group = {};
+						group["Name"] = String(groupXML.@name);
+						list = new ArrayCollection();
+						for each(var itemXML:XML in groupXML.Item)
+						{
+							list.addItem({
+								"Name":String(itemXML.Name), 
+								"Value":String(itemXML.Value), 
+								"Memo":String(itemXML.Memo)
+							});
+						}
+						group["Value"] = list;
+						_Groups.addItem(group);
+					}
+					
+				}
+				return _Groups;
+			}
+			//function(value:String):void
+			private var _Callback:Function;
+			
+			public function Show(value:String, settings:ReportSettings, callback:Function):void
+			{
+				_Callback = callback;
+				
+				PopUp();
+ 
+				_GroupList.dataProvider = null;
+				_ItemList.dataProvider = null;
+				
+				var groups:ArrayCollection = GetGroups();
+				var list:ArrayCollection;
+				var item:String;
+				list = new ArrayCollection();
+				var parameters:ArrayCollection = DesignUtil.GetParameterSource(settings);
+				for each(item in parameters)
+				{
+					list.addItem({"Name":item, "Value":"Parameters!"+item+".Value", "Memo":"Parameters!"+item+".Value"});
+				}
+				groups[0]["Value"] = list;
+				list = new ArrayCollection();
+				var columns:ArrayCollection = DesignUtil.GetColumnSource(settings);
+				for each(item in columns)
+				{
+					list.addItem({"Name":item, "Value":"Fields!"+item+".Value", "Memo":"Fields!"+item+".Value"});
+				}
+				groups[1]["Value"] = list;
+				
+				_GroupList.dataProvider = groups;
+				
+				GroupSelectionChanged();
+				
+				_Output.text = value;
+				_Output.setFocus();
+			}
+			
+			private function Confirm():void
+			{
+				if (_Callback != null)
+				{
+					var value:String = _Output.text;
+					_Callback(value);
+				}
+				Close();
+			}
+			private function GroupSelectionChanged():void
+			{
+				if(_GroupList.selectedItem)
+					_ItemList.dataProvider = _GroupList.selectedItem.Value
+				else
+					_ItemList.dataProvider = null;
+				ItemSelectionChanged();
+			}
+			private function ItemSelectionChanged():void
+			{
+				_Comment.text = _ItemList.selectedItem?_ItemList.selectedItem.Memo:"";
+			}
+			private function Add():void
+			{
+				if(_ItemList.selectedItem)
+				{
+					AppendText(_ItemList.selectedItem.Value);
+				}
+			}
+			
+			private function AppendText(value:String):void
+			{
+				if(!value) return;
+				var i:int = _Output.selectionBeginIndex + value.length;
+				var txt:String = _Output.text.substring(0, _Output.selectionBeginIndex) + 
+					value + _Output.text.substring(_Output.selectionEndIndex);
+				if(txt.length && txt.charAt(0)!="=")
+				{
+					txt = "=" + txt;
+					if(i>0) i++;
+				}
+				_Output.text = txt;
+				_Output.setFocus();
+				_Output.setSelection(i, i);
+			}
+	 
+		]]>
+	</mx:Script>
+	<mx:Label text="请编辑表达式："/>
+	<mx:TextArea width="100%" height="86" id="_Output"/>
+	<mx:HBox width="100%" height="100%">
+		<mx:List height="100%" width="100" id="_GroupList" labelField="Name" change="GroupSelectionChanged()"/>
+		<mx:List width="120" height="100%" id="_ItemList" labelField="Name" change="ItemSelectionChanged()" doubleClickEnabled="true" doubleClick="Add()"/>
+		<mx:VBox width="60%" height="100%">
+			<mx:Button label="添加到表达式" click="Add()"/>
+			<mx:TextArea editable="false" width="100%" height="100%" id="_Comment"/>
+		</mx:VBox>
+	</mx:HBox>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VDividedBox xmlns:mx="http://www.adobe.com/2006/mxml" width="100%" height="100%" xmlns:ns1="smartx.flex.components.*" creationComplete="init()" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import smartx.flex.components.core.chart.AdvChart;
+			import smartx.flex.components.core.chart.AdvPieChart;
+			import smartx.flex.components.event.BillListPanelEvent;
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var charts:Array;
+			//add by zhangzz for issue#SMARTX-8 begin
+			[Bindable]
+			public var endpoint:String
+			//add by zhangzz for issue#SMARTX-8 end
+			
+			private function init():void{
+				if(charts != null){
+					for each (var novaChart:AdvChart in charts){
+						chartNavigator.addChild(novaChart);
+					}
+				}
+			}
+			
+			private function dataPrepared(event:BillListPanelEvent):void{
+				if(charts != null){
+					for each (var novaChart:AdvChart in charts){
+						novaChart.refreshData(listPanel.getCurrentData());
+					}
+				}
+			}
+			
+			private function listPanelClick():void{
+				if(charts != null && listPanel.getSelectedRowValue() != null){
+					for each (var novaChart:AdvChart in charts){
+						if(novaChart is AdvPieChart){
+							AdvPieChart(novaChart).pieChartClick(listPanel.getSelectedRowValue());
+						}
+					}
+				}
+			}
+		]]>
+	</mx:Script>
+
+	<mx:TabNavigator width="100%" height="70%" id="chartNavigator">
+	
+	</mx:TabNavigator>
+	<core:BillListPanel endpoint="{endpoint}" id="listPanel" click="listPanelClick()" debugMode="{debugMode}" queryEnd="dataPrepared(event)" templetCode="{templetCode}" editable="false" showEditBox="false" showQuickQueryPanel="false" showDataAfterInit="true" showInitingWindow="false" width="100%" height="30%"/>
+</mx:VDividedBox>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			[Bindable]
+			private var buttonXML:XML;
+			[Bindable]
+			public var customListButtonXml:XML;
+			
+			private function addBtn_clickHandler(event:MouseEvent):void{
+				var tempBtnXml:XML = <button id="在此填写按钮ID" label="在此填写按钮名称" toolTip="在此填写按钮提示信息" icon="在此填写按钮图标" >
+										<listeners />
+									</button>;
+				if( customListButtonXml.customButton.length()<= 0 ){
+					var customListButtonXML:XML = new XML("<customButton />");
+					customListButtonXml.appendChild(customListButtonXML);
+				}
+				customListButtonXml.customButton.appendChild(tempBtnXml);
+				refreshBtnsDg();
+			}
+			
+			private function musBtn_clickHandler(event:MouseEvent):void{
+				var item:Object = btnsDatagrid.selectedItem;
+				if(item != null ){
+					var tempXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(tempXml);
+					buttonXML = null;
+				}
+			}
+			
+			private function addLstBtn_clickHandler(event:MouseEvent):void{
+				var btnObj:Object = btnsDatagrid.selectedItem;
+				if( btnObj != null ){
+					if( buttonXML == null ){
+						buttonXML = <button id="" label="" toolTip="" icon="" >
+										<listeners />
+									</button>;
+					}
+					
+					var listener:XML = new XML("<listener>在此填写监听器实现类</listener>");
+					buttonXML.listeners.appendChild(listener);
+					lstsDatagrid.invalidateList();
+				}else
+					SmartXMessage.show("请先选择一条按钮数据!");
+			}
+			
+			private function musLstBtn_clickHandler(event:MouseEvent):void{
+				var item:Object = lstsDatagrid.selectedItem;
+				if( item != null ){
+					var listenerXml:XML = item as XML;
+					CEPUtils.xmlDeleteNode(listenerXml);
+					lstsDatagrid.invalidateList();
+				}
+			}
+			
+			private function btnsDatagrid_clickHandler(event:MouseEvent):void{
+				var item:Object = btnsDatagrid.selectedItem;
+				if(item != null ){
+					buttonXML = item as XML;
+					lstsDatagrid.invalidateList();
+				}
+			}
+			
+			private function lstsColLabelFunction(item:Object,column:DataGridColumn):String{
+				var tempXml:XML = XML(item);
+				var result:String = tempXml.text();
+				return result;
+			}
+			
+			public function getContentXml():XML{
+				return (customListButtonXml && customListButtonXml.customButton.length() > 0)?customListButtonXml.customButton[0]:null;
+			}
+			
+			private function refreshBtnsDg():void{
+				btnsDatagrid.dataProvider = customListButtonXml.customButton.button;
+				btnsDatagrid.invalidateList();
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="50%">
+		<mx:HBox width="100%" >
+			<mx:Label text="按钮:" />
+			<mx:LinkButton id="addBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+						   toolTip="添加按钮" click="addBtn_clickHandler(event)"/>
+			<mx:LinkButton id="musBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+						   toolTip="删除按钮" click="musBtn_clickHandler(event)"/>
+		</mx:HBox>
+		<mx:DataGrid width="100%" height="100%" id="btnsDatagrid" editable="true" dataProvider="{customListButtonXml.customButton.button}" 
+					 click="btnsDatagrid_clickHandler(event)" >
+			<mx:columns>
+				<mx:DataGridColumn headerText="唯一标识" editable="true" dataField="@id" />
+				<mx:DataGridColumn headerText="名称" editable="true" dataField="@label" />
+				<mx:DataGridColumn headerText="提示信息" editable="true" dataField="@toolTip" />
+				<mx:DataGridColumn headerText="图片路径" editable="true" dataField="@icon" />
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+	<mx:VBox width="100%" height="50%">
+		<mx:HBox width="100%" horizontalAlign="left" >
+			<mx:Label text="监听器:" />
+			<mx:LinkButton id="addLstBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+						   toolTip="添加监听器" click="addLstBtn_clickHandler(event)"/>
+			<mx:LinkButton id="musLstBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+						   toolTip="删除监听器" click="musLstBtn_clickHandler(event)"/>
+		</mx:HBox>
+		<mx:DataGrid width="100%" height="100%" id="lstsDatagrid" editable="true" 
+					 allowMultipleSelection="false" dataProvider="{buttonXML.listeners.listener}" >
+			<mx:columns>
+				<mx:DataGridColumn id="lstsCol" headerText="实现类" editable="true" dataField="*" labelFunction="lstsColLabelFunction" />
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:VBox>
+</mx:VBox>

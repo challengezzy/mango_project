@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   preinitialize="preinit()"
+			   layout="vertical"
+			   creationComplete="creationComplete()"
+			   minWidth="955" minHeight="600">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+		import mx.collections.ArrayCollection;
+		import mx.controls.Alert;
+		import mx.controls.dataGridClasses.DataGridColumn;
+		
+		[Bindable]
+		private var  employees:XML =<root>
+				<employee>
+					<name>Christina Coenraets</name>
+					<phone>555-219-2270</phone>
+					<email>ccoenraets@fictitious.com</email>
+				</employee>
+				<employee>
+					<name>Joanne Wall</name>
+					<phone>555-219-2012</phone>
+					<email>jwall@fictitious.com</email>
+				</employee>
+				<employee>
+					<name>Maurice Smith</name>
+					<phone>555-219-2012</phone>
+					<email>maurice@fictitious.com</email>
+				</employee>
+				<employee>
+					<name>Mary Jones</name>
+					<phone>555-219-2000</phone>
+					<email>mjones@fictitious.com</email>
+				</employee>
+		</root>;
+		
+		private var dataGridColumns:Array = new Array();
+		
+		private var queryDataGridColumns:ArrayCollection = new ArrayCollection([
+				{ headerText:"Name", dataField: "name",linkable:true}
+				,{ headerText:"Phone", dataField: "phone",linkable:false}
+				,{ headerText:"Email", dataField: "email",linkable:false}
+			]) ;
+		
+		private function preinit():void {
+			for(var i:int =  0; i< queryDataGridColumns.length; i++) {
+				var dataGridColumn:DataGridColumn = new DataGridColumn();
+				dataGridColumn.headerText = queryDataGridColumns.getItemAt(i).headerText ;
+				dataGridColumn.dataField = queryDataGridColumns.getItemAt(i).dataField ;
+				dataGridColumn.visible = true ;
+		
+				if(queryDataGridColumns.getItemAt(i).linkable) {
+					var urlLinkRenderer:ClassFactory = new ClassFactory(UrlLinkRenderer);
+					urlLinkRenderer.properties = { linkButtonLabel: queryDataGridColumns.getItemAt(i).dataField };
+					dataGridColumn.itemRenderer = urlLinkRenderer ;
+				}                    
+				dataGridColumns.push(dataGridColumn);
+			}
+		}
+		
+		private function creationComplete():void {
+			createDataGrid();
+			this.addEventListener("DataGridLinkButtonClickEvent",linkButtonClickHandler);
+		}
+		
+		private function createDataGrid():void {
+			queryDataGrid.columns = dataGridColumns ;
+			//BindingUtils.bindProperty(queryDataGrid,"dataProvider",this,"_queryDataGridProvider");
+			this.addChild(queryDataGrid);
+		}
+		
+		private function linkButtonClickHandler(event:LinkButtonDynamicEvent):void {
+			Alert.show(event.rowObject.name + "" + event.rowObject.phone);//输出内容
+		}
+		]]>
+	</fx:Script>
+	<mx:DataGrid id="queryDataGrid" left="5" right="5" top="5" bottom="5" height="500" width="400"
+				 dataProvider="{employees.employee}">
+	</mx:DataGrid>
+	<mx:HBox backgroundColor="blue">
+		<mx:Button label="Button"/>
+		<mx:TextArea text="test textarea dfssssssssssssssssssssssss" borderStyle="none" />
+		
+	</mx:HBox>
+</mx:Application>

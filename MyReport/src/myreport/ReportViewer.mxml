@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpPanel xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="300"
+		  backgroundColor="#828280" borderStyle="none" fontSize="12" fontFamily="Simsun" 
+		 xmlns:util="myreport.util.*" xmlns:myreport="myreport.*" >
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import flash.utils.getTimer;
+			
+			import hlib.MsgUtil;
+			import hlib.UrlLoader;
+			
+			import mx.collections.ArrayCollection;
+			
+			import myreport.data.report.ReportSettings;
+			import myreport.design.FilterEditor;
+			import myreport.res.Asset;
+			
+			private static var g_Instance:ReportViewer;
+			public static function get Instance():ReportViewer
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ReportViewer();
+					g_Instance.initialize();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			
+			private var _Loader:UrlLoader;
+			private var _TableData:ArrayCollection;
+			private var _ParameterData:Object;
+			private var _Settings:ReportSettings;
+			private var _Filter:String;
+ 
+			/**
+			 * @param source: 支持XML对象、url路径或null值
+			 */ 
+			public function Load(source:Object, tableData:ArrayCollection, parameterData:Object):void
+			{
+				_TableData = tableData;
+				_ParameterData = parameterData;				
+				_Filter = null;
+				_Settings = null;
+				if (_Print)
+				{
+					if(_Print.OnZoom == null)
+					{
+						_Print.OnZoom = OnZoom;
+						_Print.OnGotoPage = OnGotoPage;
+						_Print.OnPrint = OnPrint;
+					}
+					_Print.Total = 0;
+				}
+
+				if (source is XML)
+				{
+					LoadSetting(XML(source));
+				}
+				else if (source != null)
+				{
+					_Loader = new UrlLoader();
+					_Loader.addEventListener(Event.COMPLETE, LoadCompleteHandler);
+					_Loader.Load(source.toString());
+				}				
+			}
+ 
+			private function LoadCompleteHandler(event:Event):void
+			{
+				LoadSetting(XML(_Loader.Data));
+			}
+			/**
+			 * @param source: 支持XML对象、url路径或null值
+			 */ 
+			public function Show(source:Object, tableData:ArrayCollection, parameterData:Object):void
+			{
+				PopUp();
+				Load(source, tableData, parameterData);
+			}
+
+			private function LoadSetting(xml:XML):void
+			{
+//				trace("begin:"+flash.utils.getTimer());
+				_Settings = new ReportSettings(xml);
+				_Settings.TableData = _TableData;
+				_Settings.ParameterData = _ParameterData;
+				var table:ArrayCollection = myreport.ReportEngine.FilterTable(_TableData, _Filter);
+				ReportEngine.GeneratePagesAsync(_Settings, table, _ParameterData, 
+					function(pages:Array):void
+					{
+						_PreviewPanel.Pages = pages;
+						_Print.Total = _PreviewPanel.PageCount;
+//						trace("end:"+flash.utils.getTimer());
+					});
+ 
+			}
+			public function get Setting():*
+			{
+				return _Settings;
+			}
+			public function get TableData():ArrayCollection
+			{
+				return _TableData;
+			}
+			public function get ParameterData():Object
+			{
+				return _ParameterData;
+			}
+			private function OnPrint(pageRange:String):void
+			{
+				var table:ArrayCollection = myreport.ReportEngine.FilterTable(_TableData, _Filter);
+				ReportEngine.PrintAsync(_Settings, table, _ParameterData, pageRange);
+			}
+			
+			private function OnGotoPage(pageNumber:int):void
+			{
+				_PreviewPanel.GotoPage(pageNumber);
+			}
+			
+			private function OnZoom(scale:Number):void
+			{
+				_PreviewPanel.Zoom(scale);
+			}
+			private function ShowFilterEditor():void
+			{
+				if(!_Settings)
+				{
+					MsgUtil.ShowInfo("尚未加载数据。");
+					return;
+				}
+				FilterEditor.Instance.Show(_Settings, _Filter, 
+					function(filter:String):void
+					{
+						_Filter = filter;
+						var table:ArrayCollection = myreport.ReportEngine.FilterTable(_TableData, _Filter);
+						ReportEngine.GeneratePagesAsync(_Settings, table, _ParameterData, 
+							function(pages:Array):void
+							{
+								_PreviewPanel.Pages = pages;
+								_Print.Total = _PreviewPanel.PageCount;
+							});
+						//_PreviewPanel.Load(_Settings, table, _ParameterData);
+						//_Print.Total = _PreviewPanel.PageCount;
+					});
+			}
+			public function About():void
+			{
+				_PreviewPanel.ShowAbout();
+			}
+			protected override function OnClose():void
+			{
+				_PreviewPanel.Clear();
+			}
+ 
+		]]>
+	</mx:Script>
+	<util:ToolBar height="30" width="100%" paddingLeft="8" paddingRight="8">
+		<util:PrintToolBar id="_Print">
+		</util:PrintToolBar>
+		<mx:VRule height="24"/>
+		<util:ToolButton icon="{Asset.ICON_FILTER}" toolTip="筛选" label="筛选" click="ShowFilterEditor()"/>
+		<mx:HBox id="CustomToolBar" verticalScrollPolicy="off" horizontalScrollPolicy="off" verticalAlign="middle">
+			
+		</mx:HBox>
+		<mx:Spacer width="100%"/>
+		<util:ToolButton icon="{Asset.ICON_HELP}" toolTip="关于MyReport" click="About()" width="23"/>
+		<util:ToolButton icon="{Asset.ICON_CLOSE}" toolTip="关闭" click="Close()" width="23"/>
+	</util:ToolBar>
+	<myreport:ReportViewPanel id="_PreviewPanel" y="31" width="100%" height="100%">
+	</myreport:ReportViewPanel>
+</util:PopUpPanel>

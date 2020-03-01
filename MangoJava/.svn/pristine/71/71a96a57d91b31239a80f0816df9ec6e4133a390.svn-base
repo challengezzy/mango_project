@@ -1,0 +1,643 @@
+/**************************************************************************
+ * $RCSfile: MenuConfigFrame.java,v $  $Revision: 1.2.10.4 $  $Date: 2010/03/26 06:18:33 $
+ **************************************************************************/
+package smartx.system.login.ui;
+
+import java.io.*;
+import java.util.*;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+import javax.swing.event.*;
+import javax.swing.tree.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.common.vo.*;
+import smartx.framework.metadata.ui.*;
+import smartx.framework.metadata.ui.componentscard.*;
+import smartx.framework.metadata.vo.*;
+import smartx.framework.metadata.vo.sqlmapping.*;
+import smartx.system.login.vo.*;
+
+
+
+/**
+ * 系统菜单管理器
+ * @author James.W
+ *
+ */
+public class MenuConfigFrame extends JFrame {
+
+    private static final long serialVersionUID = 6775262548281673032L;
+
+    protected JScrollPane scrollPane = null; //菜单树所在的滚动面板
+
+    protected JTree menuTree = null;
+
+    BillCardPanel billCardPanel = null;
+
+    BillListPanel billListPanel = null;
+
+    private boolean oninsert = false;
+
+    private String str_selectedID = null;
+
+    public MenuConfigFrame() {
+        this("菜单管理");
+    }
+
+    public MenuConfigFrame(String _title) {
+        super(_title);
+
+        this.setSize(999, 600);
+        this.setLocation(0, 0);
+
+        this.getContentPane().setLayout(new BorderLayout());
+
+        // 创建树
+        scrollPane = new JScrollPane(getMenuTree());
+        scrollPane.setPreferredSize(new Dimension(100, 400));
+        JPanel panel_left = new JPanel();
+        panel_left.setLayout(new BorderLayout());
+        panel_left.add(scrollPane, BorderLayout.CENTER);
+        
+        //左右分割
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panel_left, getTabPanel_1());
+        splitPane.setDividerLocation(280);
+        splitPane.setDividerSize(10);
+        splitPane.setOneTouchExpandable(true);
+        
+        //工具栏
+        JToolBar toolbar = new JToolBar();
+        toolbar.setFloatable(false);
+        toolbar.setBorderPainted(false);
+        //ImageIcon icon = new ImageIcon("icon.gif");
+        toolbar.add(new AbstractAction("刷 新") {
+            public void actionPerformed(ActionEvent evt) {
+            	onRefresh();
+            }
+        }).setPreferredSize(new Dimension(75, 20));
+        toolbar.add(new AbstractAction("导 出") {
+            public void actionPerformed(ActionEvent evt) {
+            	onOut();
+            }
+        }).setPreferredSize(new Dimension(75, 20));
+        toolbar.addSeparator();
+        toolbar.add(new AbstractAction("保 存") {
+            public void actionPerformed(ActionEvent evt) {
+            	onSave();
+            }
+        }).setPreferredSize(new Dimension(75, 20));
+        
+        
+        this.getContentPane().add(toolbar, BorderLayout.NORTH);
+        this.getContentPane().add(splitPane, BorderLayout.CENTER);
+
+    }
+
+    private JPanel getTabPanel_1() {
+        JPanel menuContentPanel_tab1 = new JPanel();
+        menuContentPanel_tab1.setLayout(new BorderLayout()); //
+
+        // 创建右边的内容框
+        billCardPanel = new BillCardPanel(new PUB_MENU_CODE_1_VO()); // 创建
+        // BillCardPane
+        if (billCardPanel.getCompentByKey("COMMANDTYPE") instanceof ComBoxPanel) { // 切换command模板类型时重置参数类型()为空
+            ComBoxPanel commandtype = (ComBoxPanel) billCardPanel.getCompentByKey("COMMANDTYPE");
+            commandtype.getComBox().addItemListener(new ItemListener() {
+                public void itemStateChanged(ItemEvent e) {
+                    if (e.getStateChange() == ItemEvent.SELECTED) {
+                        billCardPanel.getCompentByKey("COMMAND").reset();
+                    }
+                }
+            });
+        }
+        menuContentPanel_tab1.add(billCardPanel, BorderLayout.CENTER); //
+        
+        return menuContentPanel_tab1;
+    }
+
+    protected void onOut() {
+        String str_cols = "Select COLUMN_NAME, DATA_TYPE From cols Where TABLE_NAME = 'PUB_MENU' Order by COLUMN_ID";
+        String str_sql = "Select distinct * From PUB_MENU";
+        String str_update = "select distinct AA." + SQL_PUB_MENU.NAME + ", BB." + SQL_PUB_MENU.NAME +
+            "  parentname from " + SQL_PUB_MENU.TABLENAME + " AA left join " + SQL_PUB_MENU.TABLENAME + " BB on AA." +
+            SQL_PUB_MENU.PARENTMENUID + " = BB.id";
+        if (str_selectedID != null) {
+            str_sql = str_sql + " Start With " + SQL_PUB_MENU.ID + " = '" + str_selectedID + "' connect by prior " +
+                SQL_PUB_MENU.ID + " = " + SQL_PUB_MENU.PARENTMENUID;
+            str_update = str_update + " Start With AA." + SQL_PUB_MENU.ID + " = '" + str_selectedID +
+                "' connect by prior AA." + SQL_PUB_MENU.ID + " = AA." + SQL_PUB_MENU.PARENTMENUID;
+        } else {
+            str_sql = str_sql + " connect by prior " + SQL_PUB_MENU.ID + " = " + SQL_PUB_MENU.PARENTMENUID;
+            str_update = str_update + " connect by prior AA." + SQL_PUB_MENU.ID + " = AA." + SQL_PUB_MENU.PARENTMENUID;
+        }
+
+        String[] str_sqls = new String[] {str_cols, str_sql, str_update};
+
+        Vector vector = null;
+        try {
+            vector = UIUtil.getHashVoArrayReturnVectorByMark(null, str_sqls);
+        } catch (Exception e1) {
+            NovaMessage.show("检索菜单发生错误，导出失败！", NovaConstants.MESSAGE_ERROR);
+        }
+
+        HashVO[] hv_cols = (HashVO[]) vector.get(0); //
+        HashVO[] hv_data = (HashVO[]) vector.get(1); //
+        HashVO[] hv_menu = (HashVO[]) vector.get(2); //
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        int result = chooser.showSaveDialog(this);
+        if (result != 0) {
+            return;
+        }
+        String file_path = chooser.getSelectedFile().getPath();
+
+        String file_name = file_path + "\\PUB_MENU.sql";
+
+        File out_file = new File(file_name);
+        if (!out_file.exists()) {
+            try {
+                out_file.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        try {
+            FileWriter fw_file = new FileWriter(out_file);
+            PrintWriter pw_export = new PrintWriter(fw_file);
+            pw_export.println("--pub_menu");
+
+            if (hv_data.length <= 0) {
+                fw_file.close();
+                return;
+            }
+            
+            
+            pw_export.println("DECLARE MENU_COUNT NUMBER(6);");
+            pw_export.println("BEGIN");
+            for (int i = 0; i < hv_data.length; i++) {
+            	String str_name = hv_data[i].getStringValue("NAME");
+            	pw_export.println("  SELECT COUNT(*) INTO MENU_COUNT FROM PUB_MENU WHERE NAME ='"+str_name+"';");
+            	pw_export.println("  IF MENU_COUNT > 0 THEN");
+            	{
+	            	pw_export.print("    UPDATE PUB_MENU SET ");
+	                String[] str_keys = hv_data[i].getKeys();
+	                StringBuffer sSet = new StringBuffer(2048);
+	                for (int j = 0; j < str_keys.length; j++) {
+	                	if(str_keys[j].equalsIgnoreCase("PARENTMENUID")) continue;
+	                	if(str_keys[j].equalsIgnoreCase("ID")) continue;
+	                	if(str_keys[j].equalsIgnoreCase("NAME")) continue;
+	                	sSet.append(",").append(str_keys[j]).append("=")
+	                	    .append(getInsertValue(hv_data[i].getStringValue(str_keys[j]), str_keys[j], hv_cols));
+	                }
+	                pw_export.print(sSet.toString().substring(1));
+	                pw_export.println(" WHERE NAME ='"+str_name+"';");
+            	}
+	            pw_export.println("  ELSE");
+	            {	
+	            	pw_export.print("    INSERT INTO PUB_MENU (");
+	                String[] str_keys = hv_data[i].getKeys();
+	                StringBuffer sField = new StringBuffer(2048);
+	                StringBuffer sValue = new StringBuffer(2048);
+	                sField.append(",ID");
+	                sValue.append(",S_PUB_MENU.NEXTVAL");
+	                for (int j = 0; j < str_keys.length; j++) {
+	                	if(str_keys[j].equalsIgnoreCase("PARENTMENUID")) continue;
+	                	if(str_keys[j].equalsIgnoreCase("ID")) continue;	                	
+	                	sField.append(",").append(str_keys[j]) ;
+	                	sValue.append(",").append(getInsertValue(hv_data[i].getStringValue(str_keys[j]), str_keys[j], hv_cols));                    
+	                }
+	                pw_export.print(sField.toString().substring(1));
+	                pw_export.print(") VALUES (");
+	                pw_export.println(sValue.toString().substring(1) + ");");
+	            }
+	            pw_export.println("  END IF;");
+            }
+            pw_export.println("COMMIT;");
+            pw_export.println("END;");
+            pw_export.println("/");
+            
+            
+            if (hv_menu.length <= 0) {
+                fw_file.close();
+                return;
+            }
+            for (int k = 0; k < hv_menu.length; k++) {
+                String str_name = hv_menu[k].getStringValue("NAME");
+                String str_parent = hv_menu[k].getStringValue("PARENTNAME");
+                String _sql = "Update " + SQL_PUB_MENU.TABLENAME + " AA Set AA." + SQL_PUB_MENU.PARENTMENUID +
+                    " = (Select BB." + SQL_PUB_MENU.ID + " From " + SQL_PUB_MENU.TABLENAME + " BB Where BB." +
+                    SQL_PUB_MENU.NAME;
+                String _end_sql = " = '" + str_parent + "') Where AA." + SQL_PUB_MENU.NAME + " = '" + str_name + "';";
+                if (str_parent == null || str_parent.equalsIgnoreCase("null") || str_parent.equals("")) {
+                    continue;
+                }
+                pw_export.println(_sql + _end_sql);
+            }
+            pw_export.println("COMMIT;");
+            pw_export.println("/");
+            
+            fw_file.close();
+            JOptionPane.showMessageDialog(this, "菜单导出成功！", "操作提示", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, file_name + "写入PUB_MENU.sql出错！");
+        }
+    }
+
+    /**
+     * 根据_value来确定要插入的值,如果该列的数据类型为DATE，则插入"SYSDATE"
+     *
+     * @param _value:列的值
+     * @param _column:列名
+     * @param _hv
+     * @return
+     */
+    private String getInsertValue(String _value, String _column, HashVO[] _hv) {
+        String str_value = null;
+
+        for (int i = 0; i < _hv.length; i++) {
+            String str_col = _hv[i].getStringValue("COLUMN_NAME");
+            if (str_col.equalsIgnoreCase(_column)) {
+                String str_type = _hv[i].getStringValue("DATA_TYPE");
+                if (str_type.equalsIgnoreCase("DATE")) {
+                    return "SYSDATE";
+                }
+            }
+        }
+        if (_value == null || _value.equals("")) {
+            str_value = "null";
+        } else {
+            str_value = "'" + convert(_value) + "'";
+        }
+        return str_value;
+    }
+
+    private String convert(String _str) {
+        if (_str == null) {
+            return "";
+        }
+        return _str.replaceAll("'", "''");
+    }
+
+    private JPanel getMenuTree() {
+        JPanel rpanel = new JPanel();
+        rpanel.setLayout(new BorderLayout());
+        if (menuTree == null) {
+            menuTree = UIUtil.getJTreeByParentPK_HashVO(null, "所有功能",
+                "select id,name code,localname name,parentmenuid,commandtype," +
+                "command,icon from pub_menu order by seq", "id", "parentmenuid");
+            menuTree.addTreeSelectionListener(new TreeSelectionListener() {
+                public void valueChanged(TreeSelectionEvent evt) {
+                    TreePath[] paths = evt.getPaths();
+
+                    for (int i = 0; i < paths.length; i++) {
+                        if (evt.isAddedPath(i)) {
+                            DefaultMutableTreeNode node = (DefaultMutableTreeNode) paths[i].getLastPathComponent();
+                            onChangeSelectTree(node); // This node has been
+                        }
+                    }
+                }
+            });
+            menuTree.addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent event) {
+                    if ( ( (event.getModifiers() & InputEvent.BUTTON3_MASK) != 0) && (menuTree.getSelectionCount() > 0)) {
+                        showMenu(event.getX(), event.getY());
+                    }
+                }
+            });
+
+            MyTreeCellRender myTreeCellRender = new MyTreeCellRender();
+            menuTree.setCellRenderer(myTreeCellRender);
+        }
+        rpanel.add(menuTree, BorderLayout.CENTER);
+        return rpanel;
+    }
+
+    protected void showMenu(int x, int y) {
+        JPopupMenu popup = new JPopupMenu();
+        JMenuItem mi_new = new JMenuItem("新增");
+        JMenuItem mi_del = new JMenuItem("删除");
+        JMenuItem mi_modify = new JMenuItem("修改");
+        JMenuItem mi_refresh = new JMenuItem("刷新");
+
+        TreePath path = menuTree.getSelectionPath();
+        Object node = path.getLastPathComponent();
+        if (node == menuTree.getModel().getRoot()) {
+            mi_del.setEnabled(false);
+        }
+        popup.add(mi_new);
+        popup.add(mi_del);
+        popup.add(mi_modify);
+        popup.addSeparator();
+        popup.add(mi_refresh);
+
+        mi_new.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent event) {
+                onInsert();
+            }
+        });
+        mi_del.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onDelete();
+            }
+        });
+        mi_modify.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+            }
+        });
+        mi_refresh.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onRefresh();
+            }
+        });
+        popup.show(menuTree, x, y);
+    }
+
+    private void refreshTree() {
+        menuTree = UIUtil.getJTreeByParentPK_HashVO(null, "所有功能",
+            "select id,name code,localname name,parentmenuid,commandtype," + "command,icon from pub_menu order by seq",
+            "id", "parentmenuid");
+        menuTree.addTreeSelectionListener(new TreeSelectionListener() {
+            public void valueChanged(TreeSelectionEvent evt) {
+                TreePath[] paths = evt.getPaths();
+
+                for (int i = 0; i < paths.length; i++) {
+                    if (evt.isAddedPath(i)) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) paths[i].getLastPathComponent();
+                        onChangeSelectTree(node); // This nod
+                    }
+                }
+            }
+        });
+        menuTree.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent event) {
+                if ( ( (event.getModifiers() & InputEvent.BUTTON3_MASK) != 0) && (menuTree.getSelectionCount() > 0)) {
+                    showMenu(event.getX(), event.getY());
+                }
+            }
+        });
+
+        MyTreeCellRender myTreeCellRender = new MyTreeCellRender();
+        menuTree.setCellRenderer(myTreeCellRender);
+        scrollPane.getViewport().removeAll();
+        scrollPane.getViewport().add(menuTree);
+        scrollPane.updateUI();
+    }
+
+    private void onChangeSelectTree(DefaultMutableTreeNode _node) {
+        if (_node.isRoot()) {
+            str_selectedID = null;
+            billCardPanel.reset(); //
+            billCardPanel.setEditState(NovaConstants.BILLDATAEDITSTATE_INIT);
+        } else {
+            HashVO vo = (HashVO) _node.getUserObject();
+            String str_id = vo.getStringValue("ID");
+            str_selectedID = str_id;
+            String str_wherecondition = " 1=1 and id='" + str_id + "'";
+            billCardPanel.refreshData(str_wherecondition);
+            billCardPanel.setEditState(NovaConstants.BILLDATAEDITSTATE_UPDATE); // 状态处于编辑状态
+        }
+    }
+
+    private void onInsert() {
+        oninsert = true;
+        HashVO vo = getCurrSelectedTreeVO();
+        billCardPanel.createNewRecord(); //
+        billCardPanel.setEditState(NovaConstants.BILLDATAEDITSTATE_INSERT); // 处于新增状态..
+        billCardPanel.getCompentByKey("SEQ").setObject("1"); //
+
+        HashVO selectEdTreeHashVO = getCurrSelectedTreeVO(); //
+        if (vo != null) {
+            billCardPanel.getCompentByKey("PARENTMENUID").setObject(vo.getIntegerValue("ID") + ""); //
+            billCardPanel.getCompentByKey("PARENTMENUID_NAME").setObject(new RefItemVO(selectEdTreeHashVO.
+                getStringValue(0), selectEdTreeHashVO.getStringValue(1), selectEdTreeHashVO.getStringValue(2))); //
+        }
+        oninsert = false;
+    }
+
+    private void onDelete() {
+        HashVO[] vo = getCurrSelectedTreeVOWithChildren();
+        TreePath path = menuTree.getSelectionPath();
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+        if (vo == null || vo.length <= 0) {
+            return;
+        }
+        String str_pk = vo[vo.length - 1].getIntegerValue("ID") + "";
+        String str_localname = null;
+        if (vo[vo.length - 1].getStringValue("NAME") != null && !vo[vo.length - 1].getStringValue("NAME").equals("")) {
+            str_localname = vo[vo.length - 1].getStringValue("NAME");
+        }
+        if (!NovaMessage.confirm("你真的想删除[" + (str_localname == null ? str_pk : str_localname) + "]的菜单吗,这将删除它的所有子菜单?")) {
+            return;
+        }
+        String[] sqls = new String[vo.length * 4];
+        for (int i = 0; i < vo.length; i++) {
+            String str_pk2 = vo[i].getIntegerValue("ID") + "";
+            sqls[i] = "delete from pub_user_menu where menuID='" + str_pk2 + "'";
+            sqls[vo.length + i] = "delete from pub_role_menu where menuID='" + str_pk2 + "'";
+            sqls[vo.length * 2 + i] = "delete from pub_workposition_menu where menuID='" + str_pk2 + "'";
+        }
+
+        for (int i = 0; i < vo.length; i++) {
+            String str_pk2 = vo[i].getIntegerValue("ID") + "";
+            sqls[vo.length * 3 + i] = "delete from pub_menu where ID='" + str_pk2 + "'";
+        }
+        try {
+            UIUtil.executeBatchByDS(null, sqls);
+            node.removeFromParent();
+            menuTree.updateUI();
+            billCardPanel.reset();
+            NovaMessage.show("删除菜单成功!!");
+        } catch (Exception e) {
+            NovaMessage.show("删除菜单失败,原因:" + e.getMessage(), NovaConstants.MESSAGE_ERROR);
+        }
+    }
+
+    private HashVO[] getCurrSelectedTreeVOWithChildren() {
+        TreePath path = menuTree.getSelectionPath();
+        if (path == null) {
+            NovaMessage.show(this, "请先选择一个结点!", NovaConstants.MESSAGE_WARN);
+            return null;
+        }
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+        ArrayList children = getChildrenNode(node);
+
+        if (node.isRoot()) {
+            NovaMessage.show(this, "不能删除根结点!!!", NovaConstants.MESSAGE_ERROR);
+            return null;
+        }
+        HashVO[] vos = new HashVO[children.size()];
+        for (int i = 0; i < children.size(); i++) {
+            DefaultMutableTreeNode tnode = (DefaultMutableTreeNode) children.get(i);
+            vos[i] = (HashVO) tnode.getUserObject();
+        }
+        return vos; //
+    }
+
+    private ArrayList getChildrenNode(DefaultMutableTreeNode node) { // 得到所选结点的所有子结点.删除时顺序遍历即可
+        ArrayList temp = new ArrayList();
+        if (node.getChildCount() > 0) {
+            for (int i = 0; i < node.getChildCount(); i++) {
+                temp.addAll(getChildrenNode( (DefaultMutableTreeNode) node.getChildAt(i)));
+            }
+
+        }
+        temp.add(node);
+        return temp;
+
+    }
+
+    private HashVO getCurrSelectedTreeVO() {
+        TreePath path = menuTree.getSelectionPath();
+        if (path == null) {
+            JOptionPane.showMessageDialog(this, "请先选择一个结点!");
+            return null;
+        }
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+
+        if (node.isRoot()) {
+            if (oninsert) {
+                return null;
+            }
+            JOptionPane.showMessageDialog(this, "不能操作根结点!!!");
+            return null;
+        }
+        HashVO vo = (HashVO) node.getUserObject();
+        return vo; //
+    }
+
+    private void onRefresh() {
+        refreshTree(); // 刷新树
+    }
+
+    private void onSave() {
+        if (billCardPanel.getEditState().equals(NovaConstants.BILLDATAEDITSTATE_INSERT)) { // 如果是新增状态
+            insertSave();
+        } else if (billCardPanel.getEditState().equals(NovaConstants.BILLDATAEDITSTATE_UPDATE)) { // 如果是编辑状态
+            updateSave();
+        } else {
+            JOptionPane.showMessageDialog(this, "当前不处于新增或修改状态!!");
+            return;
+        }
+
+    }
+
+    private void insertSave() {
+        String str_sql = billCardPanel.getInsertSQL();
+        System.out.println("新增SQL:" + str_sql); //
+        try {
+            UIUtil.executeUpdateByDS(null, str_sql); //
+            JOptionPane.showMessageDialog(this, "新增数据成功!!");
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "新增数据失败,原因:" + e.getMessage());
+        }
+    }
+
+    private void updateSave() {
+        String str_sql = billCardPanel.getUpdateSQL();
+        try {
+            UIUtil.executeUpdateByDS(null, str_sql); //
+            JOptionPane.showMessageDialog(this, "修改数据成功!!");
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "修改数据失败,原因:" + e.getMessage());
+        }
+    }
+
+    class MyTreeCellRender extends DefaultTreeCellRenderer {
+        private static final long serialVersionUID = 6902375910906984589L;
+
+        public MyTreeCellRender() {
+        }
+
+        public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded,
+            boolean leaf, int row, boolean hasFocus) {
+            JLabel label = (JLabel)super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+            if (value instanceof DefaultMutableTreeNode) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+                if (!node.isRoot()) {
+                    HashVO nodeVO = (HashVO) node.getUserObject();
+                    String str_icon = nodeVO.getStringValue("icon");
+                    if (str_icon != null && !str_icon.trim().equals("")) {
+                        ImageIcon icon = UIUtil.getImage(str_icon);
+                        if (icon != null) {
+                            label.setIcon(icon); //
+                        }
+                    }
+                }
+            }
+            return label;
+        }
+
+    }
+}
+/**************************************************************************
+ * $RCSfile: MenuConfigFrame.java,v $  $Revision: 1.2.10.4 $  $Date: 2010/03/26 06:18:33 $
+ *
+ * $Log: MenuConfigFrame.java,v $
+ * Revision 1.2.10.4  2010/03/26 06:18:33  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2.10.3  2010/03/16 08:49:53  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2.10.2  2009/12/06 13:34:14  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2.10.1  2008/11/05 05:21:18  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/05/31 07:41:32  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:22:08  qilin
+ * no message
+ *
+ * Revision 1.15  2007/05/16 02:07:05  qilin
+ * no message
+ *
+ * Revision 1.14  2007/05/15 03:01:10  qilin
+ * no message
+ *
+ * Revision 1.13  2007/03/13 09:27:26  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.12  2007/03/08 03:51:03  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.11  2007/03/08 03:48:32  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.10  2007/03/07 02:01:56  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.9  2007/03/05 07:23:40  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.8  2007/03/05 07:22:06  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.7  2007/03/02 05:16:43  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.6  2007/03/01 09:05:43  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/02/27 09:38:47  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/02/27 06:02:59  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/02/10 08:59:36  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 04:20:39  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

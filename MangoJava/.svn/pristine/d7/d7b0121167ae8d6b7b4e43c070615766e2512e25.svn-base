@@ -1,0 +1,144 @@
+/**************************************************************************
+ * $RCSfile: QuickPutValueDialog.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:18 $
+ **************************************************************************/
+package smartx.framework.metadata.ui.componentscard;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import smartx.framework.metadata.vo.*;
+
+
+public class QuickPutValueDialog extends JDialog {
+    private Object result = null;
+    private Pub_Templet_1_ItemVO itemvo = null;
+    JPanel panel = null;
+    JFormattedTextField formattext = null;
+    JPasswordField passtext = null;
+    private boolean isModified = false;
+    public QuickPutValueDialog(Container _parent, String _title, Pub_Templet_1_ItemVO _itemvo, boolean model) {
+        super(JOptionPane.getFrameForComponent(_parent), _title, model);
+        this.itemvo = _itemvo;
+        initPanel();
+        this.getContentPane().setLayout(new BorderLayout());
+        this.getContentPane().add(initPanel(), BorderLayout.CENTER);
+        this.getContentPane().add(getBtnpanel(), BorderLayout.SOUTH);
+        if (panel != null) {
+            this.setSize( (int) panel.getPreferredSize().getWidth() + 50, 100);
+        } else {
+            this.setSize(300, 184);
+        }
+        this.setLocation(400, 200);
+        this.setVisible(true);
+    }
+
+    private JPanel getBtnpanel() {
+        JPanel rpanel = new JPanel();
+        rpanel.setLayout(new FlowLayout());
+        JButton btn = new JButton("确定");
+        btn.setPreferredSize(new Dimension(65, 20));
+        btn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onConfirm();
+            }
+        });
+        JButton cancel = new JButton("取消");
+        cancel.setPreferredSize(new Dimension(65, 20));
+        cancel.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onExit();
+            }
+        });
+        rpanel.add(btn);
+        rpanel.add(cancel);
+        return rpanel;
+    }
+
+    private JPanel initPanel() {
+        JPanel rpanel = new JPanel();
+        rpanel.setLayout(new FlowLayout());
+        String str_type = itemvo.getItemtype();
+        if (str_type.equals("文本框")) {
+            panel = new TextFieldPanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("数字框")) {
+            formattext = new JFormattedTextField();
+            formattext.setPreferredSize(new Dimension(100, 20));
+            rpanel.add(formattext);
+        } else if (str_type.equals("密码框")) {
+            passtext = new JPasswordField(20);
+            passtext.setPreferredSize(new Dimension(100, 20));
+            rpanel.add(passtext);
+        } else if (str_type.equals("下拉框")) {
+            panel = new ComBoxPanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("参照")) {
+            panel = new UIRefPanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("时间")) {
+            panel = new UITimeSetPanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("日历")) {
+            panel = new UIDateTimePanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("文件选择框")) {
+            panel = new UIFilePathPanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("颜色")) {
+            panel = new UIColorPanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("大文本框")) {
+            panel = new UITextAreaPanel(itemvo);
+            rpanel.add(panel);
+        } else if (str_type.equals("勾选框")) {
+            panel = new UICheckBoxPanel(itemvo);
+            rpanel.add(panel);
+        }
+        return rpanel;
+    }
+
+    public boolean isModified() {
+        return this.isModified;
+    }
+
+    public void onConfirm() {
+        this.isModified = true;
+        setValue();
+        this.dispose();
+    }
+
+    public void onExit() {
+        this.isModified = false;
+        this.dispose();
+    }
+
+    public void setValue() {
+        if (panel != null) {
+            result = ( (INovaCompent) panel).getObject();
+        } else if (formattext != null) {
+            result = formattext.getText();
+        } else if (passtext != null) {
+            result = new String(passtext.getPassword());
+        }
+    }
+
+    public Object getValue() {
+        return result;
+    }
+}
+/**************************************************************************
+ * $RCSfile: QuickPutValueDialog.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:18 $
+ *
+ * $Log: QuickPutValueDialog.java,v $
+ * Revision 1.2  2007/05/31 07:38:18  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:01:07  qilin
+ * no message
+ *
+ * Revision 1.2  2007/01/30 05:14:32  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

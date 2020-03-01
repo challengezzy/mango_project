@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						 xmlns:s="library://ns.adobe.com/flex/spark" 
+						 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" label="过滤规则" 
+						 creationComplete="init()" xmlns:synonyms="smartx.bam.flex.modules.synonyms.*" 
+						 xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*" show="showHandler()">
+	<fx:Declarations>
+		<mx:TitleWindow id="ruleWindow" width="320" height="190" title="规则" showCloseButton="true"
+						close="PopUpManager.removePopUp(ruleWindow)">
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="名称" width="25%" />
+					<mx:TextInput id="newRuleNameTxt" text="" width="75%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="编码" width="25%" />
+					<mx:TextInput id="newRuleCodeTxt" text="" width="75%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="分区字段" width="25%" />
+					<mx:ComboBox id="newGroupColumnCbo"  labelField="name" width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="addRuleHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(ruleWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		<mx:TitleWindow id="ruleEditWindow" width="320" height="190" title="规则" showCloseButton="true"
+						close="PopUpManager.removePopUp(ruleEditWindow)">
+			<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" >
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="名称" width="25%" />
+					<mx:TextInput id="editRuleNameTxt" text="" width="75%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="编码" width="25%" />
+					<mx:TextInput id="editRuleCodeTxt" text="" width="75%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="left">
+					<mx:Label text="分区字段" width="25%" />
+					<mx:ComboBox id="editGroupColumnCbo" labelField="name"  width="75%" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="editRuleHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(ruleEditWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.CollectionEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.collections.HashMap;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.bam.flex.modules.entitymodel.QueryDatagridWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityTaskViewWindow;
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var formService:RemoteObject;
+			private var bamService:RemoteObject;
+			
+			[Bandable]
+			public var refreshFun:Function;
+			
+			[Bandable]
+			public var rulesArr:ArrayCollection;
+			
+			[Bandable]
+			public var entitiesCache:HashMap;
+			
+			[Bindable]
+			private var columnsCol:ArrayCollection = new ArrayCollection();
+			
+			[Bindable]
+			private var attributesCol:ArrayCollection = new ArrayCollection();
+			
+			private var queryResultCol:ArrayCollection = new ArrayCollection();
+			
+			private var queryDatagridWindow:QueryDatagridWindow = new QueryDatagridWindow();
+			
+			private var entityUtil:EntityUtil = new EntityUtil();
+			
+			public var selectedRule:XML;
+			
+			private var datasource:String;
+			
+			public var allInheritAtts:ArrayCollection = new ArrayCollection();//继承属性
+			
+			public var allInheritRelation:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				bamService.dealRealTimeStatistics.addEventListener(ResultEvent.RESULT,dealRealTimeStatisticsHandler);
+				bamService.dealRealTimeStatistics.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("生成统计结果时出错!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				bamService.generateEntitySql.addEventListener(ResultEvent.RESULT,generateEntitySqlHandler);
+				bamService.generateEntitySql.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("生成SQL错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				setAttributesCol();
+				datasource = String(contentXml.datasource);
+				isCreationComplete = true;
+			}
+			
+			private function setAttributesCol():void{
+				attributesCol.removeAll();
+				var emptyObj:Object = new Object();
+				emptyObj["name"] = "";
+				attributesCol.addItem(emptyObj);
+				var attXml:XML;
+				var item:Object;
+				for each(attXml in allInheritAtts){
+					item = {name:String(attXml.@name)};
+					attributesCol.addItem(item);
+				}
+				for each(attXml in selectedItem.content.attributes.attribute){
+					item = {name:String(attXml.@name)};
+					attributesCol.addItem(item);
+				}
+			}
+			
+			private function addFilterItem():void{
+				
+				var rule:Object = ruleDatagrid.selectedItem;
+				if(rule != null ){
+					
+					var tempColumn:String ="";
+					if(columnsCol.length > 0){
+						var obj:Object = columnsCol.getItemAt(0);
+						tempColumn = obj["columnName"] as String;
+					}
+					
+					var itemXml:XML = <item enabled="true" type="equalValue" column="" logicalOperator="AND" relationalOperator="=" value="" />;
+					itemXml.@column = tempColumn;
+					
+					var ruleXml:XML = rule as XML;
+					ruleXml.appendChild(itemXml);
+					
+					var efip:EntityFilterItemPanel = new EntityFilterItemPanel();
+					efip.itemXml = itemXml;
+					efip.allFieldsCol = columnsCol;
+					efip.itemsVBox = itemsVbox;
+//					efip.formService = formService;
+					efip.entitiesXml = contentXml;
+					itemsVbox.addChild(efip);
+					
+				}else{
+					SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+				}
+
+			}
+			
+			private function refreshColumns():void{
+				columnsCol.removeAll();
+				var currEntityXml:XML = selectedItem.content as XML;
+				for each( var attributeItem:XML in currEntityXml.attributes.attribute){
+					var name:String = String(attributeItem.@name);
+					var type:String = String(attributeItem.@type);
+					var label:String = String(attributeItem.@label);
+					var refDesc:String = String(attributeItem.@dictionaryRef);
+					var columnItem:Object;
+					if(String(currEntityXml.@type) == "virtual"){//如果是虚拟实体
+						columnItem = new Object();
+						columnItem["columnName"] = String(attributeItem.@expression);
+						columnItem["columnAlias"] = name;
+						columnItem["columnType"] = type;
+						columnItem["columnLabel"] = label;
+						columnItem["columnRef"] = refDesc;
+						columnsCol.addItem(columnItem);
+					}else{
+						var mappingItems:XMLList = currEntityXml.mappingInfo.attributeMapping.map.(@attributeName == attributeItem.@name);
+						if(mappingItems.length() > 0){
+							columnItem = new Object();
+							columnItem["columnName"] = String(mappingItems[0].@columnName);
+							columnItem["columnAlias"] = name;
+							columnItem["columnType"] = type;
+							columnItem["columnLabel"] = label;
+							columnItem["columnRef"] = refDesc;
+							columnsCol.addItem(columnItem);
+						}
+					}
+					/* for each( var mappingItem:XML in currEntityXml.mappingInfo.attributeMapping.map){
+						var attributeName:String = String(mappingItem.@attributeName);
+						var columnName:String = String(mappingItem.@columnName);
+						if(attributeName != "" && attributeName != null && attributeName == name){
+							var columnItem:Object = new Object();
+							columnItem["columnName"] = columnName;
+							columnItem["columnAlias"] = name;
+							columnItem["columnType"] = type;
+							columnItem["columnLabel"] = label;
+							columnItem["columnRef"] = refDesc;
+							columnsCol.addItem(columnItem);
+						}
+					} */
+				}
+				
+				for each(var parentAttXml:XML in allInheritAtts){
+					var parentAttName:String = String(parentAttXml.@name);
+					var parentAttType:String = String(parentAttXml.@type);
+					var parentAttLabel:String = String(parentAttXml.@label);
+					var parentAttRefDesc:String = String(parentAttXml.@dictionaryRef);
+					var parenColumnItem:Object = new Object();
+					parenColumnItem["columnName"] = parentAttName;
+					parenColumnItem["columnAlias"] = parentAttName;
+					parenColumnItem["columnType"] = parentAttType;
+					parenColumnItem["columnLabel"] = parentAttLabel;
+					parenColumnItem["columnRef"] = parentAttRefDesc;
+					columnsCol.addItem(parenColumnItem);
+				}
+				
+				for each(var relationXml:XML in currEntityXml.relations.relation){
+					
+					var relationName:String = String(relationXml.@name);
+					var relationCode:String = String(relationXml.@code);
+					var toEntityCode:String = String(relationXml.@toEntityCode);
+					var entityObj:Object = null;
+					if(entitiesCache != null ){
+						entityObj = entitiesCache.getValue(toEntityCode);
+					}
+					
+					var relationItem:Object = new Object();
+					relationItem["columnName"] = relationCode;
+					relationItem["columnAlias"] = relationCode;
+					relationItem["columnType"] = "relationItem";
+					relationItem["columnLabel"] = relationName;
+					relationItem["columnRef"] = "";
+					relationItem["toEntity"] = entityObj;
+					columnsCol.addItem(relationItem);
+				}
+				
+				for each(var parentRelation:XML in allInheritRelation){
+					
+					var parentRelationName:String = String(parentRelation.@name);
+					var parentRelationCode:String = String(parentRelation.@code);
+					var parentToEntityCode:String = String(parentRelation.@toEntityCode);
+					var tempEntityObj:Object = null;
+					if(entitiesCache != null ){
+						tempEntityObj = entitiesCache.getValue(parentToEntityCode);
+					}
+					
+					var parentRelationItem:Object = new Object();
+					parentRelationItem["columnName"] = parentRelationCode;
+					parentRelationItem["columnAlias"] = parentRelationCode;
+					parentRelationItem["columnType"] = "relationItem";
+					parentRelationItem["columnLabel"] = parentRelationName;
+					parentRelationItem["columnRef"] = "";
+					parentRelationItem["toEntity"] = tempEntityObj;
+					columnsCol.addItem(parentRelationItem);
+				}
+				
+			}
+			
+			protected function ruleDatagrid_itemClickHandler(event:ListEvent):void
+			{
+				refreshColumns();
+				
+				var rule:Object = ruleDatagrid.selectedItem;
+				if(rule == null ){
+					return;
+				}
+				selectedRule = rule as XML;
+				itemsVbox.removeAllChildren();
+				for each( var ruleItem:XML in selectedRule.item){
+					var efip:EntityFilterItemPanel = new EntityFilterItemPanel();
+					efip.itemXml = ruleItem;
+					efip.allFieldsCol = columnsCol;
+					efip.itemsVBox = itemsVbox;
+//					efip.formService = formService;
+					efip.entitiesXml = contentXml;
+					itemsVbox.addChild(efip);
+				}
+			}
+			
+			private function addRule():void{
+				
+				PopUpManager.addPopUp(ruleWindow,this,true);
+				PopUpManager.centerPopUp(ruleWindow);
+				
+				newRuleNameTxt.text = "";
+				newRuleCodeTxt.text = "";
+				newGroupColumnCbo.dataProvider = attributesCol;
+				newGroupColumnCbo.selectedItem = null;
+				
+				
+			}
+			
+			private function addRuleHandler():void{
+				if(StringUtils.trim(newRuleCodeTxt.text) == ""){
+					SmartXMessage.show("编码不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(StringUtils.trim(newRuleNameTxt.text) == ""){
+					SmartXMessage.show("名称不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(isExistItem(newRuleCodeTxt.text,rulesArr)){
+					SmartXMessage.show("编码重复！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				var tempRuleXML:XML = <rule />;
+				var entityXml:XML = selectedItem.content as XML;
+				if(entityXml.rules.length() <= 0 ){
+					entityXml.appendChild(new XML("<rules />"));
+				}
+				tempRuleXML.@name = newRuleNameTxt.text;
+				tempRuleXML.@code = newRuleCodeTxt.text;
+				tempRuleXML.@toEntityCode = selectedItem.code;
+				
+				var temSelectedItem:Object = newGroupColumnCbo.selectedItem;
+				if(temSelectedItem != null ){
+					var name:String = temSelectedItem["name"] as String;
+					tempRuleXML.@groupcolumn = name;
+				}
+				
+				entityXml.rules.appendChild(tempRuleXML);
+				ruleDatagrid.dataProvider = selectedItem.content.rules.rule;
+				ruleDatagrid.invalidateList();
+				refreshFun();
+				PopUpManager.removePopUp(ruleWindow);
+			}
+			
+			private function deleteRule():void{
+				var rule:Object = ruleDatagrid.selectedItem;
+				if(rule != null ){
+					var ruleXml:XML = rule as XML;
+					CEPUtils.xmlDeleteNode(ruleXml);
+					ruleDatagrid.dataProvider = selectedItem.content.rules.rule;
+					ruleDatagrid.invalidateList();
+					refreshFun();
+				}else{
+					SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			private  function editRule():void{
+				var rule:Object = ruleDatagrid.selectedItem;
+				if(rule != null ){
+					var ruleXml:XML = rule as XML;
+					var tempName:String = ruleXml.@name;
+					var tempCode:String = ruleXml.@code;
+					var tempGroupColumn:String = ruleXml.@groupcolumn;
+					
+					PopUpManager.addPopUp(ruleEditWindow,this,true);
+					PopUpManager.centerPopUp(ruleEditWindow);
+					
+					editGroupColumnCbo.dataProvider = attributesCol;
+					
+					for each(var item:Object in attributesCol){
+						var itemName:String = item["name"] as String;
+						if(itemName != null && tempGroupColumn != null && itemName.toLowerCase() == tempGroupColumn.toLowerCase()){
+							editGroupColumnCbo.selectedItem = item;
+						}
+					}
+					
+					editRuleNameTxt.text = tempName;
+					editRuleCodeTxt.text = tempCode;
+					
+				}else{
+					SmartXMessage.show("请选择一条记录!",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			private function editRuleHandler():void{
+				var rule:Object = ruleDatagrid.selectedItem;
+				if(rule != null ){
+					var ruleXml:XML = rule as XML;
+					if(StringUtils.trim(editRuleCodeTxt.text) == ""){
+						SmartXMessage.show("编码不能为空！",SmartXMessage.MESSAGE_WARN);
+						return;
+					}
+					if(StringUtils.trim(editRuleNameTxt.text) == ""){
+						SmartXMessage.show("名称不能为空！",SmartXMessage.MESSAGE_WARN);
+						return;
+					}
+					if(isExistItem(editRuleCodeTxt.text,rulesArr) && editRuleCodeTxt.text != String(ruleXml.@code)){
+						SmartXMessage.show("编码重复！",SmartXMessage.MESSAGE_WARN);
+						return;
+					}
+					
+					ruleXml.@name = editRuleNameTxt.text;
+					ruleXml.@code = editRuleCodeTxt.text;
+					
+					var temSelectedItem:Object = editGroupColumnCbo.selectedItem;
+					if(temSelectedItem != null ){
+						var name:String = temSelectedItem["name"] as String;
+						ruleXml.@groupcolumn = name;
+					}
+					
+					ruleDatagrid.dataProvider = selectedItem.content.rules.rule;
+					ruleDatagrid.invalidateList();
+					refreshFun();
+					PopUpManager.removePopUp(ruleEditWindow);
+				}
+			}
+			
+			private function isExistItem(code:String,itemsArr:ArrayCollection):Boolean{
+				var isExist:Boolean = false;
+				for each(var item:Object in itemsArr){
+					var itemCode:String = String(item.code);
+					if(itemCode != null && itemCode != "" && itemCode == code){
+						isExist = true;
+						break;
+					}
+				}
+				return isExist;
+			}
+			
+			public function resetItems():void{
+				itemsVbox.removeAllChildren();
+				ruleDatagrid.selectedItem = null;
+			}
+			
+			private function onQuery():void{
+				
+				var ruleItem:Object = ruleDatagrid.selectedItem;
+				var entityXml:XML = selectedItem.content as XML; 
+				if(ruleItem != null ){
+					var ruleXml:XML = ruleItem as XML;
+					bamService.generateEntitySql(entityXml.toXMLString(),contentXml.toXMLString(),ruleXml.toXMLString());
+				}else{
+					SmartXMessage.show("请选择一条规则!");
+				}
+				
+			}
+			
+			private function dealRealTimeStatisticsHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("统计结果已生成!");
+			}
+			
+			private function onCreateTask():void{
+				if(!insertMode){
+					var entityXml:XML = selectedItem.content as XML; 
+					var entityCode:String = String(entityXml.@code);
+					var ruleItem:Object = ruleDatagrid.selectedItem;
+					if(ruleItem != null ){
+						var ruleXml:XML = ruleItem as XML;
+						var ruleCode:String = ruleXml.@code;
+						var ruleName:String = ruleXml.@name;
+						var taskCode:String = ruleXml.@taskCode;
+						
+						var rtw:EntityTaskViewWindow = new EntityTaskViewWindow();
+						rtw.entityModelCode = contentXml.entityModelCode;
+						rtw.entityCode = entityCode;
+						rtw.code = ruleCode;
+						rtw.taskCode = taskCode;
+						rtw.dataTaskDesc = ruleName;
+						rtw.content = ruleXml;
+						rtw.entityTaskType = BAMConst.ENTITY_DATATASK_RULE;
+						
+						if(desktop != null){
+							PopUpManager.addPopUp(rtw,desktop,true);
+						}else{
+							PopUpManager.addPopUp(rtw,this,true);
+						}
+						
+						PopUpManager.centerPopUp(rtw);
+						
+					}else{
+						SmartXMessage.show("请先选一条规则",SmartXMessage.MESSAGE_WARN);
+					}
+					
+				}else{
+					SmartXMessage.show("模型尚未保存,不能发布任务",SmartXMessage.MESSAGE_WARN);
+				}
+
+			}
+			
+			private function onStatistics():void{
+				if(!insertMode){
+					var entityXml:XML = selectedItem.content as XML; 
+					var entityCode:String = String(entityXml.@code);
+					var ruleItem:Object = ruleDatagrid.selectedItem;
+					if(ruleItem != null ){
+						var ruleXml:XML = ruleItem as XML;
+						var ruleCode:String = ruleXml.@code;
+						OperatingTipUtil.startOperat("正在生成统计结果....",this);
+						bamService.dealRealTimeStatistics(contentXml.toXMLString(),String(contentXml.entityModelCode),entityCode,ruleCode);
+					}else{
+						SmartXMessage.show("请先选一条规则",SmartXMessage.MESSAGE_WARN);
+					}
+				}else{
+					SmartXMessage.show("尚未保存此模型,不能进行此项操作!",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			private function generateEntitySqlHandler(event:ResultEvent):void{
+				
+				var sql:String = event.result as String;
+				if(sql !=null && sql != ""){
+					var entityXml:XML = selectedItem.content as XML;
+					var entityCode:String = String(entityXml.@code);
+					var sharedObjectCode:String = contentXml.entityModelCode+"_"+entityCode;
+					queryDatagridWindow.attributesXml = selectedItem.content.@type=="virtual"?selectedItem.content.attributes[0]
+						:EntityUtil.displayAttributeWrap(selectedItem.content,contentXml);
+					queryDatagridWindow.sharedObjectCode = sharedObjectCode;
+					queryDatagridWindow.sharedObjectSpaceName = BAMConst.KEYNAME_SHAREDOBJECT_ENTITY_MODEL_FILTERINFO;
+					queryDatagridWindow.sql = sql;
+					queryDatagridWindow.dataSource = datasource;
+					queryDatagridWindow.debugMode = debugMode;
+					
+					if(desktop != null){
+						PopUpManager.addPopUp(queryDatagridWindow,desktop,true);
+					}else{
+						PopUpManager.addPopUp(queryDatagridWindow,this,true);
+					}
+					
+					PopUpManager.centerPopUp(queryDatagridWindow);
+					
+					queryDatagridWindow.refresh();
+				}
+			}
+			
+			private function showHandler():void{
+				setAttributesCol();
+			}
+			
+		]]>
+	</fx:Script>
+		<mx:VBox id="attributeListVbox" width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" >
+			<mx:HBox width="100%" horizontalAlign="left">
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" toolTip="增加规则" width="20" height="20" click="addRule()"/>
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" toolTip="删除规则" width="20" height="20" click="deleteRule()"/>
+				<mx:LinkButton icon="{AssetsFileLib.editIcon}" toolTip="编辑规则" width="20" height="20" click="editRule()"/>
+			</mx:HBox>
+			<mx:DataGrid id="ruleDatagrid" width="100%" height="100%" 
+						 dataProvider="{selectedItem.content.rules.rule}" 
+						 itemClick="ruleDatagrid_itemClickHandler(event)" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="名称" dataField="@name" />
+					<mx:DataGridColumn headerText="编码" dataField="@code" />
+					<mx:DataGridColumn headerText="分区字段" dataField="@groupcolumn" />
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" toolTip="增加规则项" width="20" height="20" click="addFilterItem()"/>
+			</mx:HBox>
+			<mx:HRule width="100%" />
+			<mx:VBox id="itemsVbox" width="100%" height="100%" />
+			<mx:HRule width="100%" />
+			<mx:HBox width="100%" horizontalAlign="center" verticalAlign="bottom">
+				<mx:Button label="实时查询" click="onQuery()" />
+				<mx:Button label="生成统计分析结果" click="onStatistics()" />
+				<mx:Button label="定时任务管理" click="onCreateTask()" />
+			</mx:HBox>
+		</mx:VBox>
+</entitymodel:AbstractTab>

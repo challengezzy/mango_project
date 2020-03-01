@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%" 
+		   creationComplete="creationCompleteHandler()"
+		   xmlns:mtchart="smartx.flex.components.core.mtchart.*" xmlns:styletemplate="smartx.flex.components.styletemplate.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.Form;
+			import mx.containers.FormItem;
+			import mx.controls.TextInput;
+			import mx.core.UIComponent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.Consumer;
+			import mx.messaging.channels.PollingChannel;
+			import mx.messaging.channels.StreamingAMFChannel;
+			import mx.messaging.events.MessageEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.util.DataTaskParamSetWindow;
+			import smartx.flex.components.util.DataTaskUtil;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.MemoryUtil;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.util.TextAreaWindow;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.modules.datatask.vo.DataTaskLog;
+			
+			[Bindable]
+			private var metadataTemplet:MetadataTemplet;			
+			[Bindable]
+			private var endpoint:String;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var smartxService:RemoteObject;
+			
+			private var paramSetWindow:DataTaskParamSetWindow;
+			
+			private var variableControlMap:Hashtable = new Hashtable();//动态变量控件MAP
+			
+			private var paramMap:Object = new Object();//参数对象
+			
+			private var dataTaskTemplet:Object;
+			private var taskContent:String;//任务内容
+			
+			private var taskSelectWindow:DataTaskTempletSelectWindow;//数据任务模板选择窗口
+			
+//			private var consumer:Consumer;//消息接收器
+//			private var taskLogMap:Hashtable = new Hashtable();
+			
+			private var curLogTaskId:String = "";
+			
+			private var timer:Timer;
+			
+			private function mtListPreInit():void{
+				metadataTemplet= MetadataTempletUtil.getInstance().findMetadataTemplet("MT_DO_DataTaskMng");				
+				endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+				
+				listChart.metadataTemplet = metadataTemplet;
+				listChart.endpoint = endpoint;
+				
+				smartxService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				smartxService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				
+				smartxService.addDataTask.addEventListener(ResultEvent.RESULT,addDataTaskHanlder);
+				smartxService.addDataTask.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("数据预处理任务启动指令发送失败！",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				smartxService.stopDataTask.addEventListener(ResultEvent.RESULT,function(event:ResultEvent):void{
+					SmartXMessage.show("数据预处理任务停止指令发送成功！");
+					if(listChart.isLoading == false)
+						listChart.refreshComplete();
+					if(timer && timer.running){
+						timer.stop();
+					}
+				});
+				smartxService.stopDataTask.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("数据预处理任务停止指令发送失败！",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+				
+				smartxService.getMessageByTaskId.addEventListener(ResultEvent.RESULT,getMessageByTaskIdHandler);
+				smartxService.getMessageByTaskId.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+				});
+			}
+			
+			private function creationCompleteHandler():void{
+				listChart.removeMenuItem(MTChartConst.MTCHART_KEY_DETAIL);
+				listChart.removeMenuItem(MTChartConst.MTCHART_KEY_SETVAR);
+				listChart.removeMenuItem(MTChartConst.MTCHART_KEY_EDIT);
+				
+				listChart.showMenuBtn = false;
+				//数据刷新
+				listChart.start();
+				
+				timer = new Timer(7000);
+				timer.addEventListener(TimerEvent.TIMER,startTimerHandler);
+				
+//				consumer = new Consumer();  
+//				consumer.destination = GlobalConst.MSG_DESTINATION
+//				var cs:ChannelSet = new ChannelSet();
+//				var pollingEndPoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT_STREAMING) as String;
+//				cs.addChannel(new StreamingAMFChannel(GlobalConst.MSG_CHANNELSET_STREAMING,pollingEndPoint));
+//				consumer.channelSet = cs;
+//				consumer.subtopic = "datatask_log";  
+//				consumer.addEventListener(MessageEvent.MESSAGE, logMessageHandler);  
+//				consumer.subscribe();
+				
+				desktop.addEventListener(BasicEvent.CLOSE,terminalTimer);
+				desktop.addEventListener(BasicEvent.RELOGIN,terminalTimer);
+			}
+			
+			private function terminalTimer(event:BasicEvent):void{
+				if(event.type == BasicEvent.RELOGIN || event.menuId == "menu_datataskmng"){
+//					consumer.unsubscribe();//取消日志消息订阅
+					listChart.destroy();
+					//SmartXMessage.show("removedFromStageHandler");
+					if(timer && timer.running){
+						timer.stop();
+					}
+				}
+			}
+			
+//			private function logMessageHandler(event:MessageEvent):void   
+//			{  
+//				var taskLog:DataTaskLog = event.message.body as DataTaskLog;
+//				var dataTaskId:String = taskLog.dataTaskId;
+//				var logMsg:String = StringUtils.convertDateToString(taskLog.logTime,1) + "  "+ taskLog.message + " " + taskLog.taskDetail;
+//				
+//				var oldLog:String = taskLogMap.find(dataTaskId);
+//				if( oldLog != null )
+//					taskLogMap.add(dataTaskId,oldLog + "\n" + logMsg);
+//				else
+//					taskLogMap.add(dataTaskId,logMsg);
+//				//动态刷新命令行信息
+//				logArea.text = taskLogMap.find(curLogTaskId);
+//				
+//				if(logScrollChk.selected)
+//					logArea.verticalScrollPosition = logArea.maxVerticalScrollPosition;
+//			}
+			
+			private function addDataTaskHanlder(event:ResultEvent):void{
+				SmartXMessage.show("数据预处理任务启动指令发送成功！");
+				if(listChart.isLoading == false)
+					listChart.refreshComplete();
+				
+				logArea.text = "";
+				
+				curLogTaskId = event.result as String;
+				tabNavigator.selectedChild = logCmdBox;
+				
+				if(timer && !timer.running){
+					timer.start();
+				}
+			}
+			
+			private function getMessageByTaskIdHandler(event:ResultEvent):void{
+				var msgArr:Array = event.result as Array;
+				if(msgArr != null && msgArr.length>0 ){
+					for each(var sp:SimpleHashVO in msgArr){
+						logArea.text = sp.dataMap["execlog"];
+					}
+					
+					if(logScrollChk.selected)
+						logArea.verticalScrollPosition = logArea.maxVerticalScrollPosition;
+				}
+			}
+			
+			private function startDataTask():void{
+				taskSelectWindow = new DataTaskTempletSelectWindow();
+				
+				taskSelectWindow.onSelectOK = dataTaskSelected;				
+				PopUpManager.addPopUp(taskSelectWindow,this,true);
+				PopUpManager.centerPopUp(taskSelectWindow);
+			}
+			
+			private function stopDataTask():void{
+				if(listChart.listChartPanel.getSelectedRowValue() == null){
+					SmartXMessage.show("请选择一条数据任务实例！");
+				}else{
+					var taskObj:Object = listChart.listChartPanel.getSelectedRowValue();
+					var taskid:String = taskObj["id"] as String;
+					smartxService.stopDataTask(taskid);
+				}
+			}
+			
+			public function dataTaskSelected():void
+			{
+				dataTaskTemplet = taskSelectWindow.listPanel.getSelectedRowValue();
+				taskContent = dataTaskTemplet["CONTENT"];
+
+				
+				var params:ArrayCollection;
+				try{
+					params = DataTaskUtil.paramExract(taskContent);
+				}catch(e:Error){
+					trace(e.message);
+					SmartXMessage.show("数据预处理任务变量设置错误",SmartXMessage.MESSAGE_ERROR,e.message);
+					return;
+				}
+				
+				if(params.length > 0){
+					paramSetWindow = new DataTaskParamSetWindow();
+					paramSetWindow.confirmFunc = paramSetOK;
+					
+					PopUpManager.addPopUp(paramSetWindow,this,true);
+					PopUpManager.centerPopUp(paramSetWindow);
+					paramSetWindow.controlBox.addChild( initVariableControl(params) );
+					
+				}else{
+					//无变量直接执行
+					var taskTitle:String = dataTaskTemplet["NAME"] + "_" + StringUtils.hashCode(dataTaskTemplet["CODE"] + "");
+					smartxService.addDataTask(dataTaskTemplet["ID"],taskTitle,taskContent,null);
+				}
+				
+				taskSelectWindow.onSelectOK = null;
+				taskSelectWindow = null;
+				MemoryUtil.forceGC();
+				
+			}
+			
+			private function paramSetOK():void{
+				var paramStr:String = "";
+				paramMap = new Object();
+				
+				var keyArray:Array = variableControlMap.getKeySet().sort();//进行排序，保证paramStr的结果一致
+				for each(var key:String in keyArray){
+					var ui:UIComponent = variableControlMap.find(key) as UIComponent;
+					var value:String = "";
+					if(ui is TextInput){
+						var ti:TextInput = TextInput(ui);
+						value = ti.text;
+					}
+					paramMap[key] = value;
+					//paramMap.add(key,value);
+					paramStr = paramStr + key + ":" + value + ";  ";
+				}
+				if(paramSetWindow.isPopUp)
+					PopUpManager.removePopUp(paramSetWindow);			
+				
+				//进行变量解析
+				try{
+					taskContent = DataTaskUtil.parseVariable(taskContent,paramMap);
+				}catch(e:Error){
+					trace(e.message);
+					SmartXMessage.show("变量解析错误！",SmartXMessage.MESSAGE_ERROR,e.message);
+					return;
+				}
+				
+				var taskTitle:String = dataTaskTemplet["NAME"] + "_" + StringUtils.hashCode(dataTaskTemplet["CODE"] + paramStr);			
+				smartxService.addDataTask(dataTaskTemplet["ID"],taskTitle,taskContent,paramMap);
+				
+				paramSetWindow.confirmFunc = null;
+				paramSetWindow = null;
+				MemoryUtil.forceGC();
+			}
+			
+			private function initVariableControl(params:ArrayCollection):UIComponent{
+				variableControlMap.clear();
+				var controlForm:Form = new Form();
+				controlForm.percentHeight = 100;
+				controlForm.percentWidth = 100;
+				for each(var paramKey:String in params){
+					var item:FormItem = new FormItem();
+					item.required = true;
+					item.label = paramKey;
+					
+					var textInput:TextInput = new TextInput();
+					//此处设置默认值，从环境变量读取
+					var clientValue:String = ClientEnviorment.getInstance().getVar(paramKey) as String;
+					textInput.text = clientValue;
+					textInput.width = 100;
+					item.addChild(textInput);
+					
+					variableControlMap.add(paramKey,textInput);
+					controlForm.addChild(item);
+				}
+				return controlForm;
+			}
+			
+			private function viewTaskContent():void{
+				if(listChart.listChartPanel.getSelectedRowValue() == null){
+					SmartXMessage.show("请选择一条数据任务实例！");
+				}else{
+					var taskObj:Object = listChart.listChartPanel.getSelectedRowValue();
+					var content:String = taskObj["taskcontent"] as String;
+					var contentWindow:TextAreaWindow = new TextAreaWindow();
+					contentWindow.text = content;
+					PopUpManager.addPopUp(contentWindow,this,true);
+					PopUpManager.centerPopUp(contentWindow);
+				}
+			}
+			
+			//命令行信息显示日志消息执行
+			private function onRunLogShow():void{
+				logArea.text = "";
+				if(listChart.listChartPanel.getSelectedRowValue() != null){
+					var taskObj:Object = listChart.listChartPanel.getSelectedRowValue();
+					var tempTaskId:String = taskObj["id"] as String;
+					curLogTaskId = tempTaskId;
+					smartxService.getMessageByTaskId(curLogTaskId);
+					if(timer && !timer.running ){
+						timer.start();
+					}
+				}
+//				logArea.text = taskLogMap.find(curLogTaskId);
+			}
+			
+			protected function manageBox_showHandler(event:FlexEvent):void
+			{
+				if(timer && timer.running){
+					timer.stop();
+				}
+			}
+			
+			private function startTimerHandler(evnet:TimerEvent):void{
+				smartxService.getMessageByTaskId(curLogTaskId);
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:TabNavigator id="tabNavigator" width="100%" height="100%" creationPolicy="all">
+		<mx:VBox width="100%" height="100%" id="manageBox" label="数据任务管理" show="manageBox_showHandler(event)">
+			<mx:HBox id="btnBox" verticalAlign="middle" paddingTop="5" paddingBottom="8" paddingLeft="8" paddingRight="8" height="28" width="100%">
+				<mx:Button icon="{AssetsFileLib.startIcon}" label="选择任务执行"  click="startDataTask()" height="22"/>
+				<mx:Button icon="{AssetsFileLib.stopIcon}" label="终止任务"  click="stopDataTask()" height="22"/>
+				<mx:Button icon="{AssetsFileLib.viewIcon}" label="查看任务内容"  click="viewTaskContent()" height="22"/>
+			</mx:HBox>
+			<mtchart:MTListChartPanel width="100%" height="100%" id="listChart" isAutoRefresh="true" 
+									  intervalTime="5000" isShowAlert="false"
+									  metadataTemplet="{metadataTemplet}" endpoint="{endpoint}"
+									  preinitialize="mtListPreInit()">
+			</mtchart:MTListChartPanel>
+		</mx:VBox>
+		<mx:VBox id="logCmdBox" width="100%" height="100%" label="命令行输出" show="onRunLogShow()" paddingLeft="20">
+			<mx:HBox width="100%" >
+				<mx:CheckBox id="logScrollChk" label="日志滚动显示" selected="true"/>
+				<mx:Label id="taskLable" text="当前任务执行日志：" />
+			</mx:HBox>
+			<mx:TextArea width="95%" height="100%" text="" id="logArea" editable="false"/>
+		</mx:VBox>			
+	</mx:TabNavigator>
+	
+		
+</mx:Module>

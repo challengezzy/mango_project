@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:mx="library://ns.adobe.com/flex/mx" width="100" horizontalGap="0" verticalAlign="middle">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:HRule width="100%" id="underLine"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.util.TextAreaWindow;
+			import smartx.flex.components.util.script.ScriptEditor;
+			
+			[Bindable]
+			public var displayAsPassword:Boolean = false;
+			
+			[Bindable]
+			public var editable:Boolean = true;
+			
+			
+			[Bindable]
+			public var formulaMode:Boolean = false;
+			
+			
+			public function get text():String{
+				return realTextInput.text;
+			}
+			
+			public function set text(text:String):void{
+				realTextInput.text = text;
+				realTextInput.dispatchEvent(new Event(Event.CHANGE));
+			}
+			
+			private function onEditButtonClicked():void{
+				if(formulaMode){
+					var formulaWindow:ScriptEditor = new ScriptEditor();
+					formulaWindow.editable = editable;
+					formulaWindow.title = "输入公式";
+					formulaWindow.text = realTextInput.text;
+					formulaWindow.width = 600;
+					formulaWindow.height = 420;
+					formulaWindow.confirmFunc = function():void{
+						realTextInput.text = formulaWindow.text;
+						realTextInput.dispatchEvent(new Event(Event.CHANGE));
+						PopUpManager.removePopUp(formulaWindow);
+					};
+					
+					var desktopFrame:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+					var formulaParent:DisplayObject;
+					if( desktopFrame)
+						formulaParent = desktopFrame;
+					else
+						formulaParent = this;
+					
+					PopUpManager.addPopUp(formulaWindow,formulaParent,true);
+					PopUpManager.centerPopUp(formulaWindow);
+				}
+				else{
+					var window:TextAreaWindow = new TextAreaWindow();
+					window.editable = editable;
+					window.title = "输入文本内容";
+					window.text = realTextInput.text;
+					window.width = 300;
+					window.height = 300;
+					window.confirmFunc = function():void{
+						realTextInput.text = window.text;
+						realTextInput.dispatchEvent(new Event(Event.CHANGE));
+						PopUpManager.removePopUp(window);
+					};
+					PopUpManager.addPopUp(window,this,true);
+					PopUpManager.centerPopUp(window);
+				}
+				
+			}
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" id="textInputBox" verticalGap="0">
+		<mx:TextInput width="100%" id="realTextInput" height="24" borderStyle="solid" 
+					  editable="{editable}" displayAsPassword="{displayAsPassword}"
+					  />
+		<!--mx:HRule width="100%" strokeColor="#000000" strokeWidth="1"/-->
+	</mx:VBox>
+	<mx:Button  id="editButton" width="20" height="20" icon="{AssetsFileLib.edittextIcon}" click="onEditButtonClicked()" visible="{editable}"
+				tabFocusEnabled="false"/>
+</mx:HBox>

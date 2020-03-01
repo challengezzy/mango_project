@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpPanel xmlns:mx="http://www.adobe.com/2006/mxml" width="400" height="300"
+				 backgroundColor="#828280" borderStyle="none" fontSize="12" fontFamily="Simsun" 
+				 xmlns:util="myreport.util.*" xmlns:myreport="myreport.*" >
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.DisposeUtil;
+			import hlib.MsgUtil;
+			import hlib.UrlLoader;
+			import hlib.UrlLoaderManager;
+			
+			import myreport.data.report.ReportSettings;
+			import myreport.design.FilterEditor;
+			import myreport.res.Asset;
+			
+			private static var g_Instance:ReportViewer2;
+			public static function get Instance():ReportViewer2
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ReportViewer2();
+					g_Instance.initialize();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			/**
+			 * item=>{Name:String, Url:String, Data:*}
+			 */ 
+			private var _SourceList:Array = new Array();
+			private var _TableList:Array;
+			private var _ParametersList:Array;
+			private var _Index:int = -1;
+			/**
+			 * 支持多个报表
+			 * 
+			 * 参数titleList，sourceList，tableList，parametersList子项一一对应，并且长度必须一致，
+			 * 内部会循环调用 titleList[i], sourceList[i], tableList[i], parametersList[i]
+			 * 
+			 * @param titleList: 显示在下拉框的显示名称
+			 * @param sourceList: 子项是XML对象、url路径
+			 * @param tableList: 子项是ArrayCollection对象
+			 * @param parametersList: 子项是Object对象
+			 */ 
+			public function Load(titleList:Array, sourceList:Array, tableList:Array, parametersList:Array):void
+			{
+				_TableList = tableList;
+				_ParametersList = parametersList;				
+				
+				if (_Print)
+				{
+					if(_Print.OnZoom == null)
+					{
+						_Print.OnZoom = OnZoom;
+						_Print.OnGotoPage = OnGotoPage;
+						_Print.OnPrint = OnPrint;
+					}
+					_Print.Total = 0;
+				}
+				
+				hlib.DisposeUtil.Dispose(_SourceList);
+				
+				var loaderMgr:UrlLoaderManager = new UrlLoaderManager();
+				
+				for(var i:int=0;i<sourceList.length;i++)
+				{
+					var item:Object = {Name:titleList[i], Url:"", Data:null, Index:0};
+					var source:Object = sourceList[i];
+					if (source is XML)
+					{
+						item.Data = source;
+					}
+					else if (source != null)
+					{
+						item.Url = String(source);
+						loaderMgr.Load(item.Url, item.Url);
+					}
+					
+					_SourceList.push(item);
+				}
+				loaderMgr.addEventListener(Event.COMPLETE, 
+					function(e:Event):void
+					{
+						for each(var item:* in _SourceList)
+						{
+							if(item.Url)
+								item.Data = new XML(loaderMgr.GetData(item.Url));
+						}
+						LoadPages();
+						loaderMgr.Dispose();
+					});
+				loaderMgr.Commit();
+			}
+			
+			
+			private function LoadPages():void
+			{
+				var pages:Array = new Array();
+				FillPagesAryncLoop(0, pages, 
+					function(pages2:Array):void
+					{
+						_PreviewPanel.Pages = pages2;
+						_Print.Total = _PreviewPanel.PageCount;
+						_ReportList.dataProvider = _SourceList;
+						_ReportList.selectedItem = null;
+					});
+			}
+			
+			private function FillPagesAryncLoop(index:int, pages:Array, callback:Function):void
+			{
+		
+				if(index < _SourceList.length)
+				{
+					var item:Object = _SourceList[index];
+					item.Index = pages.length;
+					ReportEngine.GeneratePagesAsync(item.Data, _TableList[index], _ParametersList[index],
+						function(pages2:Array):void
+						{
+							for each(var page:Object in pages2)
+							{
+								pages.push(page);
+							}
+							FillPagesAryncLoop(index+1, pages, callback);
+						});
+				}
+				else
+				{
+					if(callback!=null)
+					{
+						callback(pages);
+					}
+				}
+			}
+			
+			/**
+			 * 支持多个报表
+			 * 
+			 * 参数titleList，sourceList，tableList，parametersList子项一一对应，并且长度必须一致，
+			 * 内部会循环调用 titleList[i], sourceList[i], tableList[i], parametersList[i]
+			 * 
+			 * @param titleList: 现在在下拉框的显示名称
+			 * @param sourceList: 子项是XML对象、url路径
+			 * @param tableList: 子项是ArrayCollection对象
+			 * @param parametersList: 子项是Object对象
+			 */ 
+			public function Show(titleList:Array, sourceList:Array, tableList:Array, parametersList:Array):void
+			{
+				PopUp();
+				
+				Load(titleList, sourceList, tableList, parametersList);
+			}
+			
+			private function OnPrint(pageRange:String):void
+			{
+				var sourceList:Array = new Array();
+				for each(var item:* in _SourceList)
+				{
+					sourceList.push(item.Data);
+				}
+				ReportEngine.PrintAsync2(sourceList, _TableList, _ParametersList, pageRange);
+				//ReportEngine.Print2(sourceList, _TableList, _ParametersList, pageRange);
+			}
+			
+			private function OnGotoPage(pageNumber:int):void
+			{
+				_PreviewPanel.GotoPage(pageNumber);
+				RefreshReportList();
+			}
+			
+			private function OnZoom(scale:Number):void
+			{
+				_PreviewPanel.Zoom(scale);
+			}
+			
+			public function About():void
+			{
+				_PreviewPanel.ShowAbout();
+			}
+			protected override function OnClose():void
+			{
+				_PreviewPanel.Clear();
+			}
+			private function OnReportListChanged():void
+			{
+				if(!_ReportList.selectedItem)
+					return;
+				
+				_Print.GotoPage(_ReportList.selectedItem.Index);
+				_ReportList.selectedItem = null;
+				
+				var title:String = _ReportList.text;
+				_ReportList.text = title;
+			}
+			
+			public function get StyleNames():Array
+			{
+				var sourceList:Array = new Array();
+				for each(var item:* in _SourceList)
+				{
+					sourceList.push(item.Name);
+				}
+				return sourceList;
+			}
+			
+			public function get StyleList():Array
+			{
+				var sourceList:Array = new Array();
+				for each(var item:* in _SourceList)
+				{
+					sourceList.push(item.Data);
+				}
+				return sourceList;
+			}
+			
+			public function get TableList():Array
+			{
+				return _TableList;
+			}
+			
+			public function get ParametersList():Array
+			{
+				return _ParametersList;
+			}
+			
+			public function get SelectedStyle():*
+			{
+				if(_Index<0)
+					return null;
+				return _SourceList[_Index].Data;
+			}
+			
+			public function get SelectedTableData():*
+			{
+				if(_Index<0)
+					return null;
+				return _TableList[_Index];
+			}
+			
+			public function get SelectedParameterData():*
+			{
+				if(_Index<0)
+					return null;
+				return _ParametersList[_Index];
+			}
+			
+			private function RefreshReportList():void
+			{
+				var index:int = _Print.Current;
+				var i:int = 0;
+				while(i<_SourceList.length)
+				{
+					var item:Object = _SourceList[i];
+					if(item.Index==index)
+						break;
+					else if(item.Index>index)
+					{
+						i--;
+						break;
+					}
+					i++;
+				}
+				if(i>=_SourceList.length)
+					i=_SourceList.length-1;
+				if(i>=0&&i<_SourceList.length)
+				{
+					_ReportList.text = _SourceList[i].Name;
+					_Index = i;
+				}
+				else
+					_ReportList.text = "";
+			}
+		]]>
+	</mx:Script>
+	<util:ToolBar height="30" width="100%" paddingLeft="8" paddingRight="8">
+		<util:PrintToolBar id="_Print">
+		</util:PrintToolBar>
+		<mx:VRule height="24"/>
+		<mx:ComboBox id="_ReportList" width="120" labelField="Name" change="OnReportListChanged()"
+					 fontWeight="normal" fillAlphas="[1.0, 1.0]" fillColors="[#FFFFFF, #FFFFFF]" cornerRadius="4"/>
+		<mx:HBox id="CustomToolBar" verticalScrollPolicy="off" horizontalScrollPolicy="off" verticalAlign="middle">
+			
+		</mx:HBox>
+		<mx:Spacer width="100%"/>
+		<util:ToolButton icon="{Asset.ICON_HELP}" toolTip="关于MyReport" click="About()" width="23"/>
+		<util:ToolButton icon="{Asset.ICON_CLOSE}" toolTip="关闭" click="Close()" width="23"/>
+	</util:ToolBar>
+	<myreport:ReportViewPanel id="_PreviewPanel" y="31" width="100%" height="100%">
+	</myreport:ReportViewPanel>
+</util:PopUpPanel>

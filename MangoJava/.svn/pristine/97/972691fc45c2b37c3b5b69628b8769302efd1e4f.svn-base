@@ -1,0 +1,788 @@
+/**
+ * 
+ */
+package smartx.publics.form.bs.utils;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.OutputStreamWriter;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import org.apache.log4j.Logger;
+import org.dom4j.Document;
+import org.dom4j.DocumentHelper;
+import org.dom4j.Element;
+import org.dom4j.io.OutputFormat;
+import org.dom4j.io.XMLWriter;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.publics.file.FileConstant;
+import smartx.publics.form.vo.InitMetaDataConst;
+import smartx.publics.form.vo.XMLExportObject;
+import smartx.publics.metadata.bs.service.SmartXMetadataTempletService;
+import smartx.publics.metadata.vo.MetadataTemplet;
+
+/**
+ * @author caohenghui
+ *
+ */
+public class ExportInitMetaData {
+	
+	protected Logger logger = NovaLogger.getLogger(this.getClass());
+	
+	public String exportXmlToMDFile(XMLExportObject[] exportObjects,String flagName)
+	throws Exception {
+		if (exportObjects == null)
+			throw new IllegalArgumentException("exportObjects不能为null");
+
+
+		
+		File file = new File(InitMetaDataConst.RootPath + FileConstant.DOWNLOAD_DIR);
+		if(!file.exists()){
+			file.mkdir();
+		}
+		
+		//大于20个文件就删除
+//		if (file.listFiles().length >= 200) {
+//			deleteFile(file);
+//		}
+
+		CommDMO dmo = new CommDMO();
+		List<String> fileNames = new ArrayList<String>();
+
+		String xmlFile = createNewFile("meta");
+		fileNames.add(xmlFile);
+
+		String clobFile = createNewFile("clob");
+		fileNames.add(clobFile);
+		
+		String flagFile = createNewFile("key");
+		fileNames.add(flagFile);
+
+		try {
+			Document doc = DocumentHelper.createDocument();
+			doc.setXMLEncoding("UTF-8");
+			Element root = doc.addElement("root");
+			for (XMLExportObject object : exportObjects) {
+				Map<String,String> refVisiblePkMap = new HashMap<String,String>();
+				Element exportObjectXml = root.addElement("xmlExportObject");
+				exportObjectXml
+						.addAttribute("tableName", object.getTableName())
+						.addAttribute("pkName", object.getPkName())
+						.addAttribute("visiblePkName",
+								object.getVisiblePkName())
+					    .addAttribute("ignoreWhenExists", object.isIgnoreWhenExists()?"true":"false");
+				// 获取数据
+				String sql;
+				if (object.getFkName() != null){
+					
+					String[] sqls = getVisibleQuerySQL(object.getVisiblePkName(),refVisiblePkMap);
+					
+					sql = "select a.* from (" + object.getFetchSql() + ") a, "
+					+ "(select t."+object.getPkName()+sqls[0]+ " from "
+					+ object.getTableName() + " t where t."
+					+object.getFkName() + " is null) b where 1=1 "+sqls[1];
+					
+				}else{
+					sql = object.getFetchSql();
+				}
+					
+				HashVO[] vos = dmo.getHashVoArrayByDS(object.getDatasource(),
+						sql);
+				for (HashVO vo : vos) {
+					Element data = exportObjectXml.addElement("data");
+					String[] keys = vo.getKeys();
+
+					for (String key : keys) {
+						
+						if(!refVisiblePkMap.containsKey(key)){
+							if (vo.getColumnType(key) == Types.CLOB) {
+								Element cLobColumns = data.element("clobColumns");
+								if (cLobColumns == null) {
+									cLobColumns = data.addElement("clobColumns");
+								}
+								Element cLobColumn = cLobColumns.addElement("clobColumn");
+								cLobColumn.addAttribute("name", key.toLowerCase());
+								cLobColumn.addText(writeClobToFile(vo.getStringValue(key), clobFile).trim());
+
+							}else if(vo.getColumnType(key) == Types.DATE || vo.getColumnType(key) == Types.TIMESTAMP){
+								String dateValue = vo.getStringValue(key);
+								if(dateValue !=null && !dateValue.equals("")){
+									Element dateColumns = data.element("dateColumns");
+									if (dateColumns == null) {
+										dateColumns = data.addElement("dateColumns");
+									}
+									Element dateColumn = dateColumns.addElement("dateColumn");
+									dateColumn.addAttribute("name", key.toLowerCase());
+									dateColumn.addText(isEmpty(vo.getStringValue(key))?"":vo.getStringValue(key).trim());
+								}
+							}else {
+								data.addAttribute(key.toLowerCase(), vo.getStringValue(key));
+							}
+						}
+						
+					}
+					if (object.getChildObjects() != null) {
+						for(XMLExportObject childObjec : object.getChildObjects()){
+							exportChildXMLObject(childObjec, data,
+									object, clobFile);
+						}
+					}
+				}
+
+			}
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("打印导出的XML[" + doc.asXML() + "]");
+			
+			writeContentToFile(doc.asXML(), xmlFile);
+			writeContentToFile(flagName,flagFile);
+			
+			return putZipEntry(fileNames,flagName);
+			
+		} finally {
+			dmo.releaseContext();
+		}
+}
+	
+	private void exportChildXMLObject(XMLExportObject object,
+			Element parentData, XMLExportObject parentObject,String clobFile) throws Exception {
+		CommDMO dmo = new CommDMO();
+		Element exportObjectXml = DocumentHelper.createElement("xmlExportObject");
+		exportObjectXml.addAttribute("tableName", object.getTableName())
+				.addAttribute("pkName", object.getPkName()).addAttribute(
+						"visiblePkName", object.getVisiblePkName());
+		
+		String fkType = object.getFkType();
+		if(isEmpty(fkType)||fkType.trim().equalsIgnoreCase("RefField")){
+			if (object.getFkName() == null)
+				throw new Exception("子对象必须指定外键引用字段[" + object.getTableName() + "]");
+			exportObjectXml.addAttribute("fkName", object.getFkName().toLowerCase());
+			exportObjectXml.addAttribute("fkType", "RefField");
+			
+		}else{
+			
+			exportObjectXml.addAttribute("fkType", "RefTable");
+			
+			if (object.getFkTable() == null)
+				throw new Exception("子对象必须指定表引用名称[" + object.getFkTable() + "]");
+			exportObjectXml.addAttribute("fkTable",object.getFkTable());
+			
+			if (object.getIdToParent() == null)
+				throw new Exception("子对象必须指定父节点引用字段[" + object.getIdToParent() + "]");
+			exportObjectXml.addAttribute("idToParent",object.getIdToParent());
+			
+			if (object.getIdToChild() == null)
+				throw new Exception("子对象必须指定子节点引用字段[" + object.getIdToChild() + "]");
+			exportObjectXml.addAttribute("idToChild",object.getIdToChild());
+			
+		}
+		
+		Map<String,String> refVisiblePkMap = new HashMap<String,String>();
+		String a = getParentIdSQL(parentObject,parentData);
+		String b = parentObject.getFetchSql();
+
+		String[] sqls = getVisibleQuerySQL(parentObject.getVisiblePkName(),null);
+		String sql = "select distinct "+parentObject.getPkName()+" from ("+a+") a,("+b+") b where 1=1 "+sqls[1];
+		
+		HashVO[] vos = dmo
+				.getHashVoArrayByDS(parentObject.getDatasource(), sql);
+		if (vos.length != 1)
+			throw new Exception("获取父对象主键失败[" + object.getTableName() + "]");
+		
+		String parentPkValue = vos[0].getStringValue(0);
+
+		String[] sqls2 = getVisibleQuerySQL(object.getVisiblePkName(),refVisiblePkMap);
+		
+		sql = "select a.* from (" + object.getFetchSql() + ") a, "
+		+ "(select t."+object.getPkName()+sqls2[0]+ " from "
+		+ object.getTableName() + " t where t."
+		+object.getFkName() + " = '"+parentPkValue+"') b where 1=1 "+sqls2[1];
+		
+		if(!isEmpty(fkType)&&fkType.trim().equalsIgnoreCase("RefTable")){
+			
+			sql = "select a.* from (" + object.getFetchSql() + ") a, "
+			+ "(select t."+object.getPkName()+sqls2[0]+ " from "
+			+ object.getTableName() + " t,"+object.getFkTable()+" f where t."+object.getPkName()+" = f."+object.getIdToChild()+" and f."
+			+object.getIdToParent() + " = '"+parentPkValue+"') b where 1=1 "+sqls2[1];
+			
+		}
+		
+		vos = dmo.getHashVoArrayByDS(object.getDatasource(), sql);
+		//有子对象数据则继续，否则直接返回
+		if(vos.length > 0)
+			parentData.add(exportObjectXml);
+		else
+			return;
+		for (HashVO vo : vos) {
+			Element data = exportObjectXml.addElement("data");
+			String[] keys = vo.getKeys();
+			for (String key : keys) {
+				
+				if(!refVisiblePkMap.containsKey(key)){
+					if(vo.getColumnType(key)==Types.CLOB){
+						Element cLobColumns = data.element("clobColumns");
+						if(cLobColumns == null){
+							cLobColumns = data.addElement("clobColumns");
+						}
+						Element cLobColumn = cLobColumns.addElement("clobColumn");
+						cLobColumn.addAttribute("name", key.toLowerCase());
+						cLobColumn.addText(writeClobToFile(vo.getStringValue(key), clobFile).trim());
+						
+					}else if(vo.getColumnType(key) == Types.DATE || vo.getColumnType(key) == Types.TIMESTAMP){
+						Element dateColumns = data.element("dateColumns");
+						if (dateColumns == null) {
+							dateColumns = data.addElement("dateColumns");
+						}
+						Element dateColumn = dateColumns.addElement("dateColumn");
+						dateColumn.addAttribute("name", key.toLowerCase());
+						dateColumn.addText(isEmpty(vo.getStringValue(key))?"":vo.getStringValue(key).trim());
+					}else{
+						data.addAttribute(key.toLowerCase(), vo.getStringValue(key));
+					}
+				}
+				
+			}
+			if (object.getChildObjects() != null) {
+				for(XMLExportObject childObjec : object.getChildObjects()){
+					exportChildXMLObject(childObjec, data,
+							object, clobFile);
+				}
+			}
+		}
+	}
+	
+	private String writeClobToFile(String content,String fileName){
+		
+		String contentIndex = null;
+		
+		try {
+			String contentTemp = isEmpty(content)?"":content;
+			File file = new File(InitMetaDataConst.RootPath + FileConstant.DOWNLOAD_DIR + "/" + fileName);
+			long startIndex = file.length();
+			
+//			FileWriter fw = new FileWriter(file,true);
+//			fw.write(contentTemp+"\n");
+//			fw.close();
+			
+			Writer writer = new OutputStreamWriter(new FileOutputStream(file,true), "UTF-8"); 
+	        writer.write(contentTemp+"\n");
+	        writer.flush();
+	        writer.close();
+			
+			long contentLength = file.length()-startIndex;
+			
+			contentIndex = startIndex+";"+contentLength;
+			
+		} catch (Exception e) {
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+		}
+		
+		return contentIndex;
+	}
+	
+	private void writeContentToFile(String content,String fileName){
+		
+		try{
+			
+			File file = new File(InitMetaDataConst.RootPath + FileConstant.DOWNLOAD_DIR + "/" + fileName);
+			Writer writer = new OutputStreamWriter(new FileOutputStream(file), "UTF-8"); 
+//	        FileWriter fw = new FileWriter(file);
+//	        fw.write(content);
+	        writer.write(content);
+	        writer.flush();
+	        writer.close();
+//	        fw.close();
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+		}
+		
+	}
+	
+	private String createNewFile(String suffix) {
+		
+		String newFileName = null;
+		try {
+			newFileName = UUID.randomUUID().toString().replaceAll("-", "");
+			File file = new File(InitMetaDataConst.RootPath + FileConstant.DOWNLOAD_DIR + "/" + newFileName+"."+suffix);
+			if (file.exists()) {
+				createNewFile(suffix);
+			} else {
+				file.createNewFile();
+			}
+		} catch (Exception e) {
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+		}
+		return newFileName+"."+suffix;
+		
+	}
+	
+	private String putZipEntry(List<String> fileNames,String filenamePrefix) throws Exception{
+		
+		String zipFileName = null;
+		try{
+			
+			String parentPath = InitMetaDataConst.RootPath + FileConstant.DOWNLOAD_DIR + "/";			
+			zipFileName = createZipFile(filenamePrefix) + ".zip";
+			logger.debug("生成ZIP文件:" + zipFileName);
+			
+			FileOutputStream  fos = new FileOutputStream (parentPath+zipFileName);
+			
+			ZipOutputStream zos = new ZipOutputStream(fos);
+			
+			for(String fileName : fileNames){
+				
+				File file = new File(parentPath+fileName);
+				FileInputStream fis = new FileInputStream(file);
+				zos.putNextEntry(new ZipEntry(fileName));
+				int i = -1;
+				while ( (i = fis.read()) != -1){
+					zos.write(i);
+				}
+				zos.flush();
+				zos.closeEntry();
+				fis.close();
+				
+				file.delete();
+				
+			}
+			
+			zos.close();
+			fos.close();
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("打包生成ZIP文件错误", e);
+			throw e;
+		}
+		//zipFileName = zipFileName.replaceAll(".zip", "");
+		return zipFileName;
+	}
+	
+	private String createZipFile(String prefix) throws Exception{
+
+		String newZipFileName = null;
+		newZipFileName = prefix + UUID.randomUUID().toString().replaceAll("-", "");
+		File file = new File(InitMetaDataConst.RootPath + FileConstant.DOWNLOAD_DIR + "/" + newZipFileName + ".zip");
+		if (file.exists()) {
+			newZipFileName = createZipFile(prefix);
+		} else {
+			file.createNewFile();
+		}
+		return newZipFileName;
+
+	}
+	
+	
+	
+
+	
+	private String[] getVisibleQuerySQL(String visiblePkName,Map<String,String> map){
+		StringBuffer querySQL = new StringBuffer();
+		StringBuffer conditionSQL = new StringBuffer();
+		try{
+			
+			String[] columnNames = visiblePkName.toLowerCase().split(",");
+			
+			for(int i=0; i<columnNames.length ; i++){
+				String columnName = columnNames[i];
+				if(columnName.indexOf("{")==0 && columnName.indexOf("}")==columnName.length()-1){
+					if(map != null ){
+						columnName=columnName.replaceAll("\\{", "");
+						columnName=columnName.replaceAll("\\}", "");
+						map.put(columnName.toLowerCase(),columnName.toLowerCase());
+					}
+				}
+				columnName=columnName.replaceAll("\\{", "");
+				columnName=columnName.replaceAll("\\}", "");
+				querySQL.append(",t."+columnName);
+				conditionSQL.append(" and a."+columnName+" = b."+columnName);
+				
+			}
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+		}
+		return new String[]{querySQL.toString(),conditionSQL.toString()};
+	}
+	
+	private String getParentIdSQL(XMLExportObject parentObject,Element parentData){
+		StringBuffer columns = new StringBuffer();
+		StringBuffer condition = new StringBuffer();
+		try{
+			
+			String[] columnNames = parentObject.getVisiblePkName().toLowerCase().split(",");
+			for(int i=0; i<columnNames.length ; i++){
+				columns.append(","+columnNames[i]);
+				condition.append(" and "+columnNames[i]+" = "+StringUtil.strToSQLValue(parentData.attributeValue(columnNames[i])));
+			}
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+		}
+		String sql = "select " + parentObject.getPkName()+columns.toString()+ " from "+ parentObject.getTableName() + " where 1=1 "+condition.toString();
+		
+		return sql;
+	}
+	
+	public synchronized String export(String name) throws Exception{
+		
+		String mtContent = null;
+		
+		List<String> listFileNames = new ArrayList<String>();
+		
+		try {
+			
+			//deleteFile(new File(InitMetaDataConst.RootPath+InitMetaDataConst.InitDatas_DIR));
+			
+			mtContent = this.getMTContent(InitMetaDataConst.MT_INITDATAS);
+			
+			 if(mtContent == null || mtContent.trim().equals("")){
+				 mtContent = getDefaultContent();
+			 }
+			 
+			 Document doc = DocumentHelper.parseText(mtContent);
+			 Element root = doc.getRootElement();
+			 
+			 List<Element> elementExpObjs = root.elements("exportobjects");
+			 Element elementExpObj = null;
+			 for(Element e : elementExpObjs){
+				 if(name.equalsIgnoreCase(e.attributeValue("name"))){
+					 //找到匹配的导出对象
+					 elementExpObj = e;
+					 break;
+				 }
+			 }
+			 if(elementExpObj == null)
+				 throw new Exception("要导出的对象描述不存在");
+			 
+			 List<Element> nodes = elementExpObj.elements();
+			 
+			 for(Element ele : nodes){
+					if(ele != null){
+						String expObjId = ele.attributeValue("id");
+						logger.info("导出数据节点ID=【"+expObjId+"】 description=【"+ele.attributeValue("description")+"】");
+						
+						List<XMLExportObject> children = new ArrayList<XMLExportObject>();
+						
+						Element dataEle = ele.element("data");
+						
+						Element sqlEle = dataEle.element("sql");
+						
+						Element childrenEle = dataEle.element("children");
+						
+						List<Element> childrenList = null;
+						if(childrenEle!=null){
+							childrenList = childrenEle.elements();
+						}
+						
+						String datasource = this.isEmpty(ele.attributeValue("datasource"))?null:ele.attributeValue("datasource");
+						
+						String fkName = this.isEmpty(ele.attributeValue("fkName"))?null:ele.attributeValue("fkName");
+						
+						//String fileType = this.isEmpty(ele.attributeValue("fileType"))?"smartxmeta":ele.attributeValue("fileType");
+						
+						String fkType = this.isEmpty(ele.attributeValue("fkType"))?null:ele.attributeValue("fkType");
+						
+						String fkTable = this.isEmpty(ele.attributeValue("fkTable"))?null:ele.attributeValue("fkTable");
+						
+						String idToParent = this.isEmpty(ele.attributeValue("idToParent"))?null:ele.attributeValue("idToParent");
+						
+						String idToChild = this.isEmpty(ele.attributeValue("idToChild"))?null:ele.attributeValue("idToChild");
+						
+						boolean ignoreWhenExists = "true".equalsIgnoreCase(ele.attributeValue("ignoreWhenExists"))?true:false;
+						
+						XMLExportObject obj = new XMLExportObject();
+						obj.setTableName(ele.attributeValue("tableName"));
+						obj.setPkName(ele.attributeValue("pkName"));
+						obj.setFkName(fkName);
+						obj.setVisiblePkName(ele.attributeValue("visiblePkName"));
+						obj.setDatasource(datasource);
+						obj.setFetchSql(sqlEle.getText());
+						obj.setFkType(fkType);
+						obj.setFkTable(fkTable);
+						obj.setIdToChild(idToChild);
+						obj.setIdToParent(idToParent);
+						obj.setIgnoreWhenExists(ignoreWhenExists);
+						
+						if(childrenEle !=null && childrenList != null){
+							for(Element childEle : childrenList){
+								createChildXMLExportObject(obj,expObjId,childEle,children);
+							}
+							
+							if(children !=null && children.size()>0){
+								XMLExportObject[] temp = new XMLExportObject[children.size()];
+								for(int i = 0;i<children.size();i++){
+									XMLExportObject tempObj = (XMLExportObject)children.get(i);
+									temp[i] = tempObj;
+								}
+								obj.setChildObjects(temp);
+							}
+							
+						}
+						//FileInfo fi = new FileInfo();
+						//fi.setDatasource(datasource);
+						//fi.setFileType(fileType);
+						listFileNames.add(exportXmlToMDFile(new XMLExportObject[]{obj},expObjId ));
+						
+					}
+				}
+			 return putZipEntry(listFileNames, name+"-patch");
+			 //writeFileNameToXML(listFileNames);
+				
+		} catch (Exception e) {
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+			throw e;
+		}
+
+	}
+	
+	private void createChildXMLExportObject(XMLExportObject parentObj,String parentId,Element ele,List<XMLExportObject> list){
+		
+		if(ele != null){
+			
+			List<XMLExportObject> children = new ArrayList<XMLExportObject>();
+			
+			String refObjId = ele.attributeValue("reference");
+			//子节点引用了自已本身
+			if(! isEmpty(refObjId) && refObjId.trim().equalsIgnoreCase(parentId)){
+				list.add(parentObj);
+				return;
+			}
+			
+			String parentIdTemp = ele.attributeValue("id");
+			logger.info("导出数据节点ID=【"+parentIdTemp+"】 description=【"+ele.attributeValue("description")+"】");
+			
+			Element dataEle = ele.element("data");
+			
+			Element sqlEle = dataEle.element("sql");
+			
+			Element childrenEle = dataEle.element("children");
+			
+			List<Element> childrenList =  childrenEle.elements();
+			
+			String datasource = this.isEmpty(ele.attributeValue("datasource"))?null:ele.attributeValue("datasource");
+			
+			String fkName = this.isEmpty(ele.attributeValue("fkName"))?null:ele.attributeValue("fkName");
+			
+			//String fileType = this.isEmpty(ele.attributeValue("fileType"))?"smartxmeta":ele.attributeValue("fileType");
+			
+			String fkType = this.isEmpty(ele.attributeValue("fkType"))?null:ele.attributeValue("fkType");
+			
+			String fkTable = this.isEmpty(ele.attributeValue("fkTable"))?null:ele.attributeValue("fkTable");
+			
+			String idToParent = this.isEmpty(ele.attributeValue("idToParent"))?null:ele.attributeValue("idToParent");
+			
+			String idToChild = this.isEmpty(ele.attributeValue("idToChild"))?null:ele.attributeValue("idToChild");
+			
+			boolean ignoreWhenExists = "true".equalsIgnoreCase(ele.attributeValue("ignoreWhenExists"))?true:false;
+			
+			XMLExportObject obj = new XMLExportObject();
+			obj.setTableName(ele.attributeValue("tableName"));
+			obj.setPkName(ele.attributeValue("pkName"));
+			obj.setFkName(fkName);
+			obj.setVisiblePkName(ele.attributeValue("visiblePkName"));
+			obj.setDatasource(datasource);
+			obj.setFetchSql(sqlEle.getText());
+			obj.setFkType(fkType);
+			obj.setFkTable(fkTable);
+			obj.setIdToChild(idToChild);
+			obj.setIdToParent(idToParent);
+			obj.setIgnoreWhenExists(ignoreWhenExists);
+			
+			if(childrenEle !=null && childrenList != null){
+				
+				for(Element childEle : childrenList){
+					createChildXMLExportObject(obj,parentIdTemp,childEle,children);
+				}
+				
+				if(children !=null && children.size()>0){
+
+					XMLExportObject[] temp = new XMLExportObject[children.size()];
+					for(int i = 0;i<children.size();i++){
+						XMLExportObject tempObj = (XMLExportObject)children.get(i);
+						temp[i] = tempObj;
+					}
+					obj.setChildObjects(temp);
+				}
+				
+			}
+			list.add(obj);
+		}
+	}
+	
+	private String getDefaultContent(){
+		
+		StringBuffer doc = new StringBuffer();
+		
+		doc.append("<root>");
+		doc.append("<exportobjects name=\"default\">");
+//		
+		doc.append("<exportobject tableName='pub_metadata_templet' pkName='id' fkName=''  visiblePkName='code' datasource='datasource_default' >");
+		doc.append("<data><sql><![CDATA[select name,code,owner,scope,content,type from pub_metadata_templet]]></sql><children></children></data>");
+		doc.append("</exportobject>");
+		
+		doc.append("<exportobject tableName='pub_menu' pkName='id' fkName='parentmenuid'  visiblePkName='name' datasource='datasource_default' >");
+		doc.append("<data><sql><![CDATA[select name,localname,icon,seq,command,showintoolbar,toolbarseq,appmodule,comments,isflex from pub_menu where isFlex='Y']]></sql><children><exportobject tableName='pub_menu' pkName='id' fkName='parentmenuid'  visiblePkName='name' datasource='datasource_default' ><data><sql><![CDATA[select name,localname,icon,seq,command,showintoolbar,toolbarseq,appmodule,comments,isflex from pub_menu where isFlex='Y']]></sql><children></children></data></exportobject></children></data>");
+		doc.append("</exportobject>");
+		
+		doc.append("<exportobject tableName='bfbiz_sysdictionary' pkName='id' fkName=''  visiblePkName='classid,attributeid,valueen' datasource='datasource_default' >");
+		doc.append("<data><sql><![CDATA[select value,valuecn,valueen,t.seqno,t.systemcomments,t.usercomments,t.type,t.abbrev,t.version,t.classid,t.attributeid,t.appmodule,t.state from bfbiz_sysdictionary t]]></sql><children></children></data>");
+		doc.append("</exportobject>");
+		
+//       测试XML
+//		 String str = "<exportobject id ='menu' fileType='smartxmeta' tableName='pub_menu' pkName='id' visiblePkName='name' fkType='RefField' fkName='parentmenuid' datasource='datasource_default' ><data><sql><![CDATA[select name,localname,icon,seq,command,showintoolbar,toolbarseq,appmodule,comments,isflex from pub_menu where isFlex='Y' and name in (select name from pub_menu start with name in('管理控制台','设计工作台','用户门户') and isFlex='Y' connect by prior id=parentmenuid) ]]></sql><children><exportobject reference='menu' /><exportobject id ='user' fileType='smartxmeta' tableName='pub_user' pkName='id' visiblePkName='loginname' fkType='RefTable' fkTable='pub_user_menu' idToParent='menuid' idToChild='userid' datasource='datasource_default' ><data><sql><![CDATA[select code,name,pwd,adminpwd,creator,createdate,telephone,mobile,email,regionid,regioncode,expdate,pwdexpdate,department,no,exttelephone,phstelephone,comments,logintime,logincount,logintimecount,isonline,appmodule,version,extendattribute1,extendattribute2,extendattribute3,extendattribute4,extendattribute5,extendattribute6,extendattribute7,extendattribute8,extendattribute9,extendattribute10,extendattribute11,extendattribute12,extendattribute13,extendattribute14,extendattribute15,extendattribute16,extendattribute17,extendattribute18,extendattribute19,extendattribute20,loginname,predefined,accountstatus from pub_user pu where pu.loginname in('user','admin','workbench') ]]></sql><children></children></data></exportobject><exportobject id ='role' fileType='smartxmeta' tableName='pub_role' pkName='id' visiblePkName='name' fkType='RefTable' fkTable='pub_role_menu' idToParent='menuid' idToChild='roleid' datasource='datasource_default' ><data><sql><![CDATA[select name,appmodule,comments,version ,predefined from pub_role where name in ('业务设计人员','系统管理员','普通用户') ]]></sql><children></children></data></exportobject></children></data></exportobject>";
+		
+//		 doc.append(str);
+		doc.append("</exportobjects>");
+		doc.append("</root>");
+		
+		
+		return doc.toString();
+		
+	}
+	
+	private void writeFileNameToXML(Map<String,FileInfo> map){
+		StringBuffer content = new StringBuffer();
+		try{
+			
+			File file = new File(InitMetaDataConst.SMARTXCONFIG);
+			if(file.exists()){
+				
+				FileReader fr = new FileReader(file);
+				
+				BufferedReader br = new BufferedReader(fr);
+				
+				String line = null;
+				
+				while( (line = br.readLine()) != null ){
+					content.append(line);
+				}
+				fr.close();
+				br.close();
+				
+				Document doc = DocumentHelper.parseText(content.toString());
+				Element root = doc.getRootElement();
+				Element initMetadataFiles = root.element("init-metadata-files");
+				if(initMetadataFiles == null ){
+					initMetadataFiles = root.addElement("init-metadata-files");
+				}
+				initMetadataFiles.addAttribute("initialize", "false");
+				List<Element> elelist = initMetadataFiles.elements();
+				if(elelist != null){
+					for(Element fileEle : elelist){
+						initMetadataFiles.remove(fileEle);
+					}
+				}
+				
+				for(String key : map.keySet()){
+					FileInfo fi = map.get(key);
+					Element fileElement = initMetadataFiles.addElement("file");
+					fileElement.addAttribute("name", key);
+					fileElement.addAttribute("datasource", fi.getDatasource());
+					//fileElement.addAttribute("fileType", fi.getFiltType());
+					
+				}
+				
+				writeXMLToFile(doc,InitMetaDataConst.SMARTXCONFIG);
+				
+			}
+		}catch(Exception e){
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+		}
+		
+	}
+	
+	private void writeXMLToFile(Document doc,String fullFileName){
+		
+		try{
+			
+			File file = new File(fullFileName);
+			
+			StringWriter sw = new StringWriter();
+	        OutputFormat format = OutputFormat.createPrettyPrint();
+	        format.setEncoding("UTF-8");
+	        XMLWriter xmlwriter = new XMLWriter(sw,format);
+	        xmlwriter.write(doc);
+			
+	        Writer writer = new OutputStreamWriter(new FileOutputStream(file), "UTF-8"); 
+	        writer.write(sw.toString());
+	        writer.flush();
+	        writer.close();
+			
+		}catch(Exception e){
+			NovaLogger.getLogger(ExportInitMetaData.class).debug("", e);
+		}
+		
+	}
+	
+	private void deleteFile(File oldPath){
+
+		if (oldPath.isDirectory()) {
+			File[] files = oldPath.listFiles();
+			if (files != null) {
+				for (File file : files) {
+					if (file.isFile()) {
+						file.delete();
+					} else {
+						deleteFile(file);
+					}
+				}
+			}
+		}else{
+			oldPath.delete();
+		}
+		
+	}
+	
+	private String getMTContent(String mtCode) throws Exception{
+		MetadataTemplet mt = new SmartXMetadataTempletService().findMetadataTemplet(mtCode);
+		return mt.getContent();
+	}
+	
+	private boolean isEmpty(String str){
+		boolean flag = false;
+		try{
+			if(str == null || str.trim().equals("") || str.trim().equalsIgnoreCase("null")){
+				flag = true;
+			}
+		}catch(Exception e){
+			NovaLogger.getLogger(XMLHandleUtil.class).debug("", e);
+			flag = true;
+		}
+		return flag;
+	}
+	
+	class FileInfo{
+		
+		private String datasource;
+		private String fileType;
+		
+		public String getDatasource() {
+			return datasource;
+		}
+		public void setDatasource(String datasource) {
+			this.datasource = datasource;
+		}
+		public String getFiltType() {
+			return fileType;
+		}
+		public void setFileType(String fileType) {
+			this.fileType = fileType;
+		}
+	}
+
+}

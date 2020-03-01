@@ -1,0 +1,665 @@
+<ReportSettings version="1.1">
+  <PageWidth>29.7</PageWidth>
+  <CanGrow>true</CanGrow>
+  <TableColumnSettings>
+    <ItemSetting type="TableColumnSetting">
+      <Width>1.7</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>2.4</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting"/>
+    <ItemSetting type="TableColumnSetting">
+      <Width>2.5</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting"/>
+    <ItemSetting type="TableColumnSetting">
+      <Width>3.5</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting">
+      <Width>2.8</Width>
+    </ItemSetting>
+    <ItemSetting type="TableColumnSetting"/>
+    <ItemSetting type="TableColumnSetting"/>
+    <ItemSetting type="TableColumnSetting"/>
+    <ItemSetting type="TableColumnSetting"/>
+    <ItemSetting type="TableColumnSetting"/>
+  </TableColumnSettings>
+  <TableHeaderSettings>
+    <ItemSetting type="TableRowSetting">
+      <Height>1</Height>
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <BindingValue>主标题</BindingValue>
+          <Style>
+            <TextAlign>center</TextAlign>
+            <FontSize>20</FontSize>
+            <FontBold>true</FontBold>
+            <Border>false</Border>
+            <LetterSpacing>8</LetterSpacing>
+          </Style>
+          <ColSpan>12</ColSpan>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+      </TableCellSettings>
+    </ItemSetting>
+    <ItemSetting type="TableRowSetting">
+      <TableCellSettings>
+        <ItemSetting type="TableCellSetting">
+          <Value>日期：</Value>
+          <Style>
+            <TextAlign>right</TextAlign>
+            <FontSize>12</FontSize>
+            <FontBold>true</FontBold>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <BindingValue>日期</BindingValue>
+          <Style>
+            <FontSize>12</FontSize>
+            <FontBold>true</FontBold>
+            <Border>false</Border>
+          </Style>
+          <Format>D</Format>
+          <ColSpan>11</ColSpan>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+        <ItemSetting type="TableCellSetting">
+          <Style>
+            <Border>false</Border>
+          </Style>
+        </ItemSetting>
+      </TableCellSettings>
+    </ItemSetting>
+    <ItemSetting type="SubReportRowSetting">
+      <SubReportParameters>=Parameters!子报表1参数.Value</SubReportParameters>
+      <SubReportTable>=Parameters!子报表1表格.Value</SubReportTable>
+      <GroupColumn>船名航次</GroupColumn>
+      <GroupEnabled>true</GroupEnabled>
+      <TableHeaderSettings>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <BindingValue>主标题</BindingValue>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontSize>14</FontSize>
+                <FontBold>true</FontBold>
+              </Style>
+              <ColSpan>12</ColSpan>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+          </TableCellSettings>
+        </ItemSetting>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <Value>序号</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>作业区</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>泊位</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>船名/航次</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>合同类别</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>收货人</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>结算用户</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>销售煤种</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>实装煤种</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>预装数量</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>完船数量</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>下单日期</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+          </TableCellSettings>
+        </ItemSetting>
+      </TableHeaderSettings>
+      <TableDetailSettings>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <Value>=GroupNumber()</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>作业区</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>泊位</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>船名航次</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>合同类别</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>收货人</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>结算用户</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>销售煤种</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>实装煤种</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>预装数量</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>=Sum(Fields!预装数量.Value, GroupStartIndex(),GroupEndIndex())</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>下单日期</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+          </TableCellSettings>
+        </ItemSetting>
+      </TableDetailSettings>
+      <TableFooterSettings>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <Value>合  计</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+              <ColSpan>9</ColSpan>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting">
+              <Value>=Sum(Fields!预装数量.Value)</Value>
+              <Style>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>=Sum(Fields!预装数量.Value)</Value>
+              <Style>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting"/>
+          </TableCellSettings>
+        </ItemSetting>
+      </TableFooterSettings>
+    </ItemSetting>
+    <ItemSetting type="SubReportRowSetting">
+      <SubReportParameters>=Parameters!子报表2参数.Value</SubReportParameters>
+      <SubReportTable>=Parameters!子报表2表格.Value</SubReportTable>
+      <GroupColumn>船名航次</GroupColumn>
+      <GroupEnabled>true</GroupEnabled>
+      <TableHeaderSettings>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <BindingValue>主标题</BindingValue>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontSize>14</FontSize>
+                <FontBold>true</FontBold>
+              </Style>
+              <ColSpan>12</ColSpan>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+          </TableCellSettings>
+        </ItemSetting>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <Value>序号</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>作业区</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>泊位</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>船名/航次</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>合同类别</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>收货人</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>结算用户</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>销售煤种</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>实装煤种</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>预装数量</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>完船数量</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>下单日期</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+          </TableCellSettings>
+        </ItemSetting>
+      </TableHeaderSettings>
+      <TableDetailSettings>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <Value>=GroupNumber()</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>作业区</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>泊位</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>船名航次</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>合同类别</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>收货人</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>结算用户</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>销售煤种</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>实装煤种</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>预装数量</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>=Sum(Fields!预装数量.Value, GroupStartIndex(),GroupEndIndex())</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <BindingColumn>下单日期</BindingColumn>
+              <Style>
+                <TextAlign>center</TextAlign>
+              </Style>
+              <MergeSameContent>true</MergeSameContent>
+            </ItemSetting>
+          </TableCellSettings>
+        </ItemSetting>
+      </TableDetailSettings>
+      <TableFooterSettings>
+        <ItemSetting type="TableRowSetting">
+          <TableCellSettings>
+            <ItemSetting type="TableCellSetting">
+              <Value>合  计</Value>
+              <Style>
+                <TextAlign>center</TextAlign>
+                <FontBold>true</FontBold>
+              </Style>
+              <ColSpan>9</ColSpan>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting"/>
+            <ItemSetting type="TableCellSetting">
+              <Value>=Sum(Fields!预装数量.Value)</Value>
+              <Style>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting">
+              <Value>=Sum(Fields!预装数量.Value)</Value>
+              <Style>
+                <FontBold>true</FontBold>
+              </Style>
+            </ItemSetting>
+            <ItemSetting type="TableCellSetting"/>
+          </TableCellSettings>
+        </ItemSetting>
+      </TableFooterSettings>
+    </ItemSetting>
+  </TableHeaderSettings>
+  <TableGroupSettings>
+    <ItemSetting type="TableGroupSetting"/>
+  </TableGroupSettings>
+</ReportSettings>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				  xmlns:util="myreport.util.*"
+				  width="326" height="224" close="Close()" fontFamily="Simsun" fontSize="12"
+				  layout="absolute" showCloseButton="true" title="关于MyReport">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+ 
+			import myreport.Assembly;
+			private static var g_Instance:AboutForm;
+			
+			public static function get Instance():AboutForm
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new AboutForm();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			
+			public function Show():void
+			{
+				PopUp();
+ 
+				_Name.text = Assembly.NAME;
+				_Version.text = "版本：" + Assembly.VERSION;
+				_Author.label = "作者：" + Assembly.AUTHOR;
+				_Author.toolTip = "Go to " + Assembly.BLOG;
+				
+			}
+	 
+			private function HunkCai():void
+			{
+				flash.net.navigateToURL(new URLRequest(Assembly.BLOG), "_blank");
+			}
+		]]>
+	</mx:Script>
+	<mx:Label x="0" y="24" text="MyReport报表引擎" fontWeight="bold" fontSize="25" textAlign="center" width="100%" id="_Name"/>
+	<mx:Label y="79" text="版本：1.1.0.0" textAlign="left" id="_Version" x="104.5"/>
+	<mx:LinkButton x="98" y="105" label="作者： Hunk Cai" fontWeight="normal" click="HunkCai()" id="_Author" textAlign="left"/>
+	<mx:ControlBar x="0" y="180" horizontalAlign="right">
+		<mx:Button label="关闭" id="btnCancel" click="Close()"/>
+	</mx:ControlBar>
+	
+</util:PopUpWindow>

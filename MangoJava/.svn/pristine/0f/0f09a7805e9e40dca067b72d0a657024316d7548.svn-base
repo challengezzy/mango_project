@@ -1,0 +1,194 @@
+/**********************************************************************
+ *$RCSfile: ComponentGenerateUtil.java,v $  $Revision: 1.1.2.1 $  $Date: 2008/11/05 05:21:07 $
+ *********************************************************************/ 
+package smartx.framework.metadata.ui.componentslist;
+
+import java.awt.Component;
+
+
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JFormattedTextField;
+import javax.swing.JLabel;
+import javax.swing.JPasswordField;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableColumnModel;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
+import javax.swing.table.TableColumnModel;
+
+import smartx.framework.metadata.vo.Pub_Templet_1_ItemVO;
+
+/**
+ * TODO 统一平台内的所有列表控件展现定义方式。
+ * <li>Title: ComponentGenerateUtil.java</li>
+ * <li>Description: list类型的界面控件的生成工具</li>
+ * <li>Project: NOVA2_MAINBRANCH</li>
+ * <li>Copyright: Copyright (c) 2008</li>
+ * @Company: GXLU. All Rights Reserved.
+ * @author James.W
+ * @version 1.0
+ */
+public class ComponentGenerateUtil {
+
+	/**
+	 * 获得表格的列定义模型
+	 * @param vos
+	 * @return
+	 */
+	public TableColumnModel getColumnModel(Pub_Templet_1_ItemVO[] vos) {		
+		DefaultTableColumnModel cmodel = new DefaultTableColumnModel(); // 创建列模式
+		TableColumn[] tcols = this.getTableColumns(vos);
+		for (int i = 0; i < vos.length; i++) {
+			if (vos[i].getListisshowable().booleanValue()) { // 如果设置列表显示,则加入该列
+				cmodel.addColumn(tcols[i]);
+			}
+		}
+		return cmodel;
+	}
+	
+	/**
+	 * 创建所有的列模型
+	 * @param firstCol 起始列
+	 * @param vos 列定义
+	 * @return
+	 */
+	private TableColumn[] getTableColumns(Pub_Templet_1_ItemVO[] vos) {
+		return getTableColumns(0,vos);
+	}
+	
+	/**
+	 * 创建所有的列
+	 * @param firstCol 起始列
+	 * @param vos 列定义
+	 * @return
+	 */
+	private TableColumn[] getTableColumns(int firstCol,Pub_Templet_1_ItemVO[] vos) {
+		int cols=vos.length;
+		TableColumn[] tcols = new TableColumn[cols];
+		for (int i = 0; i < cols; i++) {			
+			tcols[i]=getTableColumn(i+firstCol,vos[i]);
+		}
+		return tcols;
+	}
+	
+	/**
+	 * 创建列
+	 * 
+	 * @return
+	 */
+	private TableColumn getTableColumn(int idx,Pub_Templet_1_ItemVO vo) {
+		TableColumn tcol = null;
+		
+		String str_key = vo.getItemkey(); // key
+		String str_name = vo.getItemname(); // name
+		String str_type = vo.getItemtype(); // 类型
+		
+		int li_width = vo.getListwidth().intValue(); // 宽度
+		
+		TableCellEditor cellEditor = null;
+		TableCellRenderer cellRender = null;
+		if (str_type.equals("文本框")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new TextFieldCellEditor(new JTextField(),vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("数字框")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new NumberFieldCellEditor(new JFormattedTextField(), vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("密码框")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new PasswordTextFieldCellEditor(new JPasswordField(), vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+		} else if (str_type.equals("下拉框")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new ComboBoxCellEditor(new JComboBox(),vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("参照")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new UIRefPanelCellEditor(vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("时间")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new TimeSetCellEditor(vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("日历")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new DatePanelCellEditor(vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("文件选择框")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new FilePathPanelCellEditor(vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("颜色")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new ColorPanelCellEditor(vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("大文本框")) {
+			cellRender = new JLabelCellRender(vo); //
+			cellEditor = new TextAreaPanelCellEditor(vo);
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+			tcol.setCellRenderer(new CellTipText());
+		} else if (str_type.equals("勾选框")) {
+			cellRender = new CheckBoxCellRender(); //
+			cellEditor = new CheckBoxCellEditor(new JCheckBox(),vo); //
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+		} else if (str_type.equals("图片选择框")) {
+			cellRender = new ImageCellRender(vo); //
+			cellEditor = new ImagePanelCellEditor(vo); //
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+		} else {//未知设定
+			cellRender = null; //
+			cellEditor = null;
+			tcol = new TableColumn(idx, li_width, cellRender,cellEditor); // 创建列
+		}
+
+		//标题设置
+		tcol.setHeaderValue(str_name); // 列的标题
+		tcol.setIdentifier(str_key); // 唯一性标识			
+		
+		return tcol;
+	}
+	
+	
+	/**
+	 * 添加单元格提示信息，提示的信息为单元格内容 
+	 * @author Sushangdian
+	 */
+	class CellTipText extends DefaultTableCellRenderer {
+		private static final long serialVersionUID = 2924685023482535240L;
+
+		public Component getTableCellRendererComponent(JTable table,
+				Object value, boolean isSelected, boolean hasFocus, int row,
+				int column) {
+			JLabel label = null;
+			if (value != null && table != null && table.getRowCount() > 0) {
+				label = (JLabel) super.getTableCellRendererComponent(table,
+						value, isSelected, hasFocus, row, column);
+				label.setToolTipText(value.toString());
+			}
+			return label;
+		}
+	}
+
+}
+
+/**********************************************************************
+ *$RCSfile: ComponentGenerateUtil.java,v $  $Revision: 1.1.2.1 $  $Date: 2008/11/05 05:21:07 $
+ *
+ *$Log: ComponentGenerateUtil.java,v $
+ *Revision 1.1.2.1  2008/11/05 05:21:07  wangqi
+ **** empty log message ***
+ *
+ *********************************************************************/

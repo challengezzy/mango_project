@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<containers:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx" 
+					   xmlns:containers="net.brandonmeyer.containers.*" 
+					   layout="vertical" width="940" height="600" 
+					   title="应用预览[{dashboardCode}]" allowClose="true" 
+					   close="closeHandler()" initialize="init()" allowDrag="true"
+					   creationComplete="creationCompleteHandler()" 
+					   xmlns:dashboard="smartx.bam.flex.modules.dashboard.*">
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			import mx.utils.StringUtil;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.util.MemoryUtil;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			[Bindable]
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			[Bindable]
+			public var dashboardCode:String;//展示仪表盘
+			
+			private function init():void{
+				
+			}
+			
+			private function creationCompleteHandler():void{
+				
+			}
+			
+			private function closeHandler():void{
+				PopUpManager.removePopUp(this);
+				MemoryUtil.forceGC();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox id="statisticsHisAnalyseBox" width="100%" height="100%">
+		<dashboard:DashboardPanel id="dashboard" endpoint="{endpoint}" needDbTool="false" isNeedRefreshMessageBox="false" 
+							 dbcodeFromUrl="{dashboardCode}">				
+		</dashboard:DashboardPanel>
+	</mx:VBox>
+</containers:SuperPanel>

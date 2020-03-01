@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
+		 width="200" height="100%" fontFamily="Simsun" fontSize="12" horizontalAlign="center" 
+		  xmlns:design="myreport.design.*" xmlns:util="myreport.util.*" creationComplete="Init()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.report.Define;
+			import myreport.data.report.ReportSettings;
+			import myreport.data.report.TableColumnSetting;
+			import myreport.res.Asset;
+			private static var g_Instance:TableColumnEditor;
+			
+			public static function get Instance():TableColumnEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new TableColumnEditor();
+					g_Instance.initialize();
+					g_Instance.percentHeight = 100;
+					g_Instance.percentWidth = 100;
+				}
+				return g_Instance;
+			}
+			private var _Data:TableColumnSetting;
+			private var _Settings:ReportSettings;
+			private function Init():void
+			{
+				if(_Data)
+					Refresh();
+			}
+			public function SetData(settings:ReportSettings, item:Object):void
+			{
+				_Settings = settings;
+				_Data = item as TableColumnSetting;
+				Refresh();
+			}
+ 
+			public function Refresh():void
+			{
+				_Width.text = _Data.Width.toString();
+				_Dynamic.selected = _Data.Dynamic;
+				_DynamicColumnSettings.text = _Data.DynamicColumnSettings;
+
+			}
+			
+			private function OnEdit(event:Event):void
+			{
+				var value:Number;
+				if (event.currentTarget == _Width)
+				{
+					value = Number(event.currentTarget.text);
+					if (isNaN(value))
+						return;
+					EditProperty(Define.PRO_WIDTH, value);
+				}
+				else if (event.currentTarget == _Dynamic)
+				{
+					EditProperty(Define.PRO_DYNAMIC, _Dynamic.selected);
+				}
+				else if(event.currentTarget == _DynamicColumnSettings)
+				{
+					EditProperty(Define.PRO_DYNAMIC_COLUMN_SETTINGS, _DynamicColumnSettings.text);
+				}
+ 
+			}
+			
+			private function EditProperty(target:Object, value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_PROPERTY, true);
+				e.Target = target;
+				e.Value = value;
+				dispatchEvent(e);
+			}
+			
+			private function ShowExpressionEditor(input:TextInput):void
+			{
+				ExpressionEditor.Instance.Show(input.text, _Settings, function(value:String):void
+				{
+					input.text = value;
+					
+					if(input == _DynamicColumnSettings)
+					{
+						EditProperty(Define.PRO_DYNAMIC_COLUMN_SETTINGS, _DynamicColumnSettings.text);
+					}
+				 
+				});
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="列宽度(单位：cm)"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:TextInput width="100" id="_Width" enter="OnEdit(event)" focusOut="OnEdit(event)"/>
+	<mx:HBox width="100%" verticalAlign="middle" horizontalGap="0">
+		<mx:Label text="动态列"/>
+		<mx:HRule width="100%"/>
+	</mx:HBox>
+	<mx:Grid verticalGap="3" horizontalGap="3">
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%" colSpan="2" horizontalAlign="center">
+				<mx:CheckBox label="是否动态列" width="100" id="_Dynamic" change="OnEdit(event)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="列配置"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput width="100" id="_DynamicColumnSettings" enter="OnEdit(event)"
+							  focusOut="OnEdit(event)"/>
+				<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}" toolTip="表达式编辑器"
+								 click="ShowExpressionEditor(_DynamicColumnSettings)"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+
+</mx:VBox>

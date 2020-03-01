@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<design:ControlStyleEditorBase xmlns:mx="http://www.adobe.com/2006/mxml"
+							   width="100%" xmlns:design="myreport.design.*">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			protected override function OnSetData():void
+			{
+				_Label.text = DesignUtil.GetLabelName(Name);
+				_Text.text = Setting.GetStyle(Name);
+			}
+			
+			private function OnChanged():void
+			{
+				Setting.SetStyle(Name, _Text.text);
+			}
+		]]>
+	</mx:Script>
+	<mx:Label id="_Label" text="标签"/>
+	<mx:Spacer width="100%"/>
+	<mx:TextInput id="_Text" change="OnChanged()"/>
+</design:ControlStyleEditorBase>

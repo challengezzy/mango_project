@@ -1,0 +1,210 @@
+<mx:Canvas xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" 
+			xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+			xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+			xmlns:core="smartx.flex.components.core.*"
+			xmlns:fx="http://ns.adobe.com/mxml/2009"
+			>
+	
+	<fx:Declarations>
+		
+		<mx:VBox id="funVbox" width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%">
+				<mx:FormItem label="选择字段:" width="100%">
+					<mx:ComboBox id="funFieldChosseCbb" dataProvider="{dataProvider}" width="100%"/>
+				</mx:FormItem>
+				<mx:Button id="closeBtn" label="关闭" toolTip="关闭" click="closeBtn_clickHandler(event)" 
+						   width="80" icon="{AssetsFileLib.closeIcon}"/>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Button id="countBtn" label="COUNT(*)" toolTip="求记录" click="funBtn_clickHandler(event)" width="100"/>
+				<mx:Button id="avgBtn" label="AVG(*)" toolTip="平均值" click="funBtn_clickHandler(event)" width="100"/>
+				<mx:Button id="sumBtn" label="SUM(*)" toolTip="求和" click="funBtn_clickHandler(event)" width="100"/>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Button id="maxBtn" label="MAX(*)" toolTip="最大值" click="funBtn_clickHandler(event)" width="100"/>
+				<mx:Button id="minBtn" label="MIN(*)" toolTip="最小值" click="funBtn_clickHandler(event)" width="100"/>
+				<mx:Button id="varianceBtn" label="AVEDEV(*)" toolTip="平均差" click="funBtn_clickHandler(event)" width="100"/>
+			</mx:HBox>
+			<mx:HBox width="100%">
+				<mx:Button id="stddevBtn" label="STDDEV(*)" toolTip="标准差" click="funBtn_clickHandler(event)" width="100"/>
+				<mx:Button id="medianBtn" label="MEDIAN(*)" toolTip="中位数" click="funBtn_clickHandler(event)" width="100"/>
+			</mx:HBox>
+		</mx:VBox>
+		
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.Canvas;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.effects.Effect;
+			import mx.effects.EffectInstance;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import net.brandonmeyer.containers.SuperPanel;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			
+			[Bindable]
+			public var dataProvider:ArrayCollection;
+			
+			private var desktop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private var cv:SuperPanel = new SuperPanel();
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+			}
+			
+				
+			private function onClose():void{
+				PopUpManager.removePopUp(cv);
+			}
+			
+			protected function operatorBtn_clickHandler(event:MouseEvent):void{
+				
+				var btn:Button = event.currentTarget as Button;
+				var btnId:String = btn.id;
+				
+				if(btnId=="addBtn"){
+					textArea.text = textArea.text+" + ";
+				}else if(btnId=="subBtn"){
+					textArea.text = textArea.text+" - ";
+				}else if(btnId=="mulBtn"){
+					textArea.text = textArea.text+" * ";
+				}else if(btnId=="divBtn"){
+					textArea.text = textArea.text+" / ";
+				}else if(btnId=="lesBtn"){
+					textArea.text = textArea.text+" < ";
+				}else if(btnId=="greBtn"){
+					textArea.text = textArea.text+" > ";
+				}else if(btnId=="lesEquBtn"){
+					textArea.text = textArea.text+" <= ";
+				}else if(btnId=="greEquBtn"){
+					textArea.text = textArea.text+" >= ";
+				}else if(btnId=="unEquBtn"){
+					textArea.text = textArea.text+" <> ";
+				}else if(btnId=="equBtn"){
+					textArea.text = textArea.text+" = ";
+				}else if(btnId=="leftPareBtn"){
+					textArea.text = textArea.text+" ( ";
+				}else if(btnId=="rightParePareBtn"){
+					textArea.text = textArea.text+" ) ";
+				}else if(btnId=="andBtn"){
+					textArea.text = textArea.text+" and ";
+				}else if(btnId=="orBtn"){
+					textArea.text = textArea.text+" or ";
+				}else if(btnId=="notBtn"){
+					textArea.text = textArea.text+" not ";
+				}
+			}
+
+
+			protected function functionBtn_clickHandler(event:MouseEvent):void
+			{
+				cv.height = 200;
+				cv.width = 350;
+				cv.allowDrag = true;
+				cv.title="选择函数与字段";
+				
+				cv.addChild(funVbox);
+				
+				PopUpManager.addPopUp(cv,desktop,true);
+				PopUpManager.centerPopUp(cv);
+				
+			}
+
+
+			protected function funBtn_clickHandler(event:MouseEvent):void
+			{
+				var btn:Button = event.currentTarget as Button;
+				var btnId:String = btn.id;
+				
+				if(btnId=="countBtn"){
+					textArea.text = textArea.text+" COUNT("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}else if(btnId=="avgBtn"){
+					textArea.text = textArea.text+" AVG("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}else if(btnId=="sumBtn"){
+					textArea.text = textArea.text+" SUM("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}else if(btnId=="maxBtn"){
+					textArea.text = textArea.text+" MAX("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}else if(btnId=="minBtn"){
+					textArea.text = textArea.text+" MIN("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}else if(btnId=="varianceBtn"){
+					textArea.text = textArea.text+" AVEDEV("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}else if(btnId=="stddevBtn"){
+					textArea.text = textArea.text+" STDDEV("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}else if(btnId=="medianBtn"){
+					textArea.text = textArea.text+" MEDIAN("+String(funFieldChosseCbb.selectedItem)+") ";
+					onClose();
+				}
+			}
+
+
+			protected function closeBtn_clickHandler(event:MouseEvent):void
+			{
+				this.onClose();
+			}
+
+		]]>
+	</fx:Script>
+	<mx:VBox label="" width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+		<mx:HBox width="100%" >
+			<mx:Button id="addBtn" label="+" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="subBtn" label="-" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="mulBtn" label="*" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="divBtn" label="/" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="lesBtn" label="&lt;" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="greBtn" label=">" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="lesEquBtn" label="&lt;=" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="greEquBtn" label=">=" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="unEquBtn" label="&lt;>" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="equBtn" label="=" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="leftPareBtn" label="(" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="rightParePareBtn" label=")" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="andBtn" label="And" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="orBtn" label="Or" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="notBtn" label="Not" click="operatorBtn_clickHandler(event)"/>
+			<mx:Button id="functionBtn" label="函数浏览器" click="functionBtn_clickHandler(event)"/>
+		</mx:HBox>
+		<mx:TextArea id="textArea" width="100%" height="100%" toolTip="输入条件内容" />
+	</mx:VBox>
+</mx:Canvas>

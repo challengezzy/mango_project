@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mtchart:MTChartPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx" 
+					  xmlns:mtchart="smartx.flex.components.core.mtchart.*" 
+					  width="100%" initialize="preInit()"
+					  height="100%" xmlns:components="com.fusioncharts.components.*" >
+	
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mtchart:FusionChartsWrapper id="fc" width="100%" height="100%" 
+									 FCChartType="{chartType}" FCFolder="{FUSIONDIR}" FCClickEvent="fc_FCClickEventHandler(event)"
+									 click="fc_clickHandler(event)">
+			<components:FCChartData FCData="{_dataProvider}" FCParams="{params}"  />
+		</mtchart:FusionChartsWrapper>
+		
+		<mx:LinkButton id="filterBtn" icon="{AssetsFileLib.filterIcon}" width="22" height="22" right="0" top="0"
+					   toolTip="按系列过滤" click="filterBtn_clickHandler(event)" />
+		
+		<mx:TitleWindow id="filterWindow" showCloseButton="true" close="PopUpManager.removePopUp(filterWindow)"
+						width="300" height="250">
+			<mx:VBox width="100%" height="100%" horizontalAlign="center">
+				<mx:HBox width="100%">
+					<mx:Button id="selectAllBtn" label="全选" click="selectAllBtn_clickHandler(event)" />
+					<mx:Button id="reverseSelectBtn" label="反选" click="reverseSelectBtn_clickHandler(event)" />
+				</mx:HBox>
+				<mx:Tile width="100%" height="100%" id="filterTile" 
+						 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				</mx:Tile>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button id="confirmBtn" label="设置" click="confirmBtn_clickHandler(event)"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(filterWindow)" />
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+		
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.events.FCEvent;
+			import com.fusioncharts.components.FusionCharts;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.ButtonLabelPlacement;
+			import mx.controls.CheckBox;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.mtchart.event.MTChartEvent;
+			import smartx.flex.components.core.mtchart.listener.MTChartClickListener;
+			import smartx.flex.components.core.mtchart.vo.MTChart;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.SmartXMessage;
+
+			[Bindable]
+			private var chartType:String = "MSCombi2D";
+			//初始化参数
+			[Bindable]
+			private var params:ArrayCollection = new ArrayCollection([
+				{animation:'1'},
+				{showvalues:'0'},
+				{palette:'2'},
+				{baseFontSize:'15'},
+				{showFCMenuItem:'0'}
+			]);;
+			//初始化样式
+			[Bindable]
+			private var chartStyles:ArrayCollection=new ArrayCollection([
+				{name:"CaptionFontStyle",type:"font",font:"Verdana",size:"22"},
+				{toObject:"CAPTION",styles:"CaptionFontStyle"},
+			]);
+			private var dualY:ArrayCollection = new ArrayCollection([
+				"MSCombiDY2D","MSColumn3DLineDY","StackedColumn3DLineDY"
+			]);
+			//fusion的swf文件位置
+			private static const FUSIONDIR:String = "charts/fusioncharts.com/fusioncharts";
+			
+			private static const LINK_SERIAL_PREFIX:String = "S-";
+			
+			[Bindable]
+			private var _dataProvider:ArrayCollection;
+			[Bindable]
+			private var xField:String;
+			private var xaxianame:String;
+			private var pyaxianame:String;
+			private var syaxianame:String;
+			
+			private var yField:String;
+			
+			private var linkField:String;
+			
+			private var serialField:String;
+			
+			private var xShowField:String;
+			[Bindable]
+			private var serialNamesDp:ArrayCollection = new ArrayCollection();//所有系列
+			
+			private var filterSerialNames:ArrayCollection = new ArrayCollection();//要过滤的系列名称
+			
+			private var checkBoxList:Array;//所有系列CHECKBOX集合
+			
+			override protected function preInit():void{
+				super.preInit();
+			}
+			
+			override public function createCompleteHandler():void{
+				super.createCompleteHandler();
+				chartType = mc.chartType;
+				initParam();
+				
+				if(contentXml.extend.height.length() > 0 && contentXml.extend.height != "")
+					fc.height = Number(contentXml.extend.height);
+				else
+					fc.percentHeight = 100;
+				if(contentXml.extend.width.length() > 0 && contentXml.extend.width != "")
+					fc.width = Number(contentXml.extend.width);
+				else
+					fc.percentWidth = 100;
+				
+				mainBox.addChild(fc);
+				
+				//fusion控件一律延时1s加载
+				var timer:Timer = new Timer(1000,1);
+				timer.addEventListener(TimerEvent.TIMER,function(e:TimerEvent):void{
+					dispatchEvent(new MTChartEvent(MTChartEvent.INIT_COMPLETE));
+					var t:Timer = e.target as Timer;
+					if(t != null)
+						t.stop();
+				});
+				timer.start();
+			}
+			
+			private function initParam():void{
+				if(mc.labelFileds.length > 0){
+					xField = mc.labelFileds[0];
+				}
+				
+				if(mc.xShowFields.length > 0){
+					xShowField = mc.xShowFields[0];
+				}
+				//params.addItem({caption:mc.chartName});
+				params.addItem({xAxisName:mc.xAxiaName});
+				
+				if(mc.yAxisMaxValue != null && mc.yAxisMaxValue != "")
+					params.addItem({yAxisMaxValue:mc.yAxisMaxValue});
+				
+				if(mc.yAxisMinValue != null && mc.yAxisMinValue != "")
+					params.addItem({yAxisMinValue:mc.yAxisMinValue});
+				
+				if(dualY.contains(mc.chartType)){
+					params.addItem({PYAxisName:mc.pyAxiaName});
+					params.addItem({SYAxisName:mc.syAxiaName});
+				}else
+					params.addItem({YAxisName:mc.pyAxiaName});
+				if(!mc.isShowLabel)
+					params.addItem({showNames:'0'});
+				
+				if(mc.dataMode == MTChart.ROW_MODE){
+					if(mc.dataFileds.length > 0)
+						yField = mc.dataFileds[0];
+					if(mc.nameFileds.length > 0)
+						serialField = mc.nameFileds[0];
+					if(mc.linkFileds.length > 0)
+						linkField = mc.linkFileds[0];
+				}
+			}
+			
+			override public function refreshComplete():void{
+				serialNamesDp.removeAll();
+				if(mc.dataMode == MTChart.COLUMN_MODE)
+					_dataProvider = loadDataForFusion();
+				else
+					_dataProvider = loadRowDataForFusion();
+				
+				addFilterBtn();
+				
+				fc.FCChartType = chartType;
+				fc.FCData(_dataProvider);
+				fc.FCParams(params);
+				//fc.FCStyles(chartStyles);
+				//trace(fc.FCDataXML);
+				fc.FCRender();
+				super.refreshComplete();
+			}
+			
+			private function loadDataForFusion():ArrayCollection{
+				var result:ArrayCollection = new ArrayCollection();
+				for each(var label:Object in dataProvider){
+					if(xShowField != null && xShowField != "")
+						result.addItem({label:label[xShowField]});
+					else
+						result.addItem({label:label[xField]});
+				}
+				var subSerialNamesArray:Array = mc.subSeriesNames;
+				if(dataProvider.length > 0){
+					for(var j:int=0;j<mc.dataFileds.length;j++){
+						var item:* = new Object();
+						if(mc.seriesNames[j]!=null){
+							item.seriesName = String(mc.seriesNames[j]);
+							serialNamesDp.addItem({name:item.seriesName,data:item.seriesName});
+						}
+						if(mc.types[j]!=null)
+							item.renderAs = String(mc.types[j]);
+						if(mc.colors[j]!=null)
+							item.color = String(mc.colors[j]);
+						for each(var s:String in subSerialNamesArray){
+							if(s == item.seriesName){
+								item.parentYAxis="S";
+								break;
+							}
+						}
+						//判断是否需要过滤
+						if(filterSerialNames.length > 0){
+							if(filterSerialNames.contains(item.seriesName))
+								continue;
+						}
+						result.addItem(item);
+						for(var i:int=0;i<dataProvider.length;i++){
+							var data:Object = dataProvider.getItemAt(i);
+							result.addItem({value:data[mc.dataFileds[j]],link:LINK_SERIAL_PREFIX.concat(data[mc.linkFileds[j]])});
+						}
+					}
+				}
+				return result;
+			}
+			
+			private function loadRowDataForFusion():ArrayCollection{
+				var result:ArrayCollection = new ArrayCollection();
+				var xMap:Hashtable = new Hashtable();
+				var series:ArrayCollection = new ArrayCollection();
+				var xFields:ArrayCollection = new ArrayCollection();
+				var xShowValues:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<dataProvider.length;i++){
+					var data:Object = dataProvider.getItemAt(i);
+					var xValue:Object = Number(data[xField]);
+					if(isNaN(Number(data[xField])))
+						xValue = data[xField];
+					var serialValue:String = data[serialField];
+					var yValue:String = data[yField];
+					var linkValue:String = data[linkField];
+					var valueObj:Object = xMap.find(xValue);
+					var linkSerialValue:String = LINK_SERIAL_PREFIX.concat(serialValue);
+					if(valueObj){
+						if(valueObj[serialValue] == undefined){//判断对象中是否有此属性，如没有则加入该属性
+							valueObj[serialValue] = yValue;
+							valueObj[linkSerialValue] = linkValue;
+							xMap.add(xValue,valueObj);
+						}
+					}else{
+						valueObj = {};
+						valueObj[xField] = xValue;
+						valueObj[serialValue] = yValue;
+						valueObj[linkSerialValue] = linkValue;
+						xMap.add(xValue,valueObj);
+						xFields.addItem(xValue);
+						if(xShowField != null && xShowField != "")
+							xShowValues.addItem(data[xShowField]);
+					}
+					if(!series.contains(serialValue))
+						series.addItem(serialValue);
+				}
+				
+				//先构造label部分
+				var xx:String;
+				if(xShowValues.length > 0){
+					for each (xx in xShowValues){
+						result.addItem({label:xx});
+					}
+				}else{
+					for each (xx in xFields){
+						result.addItem({label:xx});
+					}
+				}
+				
+				//按系列构造
+				var seriesNames:Array = [];
+				if(mc.seriesNames.length > 0)
+					seriesNames = mc.seriesNames[0].toString().split(",");//系列名称，与serialLabel对应，如果此处不设置，直接使用serialLabel
+				var type:String = "Column";
+				if(mc.types.length>0)
+					type = mc.types[0];
+				var subSerialNamesArray:Array = mc.subSeriesNames;
+				for(var j:int=0;j<series.length;j++){
+					var realSerialName:String = series.getItemAt(j) as String;
+					var displaySerialName:String = realSerialName;
+					if(j<seriesNames.length)
+						displaySerialName = seriesNames[j] as String;
+					
+					serialNamesDp.addItem({name:displaySerialName,data:realSerialName});
+					
+					//判断是否需要过滤
+					if(filterSerialNames.length > 0){
+						if(filterSerialNames.contains(realSerialName))
+							continue;
+					}
+					
+					var color:String = null;
+					if(j<mc.colors.length)
+						color = mc.colors[j];
+					var temp:* = {seriesName:displaySerialName,renderAs:type};
+					if(color != null)
+						temp.color = color;
+					
+					
+					for each(var s:String in subSerialNamesArray){
+						if(s == realSerialName){
+							temp.parentYAxis="S";
+							break;
+						}
+					}
+					result.addItem(temp);
+					for each (var xxx:String in xFields){
+						var serialValueObj:* = xMap.find(xxx);
+						var linkSerial:String = LINK_SERIAL_PREFIX.concat(realSerialName);
+						result.addItem({value:serialValueObj[realSerialName],link:LINK_SERIAL_PREFIX.concat(serialValueObj[linkSerial])});
+					}
+				}		
+				return result;
+			}
+
+			public override function destroy():void{
+				if(fc != null)
+					fc.destroy();
+				fc = null;
+				removeAllChildren();
+				super.destroy();
+			}
+			
+			private function fc_FCClickEventHandler(event:FCEvent):void{
+				if(chartClickListeners.length == 0)
+					return;
+				for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+					chartClickListener.fcItemClick(event,this);
+				}
+			}
+			
+			private function fc_clickHandler(event:MouseEvent):void{
+				if(chartClickListeners.length == 0)
+					return;
+				for each(var chartClickListener:MTChartClickListener in chartClickListeners){
+					chartClickListener.fcClick(event,this);
+				}
+			}
+			
+			/**
+			 * 添加过滤按钮
+			 */ 
+			private function addFilterBtn():void{
+				//如果系列字段大于1个的话，才添加过滤按钮
+				if(serialNamesDp.length > 1)
+					mainBox.contains(filterBtn)?null:this.addChild(filterBtn);
+				else
+					mainBox.contains(filterBtn)?this.removeChild(filterBtn):null;
+					
+			}
+			
+			private function filterBtn_clickHandler(event:MouseEvent):void{
+				if(!filterWindow.isPopUp){
+					PopUpManager.addPopUp(filterWindow,this,false);
+					PopUpManager.centerPopUp(filterWindow);
+				}
+				
+				createCheckBox();
+			}
+			
+			private function createCheckBox():void{
+				filterTile.removeAllChildren();
+				checkBoxList = [];
+				
+				for each(var filter:Object in serialNamesDp){
+					var chk:CheckBox = new CheckBox();
+					chk.label = filter.name;
+					chk.data = filter;
+					if(filterSerialNames.contains(filter.data))
+						chk.selected = false;
+					else
+						chk.selected = true;
+					
+					chk.labelPlacement = ButtonLabelPlacement.RIGHT;
+					
+					chk.addEventListener(Event.CHANGE,function(event:Event):void{
+						var target:CheckBox = event.currentTarget as CheckBox;
+						var data:String = target.data.data;
+						//选中并且存在于过滤条件中删除，未选中不存在于过滤条件中的添加
+						if(target.selected){
+							if(filterSerialNames.contains(data))
+								filterSerialNames.removeItemAt(filterSerialNames.getItemIndex(data));
+						}else{
+							if(!filterSerialNames.contains(data))
+								filterSerialNames.addItem(data);
+						}
+					});
+					
+					filterTile.addChild(chk);
+					checkBoxList.push(chk);
+				}
+			}
+			
+			private function confirmBtn_clickHandler(event:MouseEvent):void{
+				refreshComplete();
+				PopUpManager.removePopUp(filterWindow);
+			}
+			
+			private function selectAllBtn_clickHandler(event:MouseEvent):void{
+				for each(var chk:CheckBox in checkBoxList){
+					chk.selected = true;
+					filterSerialNames.removeAll();
+				}
+			}
+			
+			private function reverseSelectBtn_clickHandler(event:MouseEvent):void{
+				for each(var chk:CheckBox in checkBoxList){
+					if(chk.selected){
+						chk.selected = false;
+						filterSerialNames.contains(chk.data.data)?null:filterSerialNames.addItem(chk.data.data);
+					}else{
+						chk.selected = true;
+						filterSerialNames.contains(chk.data.data)
+							?filterSerialNames.removeItemAt(filterSerialNames.getItemIndex(chk.data.data))
+							:null;
+					}
+				}
+			}
+			
+		]]>
+	</fx:Script>
+</mtchart:MTChartPanel>

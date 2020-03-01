@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				layout="vertical"
+				width="800" height="380" xmlns:containers="flexlib.containers.*" 
+				close="close()" showCloseButton="true" title="目标实体过滤项"
+				creationComplete="init()">
+	<fx:Declarations>
+
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.modules.entitymodel.utils.EntityUtil;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			protected var formService:RemoteObject;
+			
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			public var itemXml:XML;
+			
+			[Bindable]
+			public var modelCode:String;
+			
+			[Bindable]
+			public var datasource:String;
+			
+			[Bindable]
+			public var toEntityXml:XML;
+			
+			[Bindable]
+			public var entitiesXml:XML
+			
+			[Bindable]
+			private var allFieldsCol:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				if(endpoint != null ){
+					formService.endpoint = endpoint;
+				}
+				
+				
+				if(toEntityXml != null){
+					allFieldsCol.removeAll();
+					for each( var attributeItem:XML in toEntityXml.attributes.attribute){
+						var name:String = String(attributeItem.@name);
+						var type:String = String(attributeItem.@type);
+						var label:String = String(attributeItem.@label);
+						var category:String = String(attributeItem.@category);
+						var columnItem:Object;
+						if(String(toEntityXml.@type) == "virtual"){//如果是虚拟实体
+							columnItem = new Object();
+							columnItem["columnName"] = String(attributeItem.@expression);
+							columnItem["columnAlias"] = name;
+							columnItem["columnType"] = type;
+							columnItem["columnLabel"] = label;
+							columnItem["category"] = category;
+							if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="dictionary"){
+								columnItem["dictionaryRefCode"] = String(attributeItem.@dictionaryRefCode);
+							}else if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="entity"){
+								columnItem["refEntity"] = String(attributeItem.@refEntity);
+								columnItem["refEntityAtt"] = String(attributeItem.@refEntityAtt);
+								columnItem["refEntityShowAtt"] = String(attributeItem.@refEntityShowAtt);
+								columnItem["modelCode"] = this.modelCode;
+								columnItem["datasource"] = datasource;
+							}
+							allFieldsCol.addItem(columnItem);
+						}else{
+							var mappingItems:XMLList = toEntityXml.mappingInfo.attributeMapping.map.(@attributeName == attributeItem.@name);
+							var columnName:String = name;
+							if(mappingItems.length() > 0){
+								columnName = String(mappingItems[0].@columnName);
+							}
+								columnItem = new Object();
+								columnItem["columnName"] = columnName;
+								columnItem["columnAlias"] = name;
+								columnItem["columnType"] = type;
+								columnItem["columnLabel"] = label;
+								columnItem["category"] = category;
+								if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="dictionary"){
+									columnItem["dictionaryRefCode"] = String(attributeItem.@dictionaryRefCode);
+								}else if(!BAMUtil.isEmpty(category)&&category.toLowerCase()=="entity"){
+									columnItem["refEntity"] = String(attributeItem.@refEntity);
+									columnItem["refEntityAtt"] = String(attributeItem.@refEntityAtt);
+									columnItem["refEntityShowAtt"] = String(attributeItem.@refEntityShowAtt);
+									columnItem["modelCode"] = this.modelCode;
+									columnItem["datasource"] = datasource;
+								}
+								allFieldsCol.addItem(columnItem);
+//							}
+						}
+					}
+					
+					var allInheritAtt:ArrayCollection = EntityUtil.getInheritAttributes(toEntityXml,entitiesXml,true);
+					for each(var parentAttXml:XML in allInheritAtt){
+						var parentAttName:String = String(parentAttXml.@name);
+						var parentAttType:String = String(parentAttXml.@type);
+						var parentAttLabel:String = String(parentAttXml.@label);
+						var parentCategory:String = String(parentAttXml.@category);
+						var parenColumnItem:Object = new Object();
+						parenColumnItem["columnName"] = parentAttName;
+						parenColumnItem["columnAlias"] = parentAttName;
+						parenColumnItem["columnType"] = parentAttType;
+						parenColumnItem["columnLabel"] = parentAttLabel;
+						columnItem["category"] = parentCategory;
+						if(!BAMUtil.isEmpty(parentCategory)&&parentCategory.toLowerCase()=="dictionary"){
+							columnItem["dictionaryRefCode"] = String(attributeItem.@dictionaryRefCode);
+						}else if(!BAMUtil.isEmpty(parentCategory)&&parentCategory.toLowerCase()=="entity"){
+							columnItem["refEntity"] = String(attributeItem.@refEntity);
+							columnItem["refEntityAtt"] = String(attributeItem.@refEntityAtt);
+							columnItem["refEntityShowAtt"] = String(attributeItem.@refEntityShowAtt);
+							columnItem["modelCode"] = this.modelCode;
+							columnItem["datasource"] = datasource;
+						}
+						allFieldsCol.addItem(parenColumnItem);
+					}
+				}
+
+				
+				refreshItems();
+				
+			}
+			
+			
+			private function faultHander(event:FaultEvent):void{
+				SmartXMessage.show("错误!",SmartXMessage.MESSAGE_ERROR,
+					"错误详情:"+event.fault.faultString);
+			}
+			
+			
+			private function add():void{
+				
+				var tempColumn:String ="";
+				if(allFieldsCol.length > 0){
+					var obj:Object = allFieldsCol.getItemAt(0);
+					tempColumn = obj["columnName"] as String;
+				}
+				
+				var subItemXml:XML = <subItem enabled="true" type="equalValue" column="" logicalOperator="AND" relationalOperator="=" value="" label="" />;
+				subItemXml.@column = tempColumn;
+				itemXml.appendChild(subItemXml);
+				
+				var sifp:SubItemFilterPanel = new SubItemFilterPanel();
+				sifp.itemXml = subItemXml;
+				sifp.modelCode = this.modelCode;
+				sifp.datasource = this.datasource;
+				sifp.allFieldsCol = allFieldsCol;
+				sifp.itemsVBox = itemsVbox;
+//				sifp.formService = formService;
+				itemsVbox.addChild(sifp);
+				
+			}
+			
+			private function refreshItems():void{
+				itemsVbox.removeAllChildren();
+				for each( var sumItem:XML in itemXml.subItem){
+					var sifp:SubItemFilterPanel = new SubItemFilterPanel();
+					sifp.itemXml = sumItem;
+					sifp.modelCode = this.modelCode;
+					sifp.datasource = this.datasource;
+					sifp.allFieldsCol = allFieldsCol;
+					sifp.itemsVBox = itemsVbox;
+//					sifp.formService = formService;
+					itemsVbox.addChild(sifp);
+				}
+			}
+			
+			protected function close():void
+			{
+				PopUpManager.removePopUp(this);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" id="cardBox" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%" horizontalAlign="left" >
+			<mx:LinkButton icon="{AssetsFileLib.addIcon}" toolTip="增加" width="20" height="20" click="add()"/>
+			<mx:Label width="100%" fontWeight="bold" text="已有的字段过滤器" toolTip="单击'+'号增加新的过滤器" textAlign="center" />
+		</mx:HBox>
+		<mx:HRule width="100%" />
+		<mx:VBox width="100%" height="100%" id="itemsVbox" />
+	</mx:VBox>
+</mx:TitleWindow>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ActivityTemplate xmlns="smartx.flex.components.core.workflow.*" xmlns:mx="http://www.adobe.com/2006/mxml"
+	source="{AssetsFileLib.workflow2Icon}"
+	templateXML="{xml}" toolTip="结束环节"
+	>
+	<mx:Script>
+		<![CDATA[
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			[Bindable]
+			private var xml:XML = 
+			<activity>
+				  <code>End</code> 
+				  <wfname>结束环节</wfname> 
+				  <uiname>结束</uiname> 
+				  <x>0</x> 
+				  <y>0</y> 
+				  <afterInterceptorClassName /> 
+				  <beforeInterceptorClassName /> 
+				  <performMode>Automatic</performMode> 
+				  <splitType>AND</splitType> 
+				  <joinType>AND</joinType> 
+				  <joinCondition /> 
+				  <taskAssignRules/> 
+				  <description /> 
+	 		 </activity>;
+		]]>
+	</mx:Script>
+	
+</ActivityTemplate>

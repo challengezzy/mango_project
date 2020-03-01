@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="100%" height="100%" xmlns:flexiframe="com.google.code.flexiframe.*">
+	<mx:Script>
+		<![CDATA[
+			import com.google.code.flexiframe.IFrame;
+			
+			import mx.containers.TitleWindow;
+			import mx.core.Application;
+			import mx.core.FlexGlobals;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.utils.URLUtil;
+			
+			import smartx.flex.components.util.SuperWebBrowserPanel;
+			private function enter():void{
+				var window:SuperWebBrowserPanel = new SuperWebBrowserPanel();
+				window.title = "jwebap监控";
+				window.url = URLUtil.getFullURL(FlexGlobals.topLevelApplication.url,"./detect");
+				PopUpManager.addPopUp(window,this,true);
+				PopUpManager.centerPopUp(window);
+			}
+		]]>
+	</mx:Script>
+	<mx:VBox id="mainBox" width="100%" height="100%" horizontalAlign="center" verticalAlign="middle" backgroundColor="#C5EFF7">
+		<mx:Button label="点击进入jwebap监控..." click="enter()" labelPlacement="bottom">
+			<mx:icon>@Embed(source='../../../assets/images/jwebapLogo.png')</mx:icon>
+		</mx:Button>
+	</mx:VBox>
+</mx:Module>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ====================================================================== 
+     MangoJava代码编译，编译完成为生成MangoJava.jar       
+     ====================================================================== -->
+<project name="MangoJava" basedir="." default="jar">
+
+	<property name="lib.classpath" value="../lib" />
+	<property name="compile.src" value="../src" />
+	<property name="compile.dest" value="./temp" />
+	<property name="jar.dest" value="../jar" />
+	<property name="jar.filename" value="MangoJava.jar" />
+
+	<path id="java.classpath">
+		<fileset dir="${lib.classpath}" includes="*.jar" />
+		<!--<fileset dir="${lib.classpath}" includes="simplexml/*.jar" />-->
+	</path>
+
+
+	<target name="jar" depends="compile">
+		<mkdir dir="${jar.dest}" />
+		<jar destfile="${jar.dest}/${jar.filename}" basedir="${compile.dest}">
+			<fileset dir="${compile.src}" includes="**/*.java"/>
+		</jar>
+		<delete dir="${compile.dest}"/>
+	</target>
+
+	<target name="compile" depends="clean">
+		<mkdir dir="${compile.dest}" />
+		<echo message="...创建compile.desc目录..." />
+		<javac debug="true" srcdir="${compile.src}" destdir="${compile.dest}" nowarn="true">
+			<classpath refid="java.classpath" />
+		</javac>
+		<echo message="...javac完成..." />
+	</target>
+
+	<target name="clean">
+		<delete dir="${compile.dest}" />
+		<delete dir="${jar.dest}" />
+	</target>
+
+</project>

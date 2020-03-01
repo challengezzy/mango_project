@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009"
+						 xmlns:s="library://ns.adobe.com/flex/spark"
+						 xmlns:mx="library://ns.adobe.com/flex/mx"
+						 xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*"
+						 width="100%" height="100%" label="仪表盘"
+						 creationComplete="init()">
+	<fx:Declarations>
+		<mx:TitleWindow id="entitySelectWindow" width="400" height="350" title="实体列表" showCloseButton="true" close="PopUpManager.removePopUp(entitySelectWindow)">
+			<mx:VBox width="100%" height="100%" paddingBottom="5"
+					 paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+				<mx:DataGrid id="dataGrid" width="100%" height="100%" allowMultipleSelection="true"
+							 dataProvider="{contentXml.entities.entity}" doubleClickEnabled="true"
+							 itemDoubleClick="onSetLayout()">
+					<mx:columns>
+						<mx:DataGridColumn dataField="@name" headerText="名称"/>
+						<mx:DataGridColumn dataField="@code" headerText="编码"/>
+					</mx:columns>
+				</mx:DataGrid>
+			</mx:VBox>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="onSetLayout()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(entitySelectWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="contentXmlTw" title="元数据" showCloseButton="true" width="800" height="500" close="PopUpManager.removePopUp(contentXmlTw)">
+			<mx:TextArea id="contentXmlText" width="100%" height="100%" editable="false" />
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.effects.Effect;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.Pixelate;
+			
+			import smartx.bam.flex.modules.dashboard.DashboardLayoutPanel;
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.mtchart.MTChartPanel;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.MemoryUtil;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			private var searchDashbordSQL:String  ="select name,code,layout_mtcode mtcode,refreshinterval reftime,content from v_bam_dashboard";
+			
+			private var loginName:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME) as String;
+			
+			[Bindable]
+			public var isEdit:Boolean = true;
+			
+			[Bindable]
+			private var switchEffect:Effect;
+			
+			[Bindable]
+			public var saveFun:Function;
+			
+			[Bindable]
+			public var refresh:Function;
+			
+			private var content:String;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			[Bindable]
+			public var seletedDashbordXml:XML;
+			
+			[Bindable]
+			public var dashbordMtContent:XML;
+			
+			private var saveInfo:Object;
+			
+			private var isSaveSuccessful:Boolean = false;
+			
+			private var layoutManager:DashboardLayoutPanel;
+			
+			private var hasSaved:Boolean = false;
+			
+			public var doCodes:Array;
+			
+			private function init():void{
+				if(switchEffect == null)
+					switchEffect = new Pixelate();
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = endpoint;
+				
+				formService.getSimpleHashVOMap.addEventListener(ResultEvent.RESULT,getSimpleHashVOMapHandler);
+				formService.getSimpleHashVOMap.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取数据时出错",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.saveEntityDashbord.addEventListener(ResultEvent.RESULT,saveDashbordHandler);
+				bamService.saveEntityDashbord.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("保存时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.updateEntityDashbord.addEventListener(ResultEvent.RESULT,updateDashbordHandler);
+				bamService.updateEntityDashbord.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("更新时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				bamService.deleteEntityDashbord.addEventListener(ResultEvent.RESULT,deleteEntityDashbordHandler);
+				bamService.deleteEntityDashbord.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("删除时出错",SmartXMessage.MESSAGE_ERROR,"错误详情:"+event.fault.faultString);
+				});
+				
+				isCreationComplete = true;
+				showHandler();
+			}
+			
+			public function showHandler():void{
+				hasSaved = false;
+				layoutManager = new DashboardLayoutPanel();
+				if(seletedDashbordXml != null ){
+					if(isEdit){
+						dashbordNameTxt.text = String(seletedDashbordXml.@name);
+						dashbordDescTxt.text = String(seletedDashbordXml.@desc);
+						dashbordRefTimeTxt.text = String(seletedDashbordXml.@reftime);
+						var code:String = String(seletedDashbordXml.@code);
+						dashbordCodeTxt.text = code;
+						formService.getSimpleHashVOMap(null,searchDashbordSQL+" where code='"+code+"'");
+					}else{
+						dashbordNameTxt.text = "";
+						dashbordDescTxt.text = "";
+						dashbordRefTimeTxt.text = "";
+						dashbordCodeTxt.text = "";
+						saveInfo = new Object();
+						content = "<dashboard><layout/><pods/><relations /><guides /></dashboard>";
+						dashbordMtContent = new XML(content);
+						
+						layoutManager.contentXml =dashbordMtContent.copy();
+						layoutManager.confirmFunc = confirmBtnClick;
+						
+						dashbordMtContent = new XML(content);
+						podsList.invalidateList();
+					}
+				}
+			}
+			
+			
+			private function saveDashbordHandler(event:ResultEvent):void{
+				var code:String = event.result as String;
+				var seletedDashbordXml:XML = <dashbord />;
+				if(contentXml.dashbords.length()<=0 ){
+					contentXml.appendChild(new XML("<dashbords />"));
+				}
+				dashbordCodeTxt.text = code;
+				seletedDashbordXml.@name = dashbordNameTxt.text;
+				seletedDashbordXml.@code = code;
+				seletedDashbordXml.@desc = dashbordDescTxt.text;
+				seletedDashbordXml.@reftime = dashbordRefTimeTxt.text;
+				contentXml.dashbords.appendChild(seletedDashbordXml);
+				
+				hasSaved = true;
+				refresh();
+				saveFun();
+				
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(code,endpoint);
+				
+			}
+			
+			private function updateDashbordHandler(event:ResultEvent):void{
+				
+				seletedDashbordXml.@name = dashbordNameTxt.text;
+				seletedDashbordXml.@desc = dashbordDescTxt.text;
+				seletedDashbordXml.@reftime = dashbordRefTimeTxt.text;
+				
+				saveFun();
+				
+				refresh();
+				
+				MetadataTempletUtil.getInstance().flushMetadataTempletByMtcode(String(seletedDashbordXml.@code),endpoint);
+				
+			}
+			
+			private function deleteEntityDashbordHandler(event:ResultEvent):void{
+				CEPUtils.xmlDeleteNode(seletedDashbordXml);
+				seletedDashbordXml = null;
+				saveFun();
+			}
+			
+			private function getSimpleHashVOMapHandler(event:ResultEvent):void{
+				var obj:Object = event.result;
+				var doArr:Array = obj["SIMPLEHASHVOARRAY"] as Array;
+				for each(var sp:SimpleHashVO in doArr){
+					saveInfo = sp.dataMap;
+				}
+				content = saveInfo["content"];
+				dashbordMtContent = new XML(content);
+				
+				layoutManager.contentXml =dashbordMtContent.copy();
+				layoutManager.confirmFunc = confirmBtnClick;
+				
+				dashbordMtContent = new XML(content);
+				podsList.invalidateList();
+				
+			}
+			
+			protected function onDesign():void{
+				layoutManager.contentXml =dashbordMtContent.copy();
+				if(desktop != null){
+					PopUpManager.addPopUp(layoutManager,desktop,true);
+				}else{
+					PopUpManager.addPopUp(layoutManager,this,true);
+				}
+				
+				PopUpManager.centerPopUp(layoutManager);
+				
+				layoutManager.removePodsBox();
+				
+				PopUpManager.removePopUp(entitySelectWindow);
+				
+			}
+			
+			private function confirmBtnClick():void{
+				content = layoutManager.getContentXml();
+				dashbordMtContent = new XML(content);
+				PopUpManager.removePopUp(layoutManager);
+			}
+		
+			protected function onSave():void{
+				content = dashbordMtContent.toXMLString();
+				var dataViewerName:String = dashbordNameTxt.text;
+				var dataViewerDesc:String = dashbordDescTxt.text;
+				var dataDashbordRefTime:String = dashbordRefTimeTxt.text;
+				
+				if( BAMUtil.isEmpty(dataViewerName)){
+					SmartXMessage.show("名称不能为空!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				saveInfo["name"] = dataViewerName;
+				saveInfo["description"] = dataViewerDesc;
+				saveInfo["content"] = content;
+				saveInfo["user"] = loginName;
+				saveInfo["reftime"] = dataDashbordRefTime;
+				if(!isEdit){
+					saveInfo["code"] = contentXml.entityModelCode;
+					if(!hasSaved){
+						bamService.saveEntityDashbord(saveInfo);
+					}
+				}else{
+					bamService.updateEntityDashbord(saveInfo);
+				}
+			}
+			
+			private function onSetLayout():void{
+				
+				var selectedArr:Array = dataGrid.selectedItems;
+				PopUpManager.removePopUp(entitySelectWindow)
+				if(selectedArr != null && selectedArr.length >0){
+					
+					doCodes = new Array();
+					
+					for each(var tempEntityXml:XML in selectedArr){
+						for each(var dashbordObject:XML in tempEntityXml.dataviewers.dataviewer){
+							doCodes.push(String(dashbordObject.@code));
+						}
+					}
+					
+					var dialog:RefDialog = new RefDialog();
+					var sql:String = "";
+					if(doCodes == null)
+						sql = "select v.code as id#,v.code 编码#,v.name 名称 from v_BAM_DASHBOARDOBJECT v";
+					else{
+						var doCodesStr:String = "";
+						for(var i:int=0;i<doCodes.length;i++){
+							if(i == doCodes.length-1)
+								doCodesStr = doCodesStr.concat("'").concat(doCodes[i]).concat("'");
+							else
+								doCodesStr = doCodesStr.concat("'").concat(doCodes[i]).concat("'").concat(",");
+						}
+						if(doCodesStr != "")
+							sql = "select v.code as id#,v.code 编码#,v.name 名称 from v_BAM_DASHBOARDOBJECT v where v.code in("+doCodesStr+")";
+						else
+							sql = "select v.code as id#,v.code 编码#,v.name 名称 from v_BAM_DASHBOARDOBJECT v where 1=2"
+					}
+					dialog.init2(formService,sql,null);
+					dialog.title = "选择仪表盘对象";
+					dialog.allowMultipleSelection = true;
+					dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+						if(dialog.closeByConfirm){
+							for each(var item:Object in dialog.seletedItemsArray){
+								layoutManager.contentXml =dashbordMtContent.copy();
+								var newPod:XML = new XML("<pod/>");
+								newPod.@dbocode = item[RefDialog.itemId];
+								newPod.@dboname = item[RefDialog.itemName];
+								newPod.@code = layoutManager.getNextPodCode();
+								dashbordMtContent.pods.appendChild(newPod);
+								if(dashbordMtContent.layout.@type == BAMConst.LAYOUTTYPE_MDIWINDOW){
+									var newPodRef:XML = new XML("<podref/>");
+									newPodRef.@code = newPod.@code;
+									dashbordMtContent.layout.mdiWindowLayout.sequence.appendChild(newPodRef);
+								}
+							}
+							
+							podsList.invalidateList();
+							
+						}
+					});
+					
+					if(desktop != null){
+						PopUpManager.addPopUp(dialog,desktop,true);
+					}else{
+						PopUpManager.addPopUp(dialog,this,true);
+					}
+					PopUpManager.centerPopUp(dialog);
+					
+				}else{
+					 SmartXMessage.show("请先选择一条或多条实体记录!",SmartXMessage.MESSAGE_WARN);
+				}
+			}
+			
+			private function onAddPod():void{
+				
+				if(desktop != null){
+					PopUpManager.addPopUp(entitySelectWindow,desktop,true);
+				}else{
+					PopUpManager.addPopUp(entitySelectWindow,this,true);
+				}
+				PopUpManager.centerPopUp(entitySelectWindow);
+				
+			}
+			
+			private function onDeletePod():void{
+				var doArr:Array = podsList.selectedItems;
+				if(doArr.length == 0)//未选中要删除的对象
+					return;
+				for each(var podXML:XML in doArr){
+					var layOutType:String = String(dashbordMtContent.layout.@type);
+					if(layOutType == BAMConst.LAYOUTTYPE_MDIWINDOW){
+						for each(var podRefXML:XML in dashbordMtContent.layout..podref.(@code==podXML.@code)){
+							CEPUtils.xmlDeleteNode(podRefXML);
+						}
+					}else if(layOutType == BAMConst.LAYOUTTYPE_BOX){
+						var boxlayoutTreeXml:XML = dashbordMtContent.layout.boxLayout[0];
+						layoutManager.getAllPodref(boxlayoutTreeXml,podXML.@code);
+					}
+					for each(var relPodSrcXml:XML in dashbordMtContent.relations.relation.(@src== podXML.@code)){
+						CEPUtils.xmlDeleteNode(relPodSrcXml);
+					}
+					for each(var relPodDestXml:XML in dashbordMtContent.relations.relation.(@dest== podXML.@code)){
+						CEPUtils.xmlDeleteNode(relPodDestXml);
+					}
+					CEPUtils.xmlDeleteNode(podXML);
+					layoutManager.contentXml =dashbordMtContent.copy();
+				}
+				podsList.invalidateList();
+			}
+			
+			private function entityLabelFunction(item:Object,column:DataGridColumn):String{
+				var entityName:String = "";
+				var dbcode:String = item["dbcode"] as String;
+				var hasFound:Boolean = false;
+				for each(var tempEntityXml:XML in contentXml.entities.entity){
+					entityName = String(tempEntityXml.@name);
+					for each(var dboXml:XML in tempEntityXml.dataviewers.dataviewer){
+						var tempCode:String = String(dboXml.@code);
+						if(!BAMUtil.isEmpty(tempCode) && !BAMUtil.isEmpty(dbcode) && tempCode == dbcode){
+							hasFound = true;
+							break;
+						}
+					}
+					if(hasFound){
+						break;
+					}
+				}
+				return entityName;
+			}
+			
+			private function showXml():void{
+				if(desktop != null){
+					PopUpManager.addPopUp(contentXmlTw,desktop,true);
+				}else{
+					PopUpManager.addPopUp(contentXmlTw,this,true);
+				}
+				PopUpManager.centerPopUp(contentXmlTw);
+				contentXmlText.text = dashbordMtContent.toXMLString();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox id="cardVbox" width="100%" height="100%" paddingBottom="5"
+			 paddingLeft="5" paddingRight="5" paddingTop="5" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+		<mx:HBox width="100%">
+			<mx:Button label="保存" toolTip="保存当前信息" click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+			<mx:Button label="高级" click="onDesign()" icon="{AssetsFileLib.designIcon}" toolTip="进入布局设计"/>
+			<mx:Button label="查看XML" toolTip="查看XML" visible="{debugMode}" click="showXml()" icon="{AssetsFileLib.viewIcon}" />
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="名称" width="25%" color="blue"/>
+			<mx:TextInput id="dashbordNameTxt" width="50%" />
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="编码" toolTip="无需填写,自动生成" width="25%"/>
+			<mx:TextInput id="dashbordCodeTxt" editable="false" toolTip="无需填写,自动生成" width="50%" />
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="刷新时间" width="25%" color="blue"/>
+			<mx:TextInput id="dashbordRefTimeTxt" width="50%" restrict="\-,0-9" />
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:Label text="描述" width="25%" />
+			<mx:TextArea id="dashbordDescTxt" width="50%" height="100" />
+		</mx:HBox>
+		<mx:HBox width="100%" >
+			<mx:LinkButton width="22" height="22" click="onAddPod()" icon="{AssetsFileLib.addIcon}" toolTip="新建"/>
+			<mx:LinkButton width="22" height="22" click="onDeletePod()" icon="{AssetsFileLib.minuseIcon}" toolTip="删除"/>
+		</mx:HBox>
+		<mx:DataGrid id="podsList" width="100%" height="100%" allowMultipleSelection="true" dataProvider="{dashbordMtContent.pods.pod}" editable="true" sortableColumns="true">
+			<mx:columns>
+				<mx:DataGridColumn dataField="@code" editable="false" headerText="显示对象编码"/>
+				<mx:DataGridColumn dataField="@dboname" editable="false"  headerText="关联的仪表盘对象名称"/>
+				<mx:DataGridColumn dataField="@dbocode" editable="false" headerText="关联的仪表盘对象编码"/>
+				<mx:DataGridColumn dataField="title" editable="true" headerText="标题名称"/>
+				<mx:DataGridColumn labelFunction="entityLabelFunction" editable="false" headerText="所属实体"/>
+			</mx:columns>
+		</mx:DataGrid>
+		
+	</mx:VBox>
+</entitymodel:AbstractTab>

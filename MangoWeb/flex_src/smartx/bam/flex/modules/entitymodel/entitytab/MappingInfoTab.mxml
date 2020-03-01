@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="utf-8"?>
+<entitymodel:AbstractTab xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 label="映射" creationComplete="creationCompleteHandler()"
+		 width="100%" height="100%" xmlns:entitymodel="smartx.bam.flex.modules.entitymodel.entitytab.*"
+		 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" show="abstracttab_showHandler(event)">
+	<fx:Declarations>
+		<mx:TitleWindow id="attMappingWindow" width="400" height="200" showCloseButton="true"
+						close="PopUpManager.removePopUp(attMappingWindow)">
+			<mx:VBox width="100%" height="100%" verticalAlign="middle" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="属性名称" width="25%" />
+					<mx:ComboBox id="attNameCbo" labelField="@name" 
+								 dataProvider="{selectedItem.content.attributes.attribute}" width="60%" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="数据列名" width="25%" />
+					<mx:ComboBox id="tableColCbo" width="60%" dataProvider="{tableColArr}"/>
+				</mx:HBox>
+				<mx:HRule width="100%" height="2"/>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="确定" click="addAttMappingBtn_confirmHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(attMappingWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			[Bindable]
+			private var typeDp:ArrayCollection = new ArrayCollection([
+				{name:"关系表",data:"table"},
+				{name:"查询视图",data:"queryView"}
+			]);
+			//查询视图参照
+			private var queryViewRefPanel:ItemRefPanel;
+			
+			private var tableNameRefPanel:ItemRefPanel;
+			
+			private var rpc:RemoteObject;
+			[Bindable]
+			private var tableColArr:ArrayCollection = new ArrayCollection();
+			
+			private var isEdit:Boolean = true;
+			
+			private var selectedAttMapping:Object;
+			
+			public var datasourceName:String;
+			
+			private function creationCompleteHandler():void{
+				rpc = new RemoteObject(GlobalConst.SERVICE_FORM);
+				rpc.endpoint = endpoint;
+				rpc.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,getTableDataStructByDSHandler);
+				rpc.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,getTableDataStructByDSFaultHandler);
+				isCreationComplete = true;
+			}
+			
+			private function setTypeDp():void{
+				for each(var type:Object in typeDp){
+					if(type.data == selectedItem.content.mappingInfo.@type){
+						typeCbo.selectedItem = type;
+						break;
+					}else
+						typeCbo.selectedIndex = 0;
+				}
+				switchState(String(typeCbo.selectedItem.data)==""?"table":String(typeCbo.selectedItem.data));
+			}
+			
+			private function getTableDataStructByDSHandler(event:ResultEvent):void{
+				tableColArr.removeAll();
+				var result:TableDataStruct = event.result as TableDataStruct;
+				tableColArr.addAll(new ArrayCollection(result.table_header));
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function getTableDataStructByDSFaultHandler(event:FaultEvent):void{
+				SmartXMessage.show("获取表结构错误!",SmartXMessage.MESSAGE_ERROR,"错误:"+event.fault.faultString);
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function addAttMap():void{
+				PopUpManager.addPopUp(attMappingWindow,this,true);
+				PopUpManager.centerPopUp(attMappingWindow);
+				attMappingWindow.title = "新增属性映射";
+				attNameCbo.dataProvider = selectedItem.content.attributes.attribute;
+				isEdit = false;
+			}
+			
+			private function deleteAttMap():void{
+				if(attMapDg.selectedItems.length == 0)
+					return;
+				for each(var attMapXml:XML in attMapDg.selectedItems){
+					CEPUtils.xmlDeleteNode(attMapXml);
+				}
+				refreshAttMapDg();
+			}
+			
+			private function editAttMap():void{
+				if(attMapDg.selectedIndex < 0)
+					return;
+				selectedAttMapping = attMapDg.selectedItem;
+				PopUpManager.addPopUp(attMappingWindow,this,true);
+				PopUpManager.centerPopUp(attMappingWindow);
+				attMappingWindow.title = "编辑属性映射";
+				attNameCbo.dataProvider = selectedItem.content.attributes.attribute;
+				isEdit = true;
+				for each(var att:XML in selectedItem.content.attributes.attribute){
+					if(String(att.@name) == String(selectedAttMapping.@attributeName)){
+						attNameCbo.selectedItem = att;
+						break;
+					}else
+						attNameCbo.selectedItem = null;
+				}
+				
+				for each(var tableCol:String in tableColArr){
+					if(tableCol == String(selectedAttMapping.@columnName)){
+						tableColCbo.selectedItem = tableCol;
+						break;
+					}else
+						tableColCbo.selectedItem = null;
+				}
+			}
+			
+			private function initQueryViewRefPanel():void{
+				if(queryViewRefPanel != null && tabHbox.contains(queryViewRefPanel))
+					tabHbox.removeChild(queryViewRefPanel);
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="查询视图";
+				templetItemVO.itemkey="queryView";
+				templetItemVO.refdesc="select datasourcename value#,code || '@@' ||sql code#,name 名称 from V_BAM_QUERYVIEW where datasourcename='"+datasourceName+"';ds=datasource_default";
+				queryViewRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				queryViewRefPanel.setInputWidth(200);
+				queryViewRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(queryViewRefPanel.returnVO != null){
+						selectedItem.content.mappingInfo.queryView = queryViewRefPanel.returnVO.code;
+						selectedItem.content.mappingInfo.queryView.@name = queryViewRefPanel.returnVO.name;
+						selectedItem.content.mappingInfo.datasource = datasourceName;
+						rpc.getTableDataStructByDS(queryViewRefPanel.stringValue,"select * from ("+queryViewRefPanel.returnVO.code.split("@@")[1]+") where 1=2");
+					}
+				});
+				tabHbox.addChild(queryViewRefPanel);
+			}
+			
+			private function initRelationTableRefPanel():void{
+				if(tableNameRefPanel!=null && tabHbox.contains(tableNameRefPanel))
+					tabHbox.removeChild(tableNameRefPanel);
+				
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="关系表";
+				templetItemVO.itemkey="tablename";
+				templetItemVO.refdesc="select table_name value#,1 code#,table_name 名称 from user_tables union " +
+					"select view_name value#,1 code#,view_name 名称 from user_views;ds="+datasourceName;
+				tableNameRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				tableNameRefPanel.setInputWidth(200);
+				tableNameRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(tableNameRefPanel.returnVO != null){
+						selectedItem.content.mappingInfo.tableName = tableNameRefPanel.stringValue;
+						selectedItem.content.mappingInfo.datasource = datasourceName;
+						rpc.getTableDataStructByDS(datasourceName,"select * from ("+tableNameRefPanel.stringValue+") where 1=2");
+					}
+				});
+				tabHbox.addChild(tableNameRefPanel);
+			}
+			
+			private function switchState(state:String):void{
+				var simpleRefItemVO:SimpleRefItemVO = new SimpleRefItemVO();
+				switch(state){
+					case "table":
+						currentState = "table";
+						callLater(function():void{
+							if(selectedItem.content.mappingInfo.queryView.length() >0)
+								CEPUtils.xmlDeleteNode(XML(selectedItem.content.mappingInfo.queryView));
+							if(queryViewRefPanel && tabHbox.contains(queryViewRefPanel))
+								tabHbox.removeChild(queryViewRefPanel);
+							initRelationTableRefPanel();
+							simpleRefItemVO.name = selectedItem.content.mappingInfo.tableName;
+							simpleRefItemVO.id = selectedItem.content.mappingInfo.datasource;
+							tableNameRefPanel.data = {"tablename":simpleRefItemVO};
+							if(selectedItem.content.mappingInfo.tableName.length() > 0)
+								rpc.getTableDataStructByDS(datasourceName,"select * from ("+selectedItem.content.mappingInfo.tableName[0]+") where 1=2");
+							else
+								OperatingTipUtil.endOperat();
+								
+						});
+						break;
+					case "queryView":
+						currentState = "queryView";
+						callLater(function():void{
+							if(selectedItem.content.mappingInfo.tableName.length() > 0)
+								CEPUtils.xmlDeleteNode(XML(selectedItem.content.mappingInfo.tableName));
+							if(tableNameRefPanel && tabHbox.contains(tableNameRefPanel))
+								tabHbox.removeChild(tableNameRefPanel);
+							initQueryViewRefPanel();
+							simpleRefItemVO.name = selectedItem.content.mappingInfo.queryView.@name;
+							simpleRefItemVO.code = selectedItem.content.mappingInfo.queryView;
+							simpleRefItemVO.id = selectedItem.content.mappingInfo.datasource;
+							queryViewRefPanel.data = {"queryView":simpleRefItemVO};
+							if(selectedItem.content.mappingInfo.queryView.length() > 0)
+								rpc.getTableDataStructByDS(datasourceName,"select * from ("+selectedItem.content.mappingInfo.queryView.split("@@")[1]+") where 1=2");
+							else
+								OperatingTipUtil.endOperat();
+						});
+						break;
+				}
+			}
+			
+			protected function typeCbo_changeHandler(event:ListEvent):void{
+				switchState(String(typeCbo.selectedItem.data)==""?"table":String(typeCbo.selectedItem.data));
+				selectedItem.content.mappingInfo.@type = typeCbo.selectedItem.data;
+			}
+			
+			private function addAttMappingBtn_confirmHandler():void{
+				if(attNameCbo.selectedItem == null){
+					SmartXMessage.show("属性名称不能为空！");
+					return;
+				}
+				if(tableColCbo.selectedItem == null || tableColCbo.selectedItem == ""){
+					SmartXMessage.show("数据列名不能为空！");
+					return;
+				}
+				if(!isEdit){
+					selectedItem.content.mappingInfo.attributeMapping
+						.appendChild(<map attributeName={attNameCbo.selectedItem.@name} columnName={tableColCbo.selectedItem}/>);
+				}else{
+					selectedAttMapping.@attributeName = attNameCbo.selectedItem.@name;
+					selectedAttMapping.@columnName = tableColCbo.selectedItem;
+				}
+				refreshAttMapDg();
+				PopUpManager.removePopUp(attMappingWindow);
+			}
+			
+			private function refreshAttMapDg():void{
+				attMapDg.dataProvider = selectedItem.content.mappingInfo.attributeMapping.map;
+				attMapDg.invalidateList();
+			}
+			
+			public function showHandler():void{
+				OperatingTipUtil.startOperat("加载中...",desktop);
+				if(selectedItem.content.mappingInfo.attributeMapping.length() == 0)
+					selectedItem.content.mappingInfo.appendChild(<attributeMapping />);
+				if(String(selectedItem.content.mappingInfo.@type)=="")
+					selectedItem.content.mappingInfo.@type = "table";
+				setTypeDp();
+			}
+			
+			private function attMapDg_doubleClickHandler(event:MouseEvent):void{
+				editAttMap();
+			}
+			
+			private function abstracttab_showHandler(event:FlexEvent):void{
+				callLater(function():void{
+					refreshAttMapDg();
+				});
+			}
+			
+			protected function filterTxt_changeHandler(event:Event):void{
+				selectedItem.content.mappingInfo.filter = filterTxt.text;
+			}
+			
+		]]>
+	</fx:Script>
+	<entitymodel:states>
+		<s:State name="table" />
+		<s:State name="queryView" />
+	</entitymodel:states>
+	<mx:HBox width="100%">
+		<mx:Label text="类型" width="25%" />
+		<mx:ComboBox id="typeCbo" width="50%" labelField="name" dataProvider="{typeDp}" change="typeCbo_changeHandler(event)"/>
+	</mx:HBox>
+	<mx:HBox width="100%" id="tabHbox">
+		<mx:Label text.table="关系表名称" text.queryView="查询视图名称" width="25%" />
+	</mx:HBox>
+	<mx:HBox width="100%">
+		<mx:Button icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addAttMap()"/>
+		<mx:Button icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteAttMap()"/>
+		<mx:Button icon="{AssetsFileLib.editIcon}" width="22" height="22" toolTip="编辑" click="editAttMap()"/>
+	</mx:HBox>
+	<mx:DataGrid id="attMapDg" width="100%" height="60%" dataProvider="{selectedItem.content.mappingInfo.attributeMapping.map}"
+				 allowMultipleSelection="true" doubleClickEnabled="true" doubleClick="attMapDg_doubleClickHandler(event)">
+		<mx:columns>
+			<mx:DataGridColumn headerText="属性名" dataField="@attributeName" />
+			<mx:DataGridColumn headerText="数据列名" dataField="@columnName" />
+		</mx:columns>
+	</mx:DataGrid>
+	<mx:HBox width="100%">
+		<mx:Label text="过滤条件" />
+		<mx:TextInput id="filterTxt" width="50%" text="{selectedItem.content.mappingInfo.filter}" change="filterTxt_changeHandler(event)"/>
+	</mx:HBox>
+	<mx:Label text="注：属性若不设置映射，则默认同名映射" color="red"  />
+</entitymodel:AbstractTab>

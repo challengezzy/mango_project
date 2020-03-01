@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" 
+	width="100%" height="100%" xmlns:components="smartx.flex.components.*" creationComplete="init()" xmlns:core="smartx.flex.components.core.*"
+	>
+	<mx:Script>
+		<![CDATA[
+			import mx.rpc.events.ResultEvent;
+			import mx.controls.Alert;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import mx.effects.Effect;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.vo.GlobalConst;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			
+			[Bindable]
+			public var switchEffect:Effect;
+			
+			[Bindable]
+			public var destinationForWorkflow:String = GlobalConst.SERVICE_WORKFLOW;
+			[Bindable]
+		    public var endpointForWorkflow:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;;
+		    
+		    private var novaWorkflowService:RemoteObject;
+			
+			private function init():void{
+				if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+					debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				buttonBox.removeAllChildren();
+				buttonBox.addChild(viewButton);
+				buttonBox.addChild(flushCacheButton);
+				
+				if(switchEffect == null)
+        			switchEffect = new CoverFlowPapervision3D();
+        			
+        		novaWorkflowService = new RemoteObject(destinationForWorkflow);
+		        if(endpointForWorkflow!=null)
+		        	novaWorkflowService.endpoint = endpointForWorkflow;
+		        novaWorkflowService.flushCache.addEventListener(ResultEvent.RESULT,flushCacheHandler);
+		        novaWorkflowService.flushCache.addEventListener(FaultEvent.FAULT,faultHandler);
+			}
+			
+			private function monitor():void{
+				var prinstanceObject:Object = listPanel.getSelectedRowValue();
+				if(prinstanceObject != null){
+					var prinstanceid:String = String(prinstanceObject["ID"]);
+					monitorPanel.processInstanceId = prinstanceid;
+					monitorPanel.startMonitor();
+					mainViewStack.selectedChild = monitorPanel;
+					buttonBox.removeAllChildren();
+					buttonBox.addChild(refreshButton);
+					buttonBox.addChild(returnButton);
+				}
+			}
+			
+			private function refresh():void{
+				monitorPanel.startMonitor();
+			}
+			
+			private function returnToList():void{
+				mainViewStack.selectedChild = listPanel;
+				buttonBox.removeAllChildren();
+				buttonBox.addChild(viewButton);
+				buttonBox.addChild(flushCacheButton);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+		    
+		    private function flushCacheHandler(event:ResultEvent):void{
+		    	Alert.show("流程缓存刷新成功!");
+		    }
+			
+			private function flushCache():void{
+				novaWorkflowService.flushCache();
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" id="buttonBox">
+		<mx:Button id="viewButton" label="监控" click="monitor()" icon="@Embed(source='../../assets/images/eye.png')"/>
+		<mx:Button id="flushCacheButton" label="刷新缓存" click="flushCache()" icon="@Embed(source='../../assets/images/flush.png')"/>
+		<mx:Button id="refreshButton" label="刷新" click="refresh()" icon="@Embed(source='../../assets/images/refresh.png')"/>
+		<mx:Button id="returnButton" label="返回" click="returnToList()" icon="@Embed(source='../../assets/images/return.png')"/>
+	</mx:HBox>
+	<mx:HBox width="100%" height="1" backgroundColor="black"/>
+	<mx:ViewStack width="100%" height="100%" id="mainViewStack" creationPolicy="all">
+		<core:BillListPanel id="listPanel" templetCode="PUB_WF_PRINSTANCE_CODE1" 
+			width="100%" height="100%" debugMode="{debugMode}" showEffect="{switchEffect}" hideEffect="{switchEffect}"
+			endpoint="{endpointForWorkflow}"/>
+		<core:BillWorkflowMonitorPanel id="monitorPanel" width="100%" height="100%" showEffect="{switchEffect}" hideEffect="{switchEffect}"
+									   endpointForWorkflow="{endpointForWorkflow}"/>
+	</mx:ViewStack>
+</mx:Module>

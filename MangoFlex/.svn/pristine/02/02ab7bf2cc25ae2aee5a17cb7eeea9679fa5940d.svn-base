@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="400" height="500" close="{PopUpManager.removePopUp(this)}" showCloseButton="true" title="数据库记录详情" fontSize="12" creationComplete="init()">
+	<mx:Script>
+        <![CDATA[
+			import smartx.flex.components.vo.TableDataStruct;
+        	import mx.managers.PopUpManager;
+        	import mx.controls.Alert;
+        	import mx.rpc.remoting.mxml.RemoteObject;
+        	import mx.collections.ArrayCollection;
+        	import mx.rpc.events.FaultEvent;
+        	import mx.rpc.events.ResultEvent;
+        	[Bindable]
+        	public var sql:String;
+        	public var destination:String;
+        	public var endpoint:String;
+        	public var datasource:String;
+        	private var formService:RemoteObject;
+        	private var tableDataStruct:TableDataStruct;
+        	
+        	private function init():void{
+        		if(sql == null || destination == null)
+        			throw new Error("必须指定sql语句或者destination");
+        		formService = new RemoteObject(destination);
+		        if(endpoint!=null)
+		        	formService.endpoint = endpoint;
+		        formService.getTableDataStructByDS.addEventListener(ResultEvent.RESULT,resultHandler);
+		        formService.getTableDataStructByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+		        formService.getTableDataStructByDS(datasource,sql);
+        	}
+        	
+        	private function resultHandler(event:ResultEvent):void{   
+				tableDataStruct = event.result as TableDataStruct;
+				var headers:Array = tableDataStruct.table_header;
+				var types:Array = tableDataStruct.table_body_type;
+				var values:Array = tableDataStruct.table_body;
+				if(values.length != 1)
+					throw new Error("只能显示一条记录");
+				var gridData:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<headers.length;i++){
+					var o:Object = new Object();
+					o.columnName = headers[i];
+					o.columnType = types[i];
+					o.value = values[0][i];
+					gridData.addItem(o);
+				}
+				dataGrid.dataProvider = gridData;
+		    }
+		    
+        	private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+		    
+        ]]>
+    </mx:Script>
+	<mx:Text width="100%" id="sqlText" text="{sql}"/>
+	<mx:DataGrid width="100%" height="100%" id="dataGrid" horizontalScrollPolicy="on">
+		<mx:columns>
+			<mx:DataGridColumn headerText="字段名称" dataField="columnName"/>
+			<mx:DataGridColumn headerText="字段类型" dataField="columnType"/>
+			<mx:DataGridColumn headerText="值" dataField="value"/>
+		</mx:columns>
+	</mx:DataGrid>
+	
+</mx:TitleWindow>

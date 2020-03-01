@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:core="smartx.flex.components.core.*"
+		 showCloseButton="true" close="PopUpManager.removePopUp(this)"
+		 title="任务创建" width="860" height="520" initialize="init()" xmlns:itemcomponent="smartx.flex.components.itemcomponent.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			[Bindable]
+			public var templetCode:String = "T_BAM_TASK_CREATE";//任务创建模板
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+
+			private var bamService:RemoteObject;
+			private var formService:RemoteObject;
+			
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;	
+			[Bindable]
+			public var messageObj:Object;//原消息对象
+			
+			private var taskObj:Object;//任务对象
+			
+			[Bindable]
+			private var allUserArray:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var watcherArray:ArrayCollection = new ArrayCollection();
+			
+			private function init():void{
+				var nowStr:String = StringUtils.convertDateToString(new Date(),1);
+				
+				var originContent:String = " 消息主题：" + messageObj["SUBJECT"] + "\n 触发时间：" + messageObj["ACTIVATETIME"] 
+					+ "\n 重要程度：" + messageObj["SEVERITY"] + "\n 内容：\n" + messageObj["MSG"];
+				
+				taskObj = new Object();
+				taskObj.ORIGINSOURCE = messageObj["SUBJECT"];
+				taskObj.CREATEDATE = nowStr;
+				taskObj.LASTUPDATED = nowStr;
+				taskObj.ORIGINCONTENT = originContent;
+				taskObj.STATE = BAMConst.STATE_INCOMPLETE;
+				taskObj.ALERTMESSAGEID = messageObj["ID"]
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				bamService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				bamService.saveTaskWatcher.addEventListener(ResultEvent.RESULT,onSaveTaskWatcher);
+				bamService.saveTaskWatcher.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					Alert.show("保存任务观察者信息错误:"+event.fault.faultDetail,"error");
+				});
+				
+				formService = new RemoteObject(destination);
+				formService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			}
+			
+			private function initCardPanelComplete():void{
+				cardPanel.setDataValue(taskObj);				
+				TempletDataUtil.setTempletValue("STATE","0",taskObj,cardPanel.getTempletVO());
+				cardPanel.insertMode = true;		
+				
+			}
+			
+			private function onConfirm():void{
+				cardPanel.save();
+			}
+			
+			private function onSaveSuccessful():void{
+				cardPanel.insertMode = false;
+				//持久化观察者信息
+				if(watcherArray.length > 0 ){
+					var userArr:Array = watcherArray.toArray();				
+					
+					bamService.saveTaskWatcher(null, taskObj["ID"], userArr);
+				}
+			}
+			
+			private function onSaveTaskWatcher(event:ResultEvent):void{
+				PopUpManager.removePopUp(this);
+				//给任务相关人员发送邮件
+				var mailSubject:String = "【新任务提醒】" + taskObj["SUBJECT"];
+				var mailBody:String = "\n  有个新任务被创建："+ taskObj["SUBJECT"];
+				mailBody = mailBody + "\n  当前处理人：" + taskObj["OWNER"];
+				mailBody = mailBody + "\n  处理期限：" + taskObj["DEADLINE"];
+				mailBody = mailBody + "\n  任务备注：" + taskObj["MEMO"];
+				
+				bamService.sendTaskInfoEmail(taskObj["ID"],mailSubject,mailBody);
+			}
+			
+			//添加观察者
+			private function onAddWatcher():void{
+				var dialog:RefDialog = new RefDialog();
+				
+				dialog.init2(formService,"select t.loginname 登录名#,t.name 用户名,t.loginname 登录名 from pub_user t where 1=1",null);
+				dialog.title = "观察者用户";
+				dialog.allowMultipleSelection = true;
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){						
+						for each(var item:Object in dialog.seletedItemsArray){
+							var isExist:Boolean = false;
+							//相同用户添加多次，不处理
+							for each (var temp:String in watcherArray ){
+								if(temp == item[RefDialog.itemName] ){
+									isExist = true;
+									break;
+								}
+							}
+							if(!isExist)
+								watcherArray.addItem( item[RefDialog.itemName] );							
+						}
+						watcherList.invalidateDisplayList();
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+			}
+			
+			//删除一个任务观察者
+			private function onMinuseWatcher():void{
+				if(watcherList.selectedItem == null){
+					Alert.show("请选择一个要删除的用户！");
+				}else{
+					watcherArray.removeItemAt(watcherList.selectedIndex);
+				}
+			}
+		]]>
+	</fx:Script>
+	<mx:HBox horizontalAlign="center" width="100%" height="100%">
+		<core:BillCardPanel id="cardPanel" width="75%" height="100%" title="任务信息" 
+							destination="{destination}" endpoint="{endpoint}" templetCode="{templetCode}" debugMode="{debugMode}" 
+							insert="onSaveSuccessful()" showInitingWindow="false" initComplete="initCardPanelComplete()">
+		</core:BillCardPanel>
+		<mx:VBox width="25%" height="100%" paddingLeft="10">
+			<mx:Label text="任务观察者设置：" />
+			<mx:Spacer height="5"/>
+			<mx:HBox id ="selectUserBox">
+				<mx:LinkButton  icon="{AssetsFileLib.addIcon}" toolTip="添加任务观察者" 
+								click="onAddWatcher()" paddingLeft="0" paddingRight="0"/>
+				<mx:LinkButton  icon="{AssetsFileLib.minuseIcon}" toolTip="删除任务观察者"
+								click="onMinuseWatcher()" paddingLeft="0" paddingRight="0"/>
+			</mx:HBox>
+			<mx:Label text="观察者列表" />
+			<mx:List id="watcherList" width="100%" height="70%" dataProvider="{watcherArray}" />
+		</mx:VBox>
+	</mx:HBox>
+	<mx:HBox horizontalAlign="center" id="buttonBar" verticalAlign="middle" width="100%">
+		<mx:Button id="confirmButton" label="确定" click="onConfirm()" height="22" />
+		<mx:Button id="cancelButton" label="取消" click="PopUpManager.removePopUp(this)" height="22"/>
+	</mx:HBox>
+</mx:TitleWindow>

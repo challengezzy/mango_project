@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+				  fontSize="12" fontFamily="Simsun" width="240" height="194" title="标题"
+			   close="Close()" xmlns:util="myreport.util.*">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.MsgUtil;
+ 
+			private static var g_Instance:InputNameForm;
+			
+			public static function get Instance():InputNameForm
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new InputNameForm();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+
+			private var _Callback:Function;
+			/**
+			 * @param callback: function(name:String):void
+			 */ 
+			public function Show(title_:String, name_:String, callback:Function):void
+			{
+				_Callback = callback;
+				
+				PopUp();
+ 
+				title = title_;
+				_Name.text = name_;
+			}
+			
+			private function Confirm():void
+			{
+				var n:String = _Name.text;
+				if(!n)
+				{
+					hlib.MsgUtil.ShowInfo("名称不能为空！");
+					return;
+				}
+				
+				if (_Callback != null)
+				{
+					
+					_Callback(n);
+				}
+				Close();
+			}
+ 
+		]]>
+	</mx:Script>
+	<mx:Label text="请输入名称：" x="39" y="33"/>
+	<mx:TextInput id="_Name" width="160" x="39" y="53" enter="Confirm()"/>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

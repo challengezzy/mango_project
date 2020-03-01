@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<chart:AdvChart xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				xmlns:chart="smartx.flex.components.core.chart.*" width="100%" height="100%">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.charts.CategoryAxis;
+			import mx.charts.DateTimeAxis;
+			import mx.charts.LinearAxis;
+			import mx.charts.chartClasses.CartesianChart;
+			import mx.collections.ArrayCollection;
+			
+			import smartx.flex.components.util.Hashtable;
+		
+			private var dataUnits:String;
+			
+			private var labelUnits:String;
+			
+			private var minimum:Date;
+			
+			private var maximum:Date;
+			//时间模式(近一天)
+			private static const TIME_MODE_D:String = "timeD";
+			//时间模式(近一小时)
+			private static const TIME_MODE_H:String = "timeH";
+			
+			public var isShowLabels:Boolean;
+			
+			public var xAxisType:String;
+			
+			public var yAxisType:String;
+			
+			public var series:Array;
+			
+			public var horizontalField:String;
+			
+			public var verticalField:String;
+			
+			public var horizontalTitle:String;
+			
+			public var verticalTitle:String;
+			[Bindable]
+			public var dataProvider:ArrayCollection = new ArrayCollection();
+			
+			public var xField:String;
+			
+			public var yField:String;
+			
+			public var displayname:String;
+			
+			public var colors:Array;
+			
+			protected var axisDataProvider:ArrayCollection = new ArrayCollection();
+			
+			public var timeMode:String;
+			
+			public var seriesNames:Array;
+			
+			//初始化时间模式数据（最近一天）
+			private function initTimeDModeData():void{
+				dataUnits = "days";
+				labelUnits = "hours";
+				minimum = new Date(new Date().getTime()-60*60*24*1000);
+				maximum = new Date();
+			}
+			//初始化时间模式数据（最近1小时）
+			private function initTimeHModeData():void{
+				dataUnits = "minutes";
+				labelUnits = "minutes";
+				minimum = new Date(new Date().getTime()-60*60*1000);
+				maximum = new Date();
+			}
+			
+			protected function initXYAxis(xyChart:CartesianChart):void{
+				if(timeMode == TIME_MODE_D)
+					initTimeDModeData();
+				else
+					initTimeHModeData();
+				//数值型的轴
+				if(yAxisType == "numeral"){
+					var vLineAxis:LinearAxis  = new LinearAxis ();
+					vLineAxis.autoAdjust  =true;
+					if(verticalTitle != null && verticalTitle != "")
+						vLineAxis.title = verticalTitle;
+					xyChart.verticalAxis = vLineAxis;
+					//日期轴
+				}else if(yAxisType == "datetime"){ 
+					var vDateAxis:DateTimeAxis  = new DateTimeAxis ();
+					vDateAxis.displayLocalTime = true;
+					vDateAxis.dataUnits = dataUnits;
+					vDateAxis.labelUnits = labelUnits;
+					vDateAxis.maximum = maximum;
+					vDateAxis.minimum = minimum;
+					vDateAxis.parseFunction = myParseFunction;
+					if(verticalTitle != null && verticalTitle != "")
+						vDateAxis.title = verticalTitle;
+					xyChart.verticalAxis = vDateAxis;
+					
+					//自定义轴	
+				}else{
+					var vCategoryAxis:CategoryAxis = new CategoryAxis();
+					vCategoryAxis.dataProvider = axisDataProvider;
+					vCategoryAxis.categoryField = horizontalField;
+					vCategoryAxis.title = horizontalTitle;
+					xyChart.verticalAxis = vCategoryAxis;
+				}
+				
+				//数值型的轴
+				if(xAxisType == "numeral"){
+					var hLineAxis:LinearAxis  = new LinearAxis ();
+					hLineAxis.autoAdjust =true;
+					if(horizontalTitle != null && horizontalTitle != "")
+						hLineAxis.title = horizontalTitle;
+					xyChart.horizontalAxis = hLineAxis;
+					
+					//日期轴
+				}else if(xAxisType == "datetime"){
+					var hDateAxis:DateTimeAxis  = new DateTimeAxis ();
+					hDateAxis.displayLocalTime = true;
+					hDateAxis.dataUnits = dataUnits;
+					hDateAxis.labelUnits = labelUnits;
+					hDateAxis.maximum = maximum;
+					hDateAxis.minimum = minimum;
+					hDateAxis.parseFunction = myParseFunction;
+					if(horizontalTitle != null && horizontalTitle != "")
+						hDateAxis.title = horizontalTitle;
+					xyChart.horizontalAxis = hDateAxis;
+					
+					//自定义轴	
+				}else{
+					var hCategoryAxis:CategoryAxis = new CategoryAxis();
+					hCategoryAxis.dataProvider = axisDataProvider;
+					hCategoryAxis.categoryField = horizontalField;
+					hCategoryAxis.title = horizontalTitle;
+					xyChart.horizontalAxis = hCategoryAxis;
+				}
+			}
+			
+			private function myParseFunction(dateStr:String):Date { 
+				var newDate:Date = new Date(Number(dateStr));
+				return newDate;
+			}
+			
+			protected function refreshUserDefindAxis(xyChart:CartesianChart):void{
+				if(xAxisType=="userdefined"){
+					var hCategoryAxis:CategoryAxis = new CategoryAxis();
+					hCategoryAxis.dataProvider = axisDataProvider;
+					hCategoryAxis.categoryField = horizontalField;
+					hCategoryAxis.title = horizontalTitle;
+					xyChart.horizontalAxis = hCategoryAxis;
+				}
+				
+				if(yAxisType=="userdefined"){
+					var vCategoryAxis:CategoryAxis = new CategoryAxis();
+					vCategoryAxis.dataProvider = axisDataProvider;
+					vCategoryAxis.categoryField = horizontalField;
+					vCategoryAxis.title = horizontalTitle;
+					xyChart.verticalAxis = vCategoryAxis;
+				}
+			}
+			
+			protected function loadRowData(_dataProvider:ArrayCollection):ArrayCollection{
+				var result:ArrayCollection = new ArrayCollection();
+				var timeMap:Hashtable = new Hashtable();
+				var typeFields:ArrayCollection = new ArrayCollection();
+				var keys:ArrayCollection = new ArrayCollection();
+				for(var i:int=0;i<_dataProvider.length;i++){
+					var data:Object = _dataProvider.getItemAt(i);
+					var time:Object = Number(data[xField]);
+					if(isNaN(Number(data[xField])))
+						time = data[xField];
+					var type:String = data[displayname];
+					var value:String = data[yField];
+					var timeObj:Object = timeMap.find(time);
+					if(timeObj){
+						if(timeObj[type] == undefined){//判断对象中是否有此属性，如没有则加入该属性
+							timeObj[type] = value;
+							timeMap.add(time,timeObj);
+						}
+					}else{
+						timeObj = {};
+						timeObj[xField] = time;
+						timeObj[type] = value
+						timeMap.add(time,timeObj);
+						keys.addItem(time);
+					}
+					if(!typeFields.contains(type))
+						typeFields.addItem(type);
+				}
+				
+				initRowDataSeries(typeFields);
+				
+				for each(var key:String in keys){
+					result.addItem(timeMap.find(key));
+				}
+				
+				return result;
+			}
+			
+			protected function initRowDataSeries(typeFields:ArrayCollection):void{};
+		]]>
+	</fx:Script>
+</chart:AdvChart>

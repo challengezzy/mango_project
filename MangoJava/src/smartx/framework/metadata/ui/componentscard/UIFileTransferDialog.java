@@ -1,0 +1,328 @@
+/**************************************************************************
+ * $RCSfile: UIFileTransferDialog.java,v $  $Revision: 1.4 $  $Date: 2007/05/31 07:38:19 $
+ **************************************************************************/
+package smartx.framework.metadata.ui.componentscard;
+
+import java.io.*;
+import java.util.*;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.common.vo.*;
+import smartx.framework.metadata.ui.*;
+import smartx.framework.metadata.vo.*;
+
+
+public class UIFileTransferDialog extends NovaDialog {
+    /**
+     *
+     */
+    private static final long serialVersionUID = -9221887313088698343L;
+
+    private JTabbedPane tab = null;
+
+    private JTextField textfield = null;
+
+    private JButton btn_ref = null;
+
+    private JButton btn_upload = null;
+
+    private JButton btn_download = null;
+
+    private Pub_Templet_1_ItemVO templetItemVO = null; //
+
+    private String key = null;
+
+    private String newfilename = "";
+
+    private static String downloadpath = "C:";
+
+    private static String uploadpath = "C:";
+
+    private UIFileTransfer parent = null;
+
+    private JTextField downref = null;
+
+    public UIFileTransferDialog(UIFileTransfer _parent,
+                                Pub_Templet_1_ItemVO _templetVO) {
+        this.templetItemVO = _templetVO; //
+        this.parent = _parent;
+        this.key = templetItemVO.getItemkey(); //
+        initialize();
+    }
+
+    private void initialize() {
+        this.getContentPane().setBackground(Color.WHITE);
+        this.getContentPane().add(getTab());
+        this.setSize(300, 200);
+        this.setLocation(300, 200);
+        this.setTitle("上传／下载");
+        this.setVisible(true);
+    }
+
+    private JTabbedPane getTab() {
+        tab = new JTabbedPane();
+        tab.setBackground(Color.white);
+        tab.setFont(new Font("宋体", Font.PLAIN, 12));
+        tab.addTab("上传", getUploadPanel());
+        tab.addTab("下载", getDownloadPanel());
+        if (parent.getValue() != null && !this.parent.getValue().equals("")) {
+            tab.setSelectedIndex(1);
+        }
+        return tab;
+    }
+
+    // 上传面板
+    private JPanel getUploadPanel() {
+        JPanel rpanel = new JPanel();
+        rpanel.setBackground(Color.WHITE);
+        JLabel label = new JLabel("选择文件", SwingConstants.RIGHT);
+        textfield = new JTextField(30);
+        btn_ref = new JButton(UIUtil.getImage("images/platform/filepath.gif"));
+        btn_ref.setToolTipText("选择路径…");
+        btn_ref.setFont(new Font("宋体", Font.PLAIN, 12));
+        btn_ref.setPreferredSize(new Dimension(18, 18)); // 按扭的宽度与高度
+        btn_ref.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onUploadSelectBtnClicked();
+            }
+        });
+        btn_upload = new JButton("上传");
+        btn_upload.setFont(new Font("宋体", Font.PLAIN, 12));
+        btn_upload.setPreferredSize(new Dimension(70, 18)); // 按扭的宽度与高度
+        btn_upload.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    onUploadBtnClicked();
+                } catch (Exception e1) {
+                    e1.printStackTrace();
+                }
+            }
+        });
+        rpanel.add(label);
+        rpanel.add(textfield);
+        rpanel.add(btn_ref);
+        rpanel.add(btn_upload);
+        return rpanel;
+
+    }
+
+    // 下载面板
+    private JPanel getDownloadPanel() {
+        JPanel rpanel = new JPanel();
+        rpanel.setBackground(Color.WHITE);
+        rpanel.setLayout(new BoxLayout(rpanel, BoxLayout.Y_AXIS));
+        JLabel label = new JLabel("下载文件:" + parent.getValue());
+        JLabel save_label = new JLabel("保存路径:");
+        JButton selectbtn = new JButton(UIUtil.getImage("images/platform/filepath.gif"));
+        selectbtn.setPreferredSize(new Dimension(18, 18)); // 按扭的宽度与高度
+        selectbtn.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    onDownloadSelectBtnClicked();
+                } catch (Exception e1) {
+                    e1.printStackTrace();
+                }
+            }
+        });
+        downref = new JTextField(30);
+        this.btn_download = new JButton("下载");
+        btn_download.setFont(new Font("宋体", Font.PLAIN, 12));
+        btn_download.setPreferredSize(new Dimension(70, 18)); // 按扭的宽度与高度
+        btn_download.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    onDownloadBtnClicked();
+                } catch (Exception e1) {
+                    e1.printStackTrace();
+                }
+            }
+        });
+        JPanel labelp = new JPanel();
+        labelp.setLayout(new FlowLayout(FlowLayout.LEFT));
+        labelp.add(label);
+        rpanel.add(labelp);
+        JPanel savep = new JPanel();
+        savep.setLayout(new FlowLayout(FlowLayout.LEFT));
+        savep.add(save_label);
+        savep.add(downref);
+        savep.add(selectbtn);
+        rpanel.add(savep);
+        JPanel downp = new JPanel();
+        downp.setLayout(new FlowLayout(FlowLayout.CENTER));
+        downp.add(btn_download);
+        rpanel.add(downp);
+        return rpanel;
+    }
+
+    // 选择要上传的文件
+    private void onUploadSelectBtnClicked() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setCurrentDirectory(new File(uploadpath));
+        int result = chooser.showOpenDialog(this);
+
+        if (result == 0 && chooser.getSelectedFile() != null) {
+            String filePath = chooser.getSelectedFile().getPath();
+            this.textfield.setText(filePath);
+            uploadpath = filePath;
+        }
+    }
+
+    // 选择下载路径
+    private void onDownloadSelectBtnClicked() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setCurrentDirectory(new File(downloadpath));
+        int result = chooser.showSaveDialog(this);
+
+        if (result == 0 && chooser.getSelectedFile() != null) {
+            String filePath = chooser.getSelectedFile().getPath();
+            downloadpath = filePath;
+            this.downref.setText(downloadpath);
+        }
+    }
+
+    // 上传处理
+    private void onUploadBtnClicked() throws Exception {
+        String path = getFilePath();
+        if (path == null || path.equals("")) {
+            NovaMessage.show("请选择要上传的文件.");
+            return;
+        }
+        File uploadfile = new File(path);
+        if (!uploadfile.isFile()) {
+            NovaMessage.show("请选择文件.");
+            return;
+        }
+        FileInputStream fins = null;
+        try {
+            fins = new FileInputStream(uploadfile);
+        } catch (FileNotFoundException e1) {
+            e1.printStackTrace();
+        }
+        if (uploadfile.length() > Runtime.getRuntime().freeMemory()) {
+            NovaMessage
+                .show("文件最大长度不能超过:" + Runtime.getRuntime().freeMemory());
+            return;
+        }
+        int filelength = new Long(uploadfile.length()).intValue();
+        byte[] filecontent = new byte[filelength];
+        try {
+            fins.read(filecontent);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        ClassFileVO filevo = new ClassFileVO();
+        filevo.setClassFileName(path.substring(path.lastIndexOf("\\") + 1));
+        filevo.setByteCodes(filecontent);
+        HashMap result = UIUtil.uploadFileFromClient("PUB_FILEUPLOAD", templetItemVO
+            .getPub_Templet_1VO().getTablename(), key, filevo);
+        Boolean bool_result = (Boolean) result
+            .get(NovaConstants.UPLOAD_RESULT);
+        if (bool_result.booleanValue()) {
+            setServerFileName( ( (String) result
+                                .get(NovaConstants.UPLOAD_FILE_NAME)));
+            NovaMessage.show("上传成功");
+            parent.setValue(getFileName());
+            parent.setCode(this.getServerFileName());
+            this.dispose();
+        } else {
+            NovaMessage.show("上传失败");
+        }
+    }
+
+    // 下载处理
+    public void onDownloadBtnClicked() {
+        if (parent.getCode() == null || parent.getCode().equals("")) {
+            NovaMessage.show("没有要下载的文件.");
+            return;
+        }
+        FileOutputStream out = null;
+        try {
+            ClassFileVO vo = UIUtil.downloadToClient(parent.getCode());
+            if (vo != null) {
+                String name = vo.getClassFileName();
+                File file = new File(this.getDownloadFileDirectory() + "\\"
+                                     + name);
+                file.createNewFile();
+                out = new FileOutputStream(file);
+                out.write(vo.getByteCodes());
+                NovaMessage.show("[" + file.getAbsolutePath() + "]下载完成");
+                parent.setValue(file.getName());
+                this.dispose();
+            }
+        } catch (Exception e) {
+            NovaMessage.show("下载文件出错", NovaConstants.MESSAGE_ERROR);
+            e.printStackTrace();
+        } finally {
+            try {
+                out.close();
+            } catch (IOException e) {
+                System.out.println("关闭文件出错");
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public String getFilePath() {
+        return textfield.getText();
+    }
+
+    // 上传以后的名字
+    public void setServerFileName(String name) {
+        this.newfilename = name;
+    }
+
+    public String getServerFileName() {
+        return newfilename;
+    }
+
+    public String getDownloadFileDirectory() {
+        return downloadpath;
+    }
+
+    public void setDownloadFileDirectory(String _downpath) {
+        downloadpath = _downpath;
+    }
+
+    // 本地文件的名字
+    public String getFileName() {
+        if (this.newfilename.equals("")) {
+            return "";
+        }
+        return newfilename.substring(newfilename.indexOf("_") + 1);
+    }
+}
+/**************************************************************************
+ * $RCSfile: UIFileTransferDialog.java,v $  $Revision: 1.4 $  $Date: 2007/05/31 07:38:19 $
+ *
+ * $Log: UIFileTransferDialog.java,v $
+ * Revision 1.4  2007/05/31 07:38:19  qilin
+ * code format
+ *
+ * Revision 1.3  2007/05/22 07:58:46  qilin
+ * no message
+ *
+ * Revision 1.2  2007/05/22 02:03:34  sunxb
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/05/17 06:01:06  qilin
+ * no message
+ *
+ * Revision 1.5  2007/02/25 09:04:08  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/02/10 08:59:51  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/02/10 08:51:57  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 05:14:30  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

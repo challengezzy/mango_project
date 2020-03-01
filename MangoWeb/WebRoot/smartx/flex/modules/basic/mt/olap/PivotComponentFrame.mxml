@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%"
+		   creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			import mx.controls.Alert;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.olap.BillPivotComponent;
+			import smartx.flex.components.core.olap.MTPivotComponent;
+			import smartx.flex.components.styletemplate.MTStyleTemplate01;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var debugMode:Boolean = false;
+			
+			private function init():void{
+				var url:String = this.loaderInfo.url;
+				var parameters:Object = StringUtils.parseUrlParameters(url);
+				var mtcode:String = parameters.mtcode;
+				if(mtcode == null){
+					Alert.show("必须指定元数据模板编码(mtcode)");
+					return;
+				}
+				var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+				if(metadataTemplet == null){
+					Alert.show("不存在元数据模板[mtcode="+mtcode+"]");
+					return;
+				}
+				
+				if(metadataTemplet.contentXML.debugMode.length() == 0){
+					//如没指定debugMode，根据客户端变量设置
+					if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+						debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+					if(debugMode){
+						var xml:XML = metadataTemplet.contentXML;
+						xml.debugMode = "true";
+						metadataTemplet.contentXML = xml;
+					}
+				}
+				var pivotComponent:MTPivotComponent = new MTPivotComponent();
+				pivotComponent.metadataTemplet = metadataTemplet;
+				this.addChild(pivotComponent);
+//				var p:BillPivotComponent = new BillPivotComponent();
+//				p.sql = "select substr(actiondate,1,4)||' ' 年,substr(actiondate,5,2) 月,substr(actiondate,7,2) 日,t.source 操作者,t.operation 操作,count(1) 操作次数 from (select l.*, to_char(l.time, 'yyyymmdd') actiondate from pub_log l) t group by actiondate, source, operation order by actiondate";
+//				p.percentHeight = 100;
+//				p.percentWidth = 100;
+//				p.rows = "操作者,.操作者,,操作,.操作";
+//				p.columns = "年,.年,,月,.月,,日,.日";
+//				p.measures = [{uniqueName:"[Measures].[操作次数]",aggregation:"AVERAGE"}];
+//				
+//				//p.pivotComponent.addMeasure("[Measures].[操作次数]","操作次数",AggregationName.AVERAGE);
+//				p.showFieldList = true;
+//				this.addChild(p);
+			}
+		]]>
+	</fx:Script>
+</mx:Module>

@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 creationComplete="init()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:LinkButton id="startBtn" icon="{AssetsFileLib.startIcon}" width="22" height="22" toolTip="启动告警和任务刷新" click="startRefresh()"/>
+		<mx:LinkButton id="stopBtn" icon="{AssetsFileLib.stopIcon}" width="22" height="22" toolTip="停止告警和任务刷新" click="stopRefresh()"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			
+			public var endpoint:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+			private var desktopFrame:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			private var username:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME) as String;
+			
+			private var bamService:RemoteObject;
+			private var destinationBam:String = BAMConst.BAM_Service;
+			
+			private var messageTimer:Timer;//定时刷新管理
+			private var refreshInterval:uint = 120*1000;//刷新间隔ms
+			[Bindable]
+			private var alertCount:int = 0;
+			[Bindable]
+			private var taskCount:int = 0;
+			
+			[Bindable]
+			public var isNeedRefresh:Boolean = true;
+			
+			private var sqlAlert:String;
+			private var sqlTask:String;
+			
+			public function init():void{
+				bamService = new RemoteObject(destinationBam);
+				bamService.endpoint = endpoint;
+				
+				bamService.getMenuIdbyMenuCode.addEventListener(ResultEvent.RESULT,getMenuIdbyMenuCodeHandler);
+				bamService.getMenuIdbyMenuCode.addEventListener(FaultEvent.FAULT,getMenuIdFaultHandler);
+				
+				bamService.getAlertAndTaskCount.addEventListener(ResultEvent.RESULT,getRowCountHandler);
+				bamService.getAlertAndTaskCount.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("查询任务和告警总记录数错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultDetail);
+				});
+				
+				sqlAlert = "select id from V_BAM_MESSAGEMNG where status = 0 and username='" + username +  "'";
+				sqlTask = "select t.id from bam_task t where t.state=0 and t.owner = '" + username + "'"
+					+"union select t.id from bam_task t,bam_taskwatcher w "
+					+" where t.id=w.taskid and t.state=0 and w.username = '" + username + "'";
+				
+				messageTimer = new Timer(refreshInterval);
+				messageTimer.addEventListener(TimerEvent.TIMER,timerHandler);				
+				messageTimer.start();
+				this.addChild(stopBtn);
+				//先刷新一次
+				this.refresh();
+			}
+			
+			private function timerHandler(event:TimerEvent):void{
+				if(messageTimer && messageTimer.running){
+					refresh();
+				}
+			}
+			
+			public function stopWithNoAlert():void{
+				if(messageTimer && messageTimer.running)
+					messageTimer.stop();
+				
+				if(this.contains(stopBtn))
+					this.removeChild(stopBtn);
+				if(!this.contains(startBtn))
+					this.addChild(startBtn);
+			}
+			
+			public function startWithNoAlert():void{
+				if(messageTimer && !messageTimer.running){
+					messageTimer.start();
+					
+					if(this.contains(startBtn))
+						this.removeChild(startBtn);
+					if(!this.contains(stopBtn))
+						this.addChild(stopBtn);
+				}
+			}
+			
+			//停止刷新
+			public function stopRefresh():void{
+				if(messageTimer && messageTimer.running){
+					messageTimer.stop();
+					
+					SmartXMessage.show("消息提示刷新已停止！");
+
+					if(this.contains(stopBtn))
+						this.removeChild(stopBtn);
+					if(!this.contains(startBtn))
+						this.addChild(startBtn);
+				}
+			}
+			
+			public function startRefresh():void{
+				if(messageTimer && !messageTimer.running){
+					messageTimer.start();
+					
+					SmartXMessage.show("消息提示刷新已启动！");
+					
+					if(this.contains(startBtn))
+						this.removeChild(startBtn);
+					if(!this.contains(stopBtn))
+						this.addChild(stopBtn);
+				}
+			}
+			
+			public function refresh():void{
+				//刷新告警和任务数
+				var sqlMap:Object = new Object();
+				
+				sqlMap[BAMConst.MAPKEY_ALERT] = sqlAlert;
+				sqlMap[BAMConst.MAPKEY_TASK] = sqlTask;
+				if(isNeedRefresh){
+					bamService.getAlertAndTaskCount(null,sqlMap);
+				}
+			}
+			
+			public function getRowCountHandler(event:ResultEvent):void{
+				var rowMap:Object = event.result;
+				
+				alertCount = rowMap[BAMConst.MAPKEY_ALERT] as int;
+				taskCount = rowMap[BAMConst.MAPKEY_TASK] as int;
+				
+			}
+			
+			public function openManagerMenu(e:Event):void{
+				var menuCode:String;
+				
+				if(e.currentTarget == alertBtn)
+					menuCode = "menu_alert_msg_frame";
+				else if(e.currentTarget == taskBtn)
+					menuCode = "MENU_TASKMANAGEMENT";
+				
+				bamService.getMenuIdbyMenuCode(menuCode);
+			}
+			
+			private function getMenuIdFaultHandler(event:FaultEvent):void{
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			//打开菜单
+			private function getMenuIdbyMenuCodeHandler(event:ResultEvent):void{
+				var menuId:int = event.result as int;
+				if(desktopFrame != null){
+					desktopFrame.openMenuFrame(menuId);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:LinkButton  id="alertBtn" label="({alertCount})"  icon="{AssetsFileLib.alert2Icon}" click="openManagerMenu(event)"
+					toolTip="当前告警数，点击进入告警信息管理"/>
+	<mx:LinkButton  id="taskBtn" label="({taskCount})"  icon="{AssetsFileLib.assignIcon}" click="openManagerMenu(event)"
+					toolTip="当前任务数，点击进入任务信息管理"/>
+	
+</mx:HBox>

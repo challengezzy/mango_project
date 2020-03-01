@@ -1,0 +1,474 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   xmlns:s="library://ns.adobe.com/flex/spark"
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   horizontalScrollPolicy="off"
+		   verticalScrollPolicy="off" initialize="init()"
+		   width="100%" height="100%">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.Grouping;
+			import mx.collections.GroupingCollection2;
+			import mx.collections.GroupingField;
+			import mx.collections.SummaryField2;
+			import mx.collections.SummaryRow;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumn;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridColumnGroup;
+			import mx.controls.advancedDataGridClasses.AdvancedDataGridRendererProvider;
+			import mx.events.AdvancedDataGridEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.export.ListDataExportUtil;
+			import smartx.flex.components.util.render.NumberColorRenderer;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public static const SHOWDATA_FINISH:String = "showDataFinish";
+			public static const DATAMODE_VALUE:int = 0;
+			public static const DATAMODE_SQL:int = 1;
+			
+			public static const RENDERER_NUMBERCOLOR:String = "smartx.flex.components.util.render.NumberColorRenderer"; 
+			
+			public var xml:XML;
+			
+			[Bindable]
+			public var minColumnWidth:int = 160;//默认最小列宽度
+			[Bindable]
+			private var _columns:Array;//列表头数据
+			public var queryColumns:Array = new Array();//查询字段列表
+			
+			[Bindable]
+			public var title:String;
+			
+			public var dataMode:int;//数据提供方式,value或sql			
+			public var pageSize:int=20;//表示每页记录的条数,默认10条,可以由用户自行定义
+			public var curPage:int =1;//当前的页码
+			public var totalPage:int = 1;//一共的页数,页数从1开始，必须设置默认值
+			public var totalCount:int;//一共的记录条数
+			
+			private var formService:RemoteObject;
+			public var dataSource:String;
+			private var _sql:String;//查询数据的SQL语句
+			private var realQuerySql:String;//真正的查询SQL
+			private var listData:ArrayCollection = new ArrayCollection();//展示的所有数据
+			private var initListData:ArrayCollection= new ArrayCollection();//原始的所有数据
+			
+			[Bindable]
+			private var curPageData:ArrayCollection = new ArrayCollection();//当前页显示的记录
+			
+			private var groupingCollection:GroupingCollection2 = new GroupingCollection2();
+			private var isGrouping:Boolean = false;
+			private var columnMap:Hashtable = new Hashtable(30);
+			
+			private function init():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				formService.getSimpleHashVOMapByPage.addEventListener(ResultEvent.RESULT,getSimpleHashVOMapByPageHandler);					
+				formService.getSimpleHashVOMapByPage.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("获取分页列表数据错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvDataGrid.SHOWDATA_FINISH));
+				});
+				formService.generateExportCSVFile.addEventListener(ResultEvent.RESULT,generateExportCSVFileHandler);					
+				formService.generateExportCSVFile.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取列表CSV文件错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				
+				curPage = 1;
+				totalPage = 1;
+			}
+			
+			
+			
+			public function gcInit():void{
+				
+				var tempStr:String = xml.extend.GroupCollection.@grouping;
+				
+				var colGroupArr:Array =  new Array();
+				for each(var gItem:XML in xml.extend.GroupColumns.GroupColumn){
+					var dataField:String = gItem.@dataField;
+					var headerText:String = gItem.@headerText;
+					var type:String = gItem.@type;
+					if("groupColumn" == type){
+						var colGroup:AdvancedDataGridColumnGroup = new AdvancedDataGridColumnGroup();
+						colGroup.headerText = headerText;
+						col.minWidth = 100;
+						if(gItem.@width !="" && gItem.@width != null)
+							col.width = gItem.@width;
+						
+						var colArr:Array = new Array();
+						for each(var cItem:XML in gItem.GroupColumn){
+							var col1:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+							if(cItem.@width !="" && cItem.@width != null)
+								col.width = cItem.@width;
+							
+							col1.dataField = cItem.@dataField;
+							col1.headerText = cItem.@headerText;
+							colArr = colArr.concat(col1);
+							
+							var id1:String = cItem.@id;
+							columnMap.add(id1,col1);
+						}
+						colGroup.children = colArr;
+						colGroupArr = colGroupArr.concat(colGroup);
+					}else{
+						var col:AdvancedDataGridColumn = new AdvancedDataGridColumn();
+						if(gItem.@width !="" && gItem.@width != null)
+							col.width = gItem.@width;
+						
+						col.minWidth = 75;
+						col.dataField = dataField;
+						col.headerText = headerText;
+						colGroupArr = colGroupArr.concat(col);
+						var id:String = gItem.@id;
+						columnMap.add(id,col);
+					}
+				}
+				adg.columns = colGroupArr;
+				adg.groupedColumns = colGroupArr;
+				
+				//分组数据设置
+				if(tempStr == "true"){
+					isGrouping = true;
+					var grouping:Grouping = new Grouping();
+					var groupingFieldArr:ArrayCollection = new ArrayCollection(); 
+					for each(var gcItem:XML in xml.extend.GroupCollection.GroupingField){
+						var groupingField:GroupingField = new GroupingField();
+						var summaryRowArr:Array = new Array();//摘要数组
+						groupingField.name = gcItem.@name;
+						
+						for each(var sItem:XML in gcItem.SummaryRow){
+							var summaryRow:SummaryRow = new SummaryRow();
+							var summaryFieldArr:Array = new Array();
+							for each(var sfItem:XML in sItem.SummaryField){
+								var summaryField:SummaryField2 = new SummaryField2();
+								summaryField.dataField = sfItem.@dataField;
+								summaryField.label = sfItem.@label;
+								summaryField.summaryOperation = String(sfItem.@summaryOperation);
+								
+								summaryFieldArr = summaryFieldArr.concat(summaryField);
+							}
+							summaryRow.summaryPlacement = sItem.@summaryPlacement;
+							summaryRow.fields = summaryFieldArr;
+							summaryRowArr = summaryRowArr.concat(summaryRow);
+						}
+						groupingField.summaries = summaryRowArr;
+						groupingFieldArr.addItem(groupingField);
+					}
+					
+					grouping.fields = groupingFieldArr.toArray();
+					groupingCollection.grouping = grouping;
+				}
+				
+				//Item渲染器配置
+				var rendererArr:Array = new Array();
+				for each(var renderItem:XML in xml.extend.Renderers.Renderer){
+					var rendererProvider:AdvancedDataGridRendererProvider = new AdvancedDataGridRendererProvider();
+					var columnId:String = renderItem.@column;
+					rendererProvider.column = columnMap.find(columnId);
+					var rendererName:String = String(renderItem.@rendererClass);
+					
+					if(rendererName != null && rendererName!= ""){
+						var classRef:Class = getDefinitionByName(rendererName) as Class;
+						var renderer:ClassFactory =  new ClassFactory(classRef);
+						var dataFieldStr:String = renderItem.@dataField;
+						
+						var paramObj:Object = new Object();
+						for each(var renderParam:XML in renderItem.params.param){
+							var paramName:String = renderParam.@name;
+							var paramValue:String = renderParam.@value;
+							paramObj[paramName] = paramValue;
+						}
+						//paramObj["dataField"] = dataFieldStr;
+						renderer.properties = {dataField:dataFieldStr,paramObject:paramObj};
+						rendererProvider.renderer = renderer;
+						
+					}
+					
+					rendererArr = rendererArr.concat(rendererProvider);
+				}
+				
+				if(rendererArr.length > 0)
+					adg.rendererProviders = rendererArr;
+			}
+			
+			private function getSimpleHashVOMapByPageHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var dataMap:Object = event.result;
+				totalCount = dataMap[GlobalConst.DATA_ROWCOUNT] as int;
+				totalPage = (totalCount + pageSize - 1) / pageSize;
+				
+				var dataArr:Array = dataMap[GlobalConst.DATA_SIMPLEHASHVOARRAY] as Array;
+				curPageData.removeAll();
+				for (var i:int=0;i<dataArr.length;i++){
+					curPageData.addItem(dataArr[i][GlobalConst.DATA_DATAMAP]);
+				}
+				
+				if(isGrouping){
+					groupingCollection.source = curPageData;
+					groupingCollection.refresh();
+					adg.dataProvider = groupingCollection;
+				}else{
+					adg.dataProvider = curPageData;
+				}
+				
+				if(totalCount > 0){
+					inputpage.minimum=1;
+					inputpage.maximum=totalPage;
+					if(curPage > totalPage)
+						curPage = totalPage ;//对查询出的数据量变小的情况的显示处理
+				}else{
+					inputpage.minimum = 0;
+					inputpage.maximum = 0;
+					curPage = 0;
+				}
+				pagedetail.text = "第"+curPage+"页/共"+totalPage+"页   共"+totalCount+"条记录";
+				
+				dispatchEvent(new Event(AdvDataGrid.SHOWDATA_FINISH));
+				
+				OperatingTipUtil.endOperat();
+			}
+			
+//			public function exportCurData(fileName:String):void{
+//				
+//				//只有在响应用户事件（例如，在鼠标单击或按键事件的事件处理函数中）时才能成功调用此方法
+//				ListDataExportUtil.dataGridExport2CSV(expDataGrid,fileName);
+//			}
+			
+			/**
+			 * 导出所有数据
+			 * */
+//			public function exportAllData(fileName:String):void{
+//				expFileName = fileName;
+//				if(AdvListChart.DATAMODE_SQL == dataMode){
+//					//在服务端生成数据后再下载
+//					formService.generateExportCSVFile(dataSource,realQuerySql,GlobalConst.TEMPDATAFOLDER, fieldNameMap,fileName+".csv");
+//					OperatingTipUtil.startOperat("正在生成CSV数据文件",this);
+//					
+//				}else if(AdvListChart.DATAMODE_VALUE == dataMode){
+//					expDataGrid.dataProvider = initListData;
+//					ListDataExportUtil.dataGridExport2CSV(expDataGrid,fileName);
+//				}					
+//			}
+			
+			private function generateExportCSVFileHandler(event:ResultEvent):void{
+				var fileUrl:String = event.result as String;				
+				navigateToURL(new URLRequest(encodeURI(fileUrl)));
+				OperatingTipUtil.endOperat();
+				//var fr:FileReference = new FileReference();
+				//fr.download(new URLRequest(GlobalConst.TEMPDATAFOLDER + fileUrl),expFileName);
+				//ListDataExportUtil.dataGridExport2CSV(expDataGrid,expFileName);
+			}
+						
+			//Event handler to recognize when Ctrl-C is pressed,and copy the selected cells to the system clipboard.   
+			private function adgKeyUpHandler(event:KeyboardEvent):void   {
+				
+				var keycode_c:uint = 67;
+				if (event.ctrlKey && event.keyCode == keycode_c){ 
+					// Separator used between Strings sent to clipboard to separate selected cells. 
+					var separator:String = ","; 
+					var dataString:String = ""; 
+					
+					// Loop over the selectedCells property. 
+					// Data in selectedCells is ordered so that the last selected cell is at the head of the list. 
+					// Process the data in reverse so that it appears in the correct order in the clipboard. 
+					var n:int = event.currentTarget.selectedCells.length;
+					
+					for (var i:int = 0; i < n; i++) {  
+						var cell:Object = event.currentTarget.selectedCells[i];  
+						var data:Object =  event.currentTarget.dataProvider[cell.rowIndex];  
+						
+						// Get the name of the field for the selected cell.  
+						var dataField:String =  event.currentTarget.columns[cell.columnIndex].dataField; 
+						dataString = data[dataField] + separator + dataString; 
+					} 
+					// Remove trailing separator. 
+					dataString = dataString.substr(0, dataString.length - separator.length); 
+					// Write dataString to the clipboard. 
+					System.setClipboard(dataString);
+				} 
+			}
+			
+			//此列表可以由两种方式初始化数据，提供SQL或直接提供数据方式		
+			public function setPager(pageNum:int,showLoadWindow:Boolean=true):void
+			{
+				if(totalPage == 0)//总页数重新初始化
+					totalPage = 1;
+				
+				if(pageNum<1 || pageNum > totalPage) 
+					return;
+				
+				curPage = pageNum;
+				if(showLoadWindow ){
+					OperatingTipUtil.startOperat("正在查询....");
+				}
+				
+				if( AdvDataGrid.DATAMODE_VALUE == dataMode){					
+					curPageData.removeAll();//移出变量中的数据,以便插入新数据,页面中显示的是这个变量中的数据					
+					if(listData.length>0 && null!=listData)
+					{
+						totalCount = listData.length;
+						totalPage = (totalCount + pageSize - 1) / pageSize;
+						inputpage.minimum=1;
+						inputpage.maximum=totalPage;
+						
+						var curNum:int = (curPage-1)*pageSize;//计算出要跳转到的页面种的第一条记录在所有的记录种是第几条记录
+						for(var i:int=0;curNum<listData.length&&i<pageSize;i++,curNum++){
+							//循环的次数既要小于所有的记录数,也要小于每个页面能显示的记录数;并且curNum变量中的值也要增加
+							curPageData.addItem(listData.getItemAt(curNum));//依次抽取记录
+						}
+						//dataListGrid.invalidateList();						
+					}else{
+						totalCount = 0;
+						totalPage = 0;
+						curPage = 0;
+						inputpage.minimum = 0;
+						inputpage.maximum = 0;
+					}				
+					
+					pagedetail.text = "第"+curPage+"页/共"+totalPage+"页   共"+totalCount+"条记录";					
+					dispatchEvent(new Event(AdvDataGrid.SHOWDATA_FINISH));
+					
+					OperatingTipUtil.endOperat();					
+				}else if(AdvDataGrid.DATAMODE_SQL == dataMode){
+					formService.getSimpleHashVOMapByPage(dataSource,realQuerySql,curPage,pageSize);
+				}
+				
+			}
+			
+			public function clear():void{
+				listData = new ArrayCollection();
+				curPageData.removeAll();
+			}
+			
+			public function refresh():void{
+				//toolTipLabel.text = "";
+				realQuerySql = _sql;
+				
+				if(curPage < 1)
+					curPage = 1;
+				
+				setPager(curPage,false);
+			}
+			
+			public function set sql(value:String):void{
+				_sql = value;
+				realQuerySql = value;
+				dataMode = AdvDataGrid.DATAMODE_SQL;
+			}
+			
+			private function simpleQueryTextInput_enterHandler(event:Event):void
+			{
+				simpleQuery(simpleQueryTextInput.text);
+			}
+
+			private function filterListData(condition:String):void{
+				listData.removeAll();
+				for each(var temp:Object in initListData){
+					for each( var field2:String in queryColumns){//
+						var tempStr:String = temp[field2];
+						if(tempStr == null)
+							continue;
+						
+						//全文匹配和精确查询两种情况
+						if( isWholeWordCheckBox.selected){
+							if( condition == tempStr){
+								listData.addItem(temp);
+								continue;
+							}
+						}else{
+							if( tempStr.indexOf(condition) >= 0)
+							{
+								listData.addItem(temp);
+								continue;
+							}
+						}
+					}
+				}
+			}
+			
+			//快速查询
+			private function simpleQuery(text:String):void{
+				toolTipLabel.text = "";
+				if(text == null || "" == text){//无条件查询
+					realQuerySql = _sql;
+					listData = new ArrayCollection(initListData.toArray());
+					toolTipLabel.text = "查询条件值为空,按无条件查询";
+				}
+				else{
+					if(queryColumns != null && queryColumns.length > 0){
+						if(AdvDataGrid.DATAMODE_SQL == dataMode){
+							var condition:String = "where 1=2 ";//拼装查询条件
+							for each( var field:String in queryColumns){ 
+								if( isWholeWordCheckBox.selected)
+									condition = condition.concat(" or " + field + "='" + text +  "'" );
+								else
+									condition = condition.concat(" or " + field + " like '%" + text +  "%'" );
+							}
+							realQuerySql = "select * from (" + _sql + ")" + condition;
+							
+						}else if(AdvDataGrid.DATAMODE_VALUE == dataMode){//数据型，直接过滤数据
+							filterListData(text)
+						}
+					}else{//没有查询列的情况
+						realQuerySql = _sql;
+						listData = new ArrayCollection(initListData.toArray());
+						toolTipLabel.text = "未勾选有效查询列,按无条件查询";
+					}
+				}
+				//刷新数据
+				setPager(1);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:HBox width="100%" id="simpleQueryPanel" horizontalAlign="right" paddingRight="20" 
+			 paddingTop="2" paddingBottom="2" horizontalGap="3" verticalAlign="middle">
+		<mx:HBox id="leftBtnBox" horizontalAlign="left" verticalAlign="middle" />
+		<mx:HBox width="100%" horizontalAlign="right" verticalAlign="middle" id="searchBox">
+			<mx:Label id="toolTipLabel" text="" color="red" paddingRight="20" />
+			<mx:CheckBox id="isWholeWordCheckBox" label="全文匹配" toolTip="勾选进行全文匹配查询" labelPlacement="right"/>
+			<mx:TextInput id="simpleQueryTextInput" width="150" borderStyle="solid" enter="simpleQueryTextInput_enterHandler(event)"/>
+			<mx:LinkButton icon="{AssetsFileLib.quicQueryIcon}" 
+						   toolTip="查询" width="20" height="20" click="simpleQuery(simpleQueryTextInput.text)"/>
+		</mx:HBox>
+		<mx:HBox id="buttonBox" horizontalAlign="right" verticalAlign="middle" />
+	</mx:HBox>
+	<mx:AdvancedDataGrid id="adg" width="100%" height="100%" keyUp="adgKeyUpHandler(event);"
+						 allowMultipleSelection="false" selectionMode="singleCell"
+						 draggableColumns="true" horizontalGridLines="true" horizontalScrollPolicy="auto"
+						 sortableColumns="true" sortExpertMode="true"
+						 initialize="gcInit();"
+						 >
+		
+	</mx:AdvancedDataGrid>
+	<mx:HBox id="pageBox" width="100%" horizontalAlign="left" verticalAlign="middle">
+		<mx:Spacer width="100%" height="1"></mx:Spacer>
+		<mx:Label id="pagedetail" text="第0页/共0页"/>
+		<mx:Image width="20" height="20" buttonMode="true" click="setPager(1)" scaleContent="true"
+				  source="{AssetsFileLib.pageFirstIcon}" toolTip="首页"/>
+		<mx:Image width="20" height="20" buttonMode="true" click="setPager(totalPage)"
+				  scaleContent="true" source="{AssetsFileLib.pageLastIcon}" toolTip="末页"/>
+		<mx:Image width="20" height="20" buttonMode="true" click="setPager(curPage-1)"
+				  scaleContent="true" source="{AssetsFileLib.pagePrevIcon}" toolTip="上一页"/>
+		<mx:Image width="20" height="20" buttonMode="true" click="setPager(curPage+1)"
+				  scaleContent="true" source="{AssetsFileLib.pageNextIcon}" toolTip="下一页"/> 
+		<mx:NumericStepper id="inputpage" width="60" height="20" cornerRadius="0" maximum="0"
+						   minimum="0" stepSize="1"/>
+		<mx:Image width="20" height="20" buttonMode="true" click="setPager(inputpage.value)"
+				  scaleContent="true" source="{AssetsFileLib.pageJumpIcon}" toolTip="跳转"/>
+	</mx:HBox>
+</mx:VBox>

@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="850" height="280" 
+			allowDrag="true" allowClose="true" allowMaximize="true" 
+			allowMinimize="true" allowResize="true" close="onClose()" fontSize="12" 
+			xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+			xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+			xmlns:core="smartx.flex.components.core.*"
+			xmlns:fx="http://ns.adobe.com/mxml/2009"
+			xmlns:comm="smartx.bam.flex.modules.common.*"
+			title="告警规则条件高级设置"
+			>
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.effects.Effect;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			
+			import smartx.bam.flex.modules.common.CustomerTextInput;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			
+			[Bindable]
+			public var bcp:BillCardPanel;
+			
+			[Bindable]
+			private var templeteObj:Object;
+			
+			[Bindable]
+			public var scenarioId:String;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			private var userName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME));
+			
+			
+			private function init():void{
+				
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint!=null){
+					bamService.endpoint = endpoint;
+				}
+				
+				bamService.getRuleTempleteFields.addEventListener(ResultEvent.RESULT,getRuleTempleteFieldsHandler);
+				bamService.getRuleTempleteFields.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				initData();
+			}
+			
+			private function getRuleTempleteFieldsHandler(event:ResultEvent):void{
+				var arrayCollection:ArrayCollection = new ArrayCollection();
+				var array:Array = event.result as Array;
+				for each(var key:String in array){
+					arrayCollection.addItem(key);
+				}
+				fieldCbb.dataProvider = arrayCollection;
+				fieldCbb.selectedItem = null;
+				
+				funPanel.dataProvider = arrayCollection;
+				
+			}
+			
+			private function initData():void{
+				
+				var dataValue:Object = bcp.getDataValue();
+				if(dataValue != null){
+					var temp:String = String(dataValue["CONDITION"]);
+					funPanel.textArea.text = (temp==null||temp=="null")?"":temp;
+				}
+					
+				
+				bamService.getRuleTempleteFields(scenarioId);
+				
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			protected function subBtn_clickHandler(event:MouseEvent):void
+			{
+				var dataValue:Object = bcp.getDataValue();
+				dataValue["CONDITION"] = funPanel.textArea.text;
+				bcp.setDataValue(dataValue);
+				onClose();
+			}
+			
+			protected function fieldCbb_changeHandler(event:ListEvent):void
+			{
+				funPanel.textArea.text = funPanel.textArea.text+" "+ String(fieldCbb.selectedItem);
+				fieldCbb.selectedItem = null;
+			}
+			
+			private function onClose():void{
+				PopUpManager.removePopUp(this);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<mx:VBox label="" width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}" 
+			 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		
+		<mx:HBox width="100%" horizontalAlign="left" >
+			<mx:Label text="选择字段:" /><mx:ComboBox id="fieldCbb" change="fieldCbb_changeHandler(event)" />
+		</mx:HBox>
+		<comm:FunctionPanel id="funPanel" width="100%" height="100%"/>
+		<mx:HBox width="100%" horizontalAlign="center" >
+			<mx:Button id="subBtn" label="确定"  click="subBtn_clickHandler(event)" icon="{AssetsFileLib.okIcon}" />
+			<mx:Button id="cancelBtn" label="取消"  click="onClose()" icon="{AssetsFileLib.closeIcon}" />
+		</mx:HBox>
+			
+	</mx:VBox>
+	
+</SuperPanel>

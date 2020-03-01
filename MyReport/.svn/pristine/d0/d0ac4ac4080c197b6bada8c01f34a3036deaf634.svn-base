@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Grid xmlns:mx="http://www.adobe.com/2006/mxml"
+		 xmlns:util="myreport.util.*" verticalGap="3" creationComplete="Init()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import myreport.data.report.Define;
+			import myreport.data.report.StyleSetting;
+			import myreport.res.Asset;
+			private var _Data:StyleSetting;
+			private static var _Fonts:ArrayCollection;
+			private function Init():void
+			{
+				if(_Fonts==null)
+				{
+					_Fonts = new ArrayCollection();
+					_Fonts.addItem({label:"宋体", data:"SimSun"});
+					_Fonts.addItem({label:"仿宋", data:"FangSong"});
+					_Fonts.addItem({label:"楷体", data:"KaiTi_GB2312"});
+					_Fonts.addItem({label:"黑体", data:"SimHei"});
+				}
+				FontName.dataProvider = _Fonts;
+			}
+			
+			private function OnEdit(event:Event):void
+			{
+				if(!_Data)
+					return;
+				var value:Number;
+				if(event.currentTarget == FontName)
+				{
+					if(FontName.selectedItem)
+					{
+						_Data.FontName = FontName.selectedItem.data;
+						EditStyle(Define.STYLE_FONT_NAME, FontName.selectedItem.data);
+					}
+				}
+				else if (event.currentTarget == FontSize)
+				{
+					value = Number(FontSize.text);
+					if (isNaN(value))
+						return;
+					_Data.FontSize = value;
+					EditStyle(Define.STYLE_FONT_SIZE, value);
+				}
+				else if(event.currentTarget == TextColor)
+				{
+					_Data.TextColor = TextColor.selectedColor;
+					EditStyle(Define.STYLE_TEXT_COLOR, TextColor.selectedColor);
+				}
+				else if (event.currentTarget == VAlign)
+				{
+					_Data.VerticalAlign = VAlign.selectedLabel;
+					EditStyle(Define.STYLE_VERTICAL_ALIGN, VAlign.selectedLabel);
+				}
+				else if (event.currentTarget == HAlign)
+				{
+					_Data.TextAlign = HAlign.selectedLabel;
+					EditStyle(Define.STYLE_TEXT_ALIGN, HAlign.selectedLabel);
+				}
+				else if (event.currentTarget == FontBold)
+				{
+					_Data.FontBold = FontBold.selected;
+					EditStyle(Define.STYLE_FONT_BOLD, FontBold.selected);
+				}
+				else if (event.currentTarget == Underline)
+				{
+					_Data.Underline = Underline.selected;
+					EditStyle(Define.STYLE_UNDERLINE, Underline.selected);
+				}
+				else if (event.currentTarget == WordWrap)
+				{
+					_Data.WordWrap = WordWrap.selected;
+					EditStyle(Define.STYLE_WORD_WRAP, WordWrap.selected);
+				}
+				else if (event.currentTarget == Border)
+				{
+					_Data.Border = Border.selected;
+					EditStyle(Define.STYLE_BORDER, Border.selected);
+				}
+ 
+			}
+			
+			public function set Style(value:StyleSetting):void
+			{
+				if (FontSize == null)
+					initialize();
+				
+				_Data = value;
+				for each(var item:Object in _Fonts)
+				{
+					if(value.FontName == item.data)
+					{
+						FontName.selectedItem = item;
+						break;
+					}
+				}
+				FontSize.text = value.FontSize.toString();
+				TextColor.selectedColor = value.TextColor;
+				HAlign.selectedItem = value.TextAlign;
+				VAlign.selectedItem = value.VerticalAlign;
+				Border.selected = value.Border;
+				FontBold.selected = value.FontBold;
+				Underline.selected = value.Underline;
+				WordWrap.selected = value.WordWrap;
+			}
+			
+			private function EditStyle(target:Object, value:Object):void
+			{
+				var e:DesignEvent = new DesignEvent(DesignEvent.EDIT_STYLE, true);
+				e.Target = target;
+				e.Value = value;
+				dispatchEvent(e);
+			}
+  
+			private function ShowMoreStyleForm():void
+			{
+				MoreStyleForm.Instance.Show(_Data, function(data:StyleSetting):void
+				{
+					var targets:Array = [
+						Define.STYLE_BORDER_LEFT,
+						Define.STYLE_BORDER_RIGHT,
+						Define.STYLE_BORDER_TOP,
+						Define.STYLE_BORDER_BOTTOM,
+						Define.STYLE_BORDER_STYLE_LEFT,
+						Define.STYLE_BORDER_STYLE_RIGHT,
+						Define.STYLE_BORDER_STYLE_TOP,
+						Define.STYLE_BORDER_STYLE_BOTTOM,
+						Define.STYLE_LETTER_SPACING,
+						Define.STYLE_LEADING
+					];
+					var values:Array = [
+						data.LeftBorder,
+						data.RightBorder,
+						data.TopBorder,
+						data.BottomBorder,
+						data.LeftBorderStyle,
+						data.RightBorderStyle,
+						data.TopBorderStyle,
+						data.BottomBorderStyle,
+						data.LetterSpacing,
+						data.Leading
+					];
+					EditStyle(targets, values);
+				});
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%">
+			<mx:Label text="字体名称"/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" height="100%">
+			<mx:ComboBox width="100" id="FontName" change="OnEdit(event)">
+			</mx:ComboBox>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%">
+			<mx:Label text="字体大小"/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" height="100%">
+			<mx:TextInput width="100" id="FontSize" enter="OnEdit(event)" focusOut="OnEdit(event)"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%">
+			<mx:Label text="字体颜色"/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" height="100%">
+			<mx:ColorPicker id="TextColor" change="OnEdit(event)" focusOut="OnEdit(event)"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%">
+			<mx:Label text="水平对齐"/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" height="100%">
+			<mx:ComboBox width="100" id="HAlign" change="OnEdit(event)">
+				<mx:dataProvider>
+					<mx:ArrayCollection>
+						<mx:String>left</mx:String>
+						<mx:String>center</mx:String>
+						<mx:String>right</mx:String>
+					</mx:ArrayCollection>
+				</mx:dataProvider>
+			</mx:ComboBox>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%">
+			<mx:Label text="垂直对齐"/>
+		</mx:GridItem>
+		<mx:GridItem width="100%" height="100%">
+			<mx:ComboBox width="100" id="VAlign" change="OnEdit(event)">
+				<mx:dataProvider>
+					<mx:ArrayCollection>
+						<mx:String>top</mx:String>
+						<mx:String>middle</mx:String>
+						<mx:String>bottom</mx:String>
+					</mx:ArrayCollection>
+				</mx:dataProvider>
+			</mx:ComboBox>
+		</mx:GridItem>
+	</mx:GridRow>
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%" colSpan="2">
+			<mx:CheckBox label="字体加粗" id="FontBold" change="OnEdit(event)"/>
+			<mx:CheckBox label="下划线" id="Underline" change="OnEdit(event)"/>
+		</mx:GridItem>
+	</mx:GridRow>
+ 
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%" colSpan="2">
+			<mx:CheckBox label="自动换行" id="WordWrap" change="OnEdit(event)"/>
+			<mx:CheckBox label="显示边框" id="Border" change="OnEdit(event)"/>
+		</mx:GridItem>
+	</mx:GridRow>
+	
+	<mx:GridRow width="100%" height="100%">
+		<mx:GridItem width="100%" height="100%" colSpan="2">
+			<util:ToolButton icon="{Asset.ICON_PROPERTIES}" label="更多样式" click="ShowMoreStyleForm()"/>	
+		</mx:GridItem>
+	</mx:GridRow>
+</mx:Grid>

@@ -1,0 +1,47 @@
+/***********************************************************************
+ * $RCSfile: LogConst.java,v $  $Revision: 1.1 $  $Date: 2007/06/05 10:25:10 $
+ * $Log: LogConst.java,v $
+ * Revision 1.1  2007/06/05 10:25:10  qilin
+ * no message
+ *
+*************************************************************************/
+package smartx.system.common.constant;
+
+public class LogConst {
+    //status
+    public static final int LOGSTATUS_ON=0;
+    public static final int LOGSTATUS_OFF=1;
+
+    //Operation
+    public static final String OPERATION_ADD = "新增";
+    public static final String OPERATION_DELETE = "删除";
+    public static final String OPERATION_UPDATE = "修改";
+    public static final String OPERATION_AUDIT = "审核";
+    public static final String OPERATION_RESUME = "恢复";
+    public static final String OPERATION_ARCHIVE = "归档";
+    public static final String OPERATION_REDRAW = "撤消";
+    public static final String OPERATION_DESIGN = "设计";
+    public static final String OPERATION_SEND = "派发";
+    public static final String OPERATION_BACKFILL = "回填";
+    public static final String OPERATION_CHECK = "验收";
+    public static final String OPERATION_CUTOVER = "割接";
+    public static final String OPERATION_AUTHORIZE = "授权";
+
+    public static final String OPERATION_SET_AUTO_ARCHIEVE_CONDITION = "设置系统自动归档条件";
+    public static final String OPERATION_ARCHIEVE_SYSTEM_LOG = "手工归档";
+    public static final String OPERATION_MODIFY_USER_PASSWORD = "修改用户密码";
+    public static final String OPERATION_LOGIN = "登录";
+    public static final String OPERATION_ADMINLOGIN = "管理员登录";
+    public static final String OPERATION_SUPERLOGIN = "超级用户登录";
+    public static final String OPERATION_LOGOUT = "注销";
+    public static final String OPERATION_LOGIN_FAILED = "登录失败";
+    public static final String OPERATION_EXIT = "退出";
+
+    public static final String OPERATION_SERVER_START = "服务器启动";
+    public static final String OPERATION_SERVER_SHUTDOWN = "服务器关闭";
+
+    public static final String OPERATION_ENABLE_LOG = "激活系统日志记录";
+    public static final String OPERATION_DISABLE_LOG = "禁止系统日志记录";
+    public static final String OPERATION_CLEAR_LOG = "清除系统日志";
+    public static final String OPERATION_CLEAR_ALL_LOG = "清除所有系统日志";
+}

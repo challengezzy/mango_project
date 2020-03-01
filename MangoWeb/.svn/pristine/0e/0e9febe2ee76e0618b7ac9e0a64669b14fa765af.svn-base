@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="buildMangoWeb" basedir="." default="compileMangoWeb">
+	<property environment="env" />
+	<!-- 加载自定义的配置文件 -->
+	<property name="FLEX_HOME" value="${env.FLEX_HOME}" />
+	<property name="FLEX_FRAMEWORK" value="${FLEX_HOME}/frameworks/libs" />
+	<property name="ANT_HOME" value="${env.ANT_HOME}" />
+	<property name="SRC_DIR" value="${basedir}/../flex_src" />
+	<property name="DEPLOY_DIR" value="${basedir}/../war/MangoWeb" />
+	<property name="LOCALE_DIR" value="${basedir}/../locale" />
+	<property name="mainName" value="MangoWeb" />
+	<property name="WEBROOT_DIR" value="${basedir}/../WebRoot" />
+	<!-- 引入flexTasks.jar -->
+	<taskdef resource="flexTasks.tasks" classpath="${FLEX_HOME}/ant/lib/flexTasks.jar" />
+	<taskdef resource="net/sf/antcontrib/antlib.xml">
+		<classpath>
+			<pathelement location="${ANT_HOME}/lib/ant-contrib-1.0b3.jar" />
+		</classpath>
+	</taskdef>
+	<target name="compileMangoWeb" depends="init,copyRSLs,compileApplication,createModule,exportWar,clean" />
+	<target name="init">
+		<delete dir="${DEPLOY_DIR}" />
+		<mkdir dir="${DEPLOY_DIR}" />
+		<delete file="${DEPLOY_DIR}/../${mainName}.war" />
+	</target>
+
+	<!-- 将FLEX FRAMEWORK文件拷贝到部署目录 供RSLS使用 -->
+	<target name="copyRSLs">
+		<copy todir="${DEPLOY_DIR}">
+			<fileset dir="${FLEX_HOME}/frameworks/rsls">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+	</target>
+	<target name="compileApplication" depends="init">
+		<!-- 拷贝资源文件 -->
+		<copy todir="${DEPLOY_DIR}/style">
+			<fileset dir="${SRC_DIR}/style">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/theme">
+			<fileset dir="${WEBROOT_DIR}/theme">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/smartx/flex/modules/assets">
+			<fileset dir="${SRC_DIR}/smartx/flex/modules/assets">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/charts/fusioncharts.com/fusioncharts">
+			<fileset dir="${SRC_DIR}/charts/fusioncharts.com/fusioncharts">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/charts/fusioncharts.com/fusionwidgets">
+			<fileset dir="${SRC_DIR}/charts/fusioncharts.com/fusionwidgets">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/olap">
+			<fileset dir="${SRC_DIR}/olap">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/maps">
+			<fileset dir="${SRC_DIR}/maps">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/initmetadata">
+			<fileset dir="${WEBROOT_DIR}/initmetadata">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/ireport">
+			<fileset dir="${WEBROOT_DIR}/ireport">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<!-- 拷贝MangoWeb.html等 -->
+		<copy todir="${DEPLOY_DIR}">
+			<fileset dir="${WEBROOT_DIR}">
+				<include name="mango.html" />
+				<include name="MangoWeb.html" />
+				<include name="swfobject.js" />
+				<include name="playerProductInstall.swf" />
+			</fileset>
+		</copy>
+		<copy todir="${DEPLOY_DIR}/history">
+			<fileset dir="${WEBROOT_DIR}/history">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<!--拷贝webinfo目录至部署目录
+		<copy todir="${DEPLOY_DIR}/WEB-INF">
+			<fileset dir="../WebRoot/WEB-INF">
+				<include name="**/**" />
+			</fileset>
+		</copy>-->
+		<!--拷贝所有编译需要的LIB包-->
+		<copy todir="${DEPLOY_DIR}/WEB-INF/lib">
+			<fileset dir="../../MangoJava/jar">
+				<include name="**/**" />
+			</fileset>
+		</copy>
+		<!-- 编译主程序并生成一个Link Report 用于嵌入module中-->
+		<mxmlc file="${SRC_DIR}/${mainName}.mxml" link-report="${SRC_DIR}/${mainName}_LinkReport.xml" output="${DEPLOY_DIR}/${mainName}.swf" keep-generated-actionscript="false" keep-all-type-selectors="true" actionscript-file-encoding="UTF-8" incremental="true" benchmark="true" optimize="true" warnings="true" maxmemory="1024m" isolate-styles="false">
+			<!-- 防止出现Permgen Space错误-->
+			<jvmarg value="-Xmx1024m" />
+			<jvmarg value="-Xms512m" />
+			<jvmarg value="-XX:MaxPermSize=128m" />
+			<!--项目的多语言及配置文件目录-->
+			<source-path path-element="${LOCALE_DIR}/zh_CN" />
+			<load-config filename="${FLEX_HOME}/frameworks/flex-config.xml" />
+			<source-path path-element="${SRC_DIR}" />
+			<!-- flex 4默认的主题是spark 所以这里设置添加HALO主题 -->
+			<theme dir="${FLEX_HOME}/frameworks/themes/Halo" append="true">
+				<include name="halo.swc" />
+			</theme>
+			<!--设置services-config.xml中的{context.root}，如果没有详细定义，那flex将用空值。-->
+			<context-root>MangoWeb</context-root>
+			<!-- 指定services配置文件 -->
+			<services>D:/hudson/jobs/Mango/workspace/MangoWeb/WebRoot/WEB-INF/flex/services-config.xml</services>
+			<debug>true</debug>
+			<!-- RSL的引用 -->
+			<!--runtime-shared-library-path path-element="${FLEX_FRAMEWORK}/textLayout.swc">
+				<url rsl-url="http://fpdownload.adobe.com/pub/swz/tlf/1.0.0.595/textLayout_1.1.0.595.swz"
+				     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+				<url rsl-url="textLayout_1.0.0.595.swz" />
+			</runtime-shared-library-path>
+			<runtime-shared-library-path path-element="${FLEX_FRAMEWORK}/osmf.swc">
+				<url rsl-url="http://fpdownload.adobe.com/pub/swz/flex/4.0.0.13495/osmf_flex.4.0.0.13495.swz"
+				     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+				<url rsl-url="osmf_flex.4.0.0.13495.swz" />
+			</runtime-shared-library-path>
+			<runtime-shared-library-path path-element="${FLEX_FRAMEWORK}/framework.swc">
+				<url rsl-url="http://fpdownload.adobe.com/pub/swz/flex/4.0.0.14159/framework_4.0.0.14159.swz"
+				     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+				<url rsl-url="framework_4.0.0.14159.swz" />
+			</runtime-shared-library-path>
+			<runtime-shared-library-path path-element="${FLEX_FRAMEWORK}/rpc.swc">
+				<url rsl-url="http://fpdownload.adobe.com/pub/swz/flex/4.0.0.14159/rpc_4.0.0.14159.swz"
+				     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+				<url rsl-url="rpc_4.0.0.14159.swz" />
+			</runtime-shared-library-path-->
+			<!-- 引用MangoFlex SWC库-->
+			<library-path dir="../../MangoFlex/swc" append="true">
+				<include name="MangoFlex.swc" />
+			</library-path>
+			<include-libraries dir="../flex_libs" append="true">
+				<include name="DateTimeLibrary200903.swc" />
+				<include name="QaVis.swc" />
+			</include-libraries>
+			<!--只编译as3corelib.swc中相关联的类-->
+			<library-path dir="../flex_libs" append="true">
+				<include name="as3corelib.swc" />
+			</library-path>
+			<library-path dir="${FLEX_HOME}/frameworks" append="true">
+				<include name="libs" />
+				<include name="/locale/${application.locale}" />
+			</library-path>
+		</mxmlc>
+		<delete>
+			<!-- 删除 cache文件 -->
+			<fileset dir="${DEPLOY_DIR}/" includes="${mainName}*.cache" defaultexcludes="false" />
+		</delete>
+	</target>
+	<target name="createModule">
+		<macrodef name="compileModule">
+			<attribute name="package" />
+			<attribute name="moduleName" />
+			<attribute name="extension" />
+			<sequential>
+				<echo message="--compile module @{package}/@{moduleName}.@{extension}" />
+				<!-- 编译module并使用主程序的link_port-->
+				<mxmlc file="${SRC_DIR}/@{package}/@{moduleName}.@{extension}" 
+					load-externs="${SRC_DIR}/${mainName}_LinkReport.xml" 
+					output="${DEPLOY_DIR}/@{package}/@{moduleName}.swf" 
+					keep-generated-actionscript="false" actionscript-file-encoding="UTF-8" 
+					keep-all-type-selectors="true" incremental="true" optimize="true" 
+					warnings="true" fork="true" benchmark="true" maxmemory="1024m" isolate-styles="false">
+					<!-- 防止出现Permgen Space错误-->
+					<jvmarg value="-Xmx1024m" />
+					<jvmarg value="-Xms512m" />
+					<jvmarg value="-XX:MaxPermSize=128m" />
+
+					<!--项目的多语言及配置文件目录-->
+					<source-path path-element="${LOCALE_DIR}/zh_CN" />
+
+					<load-config filename="${FLEX_HOME}/frameworks/flex-config.xml" />
+					<source-path path-element="${SRC_DIR}" />
+					<source-path path-element="${FLEX_HOME}/frameworks" />
+					<!-- flex 4默认的主题是spark 所以这里设置添加HALO主题 -->
+					<theme dir="${FLEX_HOME}/frameworks/themes/Halo" append="true">
+						<include name="halo.swc" />
+					</theme>
+					<!-- 指定services配置文件 -->
+					<context-root>MangoWeb</context-root>
+					<services>D:/hudson/jobs/Mango/workspace/MangoWeb/WebRoot/WEB-INF/flex/services-config.xml</services>
+					<debug>true</debug>
+					<!-- RSL的引用 -->
+					<!--runtime-shared-library-path path-element="${FLEX_HOME}/frameworks/libs/textLayout.swc">
+						<url rsl-url="http://fpdownload.adobe.com/pub/swz/tlf/1.0.0.595/textLayout_1.1.0.595.swz"
+						     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+						<url rsl-url="textLayout_1.0.0.595.swz" />
+					</runtime-shared-library-path>
+					<runtime-shared-library-path path-element="${FLEX_HOME}/frameworks/libs/osmf.swc">
+						<url rsl-url="http://fpdownload.adobe.com/pub/swz/flex/4.0.0.13495/osmf_flex.4.0.0.13495.swz"
+						     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+						<url rsl-url="osmf_flex.4.0.0.13495.swz" />
+					</runtime-shared-library-path>
+					<runtime-shared-library-path path-element="${FLEX_FRAMEWORK}/framework.swc">
+						<url rsl-url="http://fpdownload.adobe.com/pub/swz/flex/4.0.0.14159/framework_4.0.0.14159.swz"
+						     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+						<url rsl-url="framework_4.0.0.14159.swz" />
+					</runtime-shared-library-path>
+					<runtime-shared-library-path path-element="${FLEX_HOME}/frameworks/libs/rpc.swc">
+						<url rsl-url="http://fpdownload.adobe.com/pub/swz/flex/4.0.0.14159/rpc_4.0.0.14159.swz"
+						     policy-file-url="http://fpdownload.adobe.com/pub/swz/crossdomain.xml" />
+						<url rsl-url="rpc_4.0.0.14159.swz" />
+					</runtime-shared-library-path-->
+					<!-- 引用MangoFlex SWC库-->
+					<library-path dir="../../MangoFlex/swc" append="true">
+						<include name="MangoFlex.swc" />
+					</library-path>
+					<include-libraries dir="../flex_libs" append="true">
+						<include name="DateTimeLibrary200903.swc" />
+						<include name="QaVis.swc" />
+					</include-libraries>
+					<library-path dir="../flex_libs" append="true">
+						<include name="as3corelib.swc" />
+						<include name="openscales-fx-2.2.swc" />
+						<include name="openscales-core-2.2.swc" />
+						<include name="openscales-geometry-2.2.swc" />
+						<include name="openscales-proj4as-2.2.swc" />
+					</library-path>
+					<library-path dir="${FLEX_HOME}/frameworks" append="true">
+						<include name="libs" />
+						<include name="/locale/${application.locale}" />
+					</library-path>
+				</mxmlc>
+				<delete>
+					<!-- 删除 cache文件 -->
+					<fileset dir="${DEPLOY_DIR}/@{package}/" includes="@{moduleName}*.cache" defaultexcludes="false" />
+				</delete>
+			</sequential>
+		</macrodef>
+		<compileModule package="smartx/flex/modules/basic/mt/styletemplate" moduleName="StyleTemplate01Frame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/mt/styletemplate" moduleName="StyleTemplate02Frame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/mt/styletemplate" moduleName="StyleTemplate03Frame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/mt/styletemplate" moduleName="StyleTemplate04Frame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/mt/styletemplate" moduleName="StyleTemplate09Frame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/mt/styletemplate" moduleName="StyleTemplate11Frame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/mt/styletemplate" moduleName="StyleTemplateGroupListFrame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/mt" moduleName="MTDesignerFrame" extension="mxml" />
+		<!--
+		<compileModule package="smartx/flex/modules/basic/mt/olap" moduleName="PivotComponentFrame" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/sample" moduleName="ceplistpanelsample" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/sample" moduleName="frame03sample" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/sample" moduleName="frame09sample" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/sample" moduleName="NovaChartFrameSample" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/sample" moduleName="ProcessChartPanelSample" extension="mxml" />
+		-->
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="authmgmt" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="streamdesigner" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="streammodulemgmt" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="templetmgmt2" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="workflowdesigner" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="workflowmonitor" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="workflowtask" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="mtmgmt" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="DBViewExport" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="DBFunctionExport" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system" moduleName="FileManagerFrame" extension="mxml" />
+		<!--
+		<compileModule package="smartx/flex/modules/basic/system/performance" moduleName="jwebap" extension="mxml" />
+		<compileModule package="smartx/flex/modules/basic/system/dbexplorer" moduleName="DBExplorer" extension="mxml" />
+		-->
+		<compileModule package="smartx/flex/modules/datatask" moduleName="DataTaskManager" extension="mxml" />
+		
+		<compileModule package="smartx/bam/flex/modules" moduleName="CustomLibrary" extension="as" />
+		<compileModule package="smartx/bam/flex/modules/dashboard" moduleName="Dashboard" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/dashboard" moduleName="DashboardManager" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/authority" moduleName="DashboardAuthorityManager" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/dashboardobject" moduleName="DashboardObject" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/report" moduleName="MTReportFrame" extension="mxml" />
+	    <compileModule package="smartx/bam/flex/modules/accountset" moduleName="AdvAccountsetPanel" extension="mxml" />
+	   	<compileModule package="smartx/bam/flex/modules/dataanalyze" moduleName="DataAnalyzeDBFrame" extension="mxml" />	
+		<compileModule package="smartx/bam/flex/modules/queryview" moduleName="QueryviewModeler" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/businessview" moduleName="BusinessViewModeler" extension="mxml" />
+		<!--
+		<compileModule package="smartx/bam/flex/modules/entitymodel" moduleName="EntityModelFrame" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/workspace" moduleName="Workspace" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/entitymodel" moduleName="EntityViewer" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/entitymodel" moduleName="EntityOLAPFrame" extension="mxml" />
+		-->
+		<!--
+		<compileModule package="smartx/bam/flex/modules/gis" moduleName="GisMapFrame" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/dqc" moduleName="EntityRuleCheckFrame" extension="mxml" />
+		<compileModule package="smartx/bam/flex/modules/common" moduleName="ExamineChart" extension="mxml" />
+	   	<compileModule package="smartx/bam/flex/modules/dqc" moduleName="EntityRuleCorrectiveConfFrame" extension="mxml" /> -->
+		<!--<compileModule package="smartx/bam/flex/modules/alertmessage" moduleName="AlertMessageManager" extension="mxml" /> -->
+		<!--<compileModule package="smartx/bam/flex/modules/businessscenario" moduleName="BusinessScenarioManager" extension="mxml" />-->
+		<!--<compileModule package="smartx/bam/flex/modules/businessscenario" moduleName="TempleteRuleListPanel" extension="mxml" />-->
+	</target>
+
+	<!-- HTML Wrapper -->
+	<!--target name="wrapper">
+		<html-wrapper title="Mango Platform"
+		              file="${mainName}.html"
+		              height="100%"
+		              width="100%"
+		              bgcolor="#000000"
+		              application="${mainName}"
+		              swf="${mainName}"
+		              version-major="10"
+		              version-minor="0"
+		              version-revision="0"
+		              history="true"
+		              templatePath="${basedir}/../html-template"
+		              express-install="true"
+		              output="${DEPLOY_DIR}" />
+	</target-->
+	<target name="exportWar">
+		<war destfile="${DEPLOY_DIR}/../${mainName}.war" webxml="${basedir}/../WebRoot/WEB-INF/web.xml">
+			<!--<lib dir="${DEPLOY_DIR}/WEB-INF/lib" />-->
+			<fileset dir="${DEPLOY_DIR}">
+				<includesfile />
+			</fileset>
+		</war>
+	</target>
+	<target name="clean">
+		<delete dir="${DEPLOY_DIR}" />
+	</target>
+</project>

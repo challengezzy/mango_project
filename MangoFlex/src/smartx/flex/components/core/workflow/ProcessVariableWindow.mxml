@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="400" height="300"
+	showCloseButton="true" close="PopUpManager.removePopUp(this)" creationComplete="init()"
+	show="refresh()" title="流程变量设置">
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public var destinationForWorkflow:String = GlobalConst.SERVICE_WORKFLOW;
+		    public var endpointForWorkflow:String;
+		    private var novaWorkflowService:RemoteObject;
+		    public var processInstanceId:String;
+		    
+		    [Bindable]
+		    private var variableDataProvider:ArrayCollection = new ArrayCollection();
+		    
+		    [Bindable]
+		    public var editable:Boolean = true;
+		    
+			private function init():void{
+				if(processInstanceId == null)
+					throw new Error("必须指定流程实例ID");
+					
+				novaWorkflowService = new RemoteObject(destinationForWorkflow);
+		        if(endpointForWorkflow!=null)
+		        	novaWorkflowService.endpoint = endpointForWorkflow;
+		        novaWorkflowService.getVariableMap.addEventListener(ResultEvent.RESULT,getVariableMapHandler);
+		        novaWorkflowService.getVariableMap.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        novaWorkflowService.setVariable.addEventListener(ResultEvent.RESULT,setVariableHandler);
+		        novaWorkflowService.setVariable.addEventListener(FaultEvent.FAULT,faultHandler);
+		        
+		        if(!editable)
+		        	this.removeChild(editBar);
+		        
+		        refresh();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+		    }
+		    
+		    private function refresh():void{
+		    	novaWorkflowService.getVariableMap(processInstanceId);
+		    }
+		    
+		    private function getVariableMapHandler(event:ResultEvent):void{
+		    	var varMap:Object = event.result as Object;
+		    	if(varMap != null){
+		    		variableDataProvider = new ArrayCollection();
+		    		for(var name:String in varMap){
+		    			var temp:Object = new Object();
+		    			temp.name = name;
+		    			temp.value = varMap[name];
+		    			variableDataProvider.addItem(temp);
+		    		}
+		    	}
+		    }
+		    
+		    private function showSelectedVariable():void{
+		    	var obj:Object = varGrid.selectedItem;
+		    	if(obj != null){
+		    		varNameInput.text = obj.name;
+		    		varValueInput.text = obj.value;
+		    	}
+		    }
+		    
+		    private function setVariable():void{
+		    	novaWorkflowService.setVariable(varNameInput.text,varValueInput.text,processInstanceId);
+		    }
+		    
+		    private function setVariableHandler(event:ResultEvent):void{
+		    	refresh();
+		    }
+		    	
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" id="editBar">
+		<mx:Label text="变量名"/>
+		<mx:TextInput width="100" id="varNameInput"/>
+		<mx:Label text="变量值"/>
+		<mx:TextInput width="100" id="varValueInput"/>
+		<mx:LinkButton click="setVariable()" toolTip="设置变量" icon="{AssetsFileLib.setIcon}" width="18"/>
+		<mx:LinkButton click="refresh()" toolTip="刷新" icon="{AssetsFileLib.refreshIcon}" width="18"/>
+	</mx:HBox>
+	<mx:DataGrid id="varGrid" width="100%" height="100%" dataProvider="{variableDataProvider}" click="showSelectedVariable()">
+		<mx:columns>
+			<mx:DataGridColumn headerText="变量名" dataField="name"/>
+			<mx:DataGridColumn headerText="变量值" dataField="value"/>
+		</mx:columns>
+	</mx:DataGrid>
+	
+</mx:TitleWindow>

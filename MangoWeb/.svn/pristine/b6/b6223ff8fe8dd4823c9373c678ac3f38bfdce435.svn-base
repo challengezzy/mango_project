@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="http://www.adobe.com/2006/mxml" width="630" height="400" 
+			allowDrag="true" allowClose="true" allowMaximize="true" 
+			allowMinimize="true" allowResize="true" close="onClose()" fontSize="12" 
+			xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+			xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" 
+			xmlns:core="smartx.flex.components.core.*"
+			title="模板参数管理"
+			>
+	<mx:Metadata>		       
+		[Event(name='edit',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='insert',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='beforeSave',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='save',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='returnToList',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='view',type='smartx.flex.components.event.StyleTemplateEvent')]
+	</mx:Metadata>
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.effects.Effect;
+			import mx.effects.EffectInstance;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+			import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletVO;
+			
+			[Bindable]
+			public var templetCode:String;
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = false;
+			[Bindable]
+			public var switchEffect:Effect;
+			private var returnAfterSave:Boolean = false;
+			[Bindable]
+			public var showSystemButton:Boolean = true;
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var initQueryCondition:String;
+			[Bindable]
+			public var templeteId:String;
+			
+			[Bindable]
+			public var closeFunctionHander:Function;
+			
+			private var templetVO:TempletVO; 
+			
+			private var formService:RemoteObject;
+			
+			private function init():void{
+				if(templetCode == null)
+					throw Error("元原模板编号不能为null");
+				if(switchEffect == null)
+					switchEffect = new CoverFlowPapervision3D();
+				
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				formService.getTempletVO.addEventListener(ResultEvent.RESULT,getTempletVOHandler);
+				formService.getTempletVO.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.getTempletVO(templetCode);
+				
+				listPanel.isShowAlert = false;
+				
+				listPanel.query(false,true,true);
+				
+			}
+			
+			
+			private function getTempletVOHandler(event:ResultEvent):void{
+				templetVO = event.result as TempletVO;
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			public function onReturn():void{
+				listPanel.refreshData();
+				mainStack.selectedChild = listBox;
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.RETURN_TO_LIST));
+			}
+			
+			public function isListPanelShowing():Boolean{
+				return (mainStack.selectedChild == listBox);
+			}
+			
+			public function onEdit():void{
+				if(listPanel.getSelectedRowValue() != null){
+					var row:Object = listPanel.getSelectedRowValue();
+					cardPanel.editable = editable;
+					cardPanel.setDataValue(row);
+					mainStack.selectedChild = cardBox;
+					cardPanel.insertMode = false;
+					if(editable)
+						dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.EDIT));
+					else
+						dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.VIEW));
+				}
+				else
+					Alert.show("请选择一条记录");
+			}
+			
+			public function onInsert():void{
+				//cardPanel.editable = true;
+				
+				var obj:Object = new Object();
+				cardPanel.setDataValue(obj);
+				mainStack.selectedChild = cardBox;
+				TempletDataUtil.setTempletValue("RULETEMPLATEID",this.templeteId,obj,templetVO,function():void{
+					cardPanel.setDataValue(obj);
+				},null,this.endpoint);
+				cardPanel.insertMode = true;
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.INSERT));
+			}
+			
+			public function onSave():void{
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.BEFORE_SAVE,cardPanel.getDataValue()));
+				cardPanel.save();
+				dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.SAVE));
+			}
+			
+			public function onSaveAndReturn():void{
+				onSave();
+				returnAfterSave = true;
+				listPanel.query(false,true,true);
+			}
+			private function onSaveSuccessful():void{
+				if(returnAfterSave)
+					onReturn();
+				cardPanel.insertMode = false;
+				returnAfterSave = false;
+			}
+			
+			private function onClose():void{
+				PopUpManager.removePopUp(this);
+				closeFunctionHander();
+			}
+			
+			private function deleteRow():void{
+				
+				var item:* = listPanel.getSelectedRowValue();
+				
+				if(item == null){
+					Alert.show("请先选择一条数据!","提示");
+				}else{
+					listPanel.deleteRow();
+					listPanel.save();
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all" >
+		<mx:VBox width="100%" height="100%" id="listBox" showEffect="{switchEffect}" hideEffect="{switchEffect}" 
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%" id="listButtonBox">
+				<mx:Button id="viewButton" label="{editable?'编辑':'查看'}" toolTip="编辑一个已有的参数信息" 
+						   click="onEdit()" icon="{AssetsFileLib.editingIcon}" />
+				<mx:Button id="insertButton" label="新增" toolTip="新增一个模板参数" click="onInsert()" 
+						   icon="{AssetsFileLib.addIcon}" />
+				<mx:Button id="deleteButton" label="删除" toolTip="删除一个模板参数" click="deleteRow()" 
+						   icon="{AssetsFileLib.minuseIcon}" />
+				<mx:Button id="orderButton" label="关闭" toolTip="关闭窗口" click="onClose()"  icon="{AssetsFileLib.closeIcon}" />
+			</mx:HBox>
+			<core:BillListPanel showInitingWindow="false" destination="{destination}" endpoint="{endpoint}" 
+								doubleClick="onEdit()" templetCode="{templetCode}" id="listPanel" editable="false" 
+								width="100%" height="100%" showEditBox="false" debugMode="{debugMode}" initQueryCondition="{initQueryCondition}">
+			</core:BillListPanel>
+		</mx:VBox>
+		<mx:VBox width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}" 
+				 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+			<mx:HBox width="100%" id="cardButtonBox">
+				<mx:Button id="returnButton" label="返回" toolTip="返回参数列表" click="onReturn()" icon="{AssetsFileLib.returnIcon}" />
+				<mx:Button id="saveAndReturnButton" label="保存并返回" toolTip="保存参数并返回参数列表" 
+						   click="onSaveAndReturn()" icon="{AssetsFileLib.savereturnIcon}" />
+				<mx:Button id="cardSaveButton" label="保存" toolTip="保存参数" click="onSave()" icon="{AssetsFileLib.saveIcon}" />
+				<mx:Button id="orderButton2" label="关闭" toolTip="关闭窗口" click="onClose()" icon="{AssetsFileLib.closeIcon}" />
+			</mx:HBox>
+			<core:BillCardPanel destination="{destination}" endpoint="{endpoint}" templetCode="{templetCode}" 
+								id="cardPanel" width="100%" height="100%" title="详细信息" debugMode="{debugMode}" 
+								saveSuccessful="onSaveSuccessful()" showInitingWindow="false" >
+			</core:BillCardPanel>
+		</mx:VBox>
+	</mx:ViewStack>	
+</SuperPanel>

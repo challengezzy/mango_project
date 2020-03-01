@@ -1,0 +1,83 @@
+/**************************************************************************
+ * $RCSfile: CustListPanel.java,v $  $Revision: 1.4 $  $Date: 2007/05/31 07:39:06 $
+ **************************************************************************/
+package smartx.publics.styletemplet.ui.cust;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+import smartx.framework.common.ui.*;
+import smartx.framework.metadata.ui.*;
+
+
+public class CustListPanel extends AbstractListCustomerButtonBarPanel {
+
+    private static final long serialVersionUID = -6291945435323172247L;
+
+    JButton btn_import = null;
+
+    JButton btn_showDetail = null;
+
+    public void initialize() {
+        btn_import = new JButton(UIUtil.getImage("images/platform/site.gif")); //
+        btn_showDetail = new JButton(UIUtil.getImage("images/platform/find.gif")); //
+
+        btn_import.setPreferredSize(new Dimension(20, 20));
+        btn_showDetail.setPreferredSize(new Dimension(20, 20));
+        btn_import.setToolTipText("自定义按钮_快速导入记录"); //
+        btn_showDetail.setToolTipText("自定义按钮_显示明细记录"); //
+
+        btn_import.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onImport();
+            }
+        }); //
+
+        btn_showDetail.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onShowDetail();
+            }
+        }); //
+
+        this.add(btn_import); //
+        this.add(btn_showDetail); //
+    }
+
+    private void onImport() {
+        //Dialog dialog = new Dialog();
+        //		String str_aa = dialog.getID;
+        //		this.getBillListPanel().setValueAt("ss", 1, _"dd");  //
+
+    }
+
+    private void onShowDetail() {
+        int li_row = getBillListPanel().getSelectedRow();
+        if (li_row < 0) {
+            return;
+        }
+        String str_code = (String) getBillListPanel().getValueAt(li_row, "CODE"); //
+        JOptionPane.showMessageDialog(this, "选中的Code是[" + str_code + "]");
+    }
+}
+/**************************************************************************
+ * $RCSfile: CustListPanel.java,v $  $Revision: 1.4 $  $Date: 2007/05/31 07:39:06 $
+ *
+ * $Log: CustListPanel.java,v $
+ * Revision 1.4  2007/05/31 07:39:06  qilin
+ * code format
+ *
+ * Revision 1.3  2007/05/22 07:58:47  qilin
+ * no message
+ *
+ * Revision 1.2  2007/05/22 02:04:11  sunxb
+ * *** empty log message ***
+ *
+ * Revision 1.1  2007/05/17 06:14:29  qilin
+ * no message
+ *
+ * Revision 1.2  2007/01/30 04:48:34  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

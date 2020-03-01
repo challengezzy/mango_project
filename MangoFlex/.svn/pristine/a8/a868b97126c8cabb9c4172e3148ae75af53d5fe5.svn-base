@@ -1,0 +1,1075 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" xmlns:containers="flexlib.containers.*" xmlns:workflow="smartx.flex.components.core.workflow.*"
+		   creationComplete="init()" xmlns:flowui="smartx.flex.components.util.flowui.*"
+		   xmlns:bd="net.brandonmeyer.containers.*" xmlns:core="smartx.flex.components.core.*">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<mx:Glow id="glow1" blurXFrom="0" color="0xFF0000" blurXTo="15" blurYFrom="0" blurYTo="15" />
+		<mx:Glow id="glow2" alphaFrom="50" alphaTo="0" blurXFrom="15" color="0x00FF00" blurXTo="0" blurYFrom="15" blurYTo="0" />
+		<bd:SuperPanel id="debugPanel" title="模块调试" layout="vertical" 
+					   allowDrag="true" allowClose="true" allowMaximize="true" 
+					   allowMinimize="true" allowResize="true"
+					   close="PopUpManager.removePopUp(debugPanel)" width="600" height="600" 
+					   paddingLeft="3" paddingRight="3" paddingTop="3" paddingBottom="3">
+			<core:BillStreamMonitorPanel id="streamMonitorPanel" width="100%" height="100%" streamInstanceMap="{streamInstanceMap}"
+										 endpoint="{endpoint}"/>
+		</bd:SuperPanel>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.utils.getDefinitionByName;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ArrayList;
+			import mx.controls.Alert;
+			import mx.core.Container;
+			import mx.core.DragSource;
+			import mx.core.IUIComponent;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.DragEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.cep.AbstractStreamControlPropertyEditor;
+			import smartx.flex.components.core.cep.CEPConst;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.core.cep.IStreamControl;
+			import smartx.flex.components.core.cep.StreamControlFactory;
+			import smartx.flex.components.core.cep.StreamControlTemplateIcon;
+			import smartx.flex.components.core.cep.StreamEvent;
+			import smartx.flex.components.core.cep.StreamEventField;
+			import smartx.flex.components.core.cep.StreamInstance;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.flowui.ArrowLine;
+			import smartx.flex.components.util.flowui.FlowIcon;
+			import smartx.flex.components.util.flowui.IconEvent;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			public var destination:String = GlobalConst.SERVICE_CEP;
+			[Bindable]
+			public var endpoint:String;
+			private var cepService:RemoteObject;
+			
+			public var formDestination:String = GlobalConst.SERVICE_FORM;
+			public var formEndpoint:String;
+			private var formService:RemoteObject;
+			
+			public var datasource:String;
+			
+			public var operatorName:String = "defaultUser";
+
+			private var currentStreamAppXML:XML;
+			
+			private var streamIconMap:Object = new Object();
+			private var connectorIconMap:Object = new Object();
+			[Bindable]
+			private var streamInstanceMap:Object = new Object();
+			
+			private static const DESIGNGRAPHMODE_SELECT:int = 0;
+			private static const DESIGNGRAPHMODE_LINE:int = 1;
+			
+			private var startLineDrag:Boolean = false;
+			
+			private var tempLine:ArrowLine; 
+			
+			private var sourceIcon:FlowIcon;  
+			
+			[Bindable]
+			private var inputTreeData:ArrayCollection;
+			
+			[Bindable]
+			private var outputTreeData:ArrayCollection;
+			
+			[Bindable]
+			private var designGraphMode:int = DESIGNGRAPHMODE_SELECT;
+			
+			private var _isSaved:Boolean = true;
+			
+			private var closeAfterSave:Boolean = false;
+			
+			[Bindable]
+			private static var passedIcon:Class = AssetsFileLib.passedIcon;
+			
+			[Bindable]
+			private static var warningIcon:Class = AssetsFileLib.warningIcon;
+			
+			[Bindable]
+			private static var editingIcon:Class = AssetsFileLib.editingIcon;
+			
+			[Bindable]
+			private static var savedIcon:Class = AssetsFileLib.saveIcon;
+			
+			private var _isValidateSuccessful:Boolean = true;
+			
+			private var validateErrorInfo:String;
+			
+			private var eplMap:Hashtable;
+			
+			private var currentShowingStreamCode:String;
+			
+			public var useDefaultProvider:Boolean = true;
+			
+			private function init():void{
+				cepService = new RemoteObject(destination);
+				if(endpoint!=null)
+					cepService.endpoint = endpoint;
+				cepService.saveStreamApp.addEventListener(ResultEvent.RESULT,saveStreamAppHandler);
+				cepService.saveStreamApp.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				cepService.loadStreamAppXML.addEventListener(ResultEvent.RESULT,loadStreamAppXMLHandler);
+				cepService.loadStreamAppXML.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				cepService.batchDeployStreamModule.addEventListener(ResultEvent.RESULT,deployStreamModuleHandler);
+				cepService.batchDeployStreamModule.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				cepService.deployAndStartStreamModule.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				formService = new RemoteObject(formDestination);
+				if(formEndpoint!=null)
+					formService.endpoint = formEndpoint;
+				
+				streamControlsInit(CEPConst.TYPE_STREAMCONTROL_OPERATOR,operatorBox);
+				streamControlsInit(CEPConst.TYPE_STREAMCONTROL_STREAM,streamBox);
+			}
+			
+			private function saveStreamAppHandler(event:ResultEvent):void{
+				isSaved = true;
+				Alert.show("保存成功！");
+				if(closeAfterSave){
+					closeAfterSave = false;
+					close();
+				}
+			}
+			
+			private function deployStreamModuleHandler(event:ResultEvent):void{
+				Alert.show("发布成功！");
+			}
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+			
+			private function streamControlsInit(type:String,box:Container):void{
+				//初始化控件
+				var operators:ArrayCollection = StreamControlFactory.getStreamControlByType(type);
+				for each(var operator:IStreamControl in operators){
+					var streamControlTemplateIcon:StreamControlTemplateIcon = new StreamControlTemplateIcon();
+					streamControlTemplateIcon.streamControl = operator;
+					streamControlTemplateIcon.addEventListener(MouseEvent.MOUSE_DOWN,streamControlTemplateMouseDownHandler);
+					box.addChild(streamControlTemplateIcon);
+				}
+			}
+			
+			private function streamControlTemplateMouseDownHandler(event:MouseEvent):void{
+				if(currentState != "none"){
+					var dragInitiator:UIComponent=UIComponent(event.currentTarget);
+					
+					var ds:DragSource = new DragSource();
+					
+					ds.addData(dragInitiator, "node");
+					DragManager.showFeedback(DragManager.COPY);
+					DragManager.doDrag(dragInitiator, ds, event);
+				}
+			}
+
+			private function dragEnterHandler(event:DragEvent):void {
+				if(currentState != "none"){
+					if (event.dragSource.hasFormat("node"))
+					{
+						DragManager.acceptDragDrop(IUIComponent(event.currentTarget));
+					}
+				}
+			}
+			
+			
+			
+			private function dragDropHandler(event:DragEvent):void {
+				if(currentState != "none"){
+					var dragObject:StreamControlTemplateIcon = StreamControlTemplateIcon(event.dragInitiator);
+					var newName:String = CEPUtils.getNextStreamName(currentStreamAppXML);
+					var newCode:String = CEPUtils.getNextStreamCode(currentStreamAppXML);
+					var aXml:XML = 
+						<stream>
+							<description/> 
+							<inputStreams/>
+							<settings/>
+						</stream>;
+					aXml.@name = newName;
+					aXml.@code = newCode;
+					aXml.@type = dragObject.streamControl.getName();
+					aXml.@x = Container(event.currentTarget).mouseX;
+					aXml.@y = Container(event.currentTarget).mouseY;
+					currentStreamAppXML.streams.appendChild(aXml);
+					refreshAll();
+				}	
+				
+			}
+
+
+			protected function newButton_clickHandler(event:MouseEvent):void
+			{
+				var newCode:String = CEPUtils.getNextStreamAppCode();
+				newApp(newCode, newCode);
+			}
+			
+			public function newApp(name:String, code:String):void{
+				if(currentState != "none"){
+					Alert.show("请先关闭你正在编辑的应用!");
+					return;
+				}
+				currentStreamAppXML = 
+					<streamApp>
+						<description/>
+						<streams/>
+					</streamApp>;
+				currentStreamAppXML.@code = code;
+				currentStreamAppXML.@name = name;
+				clearAndrefreshAll();
+				showAppProperty();
+				currentState = "editing";
+			}
+
+
+			protected function closeButton_clickHandler(event:MouseEvent):void
+			{
+				if(currentState != "none"){
+					if(isSaved){
+						close();
+						return;
+					}
+					Alert.yesLabel = "是";
+					Alert.noLabel = "否";
+					Alert.cancelLabel = "取消";
+					Alert.show("是否保存现有的修改？","提示",Alert.YES | Alert.NO | Alert.CANCEL,this,function(event:CloseEvent):void{
+						if(event.detail == Alert.YES){
+							closeAfterSave = true;
+							save();			
+						}
+						else if(event.detail == Alert.NO){
+							close();
+						}
+						else
+							return;
+					});
+					
+				}
+				
+			}
+			
+			private function close():void{
+				clearAll();
+				currentState = "none";
+			}
+
+			
+			private function clearAll():void{
+				mainGraph.removeAllChildren();
+				xmlEditor.text=null;
+				streamIconMap = new Object();
+				connectorIconMap = new Object();
+				streamInstanceMap = new Object();
+				streamWindowSizeInput.text = null;
+				showAppProperty();
+			}
+			
+			private function refreshXML():void{
+				if(currentStreamAppXML != null){
+					xmlEditor.text = currentStreamAppXML.toXMLString();
+				}
+			}
+			
+			private function clearAndrefreshAll():void{
+				clearAll();
+				refreshAll();
+			}
+			
+			//重画流图，更新xml
+			private function refreshAll():void{
+				isSaved = false;
+				try{
+					streamInstanceMap = CEPUtils.compileStreamAppXMLToStreamInstanceMap(currentStreamAppXML);
+					isValidateSuccessful = true;
+				}
+				catch(e:Error){
+					validateErrorInfo = e.message;
+					isValidateSuccessful = false;
+				}
+				refreshXML();
+				drawGraph();
+			}
+			
+			private function set isValidateSuccessful(isValidateSuccessful:Boolean):void{
+				_isValidateSuccessful = isValidateSuccessful;
+				if(_isValidateSuccessful){
+					validateStatusIcon.source = passedIcon;
+					validateInfo.text = "OK";
+				}
+				else{
+					validateStatusIcon.source = warningIcon;
+					validateInfo.text = validateErrorInfo;
+				}
+			}
+			
+			private function get isValidateSuccessful():Boolean{
+				return _isValidateSuccessful;
+			}
+			
+			private function drawGraph():void{
+				if(currentStreamAppXML != null){
+					//先画流环节
+					for each(var streamXML:XML in currentStreamAppXML.streams.stream){
+						var code:String = streamXML.@code;
+						if(code == null || code == ""){
+							Alert.show("必须指定事件流编码！");
+							clearAll();
+							return;
+						}
+						if(streamIconMap[code] == null){
+							//还没画过
+							var name:String = streamXML.@name;
+							if(name == null || name == ""){
+								Alert.show("必须指定事件流名称！");
+								clearAll();
+								return;
+							}
+							var type:String = streamXML.@type;
+							if(type == null || type == ""){
+								Alert.show("必须指定事件流类型！");
+								clearAll();
+								return;
+							}
+							var streamType:IStreamControl = StreamControlFactory.getStreamControl(type);
+							var icon:FlowIcon = new FlowIcon(streamType.getIcon(),32,32,code,name);
+							icon.x = streamXML.@x;
+							icon.y = streamXML.@y;
+							icon.addEventListener(IconEvent.ICON_MOUSE_DOWN, onIconMouseDown);
+							icon.addEventListener(IconEvent.ICON_MOUSE_UP, onIconMouseUp);
+							icon.addEventListener(IconEvent.ICON_MOVE, onIconMove);
+							mainGraph.addChild(icon);
+							mainGraph.validateDisplayList();
+							streamIconMap[code] = icon;
+						}
+						else{
+							var icon2:FlowIcon = streamIconMap[code];
+							icon2.label = streamXML.@name;
+							icon2.x = streamXML.@x;
+							icon2.y = streamXML.@y;
+							mainGraph.validateDisplayList();						
+						}
+					}
+					//再画连线
+					for each(streamXML in currentStreamAppXML.streams.stream){
+						var streamCode:String = streamXML.@code;
+						for each(var inputStreamXML:XML in streamXML.inputStreams.stream){
+							var inputStreamCode:String = inputStreamXML.@code;
+							var fromIcon:FlowIcon = streamIconMap[inputStreamCode];
+							if(fromIcon == null){
+								Alert.show("指定的来源事件流["+inputStreamCode+"]不存在");
+								clearAll();
+								return;
+							}
+							var toIcon:FlowIcon = streamIconMap[streamCode];
+							var connectorKey:String = inputStreamCode+"@"+streamCode;
+							var points:Array = CEPUtils.getArrowLineAxis(fromIcon,toIcon);
+							if(connectorIconMap[connectorKey] == null){
+								var line:ArrowLine = new ArrowLine(connectorKey,
+									points[0],
+									points[1],
+									""
+								);
+								line.addEventListener(MouseEvent.CLICK,lineClick);
+								connectorIconMap[connectorKey] = line;
+								mainGraph.addChild(line);
+								mainGraph.validateDisplayList();
+							}
+							else{
+								var line2:ArrowLine = connectorIconMap[connectorKey];
+								line2.fromPoint = points[0];
+								line2.toPoint = points[1];
+								mainGraph.validateDisplayList();
+							}
+						}
+					}
+				}
+			}
+			
+			private function lineClick(event:MouseEvent):void{
+				if(designGraphMode != DESIGNGRAPHMODE_SELECT)
+					return;
+				var line:ArrowLine = ArrowLine(event.currentTarget);
+				glow1.target = line;
+				glow1.end();
+				glow1.play();
+				clearBorders(); //删除所有图标的边框
+				line.selected = true;
+				//showTransitionProperties(line.identity);
+			}
+			
+			//当单击流程图画布上的图标时,呈选中状态,并出现发光效果.
+			internal function onIconMouseDown(event: IconEvent): void{	
+				var img: FlowIcon = FlowIcon(event.icon);
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){
+					//添加选中效果(发光)
+					glow1.target = img;//将效果指定到图标上(编程时不是为图标设置效果)
+					glow1.end();
+					glow1.play();
+					
+					clearBorders(); //删除所有图标的边框
+					
+					img.selected=true;
+					showStreamProperty(img.identity);
+					
+					//实施拖动
+					img.startDrag();
+				}
+			}
+			
+			/**
+			 * 拖动图标时重画与该图标相关的线条
+			 */
+			internal function onIconMove(event: IconEvent): void{
+				var img: FlowIcon = FlowIcon(event.icon);
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){			
+					//移动环节的新坐标更新到xml
+					for each(var a:XML in currentStreamAppXML.streams.stream){
+						if(a.@code == img.identity){
+							a.@x = img.x;
+							a.@y = img.y;
+							break;
+						}
+					}
+					refreshAll();
+				}
+			}
+			
+			internal function onIconMouseUp(event: IconEvent): void{
+				var img: FlowIcon = FlowIcon(event.icon);
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){
+					glow2.target = img;
+					glow2.end();
+					glow2.play();	
+					//停止拖动
+					img.stopDrag();
+					
+					//移动环节的新坐标更新到xml
+					for each(var a:XML in currentStreamAppXML.streams.stream){
+						if(a.@code == img.identity){
+							a.@x = img.x;
+							a.@y = img.y;
+							break;
+						}
+					}
+					refreshAll();
+				}
+			}
+			
+			private function applyXML():void{
+				if(currentState != "none"){
+					try{
+						currentStreamAppXML = new XML(xmlEditor.text);
+					}
+					catch(e:Error) { 
+						Alert.show("源代码解析失败，无法应用! "+e);
+						return;
+					}
+					clearAndrefreshAll();
+					Alert.show("应用成功！");
+				}
+			}
+			
+			private function changeDesignGraphMode(graphMode:int):void{
+				switch(graphMode){
+					case DESIGNGRAPHMODE_SELECT:
+						selectModeButton.selected = true;
+						lineModeButton.selected = false;
+						designGraphMode = DESIGNGRAPHMODE_SELECT;
+						break;
+					case DESIGNGRAPHMODE_LINE:
+						lineModeButton.selected = true;
+						selectModeButton.selected = false;
+						designGraphMode = DESIGNGRAPHMODE_LINE;
+						clearBorders();
+						break;
+				}
+			}
+			
+			//清除所有图标的边框
+			private function clearBorders(): void{
+				for(var i: int = 0; i < mainGraph.numChildren; i ++){
+					if(mainGraph.getChildAt(i) is FlowIcon){
+						//找到当前的图标
+						var currentIcon: FlowIcon = FlowIcon(mainGraph.getChildAt(i));
+						currentIcon.selected = false;
+					}
+					if(mainGraph.getChildAt(i) is ArrowLine){
+						var currentLine:ArrowLine = ArrowLine(mainGraph.getChildAt(i));
+						currentLine.selected = false;
+					}
+				}
+			}
+			
+			private function mainGraphMouseDownHandler(event:MouseEvent):void{
+				//如果用户点击的是画布,而不是按钮冒泡过来的事件
+				if((event.target is Canvas)){
+					clearBorders(); //删除所有图标的边框
+					showAppProperty();
+				}
+				else if(event.target is FlowIcon){
+					if(designGraphMode == DESIGNGRAPHMODE_LINE && !startLineDrag){
+						//开始了一次新的转移添加动作
+						sourceIcon = FlowIcon(event.target);
+						clearBorders();
+						sourceIcon.selected = true;
+						startLineDrag = true;
+						var point:Point = new Point(sourceIcon.x+sourceIcon.width/2,sourceIcon.y+sourceIcon.height/2);
+						tempLine = new ArrowLine("temp",point,point,"",0x0000FF);
+						mainGraph.addChild(tempLine);
+					}
+				}
+			}
+			
+			private function mainGraphMouseMoveHandler(event:MouseEvent):void{
+				if(designGraphMode == DESIGNGRAPHMODE_LINE && startLineDrag){
+					var point:Point;
+					if(event.target is Canvas){
+						point = new Point(event.localX,event.localY);
+					}
+					else if(event.target is FlowIcon){
+						var icon:FlowIcon = FlowIcon(event.target);
+						clearBorders();
+						sourceIcon.selected =true;
+						icon.selected = true;
+						point = new Point(icon.x+icon.width/2,icon.y+icon.height/2);
+					}
+					else if(event.target is UIComponent){
+						var uic:UIComponent = UIComponent(event.target);
+						point = new Point(uic.x+event.localX,uic.y+event.localY);
+					}
+					else
+						return;
+					tempLine.toPoint = point;
+				}
+			}
+			
+			private function connectorExists(fromCode:String,toCode:String):Boolean{
+				for each(var streamXML:XML in currentStreamAppXML.streams.stream){
+					var streamCode:String = streamXML.@code;
+					if(streamCode == toCode){
+						for each(var inputStreamXML:XML in streamXML.inputStreams.stream){
+							var inputStreamCode:String = inputStreamXML.@code;
+							if(inputStreamCode == fromCode)
+								return true;
+						}
+					}
+				}
+				return false;
+			}
+			
+			private function causeRecursiveConnector(fromCode:String, toCode:String):Boolean{
+				var fromStreamInstance:StreamInstance = streamInstanceMap[fromCode];
+				if(fromStreamInstance == null)
+					return false;
+				return hasInputStreamCode(fromStreamInstance, toCode);
+			}
+			
+			//查找是否包含编码为code的输入事件流实例（递归查找）
+			private function hasInputStreamCode(fromStreamInstance:StreamInstance,code:String):Boolean{
+				if(fromStreamInstance.inputStreamList!=null){
+					for each(var inputStreamInstance:StreamInstance in fromStreamInstance.inputStreamList){
+						if(inputStreamInstance.code == code)
+							return true;
+						if(hasInputStreamCode(inputStreamInstance,code))
+							return true;
+					}
+				}
+				return false;
+			}
+			
+			private function mainGraphMouseUpHandler(event:MouseEvent):void{
+				if(designGraphMode == DESIGNGRAPHMODE_LINE && startLineDrag){
+					clearBorders();
+					if(tempLine != null)
+						mainGraph.removeChild(tempLine);
+					startLineDrag = false;
+					if(event.target is FlowIcon){
+						var targetIcon:FlowIcon = FlowIcon(event.target);
+						var fromCode:String = sourceIcon.identity;
+						var toCode:String = targetIcon.identity;
+						//todo 还须判断循环连线的情况
+						if(fromCode != toCode && !connectorExists(fromCode,toCode) && !causeRecursiveConnector(fromCode,toCode)){
+							//新建连线
+							for each(var streamXML:XML in currentStreamAppXML.streams.stream){
+								var streamCode:String = streamXML.@code;
+								if(streamCode == toCode){
+									var temp:XML = <stream/>;
+									temp.@code = fromCode;
+									streamXML.inputStreams.appendChild(temp);
+									refreshAll();
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			private function deleteItems():void{
+				if(designGraphMode == DESIGNGRAPHMODE_SELECT){
+					if(currentState != "none" && currentStreamAppXML != null){
+						for(var i: int = 0; i < mainGraph.numChildren; i ++){
+							if(mainGraph.getChildAt(i) is ArrowLine){
+								var currentLine:ArrowLine = ArrowLine(mainGraph.getChildAt(i));
+								if(currentLine.selected){
+									//删除线条
+									var connectorKey:String = currentLine.identity;
+									var index:int = connectorKey.indexOf("@");
+									var fromCode:String = connectorKey.substring(0,index);
+									var toCode:String = connectorKey.substring(index+1,connectorKey.length);
+									for each(var s:XML in currentStreamAppXML.streams.stream){
+										if(s.@code == toCode){
+											for each(var fs:XML in s.inputStreams.stream){
+												if(fs.@code == fromCode){
+													//找到这条线了
+													CEPUtils.xmlDeleteNode(fs);
+													break;
+												}
+											}
+											break;
+										}
+									}
+								}
+							}
+							if(mainGraph.getChildAt(i) is FlowIcon){
+								//找到当前的图标
+								var currentIcon: FlowIcon = FlowIcon(mainGraph.getChildAt(i));
+								if(currentIcon.selected){
+									//删除图标
+									for each(var a:XML in currentStreamAppXML.streams.stream){
+										if(a.@code == currentIcon.identity){
+											CEPUtils.xmlDeleteNode(a);
+										}
+										//删除相关的线
+										for each(var fs2:XML in a.inputStreams.stream){
+											if(fs2.@code == currentIcon.identity){
+												CEPUtils.xmlDeleteNode(fs2);
+											}
+										}
+									}
+								}
+							}
+							
+						}
+						clearAndrefreshAll();
+					}
+				}
+			}
+			
+			private function showAppProperty():void{
+				propertyViewStack.selectedChild = appPropertyBox;//显示流程属性
+				if(currentStreamAppXML != null){
+					appCodeInput.text = currentStreamAppXML.@code;
+					appNameInput.text = currentStreamAppXML.@name;
+					appDescriptionInput.text = currentStreamAppXML.description;
+				}
+			}
+			
+			private function showStreamProperty(code:String):void{
+				propertyViewStack.selectedChild = streamPropertyBox;
+				if(currentStreamAppXML != null){
+					var streamInstance:StreamInstance = streamInstanceMap[code];
+					if(streamInstance != null){
+						streamCodeInput.text = streamInstance.code;
+						streamNameInput.text = streamInstance.name;
+						streamDescriptionInput.text = streamInstance.description;
+						streamIsNamedWindowInput.selected = streamInstance.isNamedWindow;
+						if(streamInstance.isNamedWindow){
+							streamWindowNameInput.text = streamInstance.windowName;
+							streamWindowTypeInput.text = streamInstance.windowType;
+							streamWindowSizeInput.text = streamInstance.windowSize;
+						}
+						else{
+							streamWindowNameInput.text = null;
+							streamWindowSizeInput.text = null;
+						}
+						var className:String = streamInstance.type.getPropertyEditorClassName();
+						var classReference:Class = getDefinitionByName(className) as Class;
+						var panel:AbstractStreamControlPropertyEditor = new classReference() as AbstractStreamControlPropertyEditor;
+						panel.streamInstance = streamInstance;
+						panel.addEventListener(FlexEvent.DATA_CHANGE,function(event:FlexEvent):void{
+							refreshAll();
+							showStreamOutputInfo(code);
+						});
+						settingsPanel.removeAllChildren();
+						settingsPanel.addChild(panel);
+						//输入输出事件流刷新
+						showStreamInputInfo(code);
+						showStreamOutputInfo(code);
+						
+						currentShowingStreamCode = code;
+						eplTextArea_showHandler(null);
+					}
+				}
+			}
+			
+			private function showStreamInputInfo(code:String):void{
+				inputTreeData = new ArrayCollection();
+				var root:Object = new Object();
+				root.name = "输入流";
+				root.children = new ArrayCollection();
+				inputTreeData.addItem(root);
+				var streamInstance:StreamInstance = streamInstanceMap[code];
+				if(streamInstance != null){
+					for each(var inputStreamInstance:StreamInstance in streamInstance.inputStreamList){
+						var inputStreamRoot:Object = new Object();
+						inputStreamRoot.name = inputStreamInstance.name;
+						inputStreamRoot.children = inputStreamInstance.getOutputStreamEvent().fieldList;
+						root.children.addItem(inputStreamRoot);
+					}
+					inputTree.callLater(expandInputTree);
+				}
+			}
+			
+			private function expandInputTree():void{
+				for each(var item:Object in inputTreeData){
+					inputTree.expandChildrenOf(item,true);
+				}
+			}
+			
+			private function showStreamOutputInfo(code:String):void{
+				outputTreeData = new ArrayCollection();
+				var root:Object = new Object();
+				root.name = "输出流";
+				outputTreeData.addItem(root);
+				var streamInstance:StreamInstance = streamInstanceMap[code];
+				if(streamInstance != null){
+					var outputEvent:StreamEvent = streamInstance.getOutputStreamEvent();
+					root.children = outputEvent.fieldList;
+					outputTree.callLater(expandOutputTree);
+				}
+			}
+			
+			private function expandOutputTree():void{
+				for each(var item:Object in outputTreeData){
+					outputTree.expandChildrenOf(item,true);
+				}
+			}
+			
+			private function labelFunction(item:Object):String{
+				if(item is StreamEventField){
+					return item.name+" ("+item.type+")";
+				}
+				else
+					return item.name;
+			}
+			
+			private function saveAppProperty():void{
+				if(currentStreamAppXML != null){
+					currentStreamAppXML.@name = appNameInput.text;
+					currentStreamAppXML.description = appDescriptionInput.text;
+					refreshAll();
+				}
+			}
+			
+			private function saveGeneralStreamProperty(code:String):void{
+				if(currentStreamAppXML != null){
+					var streamInstance:StreamInstance = streamInstanceMap[code];
+					var xml:XML = streamInstance.defineXML;
+					xml.@name = streamNameInput.text;
+					xml.description = streamDescriptionInput.text;
+					xml.isNamedWindow = streamIsNamedWindowInput.selected;
+					if(streamIsNamedWindowInput.selected){
+						streamWindowNameInput.text = "win_"+streamNameInput.text;
+						xml.windowName = streamWindowNameInput.text;
+						xml.windowType = streamWindowTypeInput.text;
+						xml.windowSize = streamWindowSizeInput.text;
+					}
+					refreshAll();
+				}
+			}
+			
+			private function compile():void{
+				if(streamInstanceMap != null){
+					eplMap = CEPUtils.compileStreamInstanceMapToEPL(streamInstanceMap);
+				}
+			}
+
+			public function save():void
+			{
+				if(currentStreamAppXML != null){
+					if(!isValidateSuccessful){
+						Alert.show("类型检查错误，是否强行保存？","警告",Alert.YES | Alert.NO,this,function(event:CloseEvent):void{
+							if(event.detail == Alert.YES){
+								cepService.saveStreamApp(currentStreamAppXML.toXMLString(),operatorName);			
+							}
+							else {
+								closeAfterSave = false;
+								return;
+							}
+						});
+					}
+					else
+						cepService.saveStreamApp(currentStreamAppXML.toXMLString(),operatorName);
+				}
+			}
+			
+			public function openApp(code:String):void{
+				cepService.loadStreamAppXML(code);
+			}
+			
+			private function open():void{
+				if(currentState != "none"){
+					Alert.show("请先关闭你正在编辑的应用!");
+					return;
+				}
+				var dialog:RefDialog = new RefDialog();
+				dialog.init2(formService,"select code 编码, code code#, name 名称 from pub_cep_streamapp",datasource);
+				dialog.title = "打开应用";
+				dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+					if(dialog.closeByConfirm){
+						openApp(dialog.refPK);
+					}
+				});
+				PopUpManager.addPopUp(dialog,this,true);
+				PopUpManager.centerPopUp(dialog);
+			}
+			
+			private function loadStreamAppXMLHandler(event:ResultEvent):void{
+				currentStreamAppXML = XML(event.result);
+				clearAndrefreshAll();
+				showAppProperty();
+				isSaved = true;
+				currentState = "editing";
+			}
+
+
+			protected function eplTextArea_showHandler(event:FlexEvent):void
+			{
+				if(eplMap != null && currentShowingStreamCode != null){
+					eplTextArea.text = eplMap.find(currentShowingStreamCode);
+				}
+			}
+			
+			private function deploy():void{
+				if(!isValidateSuccessful){
+					Alert.show("含有类型检查错误，无法发布！","错误");
+					return;
+				}
+				compile();
+				if(useDefaultProvider){
+					var providerName:String = GlobalConst.DEFAULTPROVIDERNAME_CEP;
+					var moduleList:ArrayCollection = new ArrayCollection();
+					for each(var moduleName:String in eplMap.getKeySet()){
+						var temp:Object = new Object();
+						temp.name = moduleName;
+						var epl:String = eplMap.find(moduleName);
+						temp.source = epl;
+						temp.providerName = providerName;
+						temp.operator = operatorName;
+						moduleList.addItem(temp);
+					}
+					cepService.batchDeployStreamModule(moduleList);
+				}
+//				var epl:String = compile();
+//				var moduleName:String = currentStreamAppXML.@name;
+//				cepService.deployStreamModule(moduleName, epl,operatorName);
+			}
+			
+			private function get isSaved():Boolean{
+				return _isSaved;
+			}
+			
+			private function set isSaved(isSaved:Boolean):void{
+				_isSaved = isSaved;
+				if(_isSaved){
+					editStatusIcon.source = savedIcon;
+					editInfo.text = "已保存";
+				}
+				else{
+					editStatusIcon.source = editingIcon;
+					editInfo.text = "编辑中";
+					compile();
+				}
+			}
+			
+			private function debug():void{
+				trace("clicked");
+				PopUpManager.addPopUp(debugPanel,this,true);
+				PopUpManager.centerPopUp(debugPanel);
+				callLater(initStreamMonitorPanel);
+				
+			}
+			
+			private function initStreamMonitorPanel():void{
+				//var epl:String = compile();
+				streamMonitorPanel.providerName = "DEFAULTPROVIDERNAME";
+				//cepService.deployAndStartStreamModule("DEFAULTPROVIDERNAME",currentStreamAppXML.@name, epl, operatorName);
+				//debugPanel.title = "模块"+streamMonitorPanel.moduleName+"调试";
+				streamMonitorPanel.refresh();
+			}
+		]]>
+	</fx:Script>
+	<mx:states>
+		<mx:State name="none"/>
+		<mx:State name="editing"/> 
+	</mx:states>
+	
+	<mx:ApplicationControlBar width="100%" dock="true">
+		<mx:Button label="新建" icon="{AssetsFileLib.newIcon}" id="newButton" click="newButton_clickHandler(event)"/>
+		<mx:Button label="打开" icon="{AssetsFileLib.openIcon}" click="open()"/>
+		<mx:Button label="保存" icon="{AssetsFileLib.saveIcon}" enabled.none="false" enabled.editing="true" click="save()"/>
+		<mx:Button label="发布" icon="{AssetsFileLib.deployIcon}" enabled.none="false" enabled.editing="true" click="deploy()"/>
+		<mx:Button label="调试" icon="{AssetsFileLib.debugIcon}" enabled.none="false" enabled.editing="true" click="debug()"/>
+		<mx:Button label="关闭" icon="{AssetsFileLib.closeIcon}" id="closeButton" click="closeButton_clickHandler(event)"
+				   enabled.none="false" enabled.editing="true"/>
+	</mx:ApplicationControlBar>
+	
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:VBox width="20%" height="100%">
+			<containers:WindowShade label="操作" width="100%">
+				<containers:FlowBox width="90%" height="100%" id="operatorBox">
+					
+				</containers:FlowBox>
+			</containers:WindowShade>
+			<containers:WindowShade label="适配器" width="100%">
+				
+			</containers:WindowShade>
+			<containers:WindowShade label="事件流" width="100%">
+				<containers:FlowBox width="90%" height="100%" id="streamBox">
+					
+				</containers:FlowBox>
+			</containers:WindowShade>
+			<containers:WindowShade label="数据结构" width="100%">
+				
+			</containers:WindowShade>
+			
+		</mx:VBox>
+		<mx:VDividedBox width="80%" height="100%">
+			<mx:VBox width="100%" height="60%" enabled.none="false" enabled.editing="true">
+				<mx:TabNavigator width="100%" height="100%"  id="mainTabNavigator" creationPolicy="all">
+					<mx:VBox label="设计器" width="100%" height="100%" horizontalAlign="center" verticalAlign="top" paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3">
+						<mx:ApplicationControlBar width="100%" dock="true">
+							<mx:Button id="selectModeButton" toggle="true" selected="true" icon="{AssetsFileLib.littleArrowIcon}" click="changeDesignGraphMode(DESIGNGRAPHMODE_SELECT)" width="20" height="20"/>
+							<mx:Button id="lineModeButton" toggle="true" icon="{AssetsFileLib.lineIcon}" click="changeDesignGraphMode(DESIGNGRAPHMODE_LINE)" width="20" height="20"/>
+							<mx:Button icon="{AssetsFileLib.delete2Icon}" click="deleteItems()" width="20" height="20"/>
+						</mx:ApplicationControlBar>
+						<mx:Canvas id="mainGraph" width="100%" height="100%"  
+											dragEnter="dragEnterHandler(event)" dragDrop="dragDropHandler(event)" 
+											mouseDown="mainGraphMouseDownHandler(event)" mouseMove="mainGraphMouseMoveHandler(event)" 
+											mouseUp="mainGraphMouseUpHandler(event)" borderStyle="solid"/>
+					</mx:VBox>
+					<mx:VBox label="源代码" width="100%" height="100%" horizontalAlign="center" verticalAlign="top" paddingBottom="3" paddingLeft="3" paddingRight="3" paddingTop="3">
+						<mx:ApplicationControlBar dock="true" width="100%">
+							<mx:Button label="应用" click="applyXML()"/>
+							<mx:Button label="重置" click="refreshXML()"/>
+						</mx:ApplicationControlBar>
+						
+						<mx:TextArea id="xmlEditor" width="100%" height="100%" editable.none="false" editable.editing="true"/>
+					</mx:VBox>
+				</mx:TabNavigator>
+				<mx:HBox width="100%" borderStyle="solid" cornerRadius="3" paddingLeft="5" paddingRight="5"
+						 paddingTop="1" paddingBottom="1" >
+					<mx:HBox width="70%" horizontalGap="1" verticalAlign="middle">
+						<mx:Label text="类型检查  " fontWeight="bold"/>
+						<mx:Image id="validateStatusIcon" width="16" height="16"/>
+						<mx:Label id="validateInfo"/>
+					</mx:HBox>
+					<mx:HBox width="30%" horizontalAlign="right" verticalAlign="middle">
+						<mx:Label text="编辑状态  " fontWeight="bold"/>
+						<mx:Image id="editStatusIcon" width="16" height="16"/>
+						<mx:Label id="editInfo"/>
+					</mx:HBox>
+				</mx:HBox>
+			</mx:VBox>
+			<mx:VBox width="100%" height="40%">
+				<mx:TabNavigator width="100%" height="100%">
+					<mx:VBox label="属性" width="100%" height="100%" enabled.none="false" enabled.editing="true">
+						<mx:ViewStack width="100%" height="100%" id="propertyViewStack" creationPolicy="all">
+							<mx:VBox id="appPropertyBox" width="100%" height="100%"> 
+								<containers:AdvancedForm id="appPropertyForm" width="100%" height="100%" >
+									<mx:FormItem label="编码" enabled="false" required="true"> 
+										<mx:TextInput id="appCodeInput" width="500" borderStyle="solid" change="saveAppProperty()"/>
+									</mx:FormItem>
+									<mx:FormItem label="名称" required="true">
+										<mx:TextInput id="appNameInput" width="500" borderStyle="solid" change="saveAppProperty()"/>
+									</mx:FormItem>
+									<mx:FormItem label="描述" required="false">
+										<mx:TextArea id="appDescriptionInput" width="500" height="50" borderStyle="solid" change="saveAppProperty()"/>
+									</mx:FormItem>
+								</containers:AdvancedForm>
+							</mx:VBox>
+							<mx:HBox id="streamPropertyBox" width="100%" height="100%">
+								<mx:VBox width="100%" height="100%" paddingBottom="1" paddingLeft="1" paddingRight="1" paddingTop="1" >
+									<mx:TabNavigator width="100%" height="100%">
+										<mx:VBox label="通用" width="100%" height="100%" paddingBottom="1" paddingLeft="1" paddingRight="1" paddingTop="1">
+											<containers:AdvancedForm id="streamPropertyForm" width="100%" height="100%" >
+												<mx:FormItem label="编码" enabled="false" required="true"> 
+													<mx:TextInput id="streamCodeInput" width="500" borderStyle="solid"/>
+												</mx:FormItem>
+												<mx:FormItem label="名称" required="true">
+													<mx:TextInput id="streamNameInput" width="500" borderStyle="solid" change="saveGeneralStreamProperty(streamCodeInput.text)"/>
+												</mx:FormItem>
+												<mx:FormItem label="描述" required="false">
+													<mx:TextArea id="streamDescriptionInput" width="500" height="30" borderStyle="solid" change="saveGeneralStreamProperty(streamCodeInput.text)"/>
+												</mx:FormItem>
+												<mx:FormItem label="是否包括查询窗口">
+													<mx:CheckBox id="streamIsNamedWindowInput" change="saveGeneralStreamProperty(streamCodeInput.text)"/>
+												</mx:FormItem>
+												<mx:FormItem label="窗口名称" visible="{streamIsNamedWindowInput.selected}" enabled="false" required="true"> 
+													<mx:TextInput id="streamWindowNameInput" width="500" borderStyle="solid"/>
+												</mx:FormItem>
+												<mx:FormItem label="窗口类型" visible="{streamIsNamedWindowInput.selected}"> 
+													<mx:ComboBox id="streamWindowTypeInput" change="saveGeneralStreamProperty(streamCodeInput.text)">
+														<mx:dataProvider>
+															<fx:String>length</fx:String>
+															<fx:String>time</fx:String>
+														</mx:dataProvider>	
+													</mx:ComboBox>
+												</mx:FormItem>
+												<mx:FormItem label="窗口大小" visible="{streamIsNamedWindowInput.selected}"> 
+													<mx:TextInput id="streamWindowSizeInput" width="500" borderStyle="solid" change="saveGeneralStreamProperty(streamCodeInput.text)"/>
+												</mx:FormItem>
+											</containers:AdvancedForm>
+										</mx:VBox>
+										<mx:VBox label="设置" width="100%" height="100%" id="settingsPanel">
+											
+										</mx:VBox>
+										<mx:VBox label="EPL预览" width="100%" height="100%" enabled.none="false" enabled.editing="true"
+												 paddingBottom="1" paddingLeft="1" paddingRight="1" paddingTop="1"  show="eplTextArea_showHandler(event)">
+											<mx:TextArea id="eplTextArea" width="100%" height="100%" editable="false"/>
+										</mx:VBox>
+									</mx:TabNavigator>
+								</mx:VBox>
+								<mx:VBox width="300" height="100%" paddingBottom="1" paddingLeft="1" paddingRight="1" paddingTop="1">
+									<mx:TabNavigator width="100%" height="100%">
+										<mx:VBox label="事件流" width="100%" height="100%" paddingBottom="1" paddingLeft="1" paddingRight="1" paddingTop="1">
+											<mx:TabNavigator width="100%" height="100%">
+												<mx:VBox label="输入" width="100%" height="100%" paddingLeft="2" paddingRight="2" paddingBottom="1" paddingTop="1">
+													<mx:Tree id="inputTree" dataProvider="{inputTreeData}" width="100%" height="100%" labelFunction="labelFunction"/>
+												</mx:VBox>
+												<mx:VBox label="输出" width="100%" height="100%" paddingLeft="2" paddingRight="2" paddingBottom="1" paddingTop="1">
+													<mx:Tree id="outputTree" dataProvider="{outputTreeData}" width="100%" height="100%" labelFunction="labelFunction" />
+												</mx:VBox>
+											</mx:TabNavigator>
+										</mx:VBox>
+										<mx:VBox label="函数" width="100%" height="100%">
+											
+										</mx:VBox>
+									</mx:TabNavigator>
+								</mx:VBox>
+							</mx:HBox>
+						</mx:ViewStack>
+					</mx:VBox>
+				</mx:TabNavigator>
+			</mx:VBox>
+		</mx:VDividedBox>
+	</mx:HDividedBox>
+
+</mx:VBox>

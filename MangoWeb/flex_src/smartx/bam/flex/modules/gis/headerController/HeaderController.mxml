@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<gis:WidgetControl xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx" 
+			creationComplete="init()" xmlns:headerController="smartx.bam.flex.modules.gis.headerController.*"
+			xmlns:gis="smartx.bam.flex.modules.gis.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.core.Container;
+			
+			import smartx.bam.flex.modules.gis.GisMap;
+			import smartx.bam.flex.modules.gis.event.GisEvent;
+			import smartx.bam.flex.modules.gis.vo.WidgetStates;
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			import spark.components.supportClasses.ItemRenderer;
+			
+			[Bindable]
+			private var widgetItemArrCol:ArrayCollection;
+			
+			[Bindable]
+			private var logo:Class = AssetsFileLib.gisLogoIcon;
+			
+			[Bindable]
+			private var xOver:int;
+			
+			private function init():void{
+				widgetItemArrCol = getWidgetItems();
+				fxMap.addEventListener(GisEvent.WIDGET_STATE_CHANGED,widgetStateChangedHandler);
+			}
+			
+			protected function logoIcon_clickHandler(event:MouseEvent):void{
+				if(currentState == "show")
+					currentState = "hiden";
+				else
+					currentState = "show";
+			}
+			
+			private function widgetItemDG_widgetItemClickHandler(event:Event):void{
+				var widgetItem:WidgetItem = ItemRenderer(event.target).data as WidgetItem;
+				fxMap.dispatchEvent(new GisEvent(GisEvent.WIDGET_RUN,widgetItem.id));
+			}
+			
+			private function getWidgetItems():ArrayCollection{
+				var widgetList:XMLList = contentXml.widgets.widget;
+				var menuItems:ArrayCollection = new ArrayCollection;
+				var widgetItem:WidgetItem;
+				for (var i:int = 0; i < widgetList.length();i++ ){
+					widgetItem = new WidgetItem;
+					widgetItem.id = Number(widgetList[i].@id);
+					widgetItem.label = String(widgetList[i].@name);
+					widgetItem.icon = String(widgetList[i].@icon) == ""?GisMap.DEFAULT_WIDGET_ICON:String(widgetList[i].@icon);
+					widgetItem.url = String(widgetList[i].@url);
+					widgetItem.open = String(widgetList[i].@preload) != "no"
+										&& (String(widgetList[i].@preload) == WidgetStates.WIDGET_OPENED 
+											|| String(widgetList[i].@preload) == WidgetStates.WIDGET_MINIMIZED);
+					
+					menuItems.addItem(widgetItem);
+				}
+				
+				return menuItems;
+			}
+			
+			private function widgetStateChangedHandler(event:GisEvent):void{
+				var data:Object = event.data;
+				for (var i:Number = 0; i < widgetItemArrCol.length;i++ )
+				{
+					var widgetItem:WidgetItem = WidgetItem(widgetItemArrCol.getItemAt(i));
+					if (data.id as Number == widgetItem.id)
+					{
+						widgetItem.open = (data.state as String == WidgetStates.WIDGET_OPENED) 
+															|| (data.state as String == WidgetStates.WIDGET_MINIMIZED);
+						break;
+					}
+				}
+			}
+			
+			private function widgetItemDG_widgetItemMouseOverHandler(event:Event):void{
+				var pointGlobal:Point = ItemRenderer(event.target).localToGlobal(new Point(0, 0));
+				var pointLocal:Point = this.globalToLocal(pointGlobal); // get the local coordinates where the menuItem will be shown
+				
+				xOver = pointLocal.x;
+				
+				if (WidgetItem(ItemRenderer(event.target).data).label)
+				{
+					menuToolTip.visible = true;
+					menuTitle.text = WidgetItem(ItemRenderer(event.target).data).label;
+				}
+			}
+			
+			private function widgetItemDG_widgetItemMouseOutHandler(event:Event):void{
+				menuToolTip.visible = false;
+			}
+			
+		]]>
+	</fx:Script>
+	<gis:states>
+		<s:State name="show" />
+		<s:State name="hiden" />
+	</gis:states>
+	<s:Group id="headerContent"
+			 width="100%" height="{height - 45}">
+		<s:Rect alpha.hiden="0" alpha.show="0.8" width="100%" height="100%">
+			<s:fill>
+				<s:SolidColor color="0x333333" />
+			</s:fill>
+		</s:Rect>
+		<s:HGroup height="100%" width="100%" gap="2" paddingLeft="2" verticalAlign="middle">
+			<mx:Image id="logoIcon" source="{logo}"
+					  horizontalAlign="left"
+					  maxHeight="{this.height}" click="logoIcon_clickHandler(event)"
+					  maxWidth="80" buttonMode="true" toolTip.show="隐藏工具栏" toolTip.hiden="显示工具栏"
+					  verticalAlign="middle"/>
+			<mx:Label text="{contentXml.@name}" fontSize="14" color="0xFFD700" visible.show="true" visible.hiden="false"/>
+			<s:HGroup id="widgetBox" width="100%" height="100%" 
+					  verticalAlign="middle" horizontalAlign="center"
+					  visible.show="true" visible.hiden="false">
+				<headerController:WidgetItemDataGroup id="widgetItemDg" dataProvider="{widgetItemArrCol}"
+													  widgetItemMouseOver="widgetItemDG_widgetItemMouseOverHandler(event)"
+													  widgetItemMouseOut="widgetItemDG_widgetItemMouseOutHandler(event)"
+													  widgetItemClick="widgetItemDG_widgetItemClickHandler(event)">
+					<headerController:layout>
+						<s:HorizontalLayout gap="12"
+											useVirtualLayout="true"
+											verticalAlign="middle"/>
+					</headerController:layout>
+				</headerController:WidgetItemDataGroup>
+			</s:HGroup>
+			<mx:Spacer width="5"/>
+			<s:HGroup id="linkBox"
+					  horizontalAlign="right"
+					  paddingRight="5"
+					  verticalAlign="middle">
+			</s:HGroup>
+		</s:HGroup>
+	</s:Group>
+	<s:VGroup id="menuToolTip"
+			  x="{xOver + 12 - menuToolTipBox.width/2}" y="{headerContent.height}"
+			  gap="0"
+			  horizontalAlign="center"
+			  visible="false">
+		<s:Graphic id="menuTriangle" visible="{menuToolTip.visible}">
+			<s:Group>
+				<s:Path data="m 7 0 l 7 14 l -14 0 z">
+					<s:fill>
+						<s:SolidColor alpha="1" color="0x333333"/>
+					</s:fill>
+				</s:Path>
+			</s:Group>
+		</s:Graphic>
+		<s:BorderContainer id="menuToolTipBox"
+						   width="{menuTitle.width + 8}" height="{menuTitle.height +2}"
+						   borderVisible="false"
+						   cornerRadius="10"
+						   visible="{menuToolTip.visible}">
+			<s:backgroundFill>
+				<s:SolidColor color="0x333333" alpha="1"/>
+			</s:backgroundFill>
+			<s:layout>
+				<s:HorizontalLayout horizontalAlign="center" verticalAlign="middle"/>
+			</s:layout>
+			<s:Label id="menuTitle"
+					 paddingBottom="4"
+					 paddingLeft="5"
+					 paddingRight="5"
+					 paddingTop="5"
+					 color="0xFFFFFF"
+					 visible="{menuToolTip.visible}"/>
+		</s:BorderContainer>
+	</s:VGroup>
+</gis:WidgetControl>

@@ -1,0 +1,91 @@
+<mx:VBox xmlns="net.brandonmeyer.containers.*" xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="25" 
+		   xmlns:ns1="smartx.flex.components.*" creationComplete="init()" 
+		   xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*"
+		   xmlns:core="smartx.flex.components.core.*"
+		   xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:s="library://ns.adobe.com/flex/spark"
+		   >
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.Canvas;
+			import mx.controls.Alert;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.itemcomponent.ext.RefDialog;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			protected var formService:RemoteObject;
+			
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			
+			[Bindable]
+			public var labelName:String;
+			
+			[Bindable]
+			public var dataValue:String;
+			
+			[Bindable]
+			public var fetchSql:String;
+			
+			[Bindable]
+			private var isVisible:Boolean  = true;
+			
+			private function init():void{
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				if(fetchSql != null && fetchSql != "" ){
+					isVisible = false;
+				}
+			}
+			
+			public function getDataValue():String{
+				
+				return textInput.text;
+			}
+			
+			protected function addBtn_clickHandler(event:MouseEvent):void{
+				
+				if(fetchSql != null && fetchSql != "" ){
+					
+					var dialog:RefDialog = new RefDialog();
+					dialog.init2(formService,fetchSql,null);
+					dialog.title = "选择参数";
+					dialog.allowMultipleSelection = false;
+					dialog.addEventListener(CloseEvent.CLOSE,function(event:CloseEvent):void{
+						if(dialog.closeByConfirm){
+							
+							textInput.text  = dialog.refCode;
+							
+						}
+					});
+					PopUpManager.addPopUp(dialog,this,true);
+					PopUpManager.centerPopUp(dialog);
+				}else{
+					SmartXMessage.show("该参数没有可选项目,请手动填写!");
+				}
+				
+			}
+			
+			protected function musBtn_clickHandler(event:MouseEvent):void
+			{
+				textInput.text = "";
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:HBox id="cti" width="100%" horizontalAlign="left">
+		<mx:Label id="labelid" text="{labelName}" horizontalCenter="left"/> 
+		<mx:TextInput id="textInput" text="{dataValue}"  width="100%" horizontalCenter="left" toolTip="输入参数值" />
+		<mx:LinkButton id="addBtn" icon="{AssetsFileLib.refsearchIcon}" width="22" height="22" toolTip="选择参数值" click="addBtn_clickHandler(event)"/>
+		<mx:LinkButton id="musBtn" icon="{AssetsFileLib.clearIcon}" width="22" height="22" toolTip="删除字段" click="musBtn_clickHandler(event)"/>
+	</mx:HBox>
+</mx:VBox>

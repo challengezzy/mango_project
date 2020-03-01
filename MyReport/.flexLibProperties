@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<flexLibProperties includeAllClasses="true" useMultiPlatformConfig="false" version="3">
+  <includeClasses>
+    <classEntry path="myreport.util.ProgressForm"/>
+    <classEntry path="myreport.util.AsyncJob"/>
+    <classEntry path="myreport.util.ProgressBar"/>
+    <classEntry path="myreport.design.ITableRowItem"/>
+    <classEntry path="myreport.data.reportdata.DummyData"/>
+  </includeClasses>
+  <includeResources/>
+  <namespaceManifests/>
+</flexLibProperties>

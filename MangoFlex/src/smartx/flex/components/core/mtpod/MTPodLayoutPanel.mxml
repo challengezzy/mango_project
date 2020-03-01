@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   width="100%" height="100%" 
+		   xmlns:containers="flexlib.mdi.containers.*" creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Style>
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace containers "flexlib.mdi.containers.*";
+		
+		.podTabNavigator {
+			tabStyleName: "podTabs";
+			firstTabStyleName: "podTabs";
+			lastTabStyleName: "podTabs";
+			selectedTabTextStyleName: "podSelectedTabs";
+		}
+		
+		.podTabs {
+			cornerRadius: 0;
+			highlightAlphas: 0, 0;
+			fillAlphas: 0, 0;
+			backgroundAlpha: 0;
+			fontWeight: normal;
+			textDecoration: underline;
+			borderWeight:0;
+		}
+		
+		.podSelectedTabs {
+			fontWeight: bold;
+			textDecoration: underline;
+		}
+		
+	</fx:Style>
+	<fx:Script>
+		<![CDATA[
+			import com.esria.samples.dashboard.events.LayoutChangeEvent;
+			import com.esria.samples.dashboard.managers.PodLayoutManager;
+			import com.esria.samples.dashboard.managers.StateManager;
+			import com.esria.samples.dashboard.view.Pod;
+			import com.google.code.flexiframe.IFrame;
+			
+			import flexlib.containers.WindowShade;
+			import flexlib.mdi.containers.MDICanvas;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.Box;
+			import mx.containers.HBox;
+			import mx.containers.TabNavigator;
+			import mx.containers.TitleWindow;
+			import mx.containers.VBox;
+			import mx.controls.Image;
+			import mx.core.Container;
+			import mx.core.ContainerCreationPolicy;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.IndexChangedEvent;
+			import mx.modules.ModuleLoader;
+			
+			import net.brandonmeyer.containers.SuperPanel;
+			
+			import smartx.flex.components.core.mtchart.MTChartPanel;
+			import smartx.flex.components.core.mtpod.vo.MTPods;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.SmartXMessage;
+			
+			public var mtPods:ArrayCollection = new ArrayCollection();
+			
+			public var chartMap:Hashtable = new Hashtable();
+			
+			private var manager:PodLayoutManager;
+			
+			private var mdiCanvas:MDICanvas;
+			
+			private const VBOX:String = "vbox";
+			
+			private const HBOX:String = "hbox";
+			
+			private const PODREF:String = "podref";
+			
+			private const TAB:String = "tab";
+			
+			private const SWF:String = "swf";
+			
+			private const IMAGE:String = "image";
+			
+			private const HTML:String = "html";
+			
+			private var tabs:Array = [];
+			
+			private function init():void{}
+			
+			//POD布局
+			public function loadPodLayout():void{
+				this.removeAllElements();
+				generateMdiCanvas();
+				this.addChild(mdiCanvas);
+			}
+			
+			private function generateMdiCanvas(mdiWindowLayoutXml:XML=null):void{
+				mdiCanvas = new MDICanvas();
+				mdiCanvas.percentHeight = 100;
+				mdiCanvas.percentWidth = 100;
+				mdiCanvas.windowManager.tilePadding = 5;
+				mdiCanvas.horizontalScrollPolicy = "off";
+				mdiCanvas.verticalScrollPolicy = "off";
+				manager = new PodLayoutManager();
+				manager.container = mdiCanvas;
+				manager.addEventListener(LayoutChangeEvent.UPDATE,StateManager.setPodLayout);
+				for each(var mtPod:MTPods in mtPods){
+					//如果是TAB的布局，则判断MTPOD是否属于当前TAB页中，不存在则继续
+					if(mdiWindowLayoutXml && mdiWindowLayoutXml..podref.(@code==mtPod.id).length() == 0)
+						continue;
+					var pod:Pod = new Pod();
+					pod.id = mtPod.id;
+					pod.title = mtPod.title;
+					pod.addChild(mtPod.child);
+					manager.addItemAt(pod,mtPod.index,mtPod.maximized);
+				}
+				var argsArray:Array = new Array();
+				argsArray.push(manager); 
+				callLater(function(m:PodLayoutManager):void{
+					m.removeNullItems();
+					m.tile();
+					m.updateLayout();
+				}, argsArray);
+			}
+			
+			//BOX布局
+			public function loadBoxLayout(layoutXml:XML):void{
+				this.removeAllElements();
+				tabs = [];
+				//是否显示仪表盘对象标题栏
+				var isHideDbTitle:Boolean =  layoutXml.boxLayout[0].@isHideDBTitle == "true"?true:false;
+				parseBoxLayoutXml(layoutXml.boxLayout[0],this,isHideDbTitle);
+			}
+			
+			private function parseBoxLayoutXml(xml:XML,parent:Container,isHideDbTitle:Boolean=false):void{
+				for each(var child:XML in xml.children()){
+					var name:String = child.name();
+					if(name.toLowerCase() == VBOX){
+						var vbox:VBox = generateVbox(child);
+						parent.addChild(vbox);
+						parseBoxLayoutXml(child,vbox,isHideDbTitle);
+					}else if(name.toLowerCase() == HBOX){
+						var hbox:HBox = generateHbox(child);
+						parent.addChild(hbox);
+						parseBoxLayoutXml(child,hbox,isHideDbTitle);
+					}else if(name.toLowerCase() == PODREF){
+						var code:String = child.@code;
+						var mtpod:MTPods;
+						if(chartMap.find(code)){
+							mtpod = chartMap.find(code);
+						}else//未找到仪表盘对象
+							return;
+						
+						if(isHideDbTitle){
+							var box:Box = new Box();
+							box.percentHeight = 100;
+							box.percentWidth = 100;
+							box.setStyle("borderStyle","solid");
+							box.setStyle("paddingBottom",2);
+							box.setStyle("paddingTop",2);
+							box.setStyle("paddingLeft",2);
+							box.setStyle("paddingRight",2);
+							box.label = mtpod.title;
+							box.addChild(mtpod.child);
+							parent.addChild(box);
+						}else{
+							var titleWindow:TitleWindow = new TitleWindow();
+							titleWindow.percentHeight = 100;
+							titleWindow.percentWidth = 100;
+							titleWindow.showCloseButton = true;
+							titleWindow.addEventListener(CloseEvent.CLOSE,closeHandle);
+							titleWindow.addChild(mtpod.child);
+							titleWindow.title =  mtpod.title;
+							parent.addChild(titleWindow);
+						}
+					}else if(name.toLowerCase() == TAB){
+						
+						var linktModeStr:String = String(child.@isLinkBtn);
+						var linkBtnMode:Boolean = (linktModeStr!=null&&linktModeStr!=""&&linktModeStr=="true")?true:false;
+						
+						var tabNavigator:TabNavigator = new TabNavigator();
+						if(linkBtnMode){
+							tabNavigator.styleName="podTabNavigator";
+						}
+						
+						if(child.@percentheight !="" && child.@percentheight != null)
+							tabNavigator.percentHeight = child.@percentheight;
+						if(child.@percentwidth !="" && child.@percentwidth != null)
+							tabNavigator.percentWidth = child.@percentwidth;
+						parent.addChild(tabNavigator);
+						tabs.push(tabNavigator);
+						lazyLoadTabNavigator(child,tabNavigator,isHideDbTitle);
+						var nextXml:XML = nextXmlNode(xml,child);
+						if(nextXml)
+							parseBoxLayoutXml(nextXml,parent,isHideDbTitle);
+					}else if(name.toLowerCase() == SWF){
+						var loader:ModuleLoader = new ModuleLoader();
+						loader.percentHeight = 100;
+						loader.percentWidth = 100;
+						loader.url = child.@url;
+						parent.addChild(loader);
+					}else if(name.toLowerCase() == IMAGE){
+						var image:Image = new Image();
+						image.source = child.@url;
+						parent.addChild(image);
+					}else if(name.toLocaleLowerCase() == HTML){
+						var iframe:IFrame = new IFrame();
+						iframe.percentHeight = 100;
+						iframe.percentWidth = 100;
+						iframe.source = child.@url;
+						parent.addChild(iframe);
+					}
+				}
+			}
+			
+			private function generateVbox(child:XML):VBox{
+				var vbox:VBox = new VBox();
+				vbox.label = child.@title;
+				if(child.@percentheight !="" && child.@percentheight != null)
+					vbox.percentHeight = child.@percentheight;
+				if(child.@percentwidth !="" && child.@percentwidth != null)
+					vbox.percentWidth = child.@percentwidth;
+				vbox.setStyle("horizontalAlign","center");
+				vbox.setStyle("verticalAlign","middle");
+				return vbox;
+			}
+			
+			private function generateHbox(child:XML):HBox{
+				var hbox:HBox = new HBox();
+				hbox.label = child.@title;
+				if(child.@percentheight !="" && child.@percentheight != null)
+					hbox.percentHeight = child.@percentheight;
+				if(child.@percentwidth !="" && child.@percentwidth != null)
+					hbox.percentWidth = child.@percentwidth;
+				hbox.setStyle("horizontalAlign","center");
+				hbox.setStyle("verticalAlign","middle");
+				return hbox;
+			}
+			
+			//返回XML子节点的下一个同级子节点
+			private function nextXmlNode(srcXml:XML,child:XML):XML{
+				for(var i:int=0,size:int=srcXml.children().length();i<size;i++){
+					if(i == size-1)//如果已经是最后个子节点则返回NULL
+						return null;
+					if(srcXml.children()[i].toXMLString() == child.toXMLString())
+						return srcXml.children()[i+1];
+				}
+				return null;
+			}
+			
+			private var tabMap:Hashtable = new Hashtable();
+			
+			//惰性加载TAB
+			private function lazyLoadTabNavigator(child:XML,tabNavigator:TabNavigator,isHideDbTitle:Boolean):void{
+				var snapshotXml:XML;//被添加到TAB页中的控件描述XML快照
+				for(var i:int=0,size:int=child.children().length();i<size;i++){
+					var xml:XML = child.children()[i];
+					var name:String = xml.name();
+					var box:Box;
+					snapshotXml = xml.copy();
+					if(name.toLowerCase() == VBOX)
+						box = generateVbox(xml);
+					else if(name.toLowerCase() == HBOX)
+						box = generateHbox(xml);
+					tabNavigator.addChild(box);
+					//第一个则直接加载
+					if(i==0)
+						parseBoxLayoutXml(xml,box,isHideDbTitle);
+					else{
+						snapshotXml.@isHideDbTitle = isHideDbTitle?"true":"false";
+						tabMap.add(box.label+i,snapshotXml);
+					}
+				}
+				
+				tabNavigator.addEventListener(IndexChangedEvent.CHANGE,tab_indexChangedHandler);
+			}
+			
+			private function tab_indexChangedHandler(event:IndexChangedEvent):void{
+				var tabNavigator:TabNavigator = event.currentTarget as TabNavigator;
+				var label:String = tabNavigator.getTabAt(tabNavigator.selectedIndex).label;
+				var key:String = label+tabNavigator.selectedIndex;
+				var xml:XML = tabMap.find(key);
+				if(xml){
+					var isHideDbTitle:Boolean = xml.@isHideDbTitle=="true"?true:false;
+					parseBoxLayoutXml(xml,tabNavigator.selectedChild as Container,isHideDbTitle);
+					tabMap.remove(key);
+				}
+			}
+			
+			private function closeHandle(event:CloseEvent):void{
+				var titleWindow:TitleWindow = event.currentTarget as TitleWindow;
+				if(titleWindow.parent)
+					titleWindow.parent.removeChild(titleWindow);
+				titleWindow.removeEventListener(CloseEvent.CLOSE,closeHandle);
+			}
+			
+			public function destroy():void{
+				for each(var tabNavigator:TabNavigator in tabs){
+					tabNavigator.removeEventListener(IndexChangedEvent.CHANGE,tab_indexChangedHandler);
+				}
+				removeAllChildren();
+				mtPods = null;
+				chartMap = null;
+				if(manager !== null){
+					manager.removeEventListener(LayoutChangeEvent.UPDATE,StateManager.setPodLayout);
+					manager.container = null;
+					manager.items = null;
+					manager = null;
+				}
+				mdiCanvas = null;
+			}
+		]]>
+	</fx:Script>
+</mx:Canvas>

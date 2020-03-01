@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  creationComplete="module1_creationCompleteHandler(event)"
+		  width="100%" height="100%" xmlns:chart="smartx.flex.components.core.chart.*">
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.FlexEvent;
+			
+			protected function module1_creationCompleteHandler(event:FlexEvent):void
+			{
+				advListPanel.sql = "select id,name,createdate,email from pub_user ";
+				advListPanel.dataSource = "datasource_default";
+				
+				var listColumns:Array = new Array();
+				
+				
+				var column1:DataGridColumn = new DataGridColumn();
+				column1.headerText = "id";
+				column1.dataField = "id";
+				column1.editable = false;
+				column1.width = 120;
+				listColumns.push(column1);
+				
+				var column2:DataGridColumn = new DataGridColumn();
+				column2.headerText = "name";
+				column2.dataField = "name";
+				column2.editable = true;
+				column2.width = 120;
+				listColumns.push(column2);
+				
+				var column3:DataGridColumn = new DataGridColumn();
+				column3.headerText = "createdate";
+				column3.dataField = "createdate";
+				column3.editable = false;
+				column3.width = 120;
+				listColumns.push(column3);
+				
+				var renderer:ClassFactory = new ClassFactory(DataGridLabel);
+				renderer.properties = {itemKey:"email"};
+				
+				var column4:DataGridColumn = new DataGridColumn();
+				column4.headerText = "email";
+				column4.dataField = "email";
+				column4.editable = true;
+				column4.width = 120;
+				column4.itemEditor = renderer;
+				listColumns.push(column4);
+			
+				//advListPanel.columns = listColumns;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<mx:Label selectable="true" id="labelRender"/>
+	</fx:Declarations>
+	
+	<chart:AdvListChart id="advListPanel">
+		
+	</chart:AdvListChart>
+</s:Module>

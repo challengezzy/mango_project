@@ -1,0 +1,110 @@
+package smartx.flex.components.itemcomponent
+{
+	import actionscriptdatetimelibrary.DateTimeField;
+	
+	import flash.events.MouseEvent;
+	
+	import mx.collections.ArrayCollection;
+	import mx.controls.DataGrid;
+	import mx.events.CalendarLayoutChangeEvent;
+	import mx.formatters.DateFormatter;
+	import mx.utils.ObjectUtil;
+	
+	import smartx.flex.components.event.UIComponentEvent;
+	import smartx.flex.components.util.TempletDataUtil;
+	import smartx.flex.components.vo.ItemVO;
+	import smartx.flex.components.vo.TempletItemVO;
+
+	public class ItemDateField extends ItemUIComponent
+	{
+		private var dateTimeInput:DateTimeField = new DateTimeField();
+		private var dateFormatter:DateFormatter = new DateFormatter();
+		private var formatString:String = "YYYY-MM-DD";
+		
+		public function ItemDateField(templetItemVO:TempletItemVO,showLabel:Boolean=true)
+		{
+			super(templetItemVO, dateTimeInput, showLabel);
+			dateTimeInput.dayNames=["日","一","二","三","四","五","六"]; 
+ 			dateTimeInput.monthNames=["一","二","三","四","五","六","七","八","九","十","十一","十二"]; 
+			dateTimeInput.setStyle("borderStyle","solid");
+			dateTimeInput.showToday = true;
+			dateTimeInput.setStyle("todayColor","red");
+			dateTimeInput.showTime = true;
+			dateTimeInput.formatString = "YYYY-MM-DD";
+			dateFormatter.formatString = formatString;
+			dateTimeInput.selectedDateTime = null;
+			dateTimeInput.width = 170;
+			dateTimeInput.addEventListener(CalendarLayoutChangeEvent.CHANGE,dataChange);
+		}
+		
+		public override function getQueryConditon(isPreciseQuery:Boolean=false):String{
+			if(dateTimeInput.selectedDateTime == null)
+				return " (1=1) ";
+			return " ("+templetItemVO.itemkey+" = to_date('"+stringValue+"','YYYY-MM-DD')) ";
+		}
+		
+		public override function get realValue():Object{
+			if(dateTimeInput.selectedDateTime!=null)
+				return dateFormatter.format(dateTimeInput.selectedDateTime);
+			return null;
+		}
+		
+		public override function get stringValue():String{
+			if(dateTimeInput.selectedDateTime!=null)
+				return dateFormatter.format(dateTimeInput.selectedDateTime);
+			return null;
+		}
+		
+		public override function get sqlStringValue():String{
+			if(realValue == null)
+				return "null";
+			if(templetItemVO.itemtype.toLowerCase() == "date"){
+				return 	"to_date('"+ stringValue + "','YYYY-MM-DD')";
+			}
+			else{
+				return "'"+stringValue+"'";
+			}
+		}
+
+
+		protected override function clearContent(event:MouseEvent):void{
+			dateTimeInput.selectedDateTime = null;
+			dataChange(null);
+		}
+		
+		 // Define the getter method.
+    	public override function set data(value:Object):void {
+        	super.data = value;
+			if(value == null)
+				return;
+        	if(value[templetItemVO.itemkey]!=null){
+				var str:String = value[templetItemVO.itemkey];
+        		dateTimeInput.selectedDateTime = TempletDataUtil.dateStrToDate(str);  		
+        	}	
+        	else
+        		dateTimeInput.selectedDateTime = null;
+     	}
+     	
+     	public override function set editable(editable:Boolean):void{
+			this._editable = editable;
+			dateTimeInput.enabled = editable;
+		}
+		
+		private function dataChange(event:CalendarLayoutChangeEvent):void{
+			dispatchEvent(new UIComponentEvent(UIComponentEvent.REAL_VALUE_CHANGE));
+		}
+		
+		public override function getSortFunction(fieldName:String):Function{
+			return function(obj1:Object,obj2:Object):int{
+				if(obj1[fieldName] != null && obj2[fieldName] == null)
+					return -1;
+				if(obj1[fieldName] == null && obj2[fieldName] != null)
+					return 1;
+				if(obj1[fieldName] && obj2[fieldName]){
+					return ObjectUtil.stringCompare(String(ItemVO(obj1[fieldName])),String(ItemVO(obj2[fieldName])));
+				}
+				return 0;
+			}
+		}
+	}
+}

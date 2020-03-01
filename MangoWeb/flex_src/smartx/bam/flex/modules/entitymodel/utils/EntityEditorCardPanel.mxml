@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   width="100%" height="100%" xmlns:core="smartx.flex.components.core.*"
+		   creationComplete="creationCompleteHandler()" xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*">
+	<fx:Metadata>		       
+		[Event(name='onReturn',type='smartx.bam.flex.modules.entitymodel.event.EntityEditorEvent')]
+		[Event(name='saveSuccessful',type='smartx.bam.flex.modules.entitymodel.event.EntityEditorEvent')]
+	</fx:Metadata>
+	<fx:Declarations>
+		<viewStackEffects:CoverFlowPapervision3D id="effect"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ArrayUtil;
+			
+			import smartx.bam.flex.modules.entitymodel.event.EntityEditorEvent;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.core.ext.DataValidator;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.TempletItemVO;
+			import smartx.flex.components.vo.TempletVO;
+			
+			public var templetCodeArr:Array;//元原模板集合
+			
+			public var endpoint:String;
+			
+			public var debugMode:Boolean;
+			
+			private var returnAfterSave:Boolean = false;
+			
+			public var insertMode:Boolean = false;//新增模式
+			
+			private var billcardPanelList:ArrayCollection = new ArrayCollection();//所有编辑CARD的集合
+			
+			private var formService:RemoteObject;
+			
+			public var item:Object;//当前选中一条
+			
+			public var entityXml:XML;//当前实体元数据
+			
+			private var parentBillCardPanel:BillCardPanel;//父类billcardpanel
+			[Bindable]
+			private var infoText:String;
+			
+			private function creationCompleteHandler():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				formService.updateDataByTempletVOs.addEventListener(ResultEvent.RESULT,updateDataByTempletVOsHandler);
+				formService.updateDataByTempletVOs.addEventListener(FaultEvent.FAULT,faultHandler);
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show('Error',SmartXMessage.MESSAGE_ERROR,event.fault.faultString,this);
+			}
+			
+			private function updateDataByTempletVOsHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				SmartXMessage.show("保存成功!");
+				onSaveSuccessful();
+			}
+			
+			public function refresh():void{
+				billcardPanelList.removeAll();
+				parentBillCardPanel = null;
+				initControls();
+			}
+			
+			private function initControls():void{
+				mainStack.removeAllChildren();
+				if(templetCodeArr && templetCodeArr.length == 0)
+					throw new Error("没有可编辑的元原模板！");
+				
+				if(templetCodeArr.length == 1)//只有一个编辑方案,则只有完成按钮
+					currentState = "complete";
+				else
+					currentState = "next";
+				OperatingTipUtil.startOperat("初始化中.....",this);
+				addBillCardPanel(templetCodeArr[0]);
+			}
+			
+			private function setInfoText(entityName:String):void{
+				if(insertMode)
+					infoText = "新增数据[实体:"+entityName+"]";
+				else
+					infoText = "编辑数据[实体:"+entityName+"]";
+			}
+			
+			//创建BillCardPanel
+			private function addBillCardPanel(templetCode:String):void{
+				var bcp:BillCardPanel = new BillCardPanel();
+				bcp.templetCode = templetCode;
+				bcp.isShowAlert = false;
+				bcp.endpoint = endpoint;
+				bcp.showInitingWindow = false;
+				bcp.percentHeight = 100;
+				bcp.percentWidth = 100;
+				bcp.setStyle("showEffect",effect);//设置显示和隐藏效果
+				bcp.setStyle("hideEffect",effect);
+				bcp.addEventListener(BillCardPanelEvent.INITCOMPLETE,cardPanelInited);
+				if(insertMode)//新增模式获取SEQ是异步的，可能在没有得到SEQ的情况下进行保存导致报错
+					bcp.addEventListener(BillCardPanelEvent.SETSEQ_COMPLETE,setSeqCompleteHandler);
+				mainStack.addChild(bcp);
+			}
+			
+			private function cardPanelInited(event:BillCardPanelEvent):void{
+				var bcp:BillCardPanel = event.target as BillCardPanel;
+				
+				billcardPanelList.addItem(bcp);
+				if(parentBillCardPanel == null)//如果父BillCardPanel为NULL，就说明刚初始化完第一个BillCardPanel
+					setInfoText(TempletItemVO(bcp.getTempletVO().itemVos[0]).extattr02);
+				
+				var fkName:String = TempletItemVO(bcp.getTempletVO().itemVos[0]).extattr01;
+				if(insertMode){//新增模式
+					if(parentBillCardPanel){//如果有父实体
+						/**
+						 * 如果父实体的主键属性和子类的外键属性相同,则说明两个实体属于同一张表，那么子实体做update处理
+						 * 如果不相同则是不同的表，那么将该表的外键做update处理
+						 **/
+						var dataValue:Object;
+						if(parentBillCardPanel.primaryKey == fkName){
+							dataValue = new Object();							
+							bcp.setDataValue(dataValue);
+							dataValue[bcp.getTempletVO().pkname] = parentBillCardPanel.primaryKeyValue;
+							bcp.insertMode = false;
+							loopProcess();
+							bcp.removeEventListener(BillCardPanelEvent.SETSEQ_COMPLETE,setSeqCompleteHandler);
+						}else
+							bcp.enterInsertMode();
+					}else
+						bcp.enterInsertMode();
+				}else{
+					bcp.initQueryCondition = fkName+"='"+item[String(entityXml.@idAttributeName).toLowerCase()]+"'";
+					bcp.insertMode = false;
+					bcp.setDataValueByQuery();
+					loopProcess();
+				}
+				
+				bcp.removeEventListener(BillCardPanelEvent.INITCOMPLETE,cardPanelInited);
+			}
+			
+			private function setSeqCompleteHandler(event:BillCardPanelEvent):void{
+				var bcp:BillCardPanel = event.target as BillCardPanel;
+				if(parentBillCardPanel){//如果有父实体并且获取SEQ完成，则说明当前实体属于INSERT模式，因此需要对外键赋值
+					var fkName:String = TempletItemVO(bcp.getTempletVO().itemVos[0]).extattr01;
+					bcp.getDataValue()[fkName] = parentBillCardPanel.primaryKeyValue;
+				}
+				loopProcess();
+				bcp.removeEventListener(BillCardPanelEvent.SETSEQ_COMPLETE,setSeqCompleteHandler);
+			}
+			
+			private function loopProcess():void{
+				if(templetCodeArr.length > 1){
+					templetCodeArr.shift();//删除头部元素
+					var bcp:BillCardPanel = billcardPanelList.getItemAt(billcardPanelList.length-1) as BillCardPanel;
+					parentBillCardPanel = bcp;
+					addBillCardPanel(templetCodeArr[0]);
+				}else
+					OperatingTipUtil.endOperat();
+			}
+			
+			private function onSaveSuccessful():void{
+				dispatchEvent(new EntityEditorEvent(EntityEditorEvent.SAVESUCCESSFUL));
+				if(returnAfterSave)
+					onReturn();
+				returnAfterSave = false;
+			}
+			
+			private function onReturn():void{
+				dispatchEvent(new EntityEditorEvent(EntityEditorEvent.ONRETURN));
+			}
+			
+			private function onSave():void{
+				OperatingTipUtil.startOperat("正在保存.......",this);
+				var dataValues:Array = [];
+				var templetVOs:Array = [];
+				for each(var bcp:BillCardPanel in billcardPanelList){
+					if(validateDataValue(bcp)){//如果验证不通过则无法保存
+						templetVOs.push(bcp.getTempletVO());
+						dataValues.push(bcp.getDataValue());
+					}else{
+						OperatingTipUtil.endOperat();
+						return;
+					}
+				}
+				/* templetVOs = templetVOs.reverse();//倒序排列，依次为 祖、父、子
+				dataValues = dataValues.reverse(); */
+				formService.updateDataByTempletVOs(templetVOs,dataValues);
+			}
+			
+			//验证数据有效性
+			private function validateDataValue(bcp:BillCardPanel):Boolean{
+				var dataValue:Object = bcp.getDataValue();
+				if(!bcp.validateData())
+					return false;
+				for each(var dataValidator:DataValidator in bcp.getDataValidators()){
+					if(!dataValidator.validateData(bcp))
+						return false;
+				}
+				
+				try{
+					if(dataValue == null)
+						throw new Error("没有设置任何数据");
+					if(bcp.insertMode){//插入模式
+						var pkName:String = bcp.getTempletVO().pkname;
+						if(pkName == null)
+							throw new Error("没有指定主键名，无法insert");
+							
+						if(parseInt(dataValue[pkName]) < 0)
+							throw new Error("没有成功得到主键值，无法插入");
+					}
+				}catch(e:Error){
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("保存失败",SmartXMessage.MESSAGE_ERROR);
+				}
+				return true;
+			}
+			
+			private function onSaveAndReturn():void{
+				onSave();
+				returnAfterSave = true;
+			}
+			
+			private function nextStepBtn_clickHandler(event:MouseEvent):void{
+				var nextIndex:int = mainStack.selectedIndex+1;
+				if(nextIndex <= billcardPanelList.length-1){
+					var bcp:BillCardPanel = billcardPanelList.getItemAt(nextIndex) as BillCardPanel;
+					mainStack.selectedChild = bcp;
+					if(nextIndex == billcardPanelList.length-1)//
+						currentState = "preAndComplete";
+					else
+						currentState = "preAndnext";
+					setInfoText(TempletItemVO(bcp.getTempletVO().itemVos[0]).extattr02);
+				}
+			}
+			
+			private function preStepBtn_clickHandler(event:MouseEvent):void{
+				var lastIndex:int = mainStack.selectedIndex-1;
+				if(lastIndex >= 0){
+					var bcp:BillCardPanel = billcardPanelList.getItemAt(lastIndex) as BillCardPanel;
+					mainStack.selectedChild = bcp;
+					if(lastIndex == 0)
+						currentState = "next";
+					else
+						currentState = "preAndnext";
+					setInfoText(TempletItemVO(bcp.getTempletVO().itemVos[0]).extattr02);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:states>
+		<s:State name="next" />
+		<s:State name="preAndnext" />
+		<s:State name="preAndComplete" />
+		<s:State name="complete" />
+	</mx:states>
+	<mx:Label text="{infoText}" />
+	<mx:ViewStack id="mainStack" width="100%" height="100%"/>
+	<mx:HBox id="cardButtonBox" width="100%" horizontalAlign="right">
+		<mx:Button id="returnButton" label="取消" toolTip="返回" click="onReturn()" icon="{AssetsFileLib.returnIcon}"/>
+		<mx:Button id="preStepBtn" label="上一步" toolTip="返回到上一个编辑方案" 
+				   icon="{AssetsFileLib.laststepIcon}" click="preStepBtn_clickHandler(event)" includeIn="preAndnext,preAndComplete"/>
+		<mx:Button id="nextStepBtn" label="下一步" toolTip="前进到下一个编辑方案" 
+				   icon="{AssetsFileLib.nextstepIcon}" click="nextStepBtn_clickHandler(event)" includeIn="next,preAndnext"/>
+		<mx:Button id="cardSaveButton" label="完成" toolTip="保存当前信息" 
+				   click="onSaveAndReturn()" icon="{AssetsFileLib.okIcon}" includeIn="preAndComplete,complete"/>
+	</mx:HBox>
+</mx:VBox>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   initialize="init()" showCloseButton="true"
+			   close="PopUpManager.removePopUp(this)" layout="vertical"
+			   width="520" height="540" xmlns:core="smartx.flex.components.core.*"
+			   title="任务类别管理">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.text.engine.TabAlignment;
+			
+			import mx.managers.PopUpManager;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.vo.GlobalConst;
+			
+			[Bindable]
+			public var templetCode:String = "T_BAM_TASKTYPE";//任务类别管理
+			[Bindable]
+			public var debugMode:Boolean = false;
+			[Bindable]
+			public var editable:Boolean = true;
+			
+			[Bindable]
+			public var destination:String = GlobalConst.SERVICE_FORM;
+			[Bindable]
+			public var endpoint:String;	
+			
+			[Bindable]
+			public var confirmFunc:Function = function():void{
+				
+			}
+			
+			private function init():void{
+				endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				
+			}
+			
+			private function onConfirm():void{
+				PopUpManager.removePopUp(this);
+				confirmFunc();
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox id="contentBox" height="100%" width="100%">
+		<core:BillListPanel id="listPanel" showDataAfterInit="true" editable="{editable}" debugMode="{debugMode}"
+							showEditBox="true"
+							destination="{destination}" endpoint="{endpoint}" templetCode="{templetCode}" >
+		</core:BillListPanel>
+	</mx:VBox>
+	<mx:HRule width="100%" />
+	<mx:HBox horizontalAlign="center" id="buttonBar" width="100%">
+		<mx:Button id="confirmButton" label="确定" click="onConfirm()" height="22"/>
+		<mx:Button id="cancelButton" label="取消" click="PopUpManager.removePopUp(this)"  height="22"/>
+	</mx:HBox>
+</mx:TitleWindow>

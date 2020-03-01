@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" verticalAlign="middle" horizontalAlign="center"
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" 
+		 xmlns:util="smartx.bam.flex.modules.queryview.util.*">
+	<fx:Declarations>
+		<mx:HBox width="100%" height="100%" id="choiseBox" horizontalAlign="center" >
+			<mx:Label text="列字段选择:"/>
+			<mx:List id="columnsList" height="97%" width="200" dataProvider="{columnsListData}" allowMultipleSelection="{allowMultipleSelection}"
+					 toolTip="选择一个字段进行设置">
+			</mx:List>
+			<mx:Button icon="{AssetsFileLib.minuseIcon}" label="删除过滤器"  click="deleteFilter()"  height="22"/>
+		</mx:HBox>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			
+			[Bindable]
+			public var columnsListData:ArrayCollection;//可选择列
+			
+			[Bindable]
+			public var allowMultipleSelection:Boolean = false;//单选还是多选
+			
+			public var filterType:String;//过滤器类型			
+			protected var column:String; //选择的列
+			
+			public var filterXml:XML;
+			
+			[Bindable]
+			public var deleteFilter:Function = function():void{
+				trace("删除当前过滤器");
+			} 
+			
+			//生成XML
+			public function getFilterXml():XML{ return null; }
+			
+		]]>
+	</fx:Script>
+	
+</mx:VBox>

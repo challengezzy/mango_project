@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+				  xmlns:util="myreport.util.*" layout="vertical" width="320" height="96" 
+				  title="操作进行中" fontFamily="Simsun" verticalGap="0" 
+				  close="Close()" showCloseButton="true">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			
+			private static var g_Instance:ProgressForm;
+			
+			public static function get Instance():ProgressForm
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ProgressForm();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			private var _Label:String;
+			private var _Current:Number;
+			private var _Total:Number;
+			private var _PopUpAfterInit:Boolean = false;
+			
+			private function Init():void
+			{
+				if(_PopUpAfterInit)
+				{
+					PopUp();
+					SetProgress(_Label, _Current, _Total);
+				}
+			}
+			
+			public function Show(message:String, value:Number, total:Number):void
+			{
+				PopUp();
+				SetProgress(message, value, total);
+			}
+			
+			private function SetProgress(message:String, value:Number, total:Number):void
+			{
+				_Label = message;
+				_Current = value;
+				_Total = total;
+				
+				if(_Message)
+				{
+					_Message.text = _Label;
+					_Progress.SetProgress(_Current, _Total);
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" height="100%" verticalAlign="middle">
+		<mx:Label id="_Message" text="标签" width="100%"/>
+	</mx:HBox>
+	
+	<util:ProgressBar id="_Progress" width="100%" height="18"/>
+	
+</util:PopUpWindow>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SuperPanel xmlns="net.brandonmeyer.containers.*" xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="800" height="600" 
+	allowDrag="true" allowClose="true" allowMaximize="true" allowMinimize="true" allowResize="true" close="closeDebugWindow()" xmlns:components="smartx.flex.components.*" 
+	title="{('流程调试 - 流程实例ID['+processInstanceId+']')}" creationComplete="init()" xmlns:core="smartx.flex.components.core.*">
+	<mx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			[Bindable]
+			public var processInstanceId:String;
+			
+			//add by zhangzz for issues#SmartX-4 begin
+			[Bindable]
+			public var endpointForWorkflow:String;
+			//add by zhangzz for issues#SmartX-4 end
+			
+			private function init():void{
+				monitorPanel.startMonitor(); 
+			}
+			
+			private function closeDebugWindow():void{
+				monitorPanel.hideProcessVariableWindow();
+				PopUpManager.removePopUp(this);
+				
+			}
+		]]>
+	</mx:Script>
+	<core:BillWorkflowMonitorPanel endpointForWorkflow="{endpointForWorkflow}" processInstanceId="{processInstanceId}" id="monitorPanel"/>
+</SuperPanel>

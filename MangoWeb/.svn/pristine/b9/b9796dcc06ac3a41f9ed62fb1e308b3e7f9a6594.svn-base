@@ -1,0 +1,1041 @@
+<?xml version="1.0" encoding="utf-8"?>
+<panels:SuperPanel xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   xmlns:variableControl="smartx.bam.flex.modules.common.variableControl.*" 
+		   xmlns:synonyms="smartx.bam.flex.modules.synonyms.*"
+		   xmlns:panels="net.brandonmeyer.containers.*"
+		   xmlns:components="smartx.bam.flex.modules.dashboardobject.designer.components.*"
+		   xmlns:containers="flexlib.containers.*"
+		   close="PopUpManager.removePopUp(this)" allowClose="true" allowDrag="true" allowResize="false" allowMaximize="false" allowMinimize="false"
+		   creationComplete="creationCompleteHandler()" initialize="init()" title="高级属性设置"  >
+	<fx:Declarations>
+		<mx:TitleWindow title="设置变量" width="1000" height="400" id="variableWindow" borderStyle="solid" 
+						showCloseButton="true" close="PopUpManager.removePopUp(variableWindow)">
+			<variableControl:SetVariablePanel id="setVariablePanel" width="100%" height="100%" confirmFun="{setVariableConfirmHandler}" 
+									 cancelFun="{setVariableCancelHandler}" />
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow title="绑定同义词" width="350" height="250" id="bindSynonymsWindow" borderStyle="solid" showCloseButton="true"
+						close="PopUpManager.removePopUp(bindSynonymsWindow)">
+			<mx:HBox width="100%" id="buttonBox">
+				<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addbBindSynonyms()"/>
+				<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="delBindSynonyms()"/>
+			</mx:HBox>
+			<mx:DataGrid id="bindSynonymsDg" width="100%" height="100%" dataProvider="{bsDateProvider}" editable="true">
+				<mx:columns>
+					<mx:DataGridColumn headerText="绑定字段" dataField="bindField" rendererIsEditor="true">
+						<mx:itemRenderer>
+							<fx:Component>
+								<mx:HBox horizontalScrollPolicy="off" width="100%" initialize="init()">
+									<fx:Script>
+										<![CDATA[
+											import mx.events.CollectionEvent;
+											public function get text():String{
+												return String(data.bindField);
+											}
+											
+											override public function set data(value:Object):void{
+												super.data = value;
+												//bindFieldCbo.selectedIndex = -1;
+												if(value){
+													bindFieldCbo.selectedIndex = -1;
+													bindFieldCbo.text = value.bindField;
+												}
+											}
+											
+											protected function init():void{
+												outerDocument.designer.fieldList.addEventListener(CollectionEvent.COLLECTION_CHANGE,function(e:CollectionEvent):void{
+													bindFieldCbo.selectedIndex = -1;
+													bindFieldCbo.text = data.bindField;
+												},false,0,true);
+											}
+										]]>
+									</fx:Script>
+									<mx:ComboBox id="bindFieldCbo" dataProvider="{outerDocument.designer.fieldList}"
+												 change="{data.bindField=bindFieldCbo.text}" width="100%"/>
+								</mx:HBox>
+							</fx:Component>
+						</mx:itemRenderer>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="同义词" dataField="synonyms" editable="true" editorDataField="value">
+						<mx:itemEditor>
+							<fx:Component>
+								<synonyms:SynonymsRefInput dataGridItemkey="synonyms" />
+							</fx:Component>
+						</mx:itemEditor>
+					</mx:DataGridColumn>
+					<mx:DataGridColumn headerText="输出字段名称" dataField="fieldName" editable="true" />
+				</mx:columns>
+			</mx:DataGrid>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<mx:Button label="确定" click="bindSynonyms_confirmHandler()"/>
+				<mx:Button label="取消" click="PopUpManager.removePopUp(bindSynonymsWindow)"/>
+			</mx:HBox>
+		</mx:TitleWindow>
+		
+		<mx:TitleWindow id="registerClickListenerWindow" width="350" height="250" borderStyle="solid" title="注册监听器"
+						showCloseButton="true" close="{PopUpManager.removePopUp(registerClickListenerWindow)}">
+			<mx:HBox width="100%" horizontalAlign="left" >
+				<mx:Label text="监听器:" />
+				<mx:LinkButton id="addLstBtn" icon="{AssetsFileLib.addIcon}" width="22" height="22" 
+							   toolTip="添加监听器" click="addLstBtn_clickHandler(event)"/>
+				<mx:LinkButton id="musLstBtn" icon="{AssetsFileLib.minuseIcon}" width="22" height="22" 
+							   toolTip="删除监听器" click="musLstBtn_clickHandler(event)"/>
+			</mx:HBox>
+			<mx:DataGrid width="100%" height="100%" id="lstsDatagrid" editable="true" dataProvider="{contentXml.chartClickListener.listener}" >
+				<mx:columns>
+					<mx:DataGridColumn headerText="实现类" editable="true" dataField="*" />
+				</mx:columns>
+			</mx:DataGrid>
+		</mx:TitleWindow>
+		
+		<mx:FormItem label="分组字段" id="groupbyFi">
+			<mx:TextInput id="groupbyTxt" width="200" toolTip="group by子句的字段"/>
+		</mx:FormItem>
+		<mx:FormItem label="聚合字段" id="groupbyColumnFi">
+			<mx:TextInput id="groupbyColumnTxt" width="200" toolTip="例如:sum(price) as price"/>
+		</mx:FormItem>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import smartx.flex.components.core.mtchart.utils.MTChartUtil;
+			import net.brandonmeyer.events.SuperPanelEvent;
+			import smartx.flex.components.vo.TableDataStruct;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.bam.flex.modules.common.variableControl.vo.VariableVo;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.vo.TempletItemVO;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import com.adobe.utils.StringUtil;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.util.SmartXMessage;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import mx.managers.PopUpManager;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			
+			//实体设计器调用时需要限制类型
+			[Bindable]
+			public var isEditEntityCob:Boolean = true;
+			//业务视图参照中所指定的范围
+			public var bvCodes:Array;
+			//查询视图参照中所指定的范围
+			public var qvCodes:Array;
+			[Bindable]
+			public var contentXml:XML;
+			[Bindable]
+			public var confirmFunc:Function;
+			
+			private var modelQuerySQL:String = "select em.name,em.code,mt.content from bam_entitymodel em" +
+				",pub_metadata_templet mt where em.mtcode = mt.code";
+			//业务视图参照
+			private var bvNameRefPanel:ItemRefPanel;
+			//关系型数据源参照
+			private var relationDSRefPanel:ItemRefPanel;
+			//查询视图参照
+			private var queryViewRefPanel:ItemRefPanel;
+			//分析视图参照
+			private var avNameRefPanel:ItemRefPanel;
+			
+			private var rpc:RemoteObject;
+			
+			private var formService:RemoteObject;
+			
+			public var endpoint:String;
+			
+			private var bvWindow:String = "";
+			
+			private var bvName:String = "";
+			
+			private var avName:String = "";
+			
+			private var avCode:String = "";
+			
+			private var tableName:String = "";
+			
+			private var queryViewDs:String = "";
+			
+			private var queryViewCode:String = "";
+			
+			private var queryViewName:String = "";
+			
+			private var modelCode:String = "";
+			
+			private var entityCode:String = "";
+			[Bindable]
+			private var datasources:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var modelCol:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var entityCol:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var dataProvider:ArrayCollection = new ArrayCollection();
+			[Bindable]
+			private var bsDateProvider:ArrayCollection = new ArrayCollection();
+			
+			private var bindSynonymsFieldList:ArrayCollection = new ArrayCollection();
+			
+			private var deskTop:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			[Bindable]
+			public var designer:BaseDesigner;//自定义设计器
+			
+			private function init():void{
+				OperatingTipUtil.startOperat("初始化中...",deskTop);
+				if(endpoint == null)
+					endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				
+				rpc = new RemoteObject(BAMConst.BAM_Service);
+				rpc.endpoint = endpoint;
+				
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = endpoint;
+				
+				rpc.queryAllRelationDsName.addEventListener(ResultEvent.RESULT,queryAllRelationDsNameHandler);
+				rpc.queryAllRelationDsName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("查询关系数据源错误，请检查数据源设置。",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				rpc.getTableStructByName.addEventListener(ResultEvent.RESULT,getTableStructByNameHandler);
+				rpc.getTableStructByName.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取表结构错误，请检查通用页面数据相关设置。",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				rpc.parseChartXmlToEpl.addEventListener(ResultEvent.RESULT,parseChartXmlToEplHandler);
+				rpc.parseChartXmlToEpl.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("解析SQL语句错误，请检查选择的数据源和表(或查询视图或自定义SQL)或业务视图是否正确。",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+				});
+				
+				formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取实体模型时出错",SmartXMessage.MESSAGE_ERROR,
+						"错误详情:"+event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+			}
+			
+			private function generalForm_creationCompleteHandler(event:FlexEvent):void{
+				buildDesigner();
+				
+				if(designer is OlapDesigner){
+					if(generalForm.contains(synonymsSetBtnFi))
+						generalForm.removeChild(synonymsSetBtnFi);
+				}else{
+					if(!generalForm.contains(synonymsSetBtnFi))
+						generalForm.addChild(synonymsSetBtnFi);
+				}
+				rpc.queryAllRelationDsName();
+			}
+			
+			private function buildDesigner():void{
+				defineDesignerVBox.addChild(designer);
+			}
+			
+			private function queryAllRelationDsNameHandler(event:ResultEvent):void{
+				datasources.removeAll();
+				var result:Array = event.result as Array;
+				for each(var value:String in result){
+					if(!StringUtil.beginsWith(value,GlobalConst.CEP_DATASOURCE_PREFIX))
+						datasources.addItem(value);
+				}
+				formService.getSimpleHashVoArrayByDS(null,modelQuerySQL);
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+				var arr:Array = event.result as Array;
+				modelCol.removeAll();
+				for each(var sp:SimpleHashVO in arr){
+					modelCol.addItem(sp.dataMap);
+				}
+				initGeneralForm();
+			}
+			
+			private function initGeneralForm():void{
+				initRefPanel();
+				initQueryViewRefPanel();
+				initRefAvPanel();
+				if(contentXml == null || "" == contentXml.toString() ){
+					contentXml = <chart>
+								   <extend />
+								 </chart>;
+					dataSourcetypeCbo.selectedIndex = 0;
+					switchState();
+				}else{
+					var simpleRefItemVO:SimpleRefItemVO = new SimpleRefItemVO();
+					if(contentXml.viewname.length() > 0){//业务视图
+						dataSourcetypeCbo.selectedIndex = 0;
+						switchState();
+						simpleRefItemVO.name = contentXml.viewname.@name;
+						simpleRefItemVO.code = contentXml.viewname;
+						
+						bvName = contentXml.viewname.@name;
+						bvWindow = contentXml.viewname;
+						bvNameRefPanel.data = {"bvname":simpleRefItemVO};
+					}else if(contentXml.datasource.length() > 0){
+						if(String(contentXml.datasource.@type) == "qv"){ //查询视图
+							dataSourcetypeCbo.selectedIndex = 2;
+							switchState();
+							queryViewDs = contentXml.datasource;
+							queryViewName = contentXml.datasource.@name;
+							queryViewCode = contentXml.datasource.@queryViewCode;
+							simpleRefItemVO.name = contentXml.datasource.@name;
+							queryViewRefPanel.data ={"queryView":simpleRefItemVO}; 
+						}else if(String(contentXml.datasource.@type) == "av"){ //分析视图
+							dataSourcetypeCbo.selectedIndex = 3;
+							switchState();
+							initRefAvPanel();
+							avName = contentXml.datasource.@avname;
+							avCode = contentXml.datasource.@tablename;
+							tableName = contentXml.datasource.@tablename;
+							simpleRefItemVO.name = contentXml.datasource.@avname;
+							simpleRefItemVO.id = contentXml.datasource.@tablename;
+							simpleRefItemVO.code = contentXml.datasource.@tablename;
+							avNameRefPanel.data ={"avname":simpleRefItemVO}; 
+						}else if(String(contentXml.datasource.@type) == "entity"){//实体
+							dataSourcetypeCbo.selectedIndex = 4;
+							modelCode = contentXml.datasource.@modelCode;
+							entityCode = contentXml.datasource.@entityCode;
+							
+							var modelItem:Object = getItemFromArrarCollectionByCode(modelCol,modelCode);
+							if(modelItem != null ){
+								modelCbo.selectedItem = modelItem;
+							}
+							switchState();
+						}else if(String(contentXml.datasource.@type) == "rdms" 
+							|| String(contentXml.datasource.@tablename) != ""){//关系型数据源
+							dataSourcetypeCbo.selectedIndex = 1;
+							currentState = "relationalDs";
+							datasourceCbo.selectedItem = String(contentXml.datasource);
+							contentXml.datasource.@tablename.length() > 0
+								?relationTypeCbo.selectedIndex = 0:relationTypeCbo.selectedIndex = 1;
+							
+							relationTypeCbo_changeHandler();
+							
+							if(relationTypeCbo.selectedIndex == 0){
+								simpleRefItemVO.name = contentXml.datasource.@tablename;
+								tableName = contentXml.datasource.@tablename;
+								relationDSRefPanel.data = {"tablename":simpleRefItemVO};
+							}else
+								sqlTxt.text = contentXml.datasource.@sql;
+							
+							
+						}
+					}
+					chartnameInput.text = contentXml.chartname;
+					backupChartnameInput.text = contentXml.backupChartname;
+					refreshIntervalTxt.text = contentXml.refreshinterval;
+					orderByTxt.text = contentXml.orderby;
+					if(rowsLimitTxt)
+						rowsLimitTxt.text = contentXml.rowsLimit;
+					if(contentXml.extend.filter.length() > 0 )
+						filterTxt.text = contentXml.extend.filter;
+					else
+						filterTxt.text = contentXml.filter;
+					
+					if(contentXml.extend.backupFilter.length() > 0 )
+						backupFilterTxt.text = contentXml.extend.backupFilter;
+					else
+						backupFilterTxt.text = contentXml.backupFilter;
+					
+					if(contentXml.groupby.length() > 0){
+						isUseGroupby.selected = true;
+						isUseGroupby_clickHandler();
+						groupbyTxt.text = contentXml.groupby;
+						groupbyColumnTxt.text = contentXml.groupbycolumn;
+					}
+				}
+				designer.contentXml = contentXml;
+				designer.generalFormComplete();
+				initBindSynonymsField();
+				OperatingTipUtil.endOperat();
+			}
+			
+			private function creationCompleteHandler():void{
+				
+			}
+			
+			private function initRefPanel():void{
+				if(bvNameRefPanel != null)
+					viewname.removeChild(bvNameRefPanel);
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="业务视图";
+				templetItemVO.itemkey="bvname";
+				if(bvCodes == null && qvCodes == null)
+					templetItemVO.refdesc="select name value#,streamwindowname code#,name 名称 from bam_businessview;ds=datasource_default";
+				else{
+					var bvCodesStr:String = "";
+					for(var i:int=0;i<bvCodes.length;i++){
+						if(i == bvCodes.length-1)
+							bvCodesStr = bvCodesStr.concat("'").concat(bvCodes[i]).concat("'");
+						else
+							bvCodesStr = bvCodesStr.concat("'").concat(bvCodes[i]).concat("'").concat(",");
+					}
+					if(bvCodesStr != "")
+						templetItemVO.refdesc="select name value#,streamwindowname code#,name 名称 from bam_businessview where code in ("+
+							bvCodesStr+");ds=datasource_default";
+					else
+						templetItemVO.refdesc="select name value#,streamwindowname code#,name 名称 from bam_businessview where 1=2;ds=datasource_default";
+				}
+				bvNameRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				bvNameRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(bvNameRefPanel.returnVO != null){
+						bvWindow = bvNameRefPanel.returnVO.code;
+						bvName = bvNameRefPanel.returnVO.name;
+						if( tableName == null || bvNameRefPanel.stringValue != tableName)
+							designer.isTableChanged = true;
+						tableName = bvNameRefPanel.stringValue;
+					}else{
+						bvName = "";
+						bvWindow = "";
+						tableName = "";
+					}
+				});
+			}
+			
+			private function initRefAvPanel():void{
+				if(avNameRefPanel != null)
+					analyzeViewname.removeChild(avNameRefPanel);
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="分析视图";
+				templetItemVO.itemkey="avname";
+				templetItemVO.refdesc="select code id#,code 编码,name 名称 from bam_analyzeview ;ds=datasource_default";
+				avNameRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				avNameRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(avNameRefPanel.returnVO != null){
+						avCode = avNameRefPanel.returnVO.code;
+						avName = avNameRefPanel.returnVO.name;
+						tableName = avNameRefPanel.returnVO.code;
+					}else{
+						avCode = "";
+						avName = "";
+						tableName = "";
+					}
+				});
+			}
+			
+			private function initRelationDsRefPanel():void{
+				if(relationDSRefPanel != null)
+					relatedTable.removeChild(relationDSRefPanel);
+				var datasourceName:String = String(datasourceCbo.selectedItem);
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="表名";
+				templetItemVO.itemkey="tablename";
+				templetItemVO.refdesc="select table_name value#,1 code#,table_name 名称 from user_tables union " +
+					"select view_name value#,1 code#,view_name 名称 from user_views;ds="+datasourceName;
+				relationDSRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				relationDSRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(relationDSRefPanel.returnVO != null){
+						if( tableName == null || relationDSRefPanel.stringValue != tableName)
+							designer.isTableChanged = true;
+						
+						tableName = relationDSRefPanel.stringValue;
+					}else
+						tableName = "";
+				});
+				relatedTable.addChild(relationDSRefPanel);
+			}
+			
+			private function initQueryViewRefPanel():void{
+				if(queryViewRefPanel != null)
+					queryViewname.removeChild(queryViewRefPanel);
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="查询视图";
+				templetItemVO.itemkey="queryView";
+				if(bvCodes == null && qvCodes == null)
+					templetItemVO.refdesc="select datasourcename value#,code code#,name 名称 from V_BAM_QUERYVIEW;ds=datasource_default";
+				else{
+					var qvCodesStr:String = "";
+					for(var i:int=0;i<qvCodes.length;i++){
+						if(i == qvCodes.length-1)
+							qvCodesStr = qvCodesStr.concat("'").concat(qvCodes[i]).concat("'");
+						else
+							qvCodesStr = qvCodesStr.concat("'").concat(qvCodes[i]).concat("'").concat(",");
+					}
+					if(qvCodesStr != "")
+						templetItemVO.refdesc="select datasourcename value#,code code#,name 名称 from V_BAM_QUERYVIEW where code in("+
+							qvCodesStr+");ds=datasource_default";
+					else
+						templetItemVO.refdesc="select datasourcename value#,code code#,name 名称 from V_BAM_QUERYVIEW where 1=2;ds=datasource_default";
+				}
+				queryViewRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				queryViewRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(queryViewRefPanel.returnVO != null){
+						queryViewCode = queryViewRefPanel.returnVO.code;
+						queryViewDs = queryViewRefPanel.stringValue;
+						queryViewName = queryViewRefPanel.returnVO.name;
+						if( tableName == null || queryViewRefPanel.returnVO.code != tableName)
+							designer.isTableChanged = true;
+						
+						tableName = queryViewRefPanel.returnVO.code;
+					}else{
+						tableName = "";
+						queryViewCode = "";
+						queryViewDs = "";
+						queryViewName = "";
+					}
+				});
+			}
+			
+			private function switchState():void{
+				var index:int = dataSourcetypeCbo.selectedIndex;
+				switch(index){
+					case 0:
+						currentState = "bv";
+						if(bvNameRefPanel)
+							viewname.addChild(bvNameRefPanel);
+						break;
+					case 1:
+						currentState = "relationalDs";
+						relationTypeCbo_changeHandler();
+						break;
+					case 2:
+						currentState = "qv";
+						if(queryViewRefPanel)
+							queryViewname.addChild(queryViewRefPanel);
+						break;
+					case 3:
+						currentState = "av";
+						if(avNameRefPanel)
+							analyzeViewname.addChild(avNameRefPanel);
+						break;
+					case 4:
+						currentState = "entityModel";
+						modelCbo_changeHandler();
+						break;
+				}
+			}
+			
+			private function setVariableConfirmHandler():void{
+				if(setVariablePanel)
+					dataProvider = setVariablePanel.dataProvider;
+				delete contentXml.variables;
+				var variables:XML = <variables />;
+				for each(var data:VariableVo in dataProvider){
+					var variable:XML = <variable name={data.name} type={data.type} defaultValue={data.defaultValue} 
+					defaultValueLabel={data.defaultValueLabel} alias={data.label} isUseSynonyms={data.isUseSynonyms?"Y":"N"} 
+					defineCbo={data.defineCbo} defineRefPanel={data.defineRefPanel} />
+					variables.appendChild(variable);
+				}
+				
+				contentXml.appendChild(variables);
+				PopUpManager.removePopUp(variableWindow);
+			}
+			
+			private function setVariableCancelHandler():void{
+				if(variableWindow.isPopUp)
+					PopUpManager.removePopUp(variableWindow);
+			}
+			
+			private function addbBindSynonyms():void{
+				bsDateProvider.addItem({bindField:"",synonyms:"",fieldName:""});
+				bindSynonymsDg.invalidateList();
+			}
+			
+			private function delBindSynonyms():void{
+				if(bindSynonymsDg.selectedIndex < 0)
+					return;
+				bsDateProvider.removeItemAt(bindSynonymsDg.selectedIndex);
+				bindSynonymsDg.invalidateList();
+			}
+			
+			private function bindSynonyms_confirmHandler():void{
+				delete contentXml.bindSynonymses.*;
+				bindSynonymsFieldList.removeAll();
+				var fieldNameFlag:Boolean = true;
+				for each(var data:Object in bsDateProvider){
+					if(data.fieldName == null || data.fieldName == "")
+						fieldNameFlag = false
+					var synonyms:String = "";
+					if(data.synonyms is SimpleRefItemVO)
+						synonyms = synonyms.concat(data.synonyms.name).concat("@@@").concat(data.synonyms.code);
+					var bindSynonymse:XML = <bindSynonymse bindField={data.bindField} synonyms={synonyms} fieldName={data.fieldName} />
+					contentXml.bindSynonymses.appendChild(bindSynonymse);
+					bindSynonymsFieldList.addItem(String(data.fieldName));
+				}
+				if(!fieldNameFlag){
+					SmartXMessage.show("无输出字段将导致同义词不能正常显示!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				PopUpManager.removePopUp(bindSynonymsWindow);
+			}
+			
+			private function addLstBtn_clickHandler(event:MouseEvent):void{
+				var listenerXML:XML = <listener>此处填写监听器</listener>;
+				contentXml.chartClickListener.appendChild(listenerXML);
+				lstsDatagrid.invalidateList();
+			}
+			
+			private function musLstBtn_clickHandler(event:MouseEvent):void{
+				if(lstsDatagrid.selectedIndex < 0)
+					return;
+				CEPUtils.xmlDeleteNode(XML(lstsDatagrid.selectedItem));
+			}
+			
+			private function synonymsSetBtn_clickHandler(event:MouseEvent):void{
+				if(!bindSynonymsWindow.isPopUp){
+					PopUpManager.addPopUp(bindSynonymsWindow,deskTop,true);
+					PopUpManager.centerPopUp(bindSynonymsWindow);
+				}
+				initTableStruct();
+				bindSynonymsFieldList.removeAll();
+			}
+			
+			private function initBindSynonymsField():void{
+				//bsDateProvider.removeAll();
+				if(contentXml.bindSynonymses.length() == 0)
+					contentXml.appendChild(<bindSynonymses />);
+				else{
+					for each(var bindSynonymsXml:XML in contentXml.bindSynonymses.bindSynonymse){
+						if(String(bindSynonymsXml.@synonyms).split("@@@").length > 1){
+							var simpleRefItemVO:SimpleRefItemVO = new SimpleRefItemVO();
+							simpleRefItemVO.name = String(bindSynonymsXml.@synonyms).split("@@@")[0];
+							simpleRefItemVO.code = String(bindSynonymsXml.@synonyms).split("@@@")[1];
+							bsDateProvider.addItem({bindField:String(bindSynonymsXml.@bindField),
+								synonyms:simpleRefItemVO,fieldName:String(bindSynonymsXml.@fieldName)});
+						}else{
+							bsDateProvider.addItem({bindField:String(bindSynonymsXml.@bindField),synonyms:"",
+								fieldName:String(bindSynonymsXml.@fieldName)});
+						}
+						bindSynonymsFieldList.addItem(String(bindSynonymsXml.@fieldName));
+					}
+				}
+			}
+			
+			private function variableSetBtn_clickHandler(event:MouseEvent):void{
+				if(!variableWindow.isPopUp){
+					PopUpManager.addPopUp(variableWindow,deskTop,true);
+					PopUpManager.centerPopUp(variableWindow);
+				}
+				dataProvider.removeAll();
+				if(contentXml.variables.length() > 0){
+					for each(var vari:XML in contentXml.variables.variable){
+						var data:VariableVo = new VariableVo(String(vari.@name),String(vari.@type),String(vari.@alias),String(vari.@defaultValue)
+							,String(vari.@defaultValueLabel),String(vari.@defineRefPanel),String(vari.@isUseSynonyms)=="Y"?true:false
+							,String(vari.@defineCbo));
+						dataProvider.addItem(data);
+					}
+					setVariablePanel.refreshData(dataProvider);
+				}
+			}
+			
+			private function initTableStruct():void {
+				designer.fieldList.removeAll();
+				designer.fieldTypeMap.clear();
+				
+				if(tableName == null 
+					&&	( bvNameRefPanel ==null || bvNameRefPanel.returnVO ==null ) 
+					&& (sqlTxt ==null || sqlTxt.text.length < 1) && (queryViewDs==null || queryViewCode==null) )
+					return;
+				
+				//判断sqlTxt的内容是否发生了变化
+				if(contentXml != null && sqlTxt && contentXml.datasource.@sql.toString() != sqlTxt.text)
+					designer.isTableChanged = true;
+				
+				var groupByStr:String = "";
+				if(isUseGroupby.selected && "" != StringUtil.trim(groupbyTxt.text) )
+					groupByStr = MTChartConst.GROUPBY_PREFIX + groupbyTxt.text.replace("group by","");
+				
+				rpc.parseChartXmlToEpl(getContentXmlStr(),groupByStr);
+			}
+			
+			private function parseChartXmlToEplHandler(event:ResultEvent):void{
+				designer.sql = event.result as String;
+				var datasourceName:String;
+				//判断是业务视图还是关系数据源
+				if("业务视图" == dataSourcetypeCbo.selectedItem){
+					datasourceName = isHisBv.selected?null:GlobalConst.CEP_DATASOURCE_PREFIX + GlobalConst.DEFAULTPROVIDERNAME_CEP;
+					var bvWindowName:String = isHisBv.selected?"bv_".concat(bvWindow):bvWindow;
+					
+					var tempSql:String = "select ";
+					
+					if( isUseGroupby.selected && "" !=StringUtil.trim(groupbyTxt.text)){
+						tempSql = tempSql + groupbyColumnTxt.text +" from " + bvWindowName + " where 1=2 group by " + groupbyTxt.text;
+					}else{
+						tempSql = tempSql + " * from " + bvWindowName + " where 1=2";
+					}					
+					
+					rpc.getTableStructByName(datasourceName, tempSql );
+				}else if( "关系型数据源" == dataSourcetypeCbo.selectedItem){
+					datasourceName = String(datasourceCbo.selectedItem);
+					rpc.getTableStructByName(datasourceName, MTChartUtil.convertFormulaMacPars(designer.sql));
+				}else if("查询视图" == dataSourcetypeCbo.selectedItem){
+					rpc.getTableStructByName(queryViewDs, designer.sql );
+				}else if("分析视图" == dataSourcetypeCbo.selectedItem){
+					rpc.getTableStructByName("datasource_ave", designer.sql );
+				}else if("实体模型" == dataSourcetypeCbo.selectedItem){
+					var model:Object = modelCbo.selectedItem;
+					if(model != null ){
+						var modelXml:XML = XML(model["content"]);
+						datasourceName =  String(modelXml.datasource);
+					}else{
+						datasourceName = "datasource_default";
+					}
+					rpc.getTableStructByName(datasourceName, designer.sql );
+				}
+			}
+			
+			private function getTableStructByNameHandler(event:ResultEvent):void{
+				var tableDataStruct:TableDataStruct = event.result as TableDataStruct;
+				designer.tableDataStruct = tableDataStruct;
+				
+				designer.fieldList.addAll(bindSynonymsFieldList);
+				for(var i:int=0;i<tableDataStruct.table_header.length;i++){
+					var name:String = tableDataStruct.table_header[i];
+					designer.fieldList.addItem(name.toLocaleLowerCase());
+					designer.fieldTypeMap.add(name.toLocaleLowerCase(),tableDataStruct.table_body_type[i]);
+				}
+				designer.initTableStructComplete();
+			}
+			
+			private function getItemFromArrarCollectionByCode(temCol:ArrayCollection,code:String):Object{
+				var item:Object = null;
+				if(temCol != null){
+					for each(var tempItem:Object in temCol){
+						var tempCode:String = tempItem["code"] as String;
+						if(tempCode !=null&&tempCode != ""&&code !=null&&code != ""&&tempCode == code){
+							item = tempItem;
+							break;
+						}
+					}
+				}
+				return item;
+			}
+			
+			private function datasourceCbo_changeHandler():void{
+				initRelationDsRefPanel();
+			}
+			
+			private function isUseGroupby_clickHandler():void{
+				var childIndex:int = generalForm.getChildIndex(isUseGroupByFi);
+				if(isUseGroupby.selected){
+					if(!generalForm.contains(groupbyFi))
+						generalForm.addChildAt(groupbyFi,childIndex+1);
+					if(!generalForm.contains(groupbyColumnFi))
+						generalForm.addChildAt(groupbyColumnFi,childIndex+2);
+				}else{
+					if(generalForm.contains(groupbyFi))
+						generalForm.removeChild(groupbyFi);
+					if(generalForm.contains(groupbyColumnFi))
+						generalForm.removeChild(groupbyColumnFi);
+				}
+			}
+			
+			private function relationTypeCbo_changeHandler():void{
+				var relatype:String = relationTypeCbo.selectedItem as String;
+				var childIndex:int = generalForm.getChildIndex(relationType);
+				
+				if("关联表" == relatype){//关联表
+					if(generalForm.contains(defineSql))
+						generalForm.removeChild(defineSql);
+					if(!generalForm.contains(relatedTable))
+						generalForm.addChildAt(relatedTable,childIndex+1);
+					datasourceCbo_changeHandler();
+				}else if("自定义SQL" == relatype){//自定义SQL
+					if(generalForm.contains(relatedTable))
+						generalForm.removeChild(relatedTable);
+					if(!generalForm.contains(defineSql))
+						generalForm.addChildAt(defineSql,childIndex+1);
+				}
+			}
+			
+			private function modelCbo_changeHandler():void{
+				var item:Object = modelCbo.selectedItem;
+				if(item != null){
+					modelCode = item["code"] as String;
+					var tempModelXml:XML =  new XML(item["content"]);
+					
+					entityCol.removeAll();
+					var tempEntityItem:Object = null;
+					for each(var entityXml:XML in tempModelXml.entities.entity){
+						var isAbstract:String = String(entityXml.@isAbstract);
+						if(isAbstract.toLowerCase() == "false"){
+							var name:String = String(entityXml.@name);
+							var code:String = String(entityXml.@code);
+							var entityItem:Object = new Object();
+							entityItem["name"] = name;
+							entityItem["code"] = code;
+							entityItem["content"] = entityXml;
+							
+							entityCol.addItem(entityItem);
+							
+							if(entityCode != null && entityCode != "" 
+								&& code != null && code != "" && entityCode == code){
+								tempEntityItem = entityItem;
+							}
+						}
+					}
+					if(tempEntityItem != null ){
+						entityCbo.selectedItem = tempEntityItem;
+					}
+					entityCbo_changeHandler();
+				}
+			}
+			
+			private function entityCbo_changeHandler():void{
+				var entityItem:Object = entityCbo.selectedItem;
+				
+				if(entityItem != null){		
+					entityCode = entityItem["code"] as String;
+				}
+			}
+			
+			private function registerClickListenerBtn_clickHandler(event:MouseEvent):void{
+				if(contentXml.chartClickListener.length() == 0)
+					contentXml.appendChild(<chartClickListener />);
+				PopUpManager.addPopUp(registerClickListenerWindow,deskTop,true);
+				PopUpManager.centerPopUp(registerClickListenerWindow);
+			}
+			
+			private function mtContent_showHandler():void{
+				mtContent.contentXml = getContentXml();
+			}
+			
+			public function getContentXmlStr():String{
+				showXml();
+				return contentXml.toXMLString();
+			}
+			
+			public function getContentXml():XML{
+				showXml();
+				return contentXml;
+			}
+			
+			private function showXml():void{
+				if(contentXml != null){
+					if(dataSourcetypeCbo.selectedIndex == 0){//业务视图
+						delete contentXml.datasource;
+						delete contentXml.rowsLimit;
+						
+						contentXml.viewname = bvWindow;
+						contentXml.viewname.@name = bvName;
+					}else if(dataSourcetypeCbo.selectedIndex == 1){//关系型数据源
+						delete contentXml.viewname;
+						delete contentXml.datasource.@queryViewCode;
+						delete contentXml.datasource.@name;
+						delete contentXml.datasource.@isQueryView;
+						delete contentXml.datasource.@modelCode;
+						delete contentXml.datasource.@entityCode;
+						
+						contentXml.rowsLimit = rowsLimitTxt.text;
+						contentXml.datasource = datasourceCbo.selectedItem;
+						contentXml.datasource.@type = "rdms";
+						if(relationTypeCbo.selectedIndex == 0){
+							delete contentXml.datasource.@sql;
+							contentXml.datasource.@tablename = tableName;
+						}else{
+							delete contentXml.datasource.@tablename;
+							contentXml.datasource.@sql = sqlTxt.text;
+						}
+					}else if(dataSourcetypeCbo.selectedIndex == 2){//查询视图
+						delete contentXml.viewname;
+						delete contentXml.datasource;
+						delete contentXml.@tablename;
+						contentXml.datasource = queryViewDs;
+						contentXml.datasource.@type = "qv";
+						contentXml.datasource.@queryViewCode = queryViewCode;
+						contentXml.datasource.@name = queryViewName;
+						contentXml.rowsLimit = rowsLimitTxt.text;
+					}else if(dataSourcetypeCbo.selectedIndex == 3){
+						
+						delete contentXml.viewname;
+						delete contentXml.datasource.@queryViewCode;
+						delete contentXml.datasource.@isQueryView;
+						delete contentXml.datasource.@name;
+						delete contentXml.datasource.@sql;
+						delete contentXml.datasource.@modelCode;
+						delete contentXml.datasource.@entityCode;
+						
+						contentXml.datasource = "datasource_ave";
+						contentXml.datasource.@type = "av";
+						contentXml.datasource.@avname = avName;
+						contentXml.datasource.@tablename = tableName;
+						
+					}else if(dataSourcetypeCbo.selectedIndex == 4){
+						
+						delete contentXml.viewname;
+						delete contentXml.datasource.@queryViewCode;
+						delete contentXml.datasource.@isQueryView;
+						delete contentXml.datasource.@name;
+						delete contentXml.datasource.@sql;
+						delete contentXml.datasource.@tablename;
+						
+						var model:Object = modelCbo.selectedItem;
+						if(model != null ){
+							var modelXml:XML = XML(model["content"]);
+							var dsName:String =  String(modelXml.datasource);
+							contentXml.datasource = dsName;
+						}else{
+							contentXml.datasource = "datasource_default";
+						}
+						contentXml.datasource.@type = "entity";
+						contentXml.datasource.@modelCode = modelCode;
+						contentXml.datasource.@entityCode = entityCode;
+						contentXml.datasource.@sql = designer.sql;
+					}
+					
+					contentXml.chartname = chartnameInput.text;
+					contentXml.backupChartname = backupChartnameInput.text;
+					contentXml.refreshinterval = refreshIntervalTxt.text;
+					contentXml.orderby = orderByTxt.text;
+					contentXml.filter = filterTxt.text;
+					contentXml.backupFilter = backupFilterTxt.text;
+					if(isUseGroupby.selected){
+						contentXml.groupby = groupbyTxt.text;
+						contentXml.groupbycolumn = groupbyColumnTxt.text;
+					}else{
+						delete contentXml.groupby;
+						delete contentXml.groupbycolumn;
+					}
+				}
+				designer.propertyConvertXml();
+			}
+			
+			private function defineDesignerVBox_showHandler():void{
+				initTableStruct();
+				designer.showHandler();
+			}
+			
+			private function confirmClickHandler():void{
+				if(designer.confirmChecked())
+					confirmFunc();
+			}
+			
+			private function superpanel1_resizeEndHandler(event:SuperPanelEvent):void{
+				var sp:SuperPanel = event.currentTarget as SuperPanel;
+				mainBox.width = sp.width;
+				mainBox.height = sp.height;
+			}
+			
+		]]>
+	</fx:Script>
+	<panels:states>
+		<s:State name="bv" />
+		<s:State name="relationalDs" />
+		<s:State name="qv" />
+		<s:State name="av" />
+		<s:State name="entityModel" />
+	</panels:states>
+	<mx:VBox id="mainBox">
+		<mx:TabNavigator id="tabMain" creationPolicy="all" width="650" height="480">
+			<mx:VBox id="main" width="100%" height="100%" label="通用"
+					 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<containers:AdvancedForm id="generalForm" width="100%" height="100%" 
+										 creationComplete="generalForm_creationCompleteHandler(event)">
+					<mx:FormItem label="类型" id="dataSourceTypeFormItem">
+						<mx:ComboBox enabled="{isEditEntityCob}" id="dataSourcetypeCbo" change="switchState()">
+							<s:ArrayCollection>
+								<fx:String>业务视图</fx:String>
+								<fx:String>关系型数据源</fx:String>
+								<fx:String>查询视图</fx:String>
+								<fx:String>分析视图</fx:String>
+								<fx:String>实体模型</fx:String>
+							</s:ArrayCollection>
+						</mx:ComboBox>
+					</mx:FormItem>
+					<mx:FormItem label="业务视图" required="true" id="viewname" includeIn="bv"/>
+					<mx:FormItem label="查询视图" required="true" id="queryViewname" includeIn="qv"/>
+					<mx:FormItem label="分析视图" required="true" id="analyzeViewname" includeIn="av"/>
+					<mx:FormItem label="数据源" required="true" id="datasourceFormItem" includeIn="relationalDs">
+						<mx:ComboBox id="datasourceCbo" dataProvider="{datasources}" change="datasourceCbo_changeHandler()"/>
+					</mx:FormItem>
+					<mx:FormItem label="类型" id="relationType" includeIn="relationalDs">
+						<mx:ComboBox id="relationTypeCbo" change="relationTypeCbo_changeHandler()">
+							<mx:dataProvider>
+								<fx:Array>
+									<fx:String>关联表</fx:String>
+									<fx:String>自定义SQL</fx:String>
+								</fx:Array>
+							</mx:dataProvider>
+						</mx:ComboBox>
+					</mx:FormItem>
+					<mx:FormItem label="关联表" required="true" id="relatedTable" includeIn="relationalDs"/>
+					<mx:FormItem label="自定义SQL" required="true" id="defineSql" includeIn="relationalDs">
+						<mx:TextArea id="sqlTxt" width="250" height="150"/>
+					</mx:FormItem>
+					
+					<mx:FormItem label="模型" required="true" id="modelFormItem" includeIn="entityModel">
+						<mx:ComboBox id="modelCbo" enabled="{isEditEntityCob}" labelField="name" 
+									 dataProvider="{modelCol}" change="modelCbo_changeHandler()"/>
+					</mx:FormItem>
+					<mx:FormItem label="实体" required="true" id="entityFormItem" includeIn="entityModel">
+						<mx:ComboBox id="entityCbo" enabled="{isEditEntityCob}" labelField="name" 
+									 dataProvider="{entityCol}" change="entityCbo_changeHandler()"/>
+					</mx:FormItem>
+					
+					<mx:FormItem label="数据量限制" id="rowsLimitItem" excludeFrom="bv">
+						<mx:TextInput id="rowsLimitTxt" width="200" restrict="0-9" toolTip="设置仪表盘对象查询的最大数据量"/>
+					</mx:FormItem>
+					<mx:FormItem label="过滤条件" id="filterItem">
+						<mx:TextInput id="filterTxt" width="200" borderStyle="solid"/>
+					</mx:FormItem>
+					<mx:FormItem label="备用过滤条件" id="backupFilterItem">
+						<mx:TextInput id="backupFilterTxt" width="200" borderStyle="solid"/>
+					</mx:FormItem>
+					<mx:FormItem label="排序" id="orderByItem">
+						<mx:TextInput id="orderByTxt" width="200" />
+					</mx:FormItem>
+					<mx:FormItem label="是否使用聚合函数" id="isUseGroupByFi">
+						<mx:CheckBox id="isUseGroupby" click="isUseGroupby_clickHandler()" />
+					</mx:FormItem>
+					<mx:FormItem label="图表名称" id="chartname">
+						<mx:TextInput id="chartnameInput" width="200" />
+					</mx:FormItem>
+					<mx:FormItem label="备用图表名称" id="backupchartname">
+						<mx:TextInput id="backupChartnameInput" width="200" />
+					</mx:FormItem>
+					<mx:FormItem label="刷新间隔(秒)">
+						<mx:TextInput id="refreshIntervalTxt"  width="200" restrict="\-,0-9" toolTip="若不输入,会默认使用仪表盘的刷新间隔 "/>
+					</mx:FormItem>
+					<mx:FormItem label="是否自动加载" id="isAutoLoadFi">
+						<mx:CheckBox id="isAutoLoadCbx" click="{contentXml.isAutoLoad = isAutoLoadCbx.selected?'true':'false'}" 
+									 selected="{contentXml.isAutoLoad == 'true'}" />
+					</mx:FormItem>
+					<mx:FormItem label="是否使用历史数据" id="hisBv" includeIn="bv">
+						<mx:CheckBox id="isHisBv" click="{contentXml.viewname.@isHisData = isHisBv.selected?'true':'false'}"
+									 selected="{contentXml.viewname.@isHisData == 'true'}"/>
+					</mx:FormItem>
+					<mx:FormItem label="变量设置">
+						<mx:Button id="variableSetBtn" label="设置" click="variableSetBtn_clickHandler(event)" />
+					</mx:FormItem>
+					<mx:FormItem label="绑定同义词" id="synonymsSetBtnFi">
+						<mx:Button id="synonymsSetBtn" label="绑定" click="synonymsSetBtn_clickHandler(event)" />
+					</mx:FormItem>
+					<mx:FormItem label="忽略访问控制异常" id="isIgnoreAccessParamErrorFi">
+						<mx:CheckBox id="isIgnoreAccessParamErrorCb" selected="{contentXml.isIgnoreAccessParamError == 'true'}"
+									 click="{contentXml.isIgnoreAccessParamError = isIgnoreAccessParamErrorCb.selected?'true':'false'}"  />
+					</mx:FormItem>
+					<mx:FormItem label="注册图表点击监听事件" id="chartClickListener">
+						<mx:Button id="registerClickListenerBtn" label="注册" click="registerClickListenerBtn_clickHandler(event)" />
+					</mx:FormItem>
+				</containers:AdvancedForm>
+			</mx:VBox>
+			
+			<mx:VBox id="defineDesignerVBox" width="100%" height="100%" label="设置" show="defineDesignerVBox_showHandler()"/>
+			
+			<components:MtContentDesginer width="100%" height="100%" id="mtContent" show="mtContent_showHandler()"
+										  applyFun="{function ():void{contentXml = mtContent.contentXml}}"/>
+		</mx:TabNavigator>
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button label="确定" click="confirmClickHandler()"/>
+			<mx:Button label="取消" click="PopUpManager.removePopUp(this)"/>
+		</mx:HBox>
+	</mx:VBox>
+</panels:SuperPanel>

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"  width="100%" height="100%" xmlns:basic="smartx.flex.components.basic.*" creationComplete="init()" xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*">
+	<mx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+		import mx.collections.ArrayList;
+		import mx.collections.SortField;
+		import mx.controls.Alert;
+		import mx.rpc.events.FaultEvent;
+		import mx.rpc.events.ResultEvent;
+		import mx.rpc.remoting.mxml.RemoteObject;
+		
+		import smartx.flex.components.basic.ifc.CustomMenuListener;
+		import smartx.flex.components.basic.ifc.LoginListener;
+		import smartx.flex.components.event.BasicEvent;
+		import smartx.flex.components.util.CookieUtil;
+		import smartx.flex.components.util.HelpUtil;
+		import smartx.flex.components.util.MetadataTempletUtil;
+		import smartx.flex.components.vo.GlobalConst;
+		import smartx.flex.components.vo.MetadataTemplet;
+		import smartx.flex.components.vo.SimpleHashVO;
+		[Bindable]
+		public var endpoint:String;
+		[Bindable]
+		public var debugMode:Boolean = true;
+		[Bindable]
+		public var defaultUsername:String = "";
+		[Bindable]
+		public var defaultUserpwd:String = "";
+		[Bindable]
+		public var defaultAdminpwd:String = "";
+		[Bindable]
+		public var autoLogin:Boolean = false;
+		[Bindable]
+		public var rememberPassword:Boolean = false;
+		[Bindable]
+		public var verticalMenu:Boolean = false;
+		[Bindable]
+		public var showToolBox:Boolean = true;
+		[Bindable]
+		public var desktopHeight:int = -1;
+		[Bindable]
+		public var enableChatPanel:Boolean = false;
+		[Bindable]
+		public var loginBackgroundImageUrl:String = "smartx/flex/modules/assets/images/earth.jpg";
+		[Bindable]
+		public var titleImageUrl:String = "smartx/flex/modules/assets/images/title-text.gif";
+		[Bindable]
+		public var titleLogoImageUrl:String = "smartx/flex/modules/assets/images/icon.gif";
+		
+		[Bindable]
+		public var leftImageUrl:String = "smartx/flex/modules/assets/images/title-text.gif";
+		
+		[Bindable]
+		public var welcomeFrameHeight:int = 0;
+		
+		[Bindable]
+		public var imageMenuHeight:int = 100;
+		
+		[Bindable]
+		public var imageBackgroundColor:String = "0x666666";
+		
+		[Bindable]
+		public var imageLabelColor:String = "0xFFFFFF";
+		
+		[Bindable]
+		public var isShowTitle:Boolean;
+		
+		public var destination:String = GlobalConst.SERVICE_FORM;
+		private var formService:RemoteObject;
+		[Bindable]
+		public var styleArray:ArrayList = new ArrayList([{name:"默认",value:""}]);
+		
+		[Bindable]
+		public var meneColorArr:Array = [0xb0b0b0,0x808080];
+		
+		[Bindable]
+		public var menuType:String = GlobalConst.MENU_TYPE_HORIZONTAL;
+		 
+		 private function init():void{
+		 	//loginFrame.addEventListener(NovaBasicEvent.LOGIN_SUCCESSFUL, loginSuccessfulHandler);
+			 ClientEnviorment.getInstance().putVar(ClientEnviorment.DESKTOP_FRAME,deskTopFrame);
+			 
+			 formService = new RemoteObject(destination);
+			 if(endpoint!=null)
+				 formService.endpoint = endpoint;
+			 formService.getSimpleHashVoArrayByDS.addEventListener(ResultEvent.RESULT,getMenuIdByCodeHandler);
+			 formService.getSimpleHashVoArrayByDS.addEventListener(FaultEvent.FAULT,faultHandler);
+		 }
+		 
+		 private function loginSuccessfulHandler(event:BasicEvent):void{
+			//调用SmartXconfig中配置的login监听器
+			 var smartxConfigXML:XML = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_XML_NOVA2CONFIG) as XML;
+			 if(smartxConfigXML.loginListener.listener.length()>0){
+				 for each(var listenerNode:XML in smartxConfigXML.loginListener.listener)
+				 {
+					 try{
+						 var listenerStr:String = listenerNode.@implClass;
+						 var classReference:Class = getDefinitionByName(listenerStr) as Class;
+						 var listener:LoginListener = new classReference() as LoginListener;
+						 listener.afterLogin(deskTopFrame);
+					 }
+					 catch(e:Error){
+						 trace(e);
+					 }
+				 }
+					 
+			 }
+			 
+		 	if(mainStack.selectedChild != deskTopFrame){
+		 		mainStack.selectedChild = deskTopFrame;
+		 		if(desktopHeight>=0)
+		 			this.height = desktopHeight;
+		 		deskTopFrame.initAfterLogin();
+		 	}
+			
+			HelpUtil.getInstance().dispatchHelpEvent(HelpUtil.SYS_LOGIN_HEAD+"IN");
+		 }
+		
+		private function loadMenuSuccessfulHandler(event:BasicEvent):void{
+			var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet("MT_SYSTEMCONFIG");
+			var contentXml:XML = metadataTemplet.contentXML;
+			var userId:String = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_ID) as String;
+			var userMenuSql:String = "select m.* from v_flex_menu m,pub_user_menu u where m.id=u.menuid and u.userid='"+userId
+				+"' union select m.* from v_flex_menu m,pub_role_menu prm,pub_user_role pur where pur.roleid = prm.roleid and m.id = prm.menuid and pur.userid='"+userId
+				+"' union select m.* from v_flex_menu m,pub_user_workposition puw,pub_workposition_menu pwm where pwm.menuid = m.id and puw.workpositionid = pwm.workpositionid and puw.userid='"+userId+"'";
+			
+			for each(var xml:XML in contentXml.customeMenus.customeMenu){
+				var menuCode:String = xml.@code;
+				formService.getSimpleHashVoArrayByDS(null,"select * from ("+userMenuSql+") where name='"+menuCode+"'");
+			}
+			//add by zhangzz 20110603 begin
+			for each(var customMenuListener:XML in contentXml.customMenusListeners.customMenusListener){
+				var customMenuClassReference:Class = getDefinitionByName(customMenuListener) as Class;
+				var customMenuListenerClass:CustomMenuListener = new customMenuClassReference() as CustomMenuListener;
+				customMenuListenerClass.process(deskTopFrame);
+			}
+			//add by zhangzz 20110603 end
+		}
+		 
+		 private function relogin(event:BasicEvent):void{
+		 	if(mainStack.selectedChild != loginFrame){
+		 		mainStack.selectedChild = loginFrame;
+		 		this.percentHeight = 100;
+				loginFrame.userinfo = "";
+		 	}
+		 }
+		
+		private function getMenuIdByCodeHandler(event:ResultEvent):void{
+			var array:Array = event.result as Array;
+			for each( var vo:SimpleHashVO in array){
+				var menuId:int = vo.dataMap["id"];
+				deskTopFrame.openMenuFrame(menuId);
+			}
+		}
+		
+		private function faultHandler(event:FaultEvent):void{   
+			Alert.show(event.fault.faultString, 'Error');
+		}
+		
+	]]>
+	</mx:Script>
+	<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all">
+		<basic:LoginFrame
+			width="100%" height="100%" id="loginFrame" debugMode="{debugMode}" 
+			loginSuccessful="loginSuccessfulHandler(event)" 
+			defaultUsername="{defaultUsername}" 
+			defaultUserpwd="{defaultUserpwd}" 
+			defaultAdminpwd="{defaultAdminpwd}" 
+			autoLogin="{autoLogin}" 
+			rememberPassword="{rememberPassword}"
+			loginBackgroundImageUrl="{loginBackgroundImageUrl}"
+			endpoint="{endpoint}"/>
+		<basic:DeskTopFrame 
+			enableChatPanel="{enableChatPanel}" 
+			verticalMenu="{verticalMenu}" 
+			showToolBox="{showToolBox}" 
+			menuType="{menuType}"
+			relogin="relogin(event)"  
+			width="100%" 
+			height="100%" 
+			id="deskTopFrame" 
+			debugMode="{debugMode}"
+			titleImageUrl="{titleImageUrl}"
+			titleLogoImageUrl="{titleLogoImageUrl}"
+			leftImageUrl="{leftImageUrl}"
+			welcomeFrameHeight="{welcomeFrameHeight}"
+			imageMenuHeight = "{imageMenuHeight}"
+			imageBackgroundColor = "{imageBackgroundColor}"
+			imageLabelColor = "{imageLabelColor}"
+			endpoint="{endpoint}"
+			isShowTitle ="{isShowTitle}"
+			loadMenuSuccessful="loadMenuSuccessfulHandler(event)"
+			styleArray="{styleArray}"
+			menuColorArr = "{meneColorArr}"
+			/>	
+	</mx:ViewStack>	
+</mx:VBox>

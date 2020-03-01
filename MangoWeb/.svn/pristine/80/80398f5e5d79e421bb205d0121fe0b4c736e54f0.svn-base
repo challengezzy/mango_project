@@ -1,0 +1,568 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   layout="absolute" width="100%" height="100%" 
+		   xmlns:styletemplate="smartx.flex.components.styletemplate.*"
+		   initialize="init()" creationComplete="creationCompleteHandler()">
+	<fx:Declarations>
+		<fx:Object id="importButton" label="导入" handler="{importHandler}" icon="{AssetsFileLib.importIcon}" rightClick="true"/>
+		<fx:Object id="exportButton" label="导出" handler="{exportHandler}" icon="{AssetsFileLib.exportIcon}" rightClick="true"/>
+		<fx:Object id="saveAsButton" label="另存为" handler="{saveAsHandler}" icon="{AssetsFileLib.saveasIcon}" rightClick="true"/>
+		<mx:TitleWindow id="saveAsWindow" title="业务视图另存为" width="400" height="250" 
+						showCloseButton="true" close="PopUpManager.removePopUp(saveAsWindow)">
+			<mx:VBox width="100%" height="100%">
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="名称" width="30%"/>
+					<mx:TextInput id="bvName" width="50%"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="编码" width="30%"/>
+					<mx:TextInput id="bvCode" width="50%" change="bvCode_changeHandler()" restrict="[a-z],[A-Z]"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="事件流名称" width="30%"/>
+					<mx:TextInput id="bvEvent" width="50%" restrict="[a-z],[A-Z]"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="事件流窗口名称" width="30%"/>
+					<mx:TextInput id="bvWindow" width="50%" restrict="[a-z],[A-Z]"/>
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Button label="保存" click="saveAs_clickHandler()"/>
+					<mx:Button label="取消" click="PopUpManager.removePopUp(saveAsWindow)"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:TitleWindow>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.LinkButton;
+			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.RemoteObject;
+			
+			import qs.utils.StringUtils;
+			
+			import smartx.bam.flex.modules.businessview.listener.BvRedeplyTreeButtonListerner;
+			import smartx.bam.flex.modules.businessview.listener.BvRestartProviderButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.BvStartTreeButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.BvStopTreeButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.BvTreeButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.DesignCardButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.QueryHisTreeButtonListener;
+			import smartx.bam.flex.modules.businessview.listener.QueryResultTreeButtonListener;
+			import smartx.bam.flex.utils.DODesignerUtil;
+			import smartx.bam.flex.vo.BAMConst;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.basic.DeskTopFrame;
+			import smartx.flex.components.core.BillCardPanel;
+			import smartx.flex.components.event.BasicEvent;
+			import smartx.flex.components.event.BillCardPanelEvent;
+			import smartx.flex.components.event.StyleTemplateEvent;
+			import smartx.flex.components.styletemplate.ifc.CardButtonListener;
+			import smartx.flex.components.styletemplate.ifc.ListButtonListener;
+			import smartx.flex.components.util.ConfirmUtil;
+			import smartx.flex.components.util.FileUploadPanel;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.IconUtility;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.XMLExportObject;
+			
+			[Bindable]
+			private var treeTempletCode:String = "T_V_BAM_BUSINESSVIEW_TREE";
+			[Bindable]
+			private var templetCodeMap:Hashtable = new Hashtable();
+			[Bindable]
+			private var loadAll:Boolean = true;
+			[Bindable]
+			private var parentFieldName:String = "PARENTID";
+			[Bindable]
+			private var seqFieldName:String ="NAME";
+			[Bindable]
+			private var labelFieldName:String = "NAME";
+			[Bindable]
+			public var endpoint:String;
+			[Bindable]
+			public var debugmode:Boolean;
+			[Bindable]
+			public var typeFiledName:String = "TYPE";
+			[Bindable]
+			public var fkFiledName:String = "PID";
+			[Bindable]
+			public var templetCodeParentFieldNameMap:Hashtable = new Hashtable();
+			[Bindable]
+			public var typeLabelMap:Hashtable = new Hashtable();
+			
+			private var mtcode:String;
+			
+			private var destination:String = GlobalConst.SERVICE_FORM;
+			
+			private var operatingWindow:IFlexDisplayObject;
+			
+			private var formService:RemoteObject;
+			
+			private var bamService:RemoteObject;
+			
+			private var xmlFolder:XMLExportObject;
+			
+			private var xmlMTContent:XMLExportObject;
+			
+			private var flagName:String="businessview";
+			
+			private var bcp:BillCardPanel;
+			
+			private var designIcon:String = "smartx/flex/modules/assets/images/design.png";
+			
+			[Bindable]
+			private var insertBfInterceptor:String = "smartx.bam.bs.bvmanager.BvInsertBfFormInterceptor";
+			[Bindable]
+			private var updateBfInterceptor:String = "smartx.bam.bs.bvmanager.BvUpdateBfFormInterceptor";
+			[Bindable]
+			private var deleteAfInterceptor:String = "smartx.bam.bs.bvmanager.BvDeleteAfFormInterceptor";
+			
+			private var hBox:HBox = new HBox();
+			
+			private var startBtnListener:BvStartTreeButtonListener = new BvStartTreeButtonListener();
+			private var stopBtnListener:BvStopTreeButtonListener = new BvStopTreeButtonListener();
+			private var redeplyTreeButtonListerner:BvRedeplyTreeButtonListerner = new BvRedeplyTreeButtonListerner();
+			private var restartProviderButtonListener:BvRestartProviderButtonListener = new BvRestartProviderButtonListener();
+			private var queryResultTreeButtonListener:QueryResultTreeButtonListener = new QueryResultTreeButtonListener();
+			private var queryHisTreeButtonListener:QueryHisTreeButtonListener = new QueryHisTreeButtonListener();
+			
+			private var startBtn:Object;
+			private var stopBtn:Object;
+			private var redeployBtn:Object;
+			private var restartProviderBtn:Object;
+			private var queryResultBtn:Object;
+			private var queryHisResultBtn:Object;
+			
+			private var operationList:ArrayCollection;
+			
+			private var deskTopFrame:DeskTopFrame = ClientEnviorment.getInstance().getVar(ClientEnviorment.DESKTOP_FRAME) as DeskTopFrame;
+			
+			private function init():void{
+				templetCodeMap.add("3","T_BAM_FOLDER_BUSINESSVIEW");
+				templetCodeMap.add("BUSINESSVIEW","T_BAM_BUSINESSVIEW");
+				templetCodeParentFieldNameMap.add("T_BAM_FOLDER_BUSINESSVIEW","PARENTID");
+				templetCodeParentFieldNameMap.add("T_BAM_BUSINESSVIEW","FOLDERID");
+				typeLabelMap.add("3","业务视图目录");
+				typeLabelMap.add("BUSINESSVIEW","业务视图");
+				endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				debugmode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+				
+				formService = new RemoteObject(destination);
+				bamService = new RemoteObject(BAMConst.BAM_Service);
+				if(endpoint != null){
+					formService.endpoint = endpoint;
+					bamService.endpoint = endpoint;
+				}
+				
+				formService.exportXmlToMDFile.addEventListener(ResultEvent.RESULT,exportXmlToMDFileHandler);
+				formService.exportXmlToMDFile.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				bamService.copyBusinessView.addEventListener(ResultEvent.RESULT,copyBusinessViewHandler);
+				bamService.copyBusinessView.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				operationList = treePanel.operationList;
+				operationList.addItem({type:"separator"});
+				operationList.addItem(importButton);
+				operationList.addItem(exportButton);
+				operationList.addItem(saveAsButton);
+				createTreeBtns();
+				addTreeBtns();
+			}
+			
+			private function creationCompleteHandler():void{
+				treePanel.treePanel.addEventListener(BasicEvent.LOADDATA_SUCCESSFUL,setDefaultItem);
+				
+			}
+			
+			private function setDefaultItem(event:BasicEvent):void{
+				var so:SharedObject = SharedObject.getLocal(BAMConst.QV_DEPEND_BV_SHAREOBJECT,"/");
+				var dependBv:Object = so.data["qv"];
+				if(dependBv && dependBv.hasOwnProperty("data")){
+					selectDefaultItem(treePanel.treePanel.getTreeData(),dependBv.data);
+					so.data["qv"] = null;
+				}
+				deskTopFrame.addEventListener(BasicEvent.OPENMENU_SUCCESSFUL,openMenuHandler);
+			}
+			
+			private function createCardBtns(bcp:BillCardPanel):void{
+				hBox.removeAllChildren();
+				hBox.percentWidth = 100;
+				
+				var designCardButtonListener:DesignCardButtonListener = new DesignCardButtonListener();
+				var designBtn:Button = createButton("设计","设计",designIcon,bcp,designCardButtonListener);
+				hBox.addChild(designBtn);
+			}
+			
+			private function createButton(label:String,tooltip:String,iconUrl:String,bcp:BillCardPanel,cardButtonListener:CardButtonListener=null):Button{
+				var btn:Button = new Button();
+				btn.label = label;
+				btn.toolTip = tooltip;
+				var icon:Class = IconUtility.getClass(btn,iconUrl,16,16);
+				btn.setStyle("icon",icon);
+				if(cardButtonListener){
+					btn.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void{
+						cardButtonListener.buttonClick(bcp);
+					});
+				}
+				return btn;
+			}
+			
+			private var isBv:Boolean = false;
+			
+			private function itemChange(event:StyleTemplateEvent):void{
+//				if(treePanel.treePanel.tree.selectedItem == null ){
+//					return;
+//				}
+				var obj:DisplayObject;
+				if(treePanel.cardPanelBox.getChildren().length > 0)
+					obj = treePanel.cardPanelBox.getChildAt(0);
+				if(obj && obj is BillCardPanel){
+					bcp = obj as BillCardPanel;
+					bcp.isShowAlert = false;
+					if(bcp.templetCode == "T_BAM_BUSINESSVIEW"){
+						createCardBtns(bcp);
+						isBv = true;
+						bcp.insertBfInterceptor = insertBfInterceptor;
+						bcp.updateBfInterceptor = updateBfInterceptor;
+						treePanel.deleteAfIncCard = deleteAfInterceptor;
+						bcp.addEventListener(BillCardPanelEvent.SAVESUCCESSFUL,cardPanelSaveSuccessful);
+						if(! treePanel.buttonBar.contains(hBox))
+							treePanel.buttonBar.addChild(hBox);
+					}else{
+						isBv = false;
+						treePanel.deleteAfIncCard = "";
+						if(treePanel.buttonBar.contains(hBox))
+							treePanel.buttonBar.removeChild(hBox);
+					}
+				}
+			}
+			
+			private var value:Object;
+			
+			private var createBcp:BillCardPanel;
+			
+			private function cardPanelSaveSuccessful(event:BillCardPanelEvent):void{
+				value = bcp.getDataValue();
+				if(parseInt(value[bcp.getTempletVO().pkname]) > 0){
+					bcp.addEventListener(BillCardPanelEvent.SETDATAVALUE_COMPLETE,cardSetDataValueCompleteHandler);
+					var item:Object = treePanel.treePanel.tree.selectedItem;
+					var querySql:String = bcp.getTempletVO().pkname+"='"+value[bcp.getTempletVO().pkname]+"'";
+					bcp.refresh(querySql);
+				}
+				if(bcp != null)
+					bcp.removeEventListener(BillCardPanelEvent.SAVESUCCESSFUL,cardPanelSaveSuccessful);
+			}
+			
+			private function cardSetDataValueCompleteHandler(event:BillCardPanelEvent):void{
+				createBcp = event.currentTarget as BillCardPanel;
+				ConfirmUtil.confirm("保存成功,是否重新发布业务视图?",this,isReplayConfirmHandler);
+				bcp.removeEventListener(BillCardPanelEvent.SETDATAVALUE_COMPLETE,cardSetDataValueCompleteHandler);
+			}
+			
+			private function isReplayConfirmHandler(event:CloseEvent):void{
+				value = createBcp.getDataValue();
+				if(event.detail == Alert.YES)
+					redeplyTreeButtonListerner.redeplyBv(value,treePanel.treePanel);
+			}
+			
+			private var sep1:Object = {type:"separator"};
+			
+			private var sep2:Object = {type:"separator"};
+			
+			private function addTreeBtns():void{
+				if(!operationList.contains(sep1))
+					operationList.addItem(sep1);
+				if(!operationList.contains(startBtn))
+					operationList.addItem(startBtn);
+				if(!operationList.contains(stopBtn))
+					operationList.addItem(stopBtn);
+				if(!operationList.contains(sep2))
+					operationList.addItem(sep2);
+				if(!operationList.contains(redeployBtn))
+					operationList.addItem(redeployBtn);
+				if(!operationList.contains(restartProviderBtn))
+					operationList.addItem(restartProviderBtn);
+				if(!operationList.contains(queryResultBtn))
+					operationList.addItem(queryResultBtn);
+				if(!operationList.contains(queryHisResultBtn))
+					operationList.addItem(queryHisResultBtn);
+			}
+			
+			private function removeTreeBtns():void{
+				if(operationList.contains(sep1))
+					operationList.removeItemAt(operationList.getItemIndex(sep1));
+				if(operationList.contains(startBtn))
+					operationList.removeItemAt(operationList.getItemIndex(startBtn));
+				if(operationList.contains(stopBtn))
+					operationList.removeItemAt(operationList.getItemIndex(stopBtn));
+				if(operationList.contains(sep2))
+					operationList.removeItemAt(operationList.getItemIndex(sep2));
+				if(operationList.contains(redeployBtn))
+					operationList.removeItemAt(operationList.getItemIndex(redeployBtn));
+				if(operationList.contains(restartProviderBtn))
+					operationList.removeItemAt(operationList.getItemIndex(restartProviderBtn));
+				if(operationList.contains(queryResultBtn))
+					operationList.removeItemAt(operationList.getItemIndex(queryResultBtn));
+				if(operationList.contains(queryHisResultBtn))
+					operationList.removeItemAt(operationList.getItemIndex(queryHisResultBtn));
+			}
+			
+			private function createTreeBtns():void{
+				startBtn = createTreeListBtn("startBtn","启动","true",startBtnListener);
+				stopBtn = createTreeListBtn("stopBtn","停止","true",stopBtnListener);
+				redeployBtn = createTreeListBtn("redeployBtn","重新发布","true",redeplyTreeButtonListerner);
+				restartProviderBtn = createTreeListBtn("restartProviderBtn","重启业务视图容器","true",restartProviderButtonListener);
+				queryResultBtn = createTreeListBtn("queryResultBtn","查询结果集","true",queryResultTreeButtonListener);
+				queryHisResultBtn = createTreeListBtn("queryHisResultBtn","查询历史数据","true",queryHisTreeButtonListener);
+			}
+			
+			private function createTreeListBtn(id:String,label:String,rightClick:String,listener:BvTreeButtonListener):Object{
+				var btn:Object = {id:id,label:label,rightClick:rightClick};
+				btn.handler = function():void{
+					if(isBv){
+						listener.billCardPanel = treePanel.cardPanelBox.getChildAt(0) as BillCardPanel;
+						listener.buttonClick(treePanel.treePanel);
+					}
+					else
+						SmartXMessage.show("目录不能执行该操作!",SmartXMessage.MESSAGE_ERROR);
+				};
+				return btn;
+			}
+			
+			private function importHandler():void{
+				
+				var fup:FileUploadPanel = new FileUploadPanel();
+				
+				fup.addEventListener(BasicEvent.LOADDATA_SUCCESSFUL,uploadSuccessfulHandler);
+				fup.datasource = treePanel.treePanel.datasource;
+				fup.flagName = flagName;
+				
+				PopUpManager.addPopUp(fup,treePanel,true);
+				PopUpManager.centerPopUp(fup);
+			}
+			
+			private function exportHandler():void{
+				if(!treePanel.treePanel.tree.selectedItems.length > 0){
+					SmartXMessage.show("请选择要导出的业务视图！");
+					return ;
+				}
+				
+				ConfirmUtil.confirm("确定要导出选中的业务视图和业务视图目录下的对象吗?",treePanel.treePanel,confirmHandler);
+				
+			}
+			
+			private function uploadSuccessfulHandler(event:BasicEvent):void{
+				treePanel.treePanel.load();
+			}
+			
+			private function faultHandler(event:FaultEvent):void{
+				endOperat();
+				SmartXMessage.show('业务视图错误!',SmartXMessage.MESSAGE_ERROR,"错误：\n"+event.fault.faultString);
+			}
+			
+			private function exportXmlToMDFileHandler(event:ResultEvent):void{
+				endOperat();
+				var url:String = event.result as String;
+				navigateToURL(new URLRequest(url), "_blank");
+			}
+			
+			private function confirmHandler(event:CloseEvent):void{
+				if(event.detail == Alert.YES){
+					//计算要导出的仪表盘对象				
+					var selectObjs:Array = treePanel.treePanel.tree.selectedItems;
+					var fetchFolderSql:String ;//查询FOLDER对象
+					var fetchDashSql:String;//查询DASHBOARD对象
+					var fetchFolderIdsSql:String;//查询所有关联的目录ID
+					var dashboardIds:String = "-1";
+					var folderIds:String = "-1";
+					
+					for(var i:int=0;i<selectObjs.length;i++){
+						var tempObj:Object = selectObjs[i];
+						if( "业务视图" == tempObj["TYPECN"]){
+							dashboardIds = dashboardIds + "," + tempObj["PID"];
+						}else if("业务视图目录" == tempObj["TYPECN"]){
+							folderIds = folderIds + "," + tempObj["PID"];
+						}
+					}
+					
+					fetchFolderIdsSql = "select id from bam_folder f connect by prior f.parentid = f.id start with f.id in ( "
+						+ " select o.folderid from BAM_BUSINESSVIEW o where o.id in (" + dashboardIds + ") )"
+						+ " union all"
+						+ " select id from bam_folder f connect by prior f.parentid = f.id start with f.id in (" + folderIds + ")"
+						+ " union all"
+						+ " select id from bam_folder f connect by prior f.id = f.parentid start with f.id in (" + folderIds + ")";
+					
+					fetchFolderSql = "select NAME,CODE,DESCRIPTION,TYPE,SEQ from bam_folder where type=3 and id in (" + fetchFolderIdsSql + ")"
+					
+					fetchDashSql = "select NAME,CODE,DESCRIPTION,ISPERSISTVIEWDATA,STREAMNAME,STREAMWINDOWNAME,STREAMMODULENAME,TYPE,METADATA from BAM_BUSINESSVIEW o where o.id in (" + dashboardIds + ")"
+						+ " union all "
+						+ " select NAME,CODE,DESCRIPTION,ISPERSISTVIEWDATA,STREAMNAME,STREAMWINDOWNAME,STREAMMODULENAME,TYPE,METADATA from BAM_BUSINESSVIEW o where o.folderid in (" + fetchFolderIdsSql + ")";
+					
+					var xmlExportObject:XMLExportObject = new XMLExportObject();
+					xmlExportObject.tableName="BAM_BUSINESSVIEW";
+					xmlExportObject.pkName="ID";
+					xmlExportObject.fkName="FOLDERID";
+					xmlExportObject.visiblePkName="code";
+					xmlExportObject.datasource=treePanel.treePanel.datasource;
+					//xmlExportObject.fetchSql = "select NAME,CODE,DESCRIPTION,TYPE,MTCODE from BAM_DASHBOARDOBJECT ";
+					xmlExportObject.fetchSql = fetchDashSql;
+					
+					xmlFolder = new XMLExportObject();
+					xmlFolder.tableName="BAM_FOLDER";
+					xmlFolder.pkName="ID";
+					xmlFolder.fkName="PARENTID";
+					xmlFolder.visiblePkName="code,type";
+					xmlFolder.datasource=treePanel.treePanel.datasource;
+					
+					//xmlFolder.fetchSql = "select NAME,CODE,DESCRIPTION,TYPE,SEQ from BAM_FOLDER where TYPE=2";
+					xmlFolder.fetchSql = fetchFolderSql;
+					xmlFolder.childObjects = [];
+					xmlFolder.childObjects.push(xmlFolder);
+					xmlFolder.childObjects.push(xmlExportObject);
+					
+					var xmlExportModule:XMLExportObject = new XMLExportObject();
+					xmlExportModule.tableName="pub_cep_streammodule";
+					xmlExportModule.pkName="id";
+					xmlExportModule.visiblePkName="name,providername";
+					xmlExportModule.datasource=treePanel.treePanel.datasource;
+					
+					var moduleCondition:String = "select STREAMMODULENAME from bam_businessview ";
+					
+					var moduleSQL:String = "select NAME,SOURCE,CREATOR,MODIFYTIME,0 as STATUS,PROVIDERNAME from pub_cep_streammodule where name in ("+moduleCondition+")";
+					xmlExportModule.fetchSql = moduleSQL;
+					
+					startOperat();
+					formService.exportXmlToMDFile([xmlFolder,xmlExportModule],"businessview_data.MD",flagName);
+				}
+			}
+			
+			private function startOperat():void{
+				
+				if(operatingWindow == null){
+					var temp:LoadingWindow = new LoadingWindow();
+					temp.text = "正在导出……";
+					operatingWindow = temp;
+				}
+				PopUpManager.addPopUp(operatingWindow,treePanel,true);
+				PopUpManager.centerPopUp(operatingWindow);
+			}
+			
+			private function endOperat():void{
+				if(operatingWindow!=null)
+					PopUpManager.removePopUp(operatingWindow);
+			}
+			
+			private function openMenuHandler(event:BasicEvent):void{
+				if(event.menuId == "业务视图建模"){
+					var code:String = String(event.dataValue);
+					selectDefaultItem(treePanel.treePanel.getTreeData(),code);
+				}
+			}
+			
+			private function selectDefaultItem(arrayCollection:ArrayCollection,code:String):void{
+				var childrenArray:ArrayCollection = new ArrayCollection();
+				for each( var obj:Object in arrayCollection){
+					if(obj["CODE"]==code){
+						treePanel.treePanel.tree.selectedItem = obj;
+						var index:int = treePanel.treePanel.tree.selectedIndex;
+						treePanel.treePanel.tree.scrollToIndex(index);
+						treePanel.treePanel.tree.dispatchEvent(new ListEvent(ListEvent.ITEM_CLICK));
+						return;
+					}
+					childrenArray = obj["children"];
+					if(childrenArray !=null && childrenArray.length>0)
+						selectDefaultItem(childrenArray,code);
+				}
+			}
+			
+			private function saveAsHandler():void{
+				if(!isBv){
+					SmartXMessage.show("目录不能执行该操作!",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				if(treePanel.treePanel.tree.selectedItem == null )
+					return;
+				PopUpManager.addPopUp(saveAsWindow,this,true);
+				PopUpManager.centerPopUp(saveAsWindow);
+			}
+			
+			private function saveAs_clickHandler():void{
+				if(StringUtils.trim(bvName.text) == ""){
+					SmartXMessage.show("业务视图名称不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				if(StringUtils.trim(bvCode.text) == ""){
+					SmartXMessage.show("业务视图编码不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				if(StringUtils.trim(bvEvent.text) == ""){
+					SmartXMessage.show("业务视图对应事件流不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				
+				if(StringUtils.trim(bvWindow.text) == ""){
+					SmartXMessage.show("业务视图对应事件流窗口不能为空！",SmartXMessage.MESSAGE_WARN);
+					return;
+				}
+				var dataValue:Object = bcp.getDataValue();
+				var source:String = dataValue["SOURCE"];
+				source = StringUtils.replaceAll(source,dataValue["STREAMNAME"],bvEvent.text);
+				source = StringUtils.replaceAll(source,dataValue["STREAMWINDOWNAME"],bvWindow.text);
+				source = StringUtils.replaceAll(source,dataValue["CODE"],bvCode.text);
+				dataValue["NAME"] = bvName.text;
+				dataValue["CODE"] = bvCode.text;
+				dataValue["CREATOR"] = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME);
+				dataValue["STREAMNAME"] = bvEvent.text;
+				dataValue["STREAMWINDOWNAME"] = bvWindow.text;
+				dataValue["SOURCE"] = source;
+				bamService.copyBusinessView(dataValue);
+			}
+			
+			private function copyBusinessViewHandler(event:ResultEvent):void{
+				treePanel.treePanel.load();
+				PopUpManager.removePopUp(saveAsWindow);
+			}
+			
+			private function bvCode_changeHandler():void{
+				bvEvent.text = bvCode.text.concat("Event");
+				bvWindow.text = bvCode.text.concat("Win");
+			}
+			
+		]]>
+	</fx:Script>
+	<styletemplate:StyleTemplate03 id="treePanel" templetCode="{treeTempletCode}" debugMode="{debugmode}"
+								   templetCodeParentFieldNameMap="{templetCodeParentFieldNameMap}"
+								   endpoint="{endpoint}"
+								   typeTempletCodeMap="{templetCodeMap}"
+								   loadAll="{loadAll}"
+								   parentFieldName="{parentFieldName}"
+								   seqFieldName="{seqFieldName}"
+								   labelFieldName="{labelFieldName}"
+								   typeFieldName="{typeFiledName}"
+								   fkFieldName="{fkFiledName}"
+								   typeLabelMap="{typeLabelMap}"
+								   itemChange="itemChange(event)" 
+								   insertBfIncCard="{insertBfInterceptor}" updateBfIncCard="{updateBfInterceptor}"
+								   deleteAfIncCard="{deleteAfInterceptor}"  />
+</mx:Module>

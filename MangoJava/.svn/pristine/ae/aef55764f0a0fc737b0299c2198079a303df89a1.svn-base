@@ -1,0 +1,1783 @@
+package smartx.publics.form.bs.service;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.log4j.Logger;
+import org.jdom.output.DOMOutputter;
+import org.w3c.dom.Document;
+
+import smartx.framework.common.bs.CommDMO;
+import smartx.framework.common.bs.FrameWorkCommServiceImpl;
+import smartx.framework.common.bs.NovaSessionFactory;
+import smartx.framework.common.bs.SysConst;
+import smartx.framework.common.bs.dbaccess.dsmgr.DataSourceManager;
+import smartx.framework.common.ui.NovaClientEnvironment;
+import smartx.framework.common.utils.FileUtil;
+import smartx.framework.common.utils.StringUtil;
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.DMOConst;
+import smartx.framework.common.vo.FrameWorkTBUtil;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.common.vo.ModifySqlUtil;
+import smartx.framework.common.vo.NovaLogger;
+import smartx.framework.common.vo.SimpleHashVO;
+import smartx.framework.metadata.bs.FrameWorkMetaDataServiceImpl;
+import smartx.framework.metadata.bs.MetaDataDMO;
+import smartx.framework.metadata.vo.Pub_Templet_1VO;
+import smartx.framework.metadata.vo.Pub_Templet_1_ItemVO;
+import smartx.framework.metadata.vo.RefItemVO;
+import smartx.framework.metadata.vo.TableDataStruct;
+import smartx.publics.datatask.CommTaskManager;
+import smartx.publics.excelexport.ExportXlsService;
+import smartx.publics.file.FileConstant;
+import smartx.publics.file.FileServletURI;
+import smartx.publics.form.bs.utils.AttachFileService;
+import smartx.publics.form.bs.utils.DataHandleUtil;
+import smartx.publics.form.bs.utils.ExportInitMetaData;
+import smartx.publics.form.bs.utils.TempletUtil;
+import smartx.publics.form.bs.utils.XMLHandleUtil;
+import smartx.publics.form.vo.BillListPanelVO;
+import smartx.publics.form.vo.UserHistoryRecordVO;
+import smartx.publics.form.vo.XMLExportObject;
+import smartx.system.common.constant.CommonSysConst;
+import smartx.system.login.bs.SystemLoginServiceImpl;
+import smartx.system.login.ui.Md5Digest;
+import smartx.system.login.vo.LoginInfoVO;
+
+/**
+ * <li>Title: NovaDataService.java</li>
+ * <li>Description: </li>
+ * <li>Project: bizservice0724</li>
+ * <li>Copyright: Copyright (c) 2009</li>
+ * 
+ * @Company: mango
+ * @author zzy
+ * @version 1.0
+ */
+public class SmartXFormService {
+	
+	protected Logger logger = NovaLogger.getLogger(this.getClass());
+
+	public static final String DATASOURCE_CHAT = "datasource_chat";
+	
+	public static final String KEYNAME_MODIFYFLAG = "FORMSERVICE_MODIFYFLAG";
+	
+	public static final String KEYNAME_TEMPLETCODE = "FORMSERVICE_TEMPLETCODE";
+	
+	private FileGenerateService fileGenerateService = new FileGenerateService();
+	
+	private BillListPanelService billListService = new BillListPanelService();
+	
+	private TempleteCopyService templeteCopyService = new TempleteCopyService();
+	
+	private DataHandleUtil dhu = new DataHandleUtil();
+	
+	private static final String CONFIG_CHARSET = "UTF-8";//配置文件编码格式
+	
+	private DOMOutputter outputter = new DOMOutputter();
+	
+	private HelpService helpService = new HelpService();
+	
+	/**
+	 * 转换公式中宏代码的内容,为客户端缓存或页面上的值!!!
+	 * 
+	 * @param _inittext
+	 * @param _env
+	 * @param _map
+	 * @return
+	 * @throws Exception
+	 */
+	public String convertFormulaMacPars(String _oldsql,
+			NovaClientEnvironment _clientenv, HashMap _map) throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			return new FrameWorkTBUtil().convertFormulaMacPars(_oldsql,
+					_clientenv, _map);
+		}catch (Exception e) {
+			logger.error("convertFormulaMacPars 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext();
+		}
+	}
+
+	/**
+	 * 根据参照原始定义取出参照的类型与SQL
+	 * 
+	 * @param refdesc
+	 * @return
+	 */
+	public String[] getRefDescTypeAndSQL(String refdesc) throws Exception {
+		return new ModifySqlUtil().getRefDescTypeAndSQL(refdesc);
+	}
+	
+	/**
+	 * 根据参照原始定义，取出扩展的参数列表，[]括起来的部分，用分号间隔
+	 * @param refdesc
+	 * @return
+	 * @throws Exception
+	 */
+	public Map<String,String> getRefDescExtendParameterMap(String refdesc) throws Exception {
+		if(refdesc == null)
+			throw new IllegalArgumentException("参照定义不能是空");
+		Map<String, String> result = new HashMap<String, String>();
+		int start = refdesc.indexOf("[");
+		int end = refdesc.indexOf("]");
+		if(start<0 || end<0 || end-start<=1)
+			return result;
+		String paraStr = refdesc.substring(start+1, end);
+		for(String equalExp : paraStr.split(";")){
+			//遍历所有二元组 aaa=bbb
+			int index = equalExp.indexOf("=");
+			if(index<=0 || index==equalExp.length()-1)//没有等号，第一个最后一个字符就是等号，直接跳过
+				continue;
+			String key = equalExp.substring(0,index);
+			String value = equalExp.substring(index+1);
+			result.put(key, value);
+		}
+		return result;
+	}
+
+	public String getSequenceNextValByDS(String datasourcename,
+			String sequenceName) throws Exception {
+		try {
+			return new FrameWorkCommServiceImpl().getSequenceNextValByDS(
+					datasourcename, sequenceName);
+		} catch (Exception e) {
+			logger.error("getSequenceNextValByDS 错误！", e);
+			throw e;
+		}finally {
+			new CommDMO().releaseContext();
+		}
+	}
+
+	public TableDataStruct getTableDataStructByDS(String datasourcename,
+			String sql) throws Exception {
+		try {
+			return new FrameWorkCommServiceImpl().getTableDataStructByDS(
+					datasourcename, sql);
+		} catch (Exception e) {
+			logger.error("getTableDataStructByDS 错误！", e);
+			throw e;
+		}finally {
+			new CommDMO().releaseContext();
+		}
+	}
+	
+	public SimpleHashVO[] getSimpleHashVoArrayByDS(String ds, String sql)
+			throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			HashVO[] vos = dmo.getHashVoArrayByDS(ds, sql);
+			SimpleHashVO[] result = new SimpleHashVO[vos.length];
+			for (int i = 0; i < vos.length; i++) {
+				SimpleHashVO vo = new SimpleHashVO(vos[i]);
+				result[i] = vo;
+			}
+			return result;
+		} catch (Exception e) {
+			logger.error("getSimpleHashVoArrayByDS 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext(ds);
+		}
+	}
+	
+	public SimpleHashVO[] getSimpleHashVoArrayUnlimitedByDS(String ds, String sql) throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			HashVO[] vos = dmo.getHashVoArrayByDSUnlimitRows(ds, sql);
+			SimpleHashVO[] result = new SimpleHashVO[vos.length];
+			for (int i = 0; i < vos.length; i++) {
+				SimpleHashVO vo = new SimpleHashVO(vos[i]);
+				result[i] = vo;
+			}
+			return result;
+		} catch (Exception e) {
+			logger.error("getSimpleHashVoArrayByDS 错误！", e);
+			throw e;
+		} finally {
+			dmo.releaseContext(ds);
+		}
+	}
+
+	public int executeUpdateByDS(String ds, String sql) throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			int r = dmo.executeUpdateByDS(ds, sql);
+			dmo.commit(ds);
+			return r;
+		} catch (Exception e) {
+			dmo.rollback(ds);
+			logger.error("executeUpdateByDS 错误！", e);
+			throw e;
+		} finally {
+			dmo.releaseContext(ds);
+		}
+	}
+
+	public int[] executeBatchByDS(String ds, String[] sqls) throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			int[] r = dmo.executeBatchByDS(ds, sqls);
+			dmo.commit(ds);
+			return r;
+		} catch (Exception e) {
+			dmo.rollback(ds);
+			logger.error("执行批量SQL数据库更新错误！", e);
+			throw e;
+		} finally {
+			dmo.releaseContext(ds);
+		}
+	}
+
+	public Pub_Templet_1VO getTempletVO(String templetCode) throws Exception {
+		CommDMO dmo = new CommDMO();
+		try {
+			Pub_Templet_1VO templetVO = null;
+			FrameWorkMetaDataServiceImpl service = new FrameWorkMetaDataServiceImpl();
+			templetVO = service.getPub_Templet_1VO(templetCode,NovaClientEnvironment.getInstance());
+
+			return templetVO;
+		} catch (Exception e) {
+			logger.error("getTempletVO 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext();
+		}
+	}
+	
+	public void refreshTempletCacheByCode(String templetCode){
+		new MetaDataDMO().refreshTempletCacheByCode(templetCode);
+	}
+	
+	public void refreshAllTempletCache(){
+		new MetaDataDMO().refreshAllTempletCache();
+	}
+	
+	public void refreshTempletCacheByEntityModelCode(String entityModelCode){
+		new MetaDataDMO().refreshTempletCacheByEntityModelCode(entityModelCode);
+	}
+	
+	public RefItemVO getRefItemVOByValue(String value,
+			Pub_Templet_1_ItemVO itemVO, HashMap relatedDataValue) throws Exception {
+		CommDMO commDMO = new CommDMO();
+		try {
+			RefItemVO result = new RefItemVO(value, value, value);
+			String str_refsql = itemVO.getRefdesc_realsql(); //
+			if (str_refsql != null && !str_refsql.trim().equals("")) {
+				String modify_str = null; //
+
+				try {
+					modify_str = new FrameWorkTBUtil().convertFormulaMacPars(
+							str_refsql, NovaClientEnvironment.getInstance(),
+							relatedDataValue);// !!!!得到转换后的SQL,即直接可以执行的SQL,即将其中的{aaa}进行转换,!!!这是关键
+				} catch (Exception e) {
+					NovaLogger.getLogger(this).debug("执行参照转换失败", e); //
+				}
+
+				if (modify_str != null) { // 如果成功转换SQL!!
+					// 将SQL语句中的1=1替换成条件子句
+					modify_str = StringUtil.replaceAll(modify_str, "1=1",
+							itemVO.getRefdesc_firstColName() + "='" + value
+									+ "'");
+					// 清除子句-=【 xxxxxx 】=-
+					modify_str = StringUtil.clearSubstring(modify_str, "-=【",
+							"】=-");
+
+					// System.out.println("开始执行参照定义转换后的SQL[" +
+					// itemVos[j].getRefdesc_datasourcename() +
+					// "]:" + modify_str); //
+					HashVO[] ht_allRefItemVOS = null; //
+
+					try {
+						ht_allRefItemVOS = commDMO.getHashVoArrayByDS(itemVO
+								.getRefdesc_datasourcename(), modify_str); //
+					} catch (Exception ex) {
+						NovaLogger.getLogger(this).debug(
+								"执行参照转换后SQL[" + modify_str + "]失败", ex); //
+					}
+
+					if (ht_allRefItemVOS != null) { // 如果取得到数据!!
+						for (int pp = 0; pp < ht_allRefItemVOS.length; pp++) { // 遍历去找!!!
+							if (value.equals(ht_allRefItemVOS[pp]
+									.getStringValue(0))) {
+								return new RefItemVO(ht_allRefItemVOS[pp]); //
+
+							}
+						}
+					}
+				}
+			}
+			return result;
+		}catch (Exception e) {
+			logger.error("",e);
+			throw e;
+		} finally {
+			commDMO.releaseContext();
+		}
+	}
+
+	public Document getDeskTopDesign() throws Exception {
+		String sysRootPath = (String) Sys.getInfo("NOVA2_SYS_ROOTPATH");
+		String str_filePath = sysRootPath + "WEB-INF/Nova2Desktop.xml"; 
+		Reader reader = new InputStreamReader(new FileInputStream(new File(str_filePath)),CONFIG_CHARSET);
+        org.jdom.Document doc = Sys.loadXML(reader);
+		return outputter.output(doc);
+	}
+
+	public Document getSmartXConfig() throws Exception {
+		String sysRootPath = (String) Sys.getInfo("NOVA2_SYS_ROOTPATH");
+		String str_filePath = sysRootPath + "WEB-INF/"+SysConst.SmartXConfig; //
+        File file = new File(str_filePath);
+        if(!file.exists()){
+        	NovaLogger.getLogger(this).debug("没有找到配置文件:"+str_filePath);
+        	str_filePath = sysRootPath + "WEB-INF/Nova2Config.xml";
+        }
+        Reader reader = new InputStreamReader(new FileInputStream(new File(str_filePath)),CONFIG_CHARSET);
+        org.jdom.Document doc = Sys.loadXML(reader);
+		return outputter.output(doc);
+	}
+
+	public Document getFlexWorkflowConfig() throws Exception {
+		String sysRootPath = (String) Sys.getInfo("NOVA2_SYS_ROOTPATH");
+		String str_filePath = sysRootPath + "WEB-INF/FlexWorkflowConfig.xml";
+		Reader reader = new InputStreamReader(new FileInputStream(new File(str_filePath)),CONFIG_CHARSET);
+        org.jdom.Document doc = Sys.loadXML(reader);
+		return outputter.output(doc);
+	}
+
+	public LoginInfoVO login(String _usercode, String _pwd, String _adminpwd,
+			boolean isAdmin) throws Exception {
+		NovaLogger.getLogger(this).debug("用户[" + _usercode + "]通过flex登录");
+
+		CommDMO dmo = new CommDMO();
+		try {
+			SystemLoginServiceImpl service = new SystemLoginServiceImpl();
+			// 假客户端变量，仅仅是为了login方法正常执行
+			NovaSessionFactory.getInstance()
+					.regisClientEnv(Thread.currentThread(),
+							NovaClientEnvironment.getInstance());
+			LoginInfoVO vo;
+			if (isAdmin)
+				vo = service.login(_usercode, _pwd, _adminpwd);
+			else
+				vo = service.login(_usercode, _pwd);
+			dmo.commitAll();
+			return vo;
+		} catch (Exception e) {
+			dmo.rollbackAll();
+			throw e;
+		} finally {
+			dmo.releaseContext();
+		}
+	}
+
+	public void dologout(String userid) throws Exception {
+		NovaLogger.getLogger(this).debug("用户[" + userid + "]通过flex登出");
+		CommDMO dmo = new CommDMO();
+		try {
+			SystemLoginServiceImpl service = new SystemLoginServiceImpl();
+			service.logout(userid);
+			dmo.commitAll();
+		} catch (Exception e) {
+			dmo.rollbackAll();
+			throw e;
+		} finally {
+			dmo.releaseContext();
+		}
+	}
+
+	public String generatePasswd(String username, String pwd) throws Exception {
+		return new SystemLoginServiceImpl().modifyPasswd(username, pwd);
+	}
+
+	/**
+	 * 获取聊天系统的登录密码，如果用户是第一次登录，则创建一个新用户
+	 * 
+	 * @param loginName
+	 * @return
+	 * @throws Exception
+	 */
+	public String getChatUserPassword(String loginName) throws Exception {
+		NovaLogger.getLogger(this).debug("获取[" + loginName + "]的聊天登录密码");
+		String sql = "select plainpassword from ofuser where username ='"
+				+ loginName + "'";
+		CommDMO dmo = new CommDMO();
+		try {
+			HashVO[] vos = dmo.getHashVoArrayByDS(DATASOURCE_CHAT, sql);
+			if (vos.length == 1)
+				return vos[0].getStringValue(0);
+			else {
+				NovaLogger.getLogger(this).debug(
+						"[" + loginName + "]第一次登录，创建新用户");
+				String pwd = Md5Digest.MD5(loginName);
+				sql = "insert into ofuser(username,plainpassword,creationdate,MODIFICATIONDATE) values('"
+						+ loginName + "','" + pwd + "',0,0)";
+				dmo.executeUpdateByDS(DATASOURCE_CHAT, sql);
+				dmo.commit(DATASOURCE_CHAT);
+				return pwd;
+			}
+
+		} catch (Exception e) {
+			dmo.rollback(DATASOURCE_CHAT);
+			throw e;
+		} finally {
+			dmo.releaseContext();
+		}
+
+	}
+	
+	
+	/**
+	 * 获取用户的管理区域
+	 * @param userid
+	 * @return
+	 * @throws Exception 
+	 */
+	public List<String> getUserManageRegionList(String userid) throws Exception{
+		NovaLogger.getLogger(this).debug("获取用户[id=" +userid + "]的管理区域");
+		String sql = "select id from region start with id in (Select regionid from pub_user_region where userid = "+userid+") connect by prior id = parentregionid";
+		CommDMO dmo = new CommDMO();
+		try {
+			HashVO[] vos = dmo.getHashVoArrayByDS(CommonSysConst.DATASOURCE_USERMGMT, sql);
+			ArrayList<String> result = new ArrayList<String>();
+			for(HashVO vo:vos){
+				result.add(vo.getStringValue(0));
+			}
+			return result;
+		}catch (Exception e) {
+			logger.error("",e);
+			throw e;
+		} finally {
+			dmo.releaseContext();
+		}
+	}
+	
+	
+	
+	/**
+	 * 创建元原模板
+	 * @return 模板编码
+	 * @throws Exception
+	 */
+	public String createTemplet() throws Exception {
+		NovaLogger.getLogger(this).debug("新建元原模板");
+		String templetCode = "T_UNTITLED"+System.currentTimeMillis();
+		String name = "新建模板";
+		String sql = "insert into pub_templet_1(pk_pub_templet_1, templetcode, templetname) values(s_pub_templet_1.nextval,?,?)";
+		CommDMO dmo = new CommDMO();
+		try{
+			dmo.executeUpdateByDS(null, sql, templetCode,name);
+			dmo.commit(null);
+		}
+		catch(Exception e){
+			dmo.rollback(null);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext(null);
+		}
+		return templetCode;
+	}
+	
+	/**
+	 * 
+	 * @param datasource
+	 * @param tableName
+	 * @param templetCode
+	 * @param templetName
+	 * @throws Exception
+	 */
+	public void importTemplet(String datasource, String tableName,
+			String templetCode, String templetName)
+			throws Exception {
+		NovaLogger.getLogger(this).debug("导入元原模板[ds="+datasource+",tablename="+tableName+",templetcode="+templetCode+"]");
+		long v_order;
+
+		String v_itemtype;
+
+		String key = "";
+
+		HashVO[] v_primarykey = null;
+
+		HashVO[] cl = null;
+
+		String str_sql = null;
+
+		CommDMO dmo = new CommDMO();
+		try {
+
+			str_sql = "Select a.Column_Name, Data_Type, Data_Length, nvl(b.Comments,a.Column_Name) Comments  From User_Tab_Cols a, User_Col_Comments b Where a.Table_Name = b.Table_Name(+) And a.COLUMN_NAME=b.COLUMN_NAME And a.Table_Name ='"
+					+ tableName + "'";
+			cl = dmo.getHashVoArrayByDS(datasource, str_sql);
+			// System.out.println("cl的值"+cl[0].getStringValue(0));
+
+			str_sql = "select COLUMN_NAME  from user_cons_columns where CONSTRAINT_NAME in (select CONSTRAINT_NAME from user_constraints where CONSTRAINT_TYPE='P' and TABLE_NAME='"
+					+ tableName + "')";
+			v_primarykey = dmo.getHashVoArrayByDS(datasource, str_sql);
+
+			if (v_primarykey != null && v_primarykey.length > 0 && v_primarykey[0] != null) {// 当导入为视图时，主键设为空
+
+				key = v_primarykey[0].getStringValue(0);
+
+			} else
+				key = null;
+
+			str_sql = "delete pub_templet_1_item where pk_pub_templet_1 in (select pk_pub_templet_1 from pub_templet_1 where templetcode ='"
+					+ templetCode + "')";
+			dmo.executeUpdateByDS(null, str_sql);
+
+			str_sql = "delete pub_templet_1 where templetcode ='"
+					+ templetCode + "'";
+			dmo.executeUpdateByDS(null, str_sql);
+
+			String v_pk = null;
+
+			str_sql = "select s_pub_templet_1.nextval from dual";
+			v_pk = dmo.getHashVoArrayByDS(null, str_sql)[0].getStringValue(0);
+			// System.out.println("V_pk的值"+v_pk);
+
+			str_sql = "insert into pub_templet_1( pk_pub_templet_1, templetcode, templetname, tablename, datasourcename,pkname,pksequencename,savedtablename,cardcustpanel, listcustpanel ) values ( '"
+					+ v_pk
+					+ "', '"
+					+ templetCode
+					+ "', '"
+					+ templetName
+					+ "', '"
+					+ tableName
+					+ "',  '"
+					+ datasource
+					+ "',  '"
+					+ key
+					+ "','S_"
+					+ tableName
+					+ "',  '" + tableName + "', null , null )";
+			dmo.executeUpdateByDS(null, str_sql);
+
+			v_order = 1;
+			for (int i = 0; i < cl.length; i++) {
+
+				v_itemtype = FormServiceUtil.f_gettype(cl[i].getStringValue("COLUMN_NAME"), cl[i].getStringValue("DATA_TYPE")
+														,cl[i].getLognValue("DATA_LENGTH").longValue());
+				str_sql = "insert into pub_templet_1_item(pk_pub_templet_1_item, pk_pub_templet_1, itemkey,itemname, itemtype, comboxdesc,refdesc,issave, isdefaultquery, ismustinput, loadformula, editformula, defaultvalueformula,colorformula,showorder,listwidth,cardwidth,listisshowable,listiseditable, cardisshowable, cardiseditable ) "
+						+ "values(s_pub_templet_1_item.nextval,'"
+						+ v_pk
+						+ "', '"
+						+ cl[i].getStringValue("COLUMN_NAME")
+						+ "', '"
+						+ cl[i].getStringValue("comments")
+						+ "', '"
+						+ v_itemtype
+						+ "', null, null, 'Y', '2','N', null,null,null,null,'"
+						+ v_order + "','145', '150', 'Y', '1','Y','1' )";
+
+				dmo.executeUpdateByDS(null, str_sql);
+
+				v_order = v_order++;
+
+			}
+			dmo.commit(null);
+		} catch (Exception e) {
+			dmo.rollback(null);
+			throw e;
+		} finally {
+			dmo.releaseContext();
+		}
+	}
+	
+	/**
+	 * 保存用户访问记录
+	 * @param imageData
+	 * @param userId
+	 * @param menuId
+	 * @throws Exception
+	 */
+	public void saveHistoryRecord(byte[] imageData,String userId,String menuId) throws Exception{
+		NovaLogger.getLogger(this).debug("保存用户菜单访问记录[userid="+userId+",menuid="+menuId+"]");
+		if(userId == null || menuId == null)
+			throw new IllegalArgumentException("用户id或者菜单id不能为null");
+		if("0".equals(menuId))//门户菜单，不保存日志
+			return;
+		String sysRootPath = (String) Sys.getInfo("NOVA2_SYS_ROOTPATH");
+		String fileName = "";
+		if(imageData != null){
+			fileName = userId+"_"+menuId+"_"+System.currentTimeMillis()+".png";
+			String str_filePath = sysRootPath + "historyrecord/"+fileName;
+			File file = new File(str_filePath);
+			FileOutputStream fos=new FileOutputStream(file);   
+			fos.write(imageData);   
+			fos.close();
+		}
+		CommDMO dmo = new CommDMO();
+		
+		//modify by zhangzy 20120913用户的访问历史目前只记录了每个用户访问某个菜单的最后时间，现在要求保留每个用户所有的菜单访问日志
+		try{
+//			String sql = "select id from PUB_USER_HISTORYRECORD where userid="+userId+" and menuid="+menuId;
+//			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql);
+//			if(vos.length > 0){
+//				//已存在
+//				sql = "update PUB_USER_HISTORYRECORD set LASTVISITTIME=sysdate,IMAGEURL='"+fileName+"' where id="+vos[0].getStringValue(0);
+//				dmo.executeUpdateByDS(null, sql);
+//			}
+//			else{
+//				sql = "insert into PUB_USER_HISTORYRECORD(id,userid,menuid,LASTVISITTIME,IMAGEURL)" +
+//						"values(s_PUB_USER_HISTORYRECORD.nextval,"+userId+","+menuId+",sysdate,'"+fileName+"')";
+//				dmo.executeUpdateByDS(null, sql);
+//			}
+			String sql = "insert into PUB_USER_HISTORYRECORD(id,userid,menuid,LASTVISITTIME,IMAGEURL)" +
+					"values(s_PUB_USER_HISTORYRECORD.nextval,"+userId+","+menuId+",sysdate,'"+fileName+"')";
+			dmo.executeUpdateByDS(null, sql);
+			dmo.commit(null);
+		}
+		catch(Exception e){
+			dmo.rollback(null);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext();
+		}
+	}
+	
+	public List<UserHistoryRecordVO> getHistoryRecordVOByUser(String userId) throws Exception{
+		NovaLogger.getLogger(this).debug("获取用户菜单访问记录[userid="+userId+"]");
+		if(userId == null)
+			throw new IllegalArgumentException("用户id不能为null");
+		List<UserHistoryRecordVO> result = new ArrayList<UserHistoryRecordVO>();
+		CommDMO dmo = new CommDMO();
+		try{
+			String sql = "select * from PUB_USER_HISTORYRECORD where userid="+userId+" order by LASTVISITTIME desc";
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql);
+			for(HashVO vo:vos){
+				UserHistoryRecordVO record = new UserHistoryRecordVO();
+				record.setId(vo.getStringValue("id"));
+				record.setUserId(vo.getLongValue("userid"));
+				record.setMenuId(vo.getLongValue("menuid"));
+				record.setLastVisitTime(vo.getDateValue("lastvisittime"));
+				record.setImageUrl(vo.getStringValue("IMAGEURL"));
+				result.add(record);
+			}
+			return result;
+		}catch (Exception e) {
+			logger.error("",e);
+			throw e;
+		} finally{
+			dmo.releaseContext();
+		}
+		
+	}
+	
+	/**
+	 * 将数据库的一组数据导出xml
+	 * @param exportObjects
+	 * @return
+	 * @throws Exception
+	 */
+	public Document exportXML(XMLExportObject[] exportObjects) throws Exception{
+		NovaLogger.getLogger(this).debug("从数据库导出XML");
+		Document xml =  XMLHandleUtil.exportXML(exportObjects);
+		return xml;
+	}
+	
+	public void importXML(Document xml,String datasource) throws Exception{
+		NovaLogger.getLogger(this).debug("从XML导入数据");
+		XMLHandleUtil.importXML(xml, datasource);
+	}
+	
+	/**
+	 * 导出元原模板为脚本
+	 * @param templetCode
+	 * @return
+	 * @throws Exception
+	 */
+	public String exportTempletScript(String templetCode) throws Exception{
+		NovaLogger.getLogger(this).debug("导出元原模板["+templetCode+"]");
+		return TempletUtil.exportTempletScript(templetCode);
+	}
+	
+	/**
+	 * 导出所有元原模板脚本
+	 * @param templetCode
+	 * @return
+	 * @throws Exception
+	 */
+	public String exportAllTempletScript() throws Exception{
+		NovaLogger.getLogger(this).debug("导出所有元原模板");
+		return TempletUtil.exportAllTempletScript();
+	}
+	
+	/**
+	 * 根据元原模板更新数据
+	 * @param templetVO
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void updateDataByTempletVO(Pub_Templet_1VO templetVO, Map<String,Object> dataValue) throws Exception{
+		NovaLogger.getLogger(this).debug("根据元原模板[code="+templetVO.getTempletcode()+"]保存数据");
+		try{
+			TempletUtil.updateDataByTempletVO(templetVO, dataValue);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("保存数据失败",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据元原模板删除数据
+	 * @param templetVO
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void deleteDataByTempletVO(Pub_Templet_1VO templetVO, Map<String,Object> dataValue) throws Exception{
+		NovaLogger.getLogger(this).debug("根据元原模板[code="+templetVO.getTempletcode()+"]删除数据");
+		try{
+			TempletUtil.deleteDataByTempletVO(templetVO, dataValue);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("删除数据失败",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据元原模板插入数据
+	 * @param templetVO
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void insertDataByTempletVO(Pub_Templet_1VO templetVO, Map<String,Object> dataValue) throws Exception{
+		NovaLogger.getLogger(this).debug("根据元原模板[code="+templetVO.getTempletcode()+"]插入数据");
+		try{
+			TempletUtil.insertDataByTempletVO(templetVO, dataValue);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("插入数据失败",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据元原模板批量更新数据
+	 * @param templetVO
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void updateBatchDataByTempletVO(Pub_Templet_1VO templetVO, List<Map<String,Object>> dataValueList) throws Exception{
+		NovaLogger.getLogger(this).debug("根据元原模板[code="+templetVO.getTempletcode()+"]批量更新数据");
+		try{
+			TempletUtil.updateBatchDataByTempletVO(templetVO, dataValueList);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("批量更新数据失败",e);
+			throw e;
+		}
+	}
+	
+	//modify by caohenghui --start
+	/**
+	 * @param templetVO
+	 * @param dataValueList
+	 * @param beforeIct
+	 * @param afterIct
+	 * @throws Exception
+	 */
+	public void updateBatchDataByTempletVO(Pub_Templet_1VO templetVO, List<Map<String,Object>> dataValueList,String beforeIct, String afterIct) throws Exception{
+		NovaLogger.getLogger(this).debug("根据元原模板[code="+templetVO.getTempletcode()+"]批量更新数据!前置拦截器["+beforeIct+"];后置拦截器 ["+afterIct+"]");
+		try{
+			TempletUtil.updateBatchDataByTempletVO(templetVO, dataValueList,beforeIct,afterIct);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("批量更新数据失败",e);
+			throw e;
+		}
+	}
+	//modify by caohenghui --end
+	
+	/**
+	 * 批量更新数据(隐含了模板编码)
+	 * @param templetVO
+	 * @param dataValue 
+	 * @throws Exception
+	 */
+	public void updateBatchData(List<Map<String,Object>> dataValueList) throws Exception{
+		NovaLogger.getLogger(this).debug("批量更新数据");
+		try{
+			TempletUtil.updateBatchData(dataValueList);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("批量更新数据失败",e);
+			throw e;
+		}
+	}
+	// add by zhangzz 20110402 for smartx-39为元原模板保存添加前置、后置拦截器 begin
+	/**
+	 * 根据元原模板更新数据(有拦截器)
+	 * @param templetVO
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void updateDataByTempletVOContainIct(Pub_Templet_1VO templetVO, Map<String,Object> dataValue,String beforeIct, String afterIct) throws Exception{
+		logger.debug("根据元原模板[code="+templetVO.getTempletcode()+"]保存数据(前置拦截器["+beforeIct+"];后置拦截器["+afterIct+"])");
+		try{
+			TempletUtil.updateDataByTempletVOContainIct( templetVO, dataValue, beforeIct, afterIct );
+		}
+		catch(Exception e){
+			logger.error("保存数据失败",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据元原模板插入数据(有拦截器)
+	 * @param templetVO
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void insertDataByTempletVOContainIct(Pub_Templet_1VO templetVO, Map<String,Object> dataValue,String beforeIct, String afterIct) throws Exception{
+		NovaLogger.getLogger(this).debug("根据元原模板[code="+templetVO.getTempletcode()+"]插入数据(前置拦截器["+beforeIct+"];后置拦截器["+afterIct+"])");
+		try{
+			TempletUtil.insertDataByTempletVOContainIct( templetVO, dataValue, beforeIct, afterIct );
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("插入数据失败",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据元原模板删除数据
+	 * @param templetVO
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void deleteDataByTempletVOContainIct(Pub_Templet_1VO templetVO, Map<String,Object> dataValue,String beforeIct, String afterIct) throws Exception{
+		NovaLogger.getLogger(this).debug("根据元原模板[code="+templetVO.getTempletcode()+"]删除数据(前置拦截器["+beforeIct+"];后置拦截器["+afterIct+"])");
+		try{
+			TempletUtil.deleteDataByTempletVOContainIct(templetVO, dataValue,beforeIct,afterIct);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("删除数据失败",e);
+			throw e;
+		}
+	}
+	// add by zhangzz 20110402 for smartx-39为元原模板保存添加前置、后置拦截器 end
+	
+	
+	//add by caohenghui --start
+	
+	public String exportXmlToMDFile(XMLExportObject[] exportObjects,String reportName,String flagName) throws Exception{
+		NovaLogger.getLogger(this).debug("从数据库导出MD文件");
+		FileServletURI fsu = new FileServletURI();
+		String downLoadFile =  new ExportInitMetaData().exportXmlToMDFile(exportObjects,flagName);
+		return fsu.getDownLoadURI(downLoadFile,reportName);
+	}
+	
+	public void importXMLFromMDFile(byte[] content, String datasource,String flagName) throws Exception {
+
+		NovaLogger.getLogger(this).debug("从MD文件导入数据");
+		String UpLoadFileName = XMLHandleUtil.createUpLoadFile(content);
+		String unZipDir = XMLHandleUtil.unZipFile(UpLoadFileName);
+		if (!XMLHandleUtil.isValidFile(unZipDir,flagName)) {
+			File file = new File(unZipDir);
+			XMLHandleUtil.deleteFielOrDir(file);
+			throw new Exception("无法导入,请选择正确的导出文件!");
+		}
+		XMLHandleUtil.importXMLFromMDFile(unZipDir, datasource);
+
+	}
+	
+	public String exportXmlToZipFile(XMLExportObject[] exportObjects,String reportName,String flagName) throws Exception{
+		NovaLogger.getLogger(this).debug("从数据库导出MAR文件");
+		FileServletURI fsu = new FileServletURI();
+		String downLoadFile =  dhu.exportXmlToZipFile(exportObjects, flagName);
+		return fsu.getDownLoadURI(downLoadFile,reportName);
+	}
+	
+	public void importXmlFromZipFile(byte[] content,String flagName) throws Exception{
+		
+		NovaLogger.getLogger(this).debug("从MAR文件导入数据");
+		String UpLoadFileName = dhu.createUpLoadFile(content);
+		String unZipDir = dhu.unZipFile(UpLoadFileName);
+		if (!dhu.isValidFile(unZipDir,flagName)) {
+			dhu.deleteFielOrDir(new File(unZipDir));
+			dhu.deleteFielOrDir(new File(UpLoadFileName));
+			throw new Exception("无法导入,请选择正确的导出文件!");
+		}
+		
+		File file = new File(unZipDir);
+		File[] files = file.listFiles();
+		if(files != null){
+			for(File temp : files){
+				if(temp.getName().endsWith(".zip")){
+					String tempUnZipDir = dhu.unZipFile(temp.getAbsolutePath());
+					dhu.importXMLFromZipFile(tempUnZipDir);
+				}
+			}
+		}
+		
+		dhu.deleteFielOrDir(new File(unZipDir));
+		dhu.deleteFielOrDir(new File(UpLoadFileName));
+		
+	}
+	
+	/**
+	 * 导出指定名称的初始化元数据补丁
+	 * @param name
+	 * @throws Exception
+	 */
+	public String exportInitMetaData(String name) throws Exception{
+		try{
+			logger.info("批量导出初始化数据["+name+"]");
+			ExportInitMetaData eimd = new ExportInitMetaData();
+			String filename = eimd.export(name);
+			FileServletURI fsu = new FileServletURI();
+			return fsu.getDownLoadURI(filename, filename);
+		}catch(Exception e){
+			throw new Exception("导出初始化元数据文件错误!",e);
+		}
+
+		
+	}
+	
+	//add by caohenghui --end
+	
+	/**
+	 * 根据sql查询结果生成csv文件
+	 * @param datasource
+	 * @param sql
+	 * @param dirPath
+	 * @param columnMap 列名称映射
+	 * @param charSet 字符编码集 如GBK,UTF-8
+	 * @return
+	 * @throws Exception
+	 */
+	public Map<String, Object> generateCSVFile(String datasource,String sql, String dirPath,Map<String, String> columnMap,String charSet) throws Exception{
+		try{
+		   return fileGenerateService.generateOlapCsvFile(datasource, sql, dirPath,columnMap,charSet);
+		}catch (Exception e) {
+			logger.error("根据SQL["+ sql +"]生成CSV文件异常！", e);
+			throw e;
+		}
+		
+	}
+	
+	/**
+	 * 根据sql查询结果生成csv文件
+	 * @param datasource
+	 * @param sql
+	 * @param dirPath
+	 * @param columnMap 列名称映射
+	 * @return 可下载的文件路径
+	 * @throws Exception
+	 */
+	public String generateExportCSVFile(String datasource,String sql, String dirPath,Map<String, String> columnMap,String reportName) throws Exception{
+		try{
+		    String fileName =  fileGenerateService.generateCSVFile(datasource, sql, dirPath,columnMap,"gbk");
+		    
+		    FileServletURI fsu = new FileServletURI();
+			return fsu.getDownLoadURI(fileName,reportName);
+		}catch (Exception e) {
+			logger.error("根据SQL["+ sql +"]生成CSV文件异常！", e);
+			throw e;
+		}
+		
+	}
+	
+	/**
+	 * 生成BillListPanel的CSV数据文件
+	 * @param templetCode
+	 * @param condition
+	 * @param clientEnviorment
+	 * @param reportName
+	 * @return
+	 * @throws Exception
+	 */
+	public String generateBillListCSVFile(String templetCode,String condition,Map<String,Object> clientEnviorment,String reportName) 
+		throws Exception {
+		try{
+			NovaClientEnvironment nce = FormServiceUtil.getNewNovaClientEnviorment(clientEnviorment);
+		    String fileName =  fileGenerateService.generateBillListCSVFile(templetCode,condition,nce,FileConstant.DOWNLOAD_DIR+"/","gbk");
+		    
+		    FileServletURI fsu = new FileServletURI();
+			return fsu.getDownLoadURI(fileName,reportName);
+		}catch (Exception e) {
+			logger.error("根据原数据模板["+ templetCode +"]生成CSV文件异常！", e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 生成BillListPanel的CSV数据文件
+	 * @param condition
+	 * @return
+	 * @throws Exception
+	 */
+	public String generateTempletSqlFile(String condition,String reportName) throws Exception {
+		try{
+		    String fileName =  fileGenerateService.generateTempletSqlFile(condition);		    
+		    FileServletURI fsu = new FileServletURI();
+			return fsu.getDownLoadURI(fileName,reportName);
+		}catch (Exception e) {
+			logger.error("根据条件["+ condition +"]导出元原模板文件异常！", e);
+			throw e;
+		}
+	}
+	
+	//add by caohenghui for SMARTX-80 --start
+	
+	public int executeUpdateByDS(String ds, String sql,Map<String,Object> map,String beforeIct, String afterIct) throws Exception {
+		try {
+			
+			this.doSomething(map, beforeIct);
+			int r = this.executeUpdateByDS(ds, sql);
+			this.doSomething(map, afterIct);
+			
+			return r;
+		} catch (Exception e) {
+			logger.error("executeUpdateByDS 错误！", e);
+			throw e;
+		}
+	}
+	
+	public int[] executeBatchByDS(String ds, String[] sqls,List<Map<String,Object>> list,String beforeIct, String afterIct) throws Exception {
+		try {
+			this.doSomething(list, beforeIct);
+			int[] r = this.executeBatchByDS(ds, sqls);
+			this.doSomething(list, afterIct);
+			return r;
+		} catch (Exception e) {
+			logger.error("", e);
+			throw e;
+		}
+	}
+	
+	public void updateBatchData(List<Map<String,Object>> dataValueList,String beforeIct, String afterIct) throws Exception{
+		NovaLogger.getLogger(this).debug("批量更新数据");
+		try{
+			this.doSomething(dataValueList, beforeIct);
+			this.updateBatchData(dataValueList);
+			this.doSomething(dataValueList, afterIct);
+		}
+		catch(Exception e){
+			NovaLogger.getLogger(this).error("批量更新数据失败",e);
+			throw e;
+		}
+	}
+	
+	private void doSomething(Map<String,Object> map,String ictClassName) throws Exception
+	{
+		if( ictClassName != null && !"".equals( ictClassName ) )
+		{
+			Object formInterceptor = Class.forName( ictClassName ).newInstance();
+			if( formInterceptor instanceof FormInterceptor )
+				((FormInterceptor) formInterceptor).doSomething(map);
+		}
+	}
+	
+	private void doSomething(List<Map<String,Object>> dataValueList,String ictClassName) throws Exception
+	{
+		if( ictClassName != null && !"".equals( ictClassName ) )
+		{
+			Object formInterceptor = Class.forName( ictClassName ).newInstance();
+			if( formInterceptor instanceof FormInterceptor )
+				((FormInterceptor) formInterceptor).doSomething(dataValueList);
+		}
+	}
+	
+	//add by caohenghui for SMARTX-80 --end
+	
+	/**
+	 * 查询分页数据
+	 * 返回的MAP对象，包括记录总数和当前页数据的SimpleHashVO数组
+	 */
+	public Map<String, Object> getSimpleHashVOMapByPage(String dataSource,String sql,int pageNum, int rowCountPerPage)	throws Exception {
+		Map<String, Object> result = getSimpleHashVOMapByPage(dataSource, sql, sql, pageNum, rowCountPerPage);
+		
+		return result;
+	}
+	
+	/**
+	 * 查询分页数据,查询总记录数和数据不是同一SQL
+	 * 查询总记录数的SQL效率要高
+	 * 返回的MAP对象，包括记录总数和当前页数据的SimpleHashVO数组
+	 */
+	public Map<String, Object> getSimpleHashVOMapByPage(String dataSource,String countSql,String dataSql,int pageNum, int rowCountPerPage)	throws Exception {
+		CommDMO dmo = new CommDMO();
+		Map<String, Object> result = new HashMap<String, Object>();
+		try {
+			int rowsCount = dmo.getRowsCountByDS(dataSource,countSql);
+			Map<String, Object> hashvoMap = dmo.getHashVoArrayByPage(dataSource, dataSql, pageNum, rowCountPerPage,rowsCount);
+			HashVO[] vos = (HashVO[])hashvoMap.get(DMOConst.HASHVOARRAY);
+			
+			SimpleHashVO[] simpleVos = new SimpleHashVO[vos.length];
+			for (int i = 0; i < vos.length; i++) {
+				SimpleHashVO vo = new SimpleHashVO(vos[i]);
+				simpleVos[i] = vo;
+			}
+			
+			result.put(DMOConst.ROWCOUNT, hashvoMap.get(DMOConst.ROWCOUNT));
+			result.put(DMOConst.SIMPLEHASHVOARRAY, simpleVos);
+			
+			return result;
+		}catch (Exception e) {
+			logger.error("getSimpleHashVOArrayByPage 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext();
+		}
+	}
+	
+	/**
+	 * 查询所有数据，无数据量限制
+	 * 返回的MAP对象，包括记录总数和当前页数据的SimpleHashVO数组
+	 */
+	public Map<String, Object> getSimpleHashVOMap(String dataSource,String sql)	throws Exception {
+		CommDMO dmo = new CommDMO();
+		Map<String, Object> result = new HashMap<String, Object>();
+		try {
+			HashVO[] vos = dmo.getHashVoArrayByDSUnlimitRows(dataSource, sql);
+			
+			SimpleHashVO[] simpleVos = new SimpleHashVO[vos.length];
+			for (int i = 0; i < vos.length; i++) {
+				SimpleHashVO vo = new SimpleHashVO(vos[i]);
+				simpleVos[i] = vo;
+			}
+			result.put(DMOConst.SIMPLEHASHVOARRAY, simpleVos);
+			
+			return result;
+		}catch (Exception e) {
+			logger.error("getSimpleHashVOArrayByPage 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext();
+		}
+	}
+	
+	//add by caohenghui 2011-08-03 --start
+	
+	public Pub_Templet_1VO getTempletVO(String templetCode,Map<String,Object> clientEnviorment) throws Exception {
+
+		CommDMO dmo = new CommDMO();
+		try {
+			Pub_Templet_1VO templetVO = null;
+			FrameWorkMetaDataServiceImpl service = new FrameWorkMetaDataServiceImpl();
+			templetVO = service.getPub_Templet_1VO(templetCode,FormServiceUtil.getNewNovaClientEnviorment(clientEnviorment));
+
+			return templetVO;
+		} catch (Exception e) {
+			logger.error("getTempletVO 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext();
+		}
+	
+	}
+	
+	public BillListPanelVO getBillListPanelVO(String templetCode,
+			String condition,Map<String,Object> clientEnviorment) throws Exception {
+		try{
+			 return billListService.getBillListPanelVO(templetCode, condition, clientEnviorment);
+		}catch (Exception e) {
+			logger.error("根据["+ templetCode +"]获取BillListPanelVO数据异常！", e);
+			throw e;
+		}	
+	}
+	
+	//BillListPanelVO
+	public BillListPanelVO getBillListPanelVO(String templetCode,String condition) throws Exception {
+		try{
+			 return billListService.getBillListPanelVO(templetCode, condition, null);
+		}catch (Exception e) {
+			logger.error("根据["+ templetCode +"]获取BillListPanelVO数据异常！", e);
+			throw e;
+		}
+	}
+	
+	public BillListPanelVO getBillListPanelVOByPage(String templetCode,
+			String condition, int pageNum, int rowCountPerPage,Map<String,Object> clientEnviorment)throws Exception {
+		try{
+			 return billListService.getBillListPanelVOByPage(templetCode, condition, pageNum, rowCountPerPage, clientEnviorment);
+		}catch (Exception e) {
+			logger.error("根据["+ templetCode +"]获取BillListPanelVOByPage异常！", e);
+			throw e;
+		}
+	}
+	
+	public BillListPanelVO getBillListPanelVOByPage(String templetCode,	String condition, int pageNum, int rowCountPerPage)	
+		throws Exception {
+		try{
+			 return billListService.getBillListPanelVOByPage(templetCode, condition, pageNum, rowCountPerPage, null);
+		}catch (Exception e) {
+			logger.error("根据["+ templetCode +"]获取BillListPanelVOByPage异常！", e);
+			throw e;
+		}
+	}
+	
+	public int getBillListPanelRowCount(String templetCode, String condition,Map<String,Object> clientEnviorment)throws Exception {
+		try{
+			 return billListService.getBillListPanelRowCount(templetCode, condition, clientEnviorment);
+		}catch (Exception e) {
+			logger.error("根据["+ templetCode +"]获取BillListPanelRowCount异常！", e);
+			throw e;
+		}
+	}
+	
+	public int getBillListPanelRowCount(String templetCode, String condition) throws Exception {
+		try{
+			  return billListService.getBillListPanelRowCount(templetCode, condition, null);
+		}catch (Exception e) {
+			logger.error("根据["+ templetCode +"]获取BillListPanelRowCount异常！", e);
+			throw e;
+		}
+	}
+	
+	public Map<String,String> loadUserParameters(String userId) throws Exception{
+		logger.debug("读取用户[id="+userId+"]的用户参数");
+		Map<String, String> result = new HashMap<String, String>();
+		CommDMO dmo = new CommDMO();
+		try{
+			//获取角色参数先
+			String sql = "select * from pub_role_parameter where " +
+					"roleid in (Select roleid from pub_user_role where userid=?)";
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, sql,userId);
+			for(HashVO vo : vos){
+				String paraname = vo.getStringValue("parametername");
+				String value = vo.getStringValue("value");
+				result.put(paraname, value);
+			}
+			//获取用户参数，用户参数优先
+			sql = "select * from pub_user_parameter where userid=?";
+			vos = dmo.getHashVoArrayByDS(null, sql,userId);
+			for(HashVO vo : vos){
+				String paraname = vo.getStringValue("parametername");
+				String value = vo.getStringValue("value");
+				result.put(paraname, value);
+			}
+		}
+		catch(Exception e){
+			logger.error("读取用户参数失败",e);
+			throw e;
+		}
+		finally{
+			dmo.releaseContext(null);
+		}
+		logger.debug("读取用户[id="+userId+"]的用户参数完毕");
+		return result;
+	}
+	
+	/**
+	 * 添加数据预处理任务
+	 * @param taskTempletId
+	 * @param taskName
+	 * @param taskContent
+	 * @param param
+	 */
+	public String addDataTask(String taskTempletId,String taskName, String taskContent,Map<String,String> paramMap) throws Exception{
+		CommDMO dmo = new CommDMO();
+		try {
+//			Map<String,String> paramStrMap = new HashMap<String,String>();
+//			if(paramMap != null){
+//				for(Entry<String,String> param :  paramMap.entrySet()){
+//					paramStrMap.put(param.getKey(), (String)param.getValue());
+//				}
+//			}
+			String datataskId = CommTaskManager.getInstance().addTask(taskTempletId, taskName, taskContent, paramMap);
+			dmo.commit(DMOConst.DS_DEFAULT);
+			
+			return datataskId;
+		} catch (Exception e) {
+			logger.debug("添加数据预处理任务【"+ taskName +"】失败。" + e.getMessage());
+			throw e;
+		}finally{
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+	
+	/**
+	 * 停止数据预处理任务
+	 * @param taskTempletId
+	 * @param taskId
+	 * @param taskContent
+	 * @param param
+	 */
+	public void stopDataTask(String taskId) throws Exception{
+		CommDMO dmo = new CommDMO();
+		try {
+			CommTaskManager.getInstance().stopTask(taskId);
+			dmo.commit(DMOConst.DS_DEFAULT);
+		} catch (Exception e) {
+			logger.debug("停止数据预处理任务taskid=【"+ taskId +"】失败。" + e.getMessage());
+			throw e;
+		}finally{
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+	
+	/**
+	 * 根据任务模板ID获取任务的所有参数和参数对应的默认值
+	 * @param taskTempletId
+	 * @return
+	 * @throws Exception
+	 */
+	public Map<String, String> getTaskParamById(String taskTempletId) throws Exception{
+		CommDMO dmo = new CommDMO();
+		try {
+			Map<String, String>  paramMap = CommTaskManager.getInstance().getTaskParamById(taskTempletId);
+			dmo.commit(DMOConst.DS_DEFAULT);
+			
+			return paramMap;
+		} catch (Exception e) {
+			logger.debug("获取任务模板参数失败。tasktempletId=" + taskTempletId + ".  " + e.getMessage());
+			throw e;
+		}finally{
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+
+	/**
+	 * 查询所有JDBC关系型数据源名称
+	 * @return
+	 * @throws Exception
+	 */
+	public String[] queryAllRelationDsName() throws Exception{
+		try {
+			return DataSourceManager.getDataSources();
+		} catch (Exception e) {
+			logger.error("查询所有JDBC关系型数据源名称错误!", e);
+			throw e;
+		}
+	}
+	
+	public void copyTempleteByCode(String templeteCode,String newName,String newCode) throws Exception {
+		try{
+			templeteCopyService.copyTempleteByCode(templeteCode, newName, newCode);
+		}catch(Exception e){
+			logger.error("复制元原模板出错!", e);
+			throw e;
+		}
+	}
+	/**
+	 * 查询所有JDBC关系型数据源配置信息
+	 * @return
+	 * @throws Exception
+	 */
+	public HashMap queryAllRelationDsConfig() throws Exception{
+		try {
+			return DataSourceManager.getDataSourcesSet();
+		} catch (Exception e) {
+			logger.error("查询所有JDBC关系型数据源配置信息错误!", e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 根据多个元原模板保存数据
+	 * @param templetVOs
+	 * @param dataValue
+	 * @throws Exception
+	 */
+	public void updateDataByTempletVOs(Pub_Templet_1VO[] templetVOs, Map<String, Object>[] dataValues) throws Exception{
+		if(logger.isDebugEnabled()){
+			StringBuilder templetCodesBuf = new StringBuilder();
+			for(Pub_Templet_1VO templetVO : templetVOs){
+				templetCodesBuf.append("[code=").append(templetVO.getTempletcode()).append("]");
+			}
+			logger.debug("根据多个元原模板"+templetCodesBuf.toString()+"保存数据");
+		}
+		
+		try{
+			TempletUtil.updateDataByTempletVOs(templetVOs, dataValues);
+		}catch(Exception e){
+			logger.error("",e);
+			throw e;
+		}
+	}
+	
+	public void uploadAttachFile(byte[] bytes,String fileName,String tableName,String keyColumn,String keyValue) 
+			throws Exception
+	{
+		try{
+			AttachFileService fileService = AttachFileService.getInstance();
+			fileService.attachFileInsert(bytes, fileName, tableName, keyColumn, keyValue);
+			logger.info("附件【" + fileName + "】上传成功！");
+		}catch (Exception e) {
+			logger.error("上传并存储附件文件失败!",e);
+			throw e;
+		}
+	}
+	
+	public String attachFileDownload(String fileContentId,String fileName) throws Exception{
+		try{
+			AttachFileService fileService = AttachFileService.getInstance();
+			fileService.attachFileDownload(fileContentId, fileName);
+			logger.info("附件【" + fileName + "】生成文件成功！");
+			
+			//String fileExtens = fileName.substring(fileName.lastIndexOf(".")+1);
+			FileServletURI fsu = new FileServletURI();
+			String downLoadUri = fsu.getDownLoadURI(fileName,fileName);
+			
+			return downLoadUri;
+		}catch (Exception e) {
+			logger.error("下载附件文件失败!",e);
+			throw e;
+		}finally{
+			new CommDMO().releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+	
+	/**
+	 * EXCEL文件导出下载
+	 * @param excelMTCode
+	 * @param condition
+	 * @param reportName
+	 * @return
+	 * @throws Exception
+	 */
+	public String excelExport(String excelMTCode, String condition, String reportName) throws Exception {
+		ExportXlsService xlsService = new ExportXlsService();
+		String fileName = xlsService.generateExcel(excelMTCode, condition);
+
+		FileServletURI fsu = new FileServletURI();
+		String downloadUrl  = fsu.getDownLoadURI(fileName, reportName);
+
+		return downloadUrl;
+	}
+	
+	public String excelExport2(String excelMTCode,String queryDetailSql,String detailTablePk,String xlsViewPk,String reportName,String detailTableDatasource) throws Exception {
+		return excelExportExt(excelMTCode,queryDetailSql,detailTablePk,xlsViewPk,reportName,detailTableDatasource,null);
+	}
+	
+	/**
+	 * 导出检查或比对结果的明细数据为EXCLE,可以添加扩展字段
+	 * @param excelMTCode
+	 * @param queryDetailSql
+	 * @param detailTablePk
+	 * @param xlsViewPk
+	 * @param reportName
+	 * @param detailTableDatasource
+	 * @return
+	 * @throws Exception
+	 */
+	public String excelExportExt(String excelMTCode,String queryDetailSql,String detailTablePk,String xlsViewPk,
+			String reportName,String detailTableDatasource,String[] extCols) throws Exception {
+		ExportXlsService xlsService = new ExportXlsService();
+		String fileName = xlsService.generateExcel(excelMTCode, queryDetailSql, detailTablePk, xlsViewPk,detailTableDatasource,extCols);
+
+		FileServletURI fsu = new FileServletURI();
+		String downloadUrl  = fsu.getDownLoadURI(fileName, reportName);
+
+		return downloadUrl;
+	}
+	
+	/**
+	 * 通过参照定义读取计算结果（给出id，计算出name，用于客户端设置参照值时用）
+	 * @param refDesc
+	 * @param itemId
+	 * @return
+	 */
+	public RefItemVO generateRefItemVO(String refDesc, String itemId)
+			throws Exception {
+		logger.debug("读取参照定义[" + refDesc + "]的VO值[id=" + itemId + "]");
+		if (refDesc == null)
+			throw new IllegalArgumentException("参照定义不能为空");
+		CommDMO commDMO = new CommDMO();
+		String str_datasourcename = null;
+		try {
+			String str_allrefdesc = refDesc.trim(); // 原始的参照定义
+
+			// 把参照定义转换一下，把变量都切换一下
+			// str_allrefdesc=tbUtil.convertExpression(_clientEnv,
+			// str_allrefdesc);
+
+			String[] str_refdefines = new ModifySqlUtil()
+					.getRefDescTypeAndSQL(str_allrefdesc);
+			String str_type = str_refdefines[0]; // 类型,比如是TABLE,TREE,MUTITREE,CUST等!!
+			String str_descql = str_refdefines[1]; // 定义的SQL,其中包括{}
+			str_datasourcename = str_refdefines[6]; // 数据源名称!!!!
+			String str_descql_firstName = null;
+
+			if (str_type.equals("TABLE") || str_type.equals("TREE")) { // 如果第一种表型或树型参照!!
+				if (str_descql == null || str_descql.trim().equals("")) {
+					logger.warn("警告:参照定义的SQL是为空,将会产生错误！");
+				} else {
+					String str_descql_upperCase = str_descql.toUpperCase();
+					if (str_descql_upperCase.indexOf("WHERE") <= 0) {
+						logger.warn("警告:参照定义的SQL[" + str_descql
+								+ "]没有Where条件定义,将会产生错误！");
+					}
+					str_descql_firstName = new ModifySqlUtil()
+							.findSQLFirstName(str_descql); // 找出其中第一个列的名称!!!
+				}
+			} else if (str_type.equals("MUTITREE")) {
+				str_descql = str_refdefines[4];
+				if (str_descql == null || str_descql.trim().equals("")) {
+					logger.warn("警告:参照定义的SQL是为空,将会产生错误!!");
+				} else {
+					String str_descql_upperCase = str_descql.toUpperCase();
+					if (str_descql_upperCase.indexOf("WHERE") <= 0) {
+						logger.warn("警告:参照定义的SQL[" + str_descql
+								+ "]没有Where条件定义,将会产生错误!!!!");
+					}
+					str_descql_firstName = new ModifySqlUtil()
+							.findSQLFirstName(str_descql); // 找出其中第一个列的名称!!!
+				}
+			}
+			String str_refsql = str_descql; //
+			if (str_refsql != null && !str_refsql.trim().equals("")) {
+				String modify_str = str_refsql; //
+
+				if (modify_str != null) { // 如果成功转换SQL!!
+					// 将SQL语句中的1=1替换成条件子句
+					modify_str = StringUtil.replaceAll(modify_str, "1=1",
+							str_descql_firstName + "='" + itemId + "'");
+					// 清除子句-=【 xxxxxx 】=-
+					modify_str = StringUtil.clearSubstring(modify_str, "-=【",
+							"】=-");
+
+					// System.out.println("开始执行参照定义转换后的SQL[" +
+					// itemVos[j].getRefdesc_datasourcename() +
+					// "]:" + modify_str); //
+					HashVO[] ht_allRefItemVOS = null; //
+
+					try {
+						ht_allRefItemVOS = commDMO.getHashVoArrayByDS(
+								str_datasourcename, modify_str); //
+					} catch (Exception ex) {
+						logger.error("", ex);
+					}
+
+					if (ht_allRefItemVOS != null) { // 如果取得到数据!!
+						for (int pp = 0; pp < ht_allRefItemVOS.length; pp++) { // 遍历去找!!!
+							if (itemId.equals(ht_allRefItemVOS[pp]
+									.getStringValue(0))) {
+								return new RefItemVO(ht_allRefItemVOS[pp]); //
+							}
+						}
+					}
+				}
+			}
+			return null;
+		} catch (Exception e) {
+			logger.error("", e);
+			throw e;
+		} finally {
+			commDMO.releaseContext(str_datasourcename);
+		}
+
+	}
+	
+	public SimpleHashVO[] getMessageByTaskId(String taskId) throws Exception{
+		
+		CommDMO dmo = new CommDMO();
+		try {
+			SimpleHashVO[] result = null;
+			HashVO[] vos = dmo.getHashVoArrayByDS(null, "select D.ID,D.DATATASKTEMPLETID,D.NAME,D.STATUS,D.LASTMASSAGE,D.RATE,TO_CHAR(D.BEGINTIME,'YYYY-MM-DD HH24:MI:SS') BEGINTIME,TO_CHAR(D.ENDTIME,'YYYY-MM-DD HH24:MI:SS') ENDTIME,D.TASKCONTENT,D.PARAMVALUE,D.EXECLOG,t.code templetecode from pub_datatask D,pub_datatask_templet t where d.datatasktempletid=t.id and d.id=?",taskId);
+			if(vos != null && vos.length>0){
+				result = new SimpleHashVO[vos.length];
+				for (int i = 0; i < vos.length; i++) {
+					SimpleHashVO vo = new SimpleHashVO(vos[i]);
+					result[i] = vo;
+				}
+			}
+			return result;
+		} catch (Exception e) {
+			logger.error("getSimpleHashVoArrayByDS 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext(null);
+		}
+	}
+	//add by caohenghui --end
+	
+	public String generateViewFile(String datasource,String sql,String reportName)
+			throws Exception {
+		try {
+			String fileName = fileGenerateService.generateViewFile(datasource, sql,FileConstant.DOWNLOAD_DIR+"/","UTF-8");
+			FileServletURI fsu = new FileServletURI();
+			return fsu.getDownLoadURI(fileName, reportName);
+		} catch (Exception e) {
+			logger.error("生成SQL文件异常!", e);
+			throw e;
+		}
+	}
+	
+	public String generateFile(String content,String reportName,String fileType) throws Exception {
+		try{
+			String fileName = fileGenerateService.generateFile(content,fileType,FileConstant.DOWNLOAD_DIR+"/","UTF-8");
+			FileServletURI fsu = new FileServletURI();
+			return fsu.getDownLoadURI(fileName,reportName);
+		}catch(Exception e){
+			logger.error("生成文件异常!", e);
+			throw e;
+		}
+	}
+	
+	public Map[] getUserSource(String datasource,String type) throws Exception {
+		CommDMO dmo = new CommDMO();
+		Map[] dataMap = null;
+		try {
+			HashVO[] vos = dmo.getHashVoArrayByDS(datasource, "select * from user_source where type=?",type);
+			if(vos != null && vos.length>0){
+				
+				Map<String,String> map = new HashMap<String,String>();;
+				for (HashVO vo : vos) {
+					String name = vo.getStringValue("name");
+					String content = vo.getStringValue("text");
+					String tempContent = map.get(name);
+					if(StringUtil.isEmpty(tempContent)){
+						map.put(name, content);
+					}else{
+						map.put(name, tempContent+" "+content);
+					}
+				}
+				Set<String> keys = map.keySet();
+				if(keys != null ){
+					dataMap = new HashMap[keys.size()];
+					int index = 0;
+					for(String key : keys ){
+						Map<String,String> m = new HashMap<String,String>();
+						m.put("name", key);
+						m.put("content", "create or replace "+map.get(key));
+						dataMap[index] = m;
+						index++;
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("getSimpleHashVoArrayByDS 错误！", e);
+			throw e;
+		}finally {
+			dmo.releaseContext(datasource);
+		}
+		return dataMap;
+	}
+	
+	public String fileUpload(byte[] content, String fileName,String type) throws Exception {
+		try {
+			String dirPath = FileConstant.RootPath+FileConstant.UPLOAD_DIR;
+			FileUtil.createDirIfNotExists(dirPath);
+			String filePath = FileUtil.createFile(dirPath, fileName);
+			FileUtils.writeByteArrayToFile(new File(filePath), content);
+			return filePath;
+		} catch (Exception e) {
+			logger.error("上传文件出现错误!", e);
+			throw e;
+		}
+	}
+	
+	public String[] getFileNamesFromFileUpload() throws Exception{
+		String[] names = null;
+		try {
+			String dirPath = FileConstant.RootPath+FileConstant.UPLOAD_DIR;
+			File file = new File(dirPath);
+			names = file.list();
+		} catch (Exception e) {
+			logger.error("获取文件名出现错误!", e);
+			throw e;
+		}
+		return names;
+	}
+	
+	public void deleteFile(String[] names) throws Exception{
+		try{
+			if(names != null){
+				String dirPath = FileConstant.RootPath+FileConstant.UPLOAD_DIR;
+				for(String name : names){
+					FileUtil.deleteFile(dirPath+"/"+name);
+				}
+			}
+		}catch(Exception e){
+			logger.error("删除文件出现错误!", e);
+			throw e;
+		}
+	}
+	
+	public void renameFile(String oldName,String newName) throws Exception{
+		try{
+			if(!StringUtil.isEmpty(newName)){
+				String[] temp = oldName.split("\\.");
+				String suffixName = temp[temp.length-1];
+				String dirPath = FileConstant.RootPath+FileConstant.UPLOAD_DIR;
+				FileUtil.renameFile(dirPath+"/"+oldName, newName+"."+suffixName);
+			}
+		}catch(Exception e){
+			logger.error("重命名出现错误!", e);
+			throw e;
+		}
+	}
+	
+	public Map<String,Object> getHelpInfo(String id) throws Exception {
+		try{
+			return this.helpService.getHelpInfo(id);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	public SimpleHashVO[] searchHelpInfo(String name) throws Exception {
+		try{
+			return this.helpService.searchHelpInfo(name);
+		}catch(Exception e){
+			logger.debug("",e);
+			throw e;
+		}
+	}
+	
+	/**
+	 * 查询后置任务
+	 * @param taskId
+	 * @return
+	 * @throws Exception
+	 */
+	public List<String> getSubsequentDataTask(String taskId) throws Exception{
+		CommDMO dmo = new CommDMO();
+		String sql  = "select t.name from pub_datatask_templet t, pub_metadata_templet m" +
+				" where t.mtcode = m.code and t.foregroundtask =(select code from pub_datatask_templet where id=?)";
+		List<String> result = new ArrayList<String>();
+		try{
+			HashVO[] vos = dmo.getHashVoArrayByDS(DMOConst.DS_DEFAULT, sql,taskId);
+			for(HashVO vo : vos){
+				result.add(vo.getStringValue("name"));
+			}
+		}catch(Exception e){
+			logger.debug("查询后置任务错误！",e);
+			throw e;
+		}finally{
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * 更新数据任务元数据
+	 * @param mtcontent
+	 * @throws Exception
+	 */
+	public void updateDataTaskMetaData(String mtcode,String mtcontent) throws Exception{
+		CommDMO dmo = new CommDMO();
+		try{
+			dmo.executeUpdateClobByDS(DMOConst.DS_DEFAULT, "content", "pub_metadata_templet", "code='"+mtcode+"'", mtcontent);
+			dmo.commit(DMOConst.DS_DEFAULT);
+		}catch(Exception e){
+			logger.error("更新数据任务元数据错误！",e);
+		}finally{
+			dmo.releaseContext(DMOConst.DS_DEFAULT);
+		}
+	}
+	
+}
+
+

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" 
+			    layout="vertical" showCloseButton="true"
+				fontSize="12" fontFamily="Simsun" width="370" height="390" title="条件样式编辑器"
+			    paddingTop="0" paddingLeft="0" paddingRight="0"	
+			   xmlns:util="myreport.util.*" 
+			   implements="myreport.util.IPagingable" creationComplete="Init()" close="Cancel()" 
+			   xmlns:design="myreport.design.*">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.CloneUtil;
+			import hlib.DisposeUtil;
+			
+			import myreport.data.report.ConditionStyleSetting;
+			import myreport.data.report.ReportSettings;
+			import myreport.res.Asset;
+			import myreport.util.IPagingable;
+			import myreport.util.PagingEvent;
+			
+			private static var g_Instance:ConditionStyleEditor;
+			
+			public static function get Instance():ConditionStyleEditor
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new ConditionStyleEditor();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			private var _ConditonStyles:Array;
+			private var _Settings:ReportSettings;
+			//function(conditionStyles:Array):void
+			private var _Callback:Function;
+			private var _Index:int = -1;
+			private function Init():void
+			{
+				_PagingBar.Pagingable = this;
+				_PagingBar.TotalLabel = "共{0}条";
+				_PagingBar.CurrentLabel2.text = "条";
+				_PagingBar.FirstPageButton.toolTip = "第一条";
+				_PagingBar.LastPageButton.toolTip = "最后一条";
+				_PagingBar.PreviousPageButton.toolTip = "上一条";
+				_PagingBar.NextPageButton.toolTip = "下一条";
+				GotoPage(0);
+			}
+			public function Show(settings:ReportSettings, conditonStyles:Array, callback:Function):void
+			{
+				_ConditonStyles = CloneUtil.Clone(conditonStyles);
+				_Settings = settings;
+				_Callback = callback;
+				
+				PopUp();
+				
+				if(initialized)
+				{
+					ReportPageChanged();
+					GotoPage(0);
+				}
+			}
+			
+			private function Confirm():void
+			{
+				if (_Callback != null)
+				{
+					_Callback(_ConditonStyles);
+				}
+				Close();
+			}
+			private function Cancel():void
+			{
+				DisposeUtil.Dispose(_ConditonStyles);
+				Close();
+			}
+			protected override function OnClose():void
+			{
+				_ConditonStyles = null;
+				_Settings = null;
+			}
+ 
+			public function Add():void
+			{
+				var conditionStyle:ConditionStyleSetting = new ConditionStyleSetting();
+				_ConditonStyles.push(conditionStyle);
+				ReportPageChanged();
+				GotoPage(_ConditonStyles.length-1);
+			}
+			public function Delete():void
+			{
+				if(_ConditonStyles && _ConditonStyles.length)
+				{
+					var index:int = Current;
+					index = Math.max(0, index);
+					index = Math.min(_ConditonStyles.length - 1, index);
+					
+					var conditionStyle:ConditionStyleSetting = _ConditonStyles.splice(index, 1)[0] as ConditionStyleSetting;
+					conditionStyle.Dispose();
+				}
+				ReportPageChanged();
+				GotoPage(Current);
+			}
+ 
+			//==========IPagingable=========
+			public function get Total():int
+			{
+				if(_ConditonStyles)
+					return _ConditonStyles.length;
+				return 0;
+			}
+			public function get Current():int
+			{
+				return _Index;
+			}
+			public function GotoPage(index:int):void
+			{
+				var enable:Boolean = _ConditonStyles && _ConditonStyles.length;
+				_Delete.enabled = _Condition.enabled = _Style.enabled = enable;
+				
+				if(!enable)
+					return;
+				index = Math.max(0, index);
+				index = Math.min(_ConditonStyles.length - 1, index);
+				if(_Index == index)
+					return;
+				_Index = index;
+				
+				var conditionStyle:ConditionStyleSetting = _ConditonStyles[_Index];
+				_Condition.text = conditionStyle.Condition;
+				_Style.Style = conditionStyle.Style;
+				ReportPageChanged();
+			}
+			private function ReportPageChanged():void
+			{
+				var e:PagingEvent = new PagingEvent(PagingEvent.PAGE_CHANGED);
+				dispatchEvent(e);
+			}
+			private function OnEdit(event:Event):void
+			{
+				if(Current < _ConditonStyles.length)
+				{ 
+					var conditionStyle:ConditionStyleSetting = _ConditonStyles[_Index];
+					conditionStyle.Condition = _Condition.text;
+				}
+			}
+			private function ShowExpressionEditor():void
+			{
+				ExpressionEditor.Instance.Show(_Condition.text, _Settings, function(value:String):void
+				{
+					_Condition.text = value;
+					OnEdit(null);
+				});
+			}
+		]]>
+	</mx:Script>
+	
+	<util:ToolBar width="100%" height="28">
+		<util:ToolButton id="_Add" icon="{Asset.ICON_ADD16}" width="23" click="Add()"/>
+		<util:ToolButton id="_Delete" icon="{Asset.ICON_DELETE16}" width="23" click="Delete()"/>
+		<mx:VRule height="22"/>
+		<util:PagingBar id="_PagingBar">
+		</util:PagingBar>		
+	</util:ToolBar>
+	<mx:HBox width="100%" paddingLeft="8" paddingRight="8">
+		<mx:Label text="请输入判断条件："/>
+	</mx:HBox>
+	<mx:HBox width="100%" verticalAlign="middle" x="78" y="28" paddingLeft="24" paddingRight="24" horizontalGap="1">
+		<mx:TextInput id="_Condition" width="100%" enter="OnEdit(event)" focusOut="OnEdit(event)"/>
+		<util:ToolButton width="23" icon="{Asset.ICON_FUNCTION}"  toolTip="表达式编辑器"
+					   click="ShowExpressionEditor()"/>
+	</mx:HBox>
+	<mx:HBox width="100%" paddingLeft="8" paddingRight="8">
+		<mx:Label text="满足该条件的样式："/>
+	</mx:HBox>
+	<mx:HBox width="100%" horizontalAlign="center">
+		<design:StyleEditor id="_Style" x="49" y="68">
+		</design:StyleEditor>
+	</mx:HBox>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Cancel()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

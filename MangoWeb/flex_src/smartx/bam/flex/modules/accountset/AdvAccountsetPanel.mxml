@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   layout="absolute" width="100%" height="100%" 
+		   xmlns:containers="flexlib.containers.*" 
+		   creationComplete="init()">
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.containers.Box;
+			import mx.controls.Alert;
+			import mx.controls.PopUpButton;
+			import mx.events.RSLEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.util.TempletDataUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			private var dataValue:Object = new Object();
+			
+			[Bindable]
+			private var loginName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_LOGINNAME));
+			
+			private var userName:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_LOGIN_USER_NAME))
+			
+			private var destination:String = "smartXBAMService";
+			private var endpoint:String = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+			private var formService:RemoteObject;
+			
+			private var bvNameRefPanel:ItemRefPanel;
+			
+			public function init():void{
+				formService = new RemoteObject(destination);
+				if(endpoint!=null)
+					formService.endpoint = endpoint;
+				
+				formService.dealAccountSetting.addEventListener(ResultEvent.RESULT,dealAccountSettingHandler);
+				formService.dealAccountSetting.addEventListener(FaultEvent.FAULT,faultHandler);
+				formService.getAttributeSimpleHashVo.addEventListener(ResultEvent.RESULT,getSimpleHashVoArrayByDSHandler);
+				formService.getAttributeSimpleHashVo.addEventListener(FaultEvent.FAULT,faultHandler);
+				
+				initRefPanel();
+				
+				formService.getAttributeSimpleHashVo(null,loginName);
+			}
+			
+			private function dealAccountSettingHandler(event:ResultEvent):void{
+				Alert.show("更新成功!", "提示");
+			}
+			
+			private function getSimpleHashVoArrayByDSHandler(event:ResultEvent):void{
+			  var dataValues:* = event.result as Array;
+			  for each(var vo:SimpleHashVO in dataValues){
+//				  dashbordcode.text = String(vo.dataMap["dashbordcode"]);
+				  initData(String(vo.dataMap["dashbordcode"]),String(vo.dataMap["dashbordname"]));
+				  alertMaxCount.text = String(vo.dataMap["alertrowcount"]);
+				  alertRefreshTime.text = String(vo.dataMap["refreshtime"]);
+			  }
+			}
+			
+			
+			private function faultHandler(event:FaultEvent):void{   
+				Alert.show(event.fault.faultString, 'Error');
+			}
+
+			protected function modifyBtn_clickHandler(event:MouseEvent):void
+			{
+				var dashbordcodeValue:String = "";
+				if( bvNameRefPanel.returnVO !=null){
+					dashbordcodeValue = bvNameRefPanel.returnVO.id;
+				}
+				
+				var alertMaxCountValue:String = alertMaxCount.text;
+				
+				var refreshtimeValue:String = alertRefreshTime.text;
+				
+				if(refreshtimeValue==""){
+					refreshtimeValue = "10000";
+				}
+				
+				if(alertMaxCountValue ==""){
+					alertMaxCountValue = "20";
+				}
+				
+				dataValue["dashbordcode"] = dashbordcodeValue;
+				dataValue["alertrowcount"] = alertMaxCountValue;
+				dataValue["refreshtime"] = refreshtimeValue;
+				dataValue["username"] = loginName;
+				formService.dealAccountSetting(dataValue);
+				
+			}
+			
+			private function initRefPanel():void{
+				var templetItemVO:TempletItemVO = new TempletItemVO();
+				templetItemVO.itemtype="参照";
+				templetItemVO.itemname="仪表盘";
+				templetItemVO.itemkey="dbocode";
+				templetItemVO.refdesc="select v.code as id#,v.code 编码#,v.name 名称 from V_BAM_DASHBOARD v;ds=datasource_default";
+				bvNameRefPanel = new ItemRefPanel(templetItemVO,GlobalConst.SERVICE_FORM,endpoint,false,false);
+				bvNameRefPanel.width = 300;
+				bvNameRefPanel.toolTip ="登录后在首页显示的仪表盘";
+				bvNameRefPanel.addEventListener(UIComponentEvent.REAL_VALUE_CHANGE,function():void{
+					if(bvNameRefPanel.returnVO != null){
+						trace(bvNameRefPanel.returnVO.id);
+					}
+				});
+				dboHbox.addChild(bvNameRefPanel);
+			}
+			
+			private function initData(dashbordcode:String,dashbordname:String):void{
+				var simpleRefItemVO:SimpleRefItemVO = new SimpleRefItemVO();
+				simpleRefItemVO.id = dashbordcode;
+				simpleRefItemVO.code = dashbordcode;
+				simpleRefItemVO.name = dashbordname;
+				bvNameRefPanel.data = {"dbocode":simpleRefItemVO};
+			}
+
+		]]>
+	</fx:Script>
+		<mx:VBox width="100%" height="100%" horizontalAlign="center" paddingTop="10">
+				<mx:HBox width="100%" horizontalAlign="center" >
+					<mx:Label text="用户选项" fontSize="20" />
+				</mx:HBox>
+				<mx:HBox width="100%" id="dboHbox" horizontalAlign="center">
+					<mx:Label text="默认显示仪表盘:  " />
+					<!--<mx:TextInput  id="dashbordcode" width="300" toolTip="登录后在首页显示的仪表盘" />-->
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="告警最大显示数量:" />
+					<mx:TextInput id="alertMaxCount" width="300"  toolTip="仪表盘上告警列表最大告警显示数量" restrict="0-9" />
+				</mx:HBox>
+				<mx:HBox width="100%" horizontalAlign="center">
+					<mx:Label text="告警刷新间隔(秒):" />
+					<mx:TextInput id="alertRefreshTime" width="300" toolTip="仪表盘告警列表的刷新间隔" restrict="0-9" />
+				</mx:HBox>
+			<mx:Button id="modifyBtn" icon="{AssetsFileLib.saveIcon}" label="保存" click="modifyBtn_clickHandler(event)" />
+		</mx:VBox>
+</mx:Module>

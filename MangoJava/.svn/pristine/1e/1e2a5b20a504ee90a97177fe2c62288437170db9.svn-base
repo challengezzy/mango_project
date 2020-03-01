@@ -1,0 +1,240 @@
+/**************************************************************************
+ * $RCSfile: RemoteCallClient.java,v $  $Revision: 1.4.6.4 $  $Date: 2009/05/12 04:04:26 $
+ **************************************************************************/
+package smartx.framework.common.ui;
+
+import java.io.*;
+import java.lang.reflect.Method;
+import java.net.*;
+import java.util.HashMap;
+
+import org.apache.log4j.Logger;
+
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.*;
+
+
+public class RemoteCallClient implements Serializable {
+
+	private static final long serialVersionUID = 2669192990614491136L;
+
+	private String str_remotecallservlerurl = null;
+
+	
+
+	public RemoteCallClient() {
+		//此变量是由gxlu.pluto.appletloaderengine.ui.NovaAppletContainer设置的。
+		//DEBUG 是在smartx.framework.metadata.ui.DebugApplet设置
+		str_remotecallservlerurl = System.getProperty("RemoteCallServletURL");
+	}
+
+
+	/**
+	 * 远程请求动作
+	 * TODO 这个方法原来有个同步标志，暂时去掉看看效果。
+	 * @param _servicename
+	 * @param _methodname
+	 * @param _parclasses
+	 * @param _parobjs
+	 * @return
+	 * @throws NovaRemoteException
+	 * @throws Exception
+	 */
+	public Object callServlet(String _servicename, String _methodname, Class[] _parclasses, Object[] _parobjs,String remoteUrl) throws NovaRemoteException, Exception {
+		URL url = null;
+		URLConnection conn = null; //
+		try {
+			if(remoteUrl != null)
+				url = new URL(remoteUrl);
+			else
+				url = new URL(str_remotecallservlerurl); //定义远程CallServlet的url!!!
+			conn = url.openConnection(); //
+			
+			//System.out.println("调用远程请求。超时设置，减少客户端不响应情况出现！");
+			String CLIENT_TIMEOUT=(Sys.getInfo("CLIENT_TIMEOUT")==null)
+			            ?"30000":((String)Sys.getInfo("CLIENT_TIMEOUT"));
+			int timeout=Integer.parseInt(CLIENT_TIMEOUT);
+			
+			//客户端计时 开始
+			long ll_1 = System.currentTimeMillis();
+			
+	        try{
+				Method method = URLConnection.class.getMethod("setConnectTimeout", new Class[]{int.class});
+				//System.out.println("按JDK1.5方式定义超时！");
+				method.invoke(conn, new Object[]{new Integer(timeout)});
+				method = URLConnection.class.getMethod("setReadTimeout", new Class[]{int.class});
+				method.invoke(conn, new Object[]{new Integer(timeout)});
+			}catch(NoSuchMethodException e){ 
+				//jdk1.5 以前的超时设置，jdk1.5以后方法可以不一样
+				//System.out.println("按JDK1.4方式定义超时！");
+				System.setProperty("sun.net.client.defaultConnectTimeout", CLIENT_TIMEOUT);
+		        System.setProperty("sun.net.client.defaultReadTimeout", CLIENT_TIMEOUT);	
+			}catch(Exception e){ 
+				;
+			}	
+	        
+			conn.setDoInput(true);
+			conn.setDoOutput(true);
+			conn.setUseCaches(false);
+			
+			
+
+			//传入参..入参永远是一个 VectorMap
+			OutputStream request_out = conn.getOutputStream(); //
+			ObjectOutputStream request_out_objStream = new ObjectOutputStream(request_out);
+
+			NovaRemoteCallParVO parVO = new NovaRemoteCallParVO(); //!!!!!
+			parVO.setClientIP(InetAddress.getLocalHost().getHostAddress()); ///
+			parVO.setClientEnv(NovaClientEnvironment.getInstance()); //
+			parVO.setServiceName(_servicename); //
+			parVO.setMethodName(_methodname); //
+			parVO.setParClasses(_parclasses); //
+			parVO.setParObjs(_parobjs); //
+			request_out_objStream.writeObject(parVO); //真正远程访问!!!核心地带!
+			request_out.flush();
+			request_out.close();
+
+			//得到反馈..
+			InputStream response_in = conn.getInputStream();
+			ObjectInputStream response_in_objStream = new ObjectInputStream(response_in);
+			NovaRemoteCallreturnVO returnVO = (NovaRemoteCallreturnVO) response_in_objStream.readObject(); //
+			Object returnObj = returnVO.getReturnObject(); //在这里判断是否是Nova远程异常!!,如果是则人工抛出异常!!
+			response_in_objStream.close();
+			long ll_dealtime = returnVO.getDealtime(); //
+			int li_stmtcount = returnVO.getCallDBCount(); //
+			//客户端计时 结束
+			long ll_2 = System.currentTimeMillis();
+			long ll_all = ll_2 - ll_1; //
+			long ll_trans = ll_all - ll_dealtime;
+
+			if(ll_all>15000 && NovaLogger.isInit()){
+				NovaLogger.getLogger(this).warn("调用远程服务[" + _servicename + "][" + _methodname + "]时间过长,共耗时[" + ll_all + "]。"); //
+			}
+			
+			if (returnObj instanceof NovaRemoteException) { //如果远程调用异常!!
+				NovaRemoteException serverNovaEx = (NovaRemoteException) returnObj; //取得server端的异常!!
+				NovaRemoteException clientNovaEx = new NovaRemoteException(serverNovaEx.getMessage()); //创建客户端异常
+				clientNovaEx.setServerTargetEx(serverNovaEx.getServerTargetEx()); //设置堆栈详细信息!
+				throw clientNovaEx; //重抛客户端异常!!!
+			} else {
+				if(NovaLogger.isInit()){
+					NovaLogger.getLogger(this).debug("调用远程服务[" + _servicename + "][" + _methodname + "]结束,共耗时[" + ll_all + "],其中应用耗时[" + ll_dealtime + "],访问DB[" + li_stmtcount + "]次,网络传输[" + ll_trans + "]"); //
+				}else{
+					System.out.println("调用远程服务[" + _servicename + "][" + _methodname + "]结束,共耗时[" + ll_all + "],其中应用耗时[" + ll_dealtime + "],访问DB[" + li_stmtcount + "]次,网络传输[" + ll_trans + "]");
+				}
+				return returnObj;
+			}
+		}catch(SocketTimeoutException e){
+			if(NovaLogger.isInit()){
+				NovaLogger.getLogger(this).debug("调用远程服务[" + _servicename + "][" + _methodname + "]发生超时！"); //
+			}
+			throw e;
+		}catch (Exception ex) {
+			throw ex;
+		} finally {
+			//conn.
+		}
+	}
+}
+/**************************************************************************
+ * $RCSfile: RemoteCallClient.java,v $  $Revision: 1.4.6.4 $  $Date: 2009/05/12 04:04:26 $
+ *
+ * $Log: RemoteCallClient.java,v $
+ * Revision 1.4.6.4  2009/05/12 04:04:26  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4.6.3  2009/02/24 06:21:28  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4.6.2  2009/02/10 19:11:23  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4.6.1  2009/01/31 12:40:40  wangqi
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/07/18 06:29:29  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/06/06 12:59:21  qilin
+ * no message
+ *
+ * Revision 1.2  2007/05/31 07:38:24  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 05:56:36  qilin
+ * no message
+ *
+ * Revision 1.25  2007/03/22 03:11:49  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.24  2007/03/22 02:03:51  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.23  2007/03/22 01:56:02  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.22  2007/03/21 05:52:28  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.21  2007/03/16 03:38:40  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.20  2007/03/14 07:08:00  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.19  2007/03/07 08:33:57  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.18  2007/03/07 08:32:31  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.17  2007/03/07 02:01:55  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.16  2007/03/02 01:44:02  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.15  2007/03/01 09:06:56  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.14  2007/02/25 10:02:15  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.13  2007/02/25 09:37:10  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.12  2007/02/25 07:30:26  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.11  2007/02/25 07:19:06  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.10  2007/02/10 08:51:58  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.9  2007/02/10 08:33:32  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.8  2007/02/10 07:57:02  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.7  2007/02/10 07:28:30  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.6  2007/02/10 07:20:05  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.5  2007/02/10 07:13:05  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.4  2007/02/10 06:23:44  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.3  2007/01/31 10:23:16  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 03:41:28  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

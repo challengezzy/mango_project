@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" 
+		   width="100%" height="100%" xmlns:ns="http://openscales.org"
+		   creationComplete="creationCompleteHandler()" xmlns:gis="smartx.bam.flex.modules.gis.*" 
+		   xmlns:widget="smartx.bam.flex.modules.gis.widget.*" initialize="init()"
+		   xmlns:headerController="smartx.bam.flex.modules.gis.headerController.*">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import com.degrafa.geometry.Geometry;
+			
+			import flash.utils.getDefinitionByName;
+			
+			import mx.collections.ArrayCollection;
+			
+			import org.openscales.core.events.FeatureEvent;
+			import org.openscales.core.feature.Feature;
+			import org.openscales.core.layer.Layer;
+			import org.openscales.core.layer.VectorLayer;
+			import org.openscales.core.style.Style;
+			import org.openscales.fx.control.FeatureDrawing;
+			import org.openscales.fx.control.PanZoom;
+			import org.openscales.fx.control.Zoom;
+			import org.openscales.fx.layer.FxWFS;
+			import org.openscales.fx.layer.FxWMSC;
+			import org.openscales.geometry.Geometry;
+			
+			import smartx.bam.flex.modules.gis.event.GisEvent;
+			import smartx.bam.flex.modules.gis.utils.UIManager;
+			import smartx.bam.flex.modules.gis.vo.WidgetStates;
+			import smartx.flex.components.util.Hashtable;
+			
+			import spark.components.Label;
+			import spark.components.List;
+			[Bindable]
+			public var mapUrl:String;
+			[Bindable]
+			public var basicLayers:Array;//基础图层
+			[Bindable]
+			public var entityLayers:Array;//业务图层
+			[Bindable]
+			public var centerPoint:String;
+			[Bindable]
+			public var zoom:String;
+			[Bindable]
+			public var contentXml:XML;
+			//默认图片路径
+			public static const DEFAULT_WIDGET_ICON:String = "smartx/bam/flex/assets/image/gis/i_widget.png";
+			
+			private var widgetHashtabel:Hashtable = new Hashtable();//key:widgetId,value:widgetControl
+			[Bindable]
+			public var srid:String;
+			
+			private function init():void{
+				initLayers();
+			}
+			
+			private function creationCompleteHandler():void{
+//				UIManager.setViewerStyle();//初始化样式
+				initBasicTool();
+				widgetHashtabel.clear();
+				loadWidget();
+				fxMap.addEventListener(GisEvent.WIDGET_RUN,widgetRun);
+			}
+			
+			private var tempWfsLayers:Array = [];//临时存放WFS图层用于最后初始化
+			
+			//初始化基础图层和业务图层
+			private function initLayers():void{
+				for each(var basicLayer:XML in basicLayers){
+					if(String(basicLayer.@isWfs) == "true" )
+						tempWfsLayers.push(basicLayer);
+					if(String(basicLayer.@isWms) == "true")
+						addWmsLayer(basicLayer);
+				}
+				
+				for each(var entityLayer:XML in entityLayers){
+					if(String(entityLayer.@isWfs) == "true" )
+						tempWfsLayers.push(entityLayer);
+					if(String(entityLayer.@isWms) == "true")
+						addWmsLayer(entityLayer);
+				}
+				
+				for each(var wfsLayer:XML in tempWfsLayers){
+					addWfsLayer(wfsLayer);
+				}
+			}
+			
+			private function addWfsLayer(layer:XML):void{
+				var wfs:FxWFS = new FxWFS;
+				wfs.name = String(layer.@title) + "(wfs)";
+				wfs.url = this.mapUrl.concat("/wfs");
+				wfs.projection = srid;
+				wfs.typename = encodeURI(String(layer.@name));
+				wfs.style = Style.getDefaultStyle();
+				wfs.version = "1.0.0";
+				wfs.visible = false;
+				fxMap.addElement(wfs);
+			}
+			
+			private function addWmsLayer(layer:XML):void{
+				var wmsc:FxWMSC = new FxWMSC;
+				wmsc.name = String(layer.@title) + "(wms)";
+				wmsc.url = this.mapUrl.concat("/wms");
+				wmsc.layers = encodeURI(String(layer.@name));
+				wmsc.transparent = true;
+				wmsc.format = "image/png";
+				wmsc.projection = srid;
+				wmsc.version = "1.1.1";
+				fxMap.addElement(wmsc);
+			}
+			
+			//初始化基础工具
+			private function initBasicTool():void{
+				mp.mousePositionCrsComboBox.visible = false;
+				mp.mousePositionUnitsComboBox.visible = false;
+				mp.selectedIndexUnit = 1;
+				
+				pan.panEast.label = "E";
+				pan.panWest.label = "W";
+				pan.panSouth.label = "S";
+				pan.panNorth.label = "N";
+				
+				if(String(contentXml.mapInfo.@showPan) == "false")
+					fxMap.removeElement(pan);
+				
+				if(String(contentXml.mapInfo.@showZoom) == "false")
+					fxMap.removeElement(zoomControl);
+				
+				if(String(contentXml.mapInfo.@showLayerManager) == "false")
+					fxMap.removeElement(layerManager);
+				
+				if(String(contentXml.mapInfo.@showScaleline) == "false")
+					fxMap.removeElement(scaleLine);
+				
+				if(String(contentXml.mapInfo.@showMousePosition) == "false")
+					fxMap.removeElement(mp);
+			}
+			
+			private function loadWidget():void{
+				for each(var widgetXml:XML in contentXml.widgets.widget){
+					if(String(widgetXml.@preload) != "no")
+						openWidget(Number(widgetXml.@id));
+				}
+			}
+			
+			private function widgetRun(event:GisEvent):void{
+				var widgetId:Number = event.data as Number;
+				openWidget(widgetId);
+			}
+			
+			private function openWidget(widgetId:Number):void{
+				if(widgetHashtabel.containsKey(widgetId)){
+					var widget:WidgetControl = widgetHashtabel.find(widgetId) as WidgetControl;
+					widget.setState(WidgetStates.WIDGET_OPENED);
+				}else{
+					var widgetControl:WidgetControl = createWidgetControl(widgetId);
+					widgetHashtabel.add(widgetId,widgetControl);
+					widgetControl.setState(WidgetStates.WIDGET_OPENED);
+					addWidgetControl(widgetControl);
+				}
+			}
+			
+			private function createWidgetControl(widgetId:Number):WidgetControl{
+				var widgetXml:XML = contentXml.widgets.widget.(@id==widgetId).length()>0?contentXml.widgets.widget.(@id==widgetId)[0]:null;
+				if(widgetXml == null)
+					throw new Error("没有找到ID为["+widgetId+"]的WidgetControl！");
+				var classRefrence:Class = getDefinitionByName(String(widgetXml.@url)) as Class;
+				var widgetControl:WidgetControl = new classRefrence();
+				widgetControl.widgetId = Number(widgetXml.@id);
+				widgetControl.widgetTitle = String(widgetXml.@name);
+				widgetControl.x = Number(widgetXml.@x);
+				widgetControl.y = Number(widgetXml.@y);
+				widgetControl.initialHeight = Number(widgetXml.@height);
+				widgetControl.initialWidth = Number(widgetXml.@width);
+				widgetControl.preload = String(widgetXml.@preload);
+				widgetControl.contentXml = this.contentXml;
+				widgetControl.fxMap = fxMap;
+				widgetControl.widgetIcon = String(widgetXml.@icon)==""?GisMap.DEFAULT_WIDGET_ICON:String(widgetXml.@icon);
+				return widgetControl;
+			}
+			
+			private function addWidgetControl(widget:WidgetControl):void{
+				fxMap.addControl(widget);
+			}
+		]]>
+	</fx:Script>
+	<ns:Map id="fxMap" width="100%" height="100%" resolution="{zoom}"  maxExtent="-180,-90,180,90" center="{centerPoint}">
+		<headerController:HeaderController id="headerController" x="0" y="0" 
+										   height="85" width="100%" contentXml="{contentXml}" fxMap="{fxMap}"/>
+		<!--<ns:Mapnik name="Mapnik" />-->
+		<ns:Pan id="pan" x="10" y="{headerController.height-40}" />
+		<ns:Zoom id="zoomControl" x="30" y="{headerController.height-40}" />
+		<ns:MousePosition id="mp" x="10" y="{fxMap.height-20}" displayProjection="{srid}"/>
+		<!--<ns:SelectFeatures id="selectFeatures" active="true" drawingMode="multiple"  />-->
+		<ns:Spinner x="{width / 2}" y="{height / 2}"/>
+		<ns:KeyBoardHandler id="keyboardHandler" />
+		<ns:DragHandler active="true" />
+		<ns:WheelHandler/>
+		<!--<ns:ClickHandler />-->
+		<ns:SelectFeaturesHandler active="true" enableClickSelection="false" enableBoxSelection="false" enableOverSelection="false" />
+		<!--<ns:OverviewMapRatio id="overviewMap" width="200" height="200" x="{width-overviewMap.width}" y="{height-overviewMap.height}" />-->
+		<!--<ns:TraceInfo x="{width-200}" y="0" />-->
+		<ns:ScaleLine id="scaleLine" x="10" y="{height-80}"/>
+		<ns:LayerManager id="layerManager" x="{width-200}" panelTitle="图层管理" y="{headerController.height-45}" width="200">
+			<ns:rendererOptions>
+				<fx:Object displayZoomToExtent="true" />
+			</ns:rendererOptions> 
+		</ns:LayerManager>
+	</ns:Map>
+</mx:Canvas>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<design:ControlStyleEditorBase  xmlns:mx="http://www.adobe.com/2006/mxml"
+								width="100%" xmlns:design="myreport.design.*">
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			public function set Source(value:*):void
+			{
+				_Text.dataProvider = value;
+				Refresh();
+			}
+			
+			protected override function OnSetData():void
+			{
+				_Label.text = DesignUtil.GetLabelName(Name);
+				Refresh();
+			}
+			
+			private function Refresh():void
+			{
+				if(!Name)
+					return;
+				var value:String = Setting.GetStyle(Name);
+				var source:ArrayCollection = _Text.dataProvider as ArrayCollection;
+				if(!source)
+					return;
+				
+				for each(var item:Object in source)
+				{
+					if(item == value)
+					{
+						_Text.selectedItem = item;
+					}
+				}
+			}
+			
+			private function OnChanged():void
+			{
+				if(_Text.selectedItem)
+					Setting.SetStyle(Name, _Text.selectedItem.toString());
+			}
+		]]>
+	</mx:Script>
+	<mx:Label id="_Label" text="标签"/>
+	<mx:Spacer width="100%"/>
+	<mx:ComboBox width="128" editable="false" id="_Text" fontWeight="normal" change="OnChanged()"/>
+</design:ControlStyleEditorBase>

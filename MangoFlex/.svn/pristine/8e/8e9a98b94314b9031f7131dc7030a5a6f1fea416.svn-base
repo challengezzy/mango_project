@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   verticalScrollPolicy="off"
+		   horizontalScrollPolicy="off"
+		   xmlns:mx="library://ns.adobe.com/flex/mx"  fontSize="12" xmlns:ns1="smartx.flex.components.*" 
+		   creationComplete="init()" xmlns:viewStackEffects="org.efflex.mx.viewStackEffects.*" xmlns:core="smartx.flex.components.core.*"
+		   preinitialize="preinit()">
+	<fx:Metadata>		       
+	    [Event(name='edit',type='smartx.flex.components.event.StyleTemplateEvent')]
+	    [Event(name='insert',type='smartx.flex.components.event.StyleTemplateEvent')]
+	    [Event(name='beforeSave',type='smartx.flex.components.event.StyleTemplateEvent')]
+	    [Event(name='save',type='smartx.flex.components.event.StyleTemplateEvent')]
+	    [Event(name='returnToList',type='smartx.flex.components.event.StyleTemplateEvent')]
+	    [Event(name='view',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='saveSuccessful',type='smartx.flex.components.event.StyleTemplateEvent')]
+		[Event(name='afterInit',type='smartx.flex.components.event.StyleTemplateEvent')]
+	</fx:Metadata>
+	<fx:Declarations>
+		<mx:HBox width="100%" id="listButtonBox">
+			<mx:PopUpMenuButton label="操作" id="operationButton" dataProvider="{operationList}" openAlways="true"
+								icon="{AssetsFileLib.operationIcon}"  />
+		</mx:HBox>
+		<fx:Object id="viewButton" label="查看" handler="{onEdit}"  icon="{AssetsFileLib.viewIcon}" rightClick="true"/>
+		<fx:Object id="editButton" label="编辑" handler="{onEdit}"  icon="{AssetsFileLib.editingIcon}" rightClick="true"/>
+		<fx:Object id="insertButton" label="新增" handler="{onInsert}"  icon="{AssetsFileLib.insertIcon}" rightClick="true"/>
+		<fx:Object id="deleteButton" label="删除" handler="{onDelete}"  icon="{AssetsFileLib.delete2Icon}" rightClick="true"/>
+		<fx:Object id="copyinsertButton" label="复制新增" handler="{oncopyInsert}"  icon="{AssetsFileLib.subDatataskIcon}" rightClick="true"/>
+		
+		<mx:Button id="viewBtn" label="查看" icon="{AssetsFileLib.viewIcon}" click="onEdit()" />
+		<mx:Button id="editBtn" label="编辑" icon="{AssetsFileLib.editingIcon}" click="onEdit()" />
+		<mx:Button id="insertBtn" label="新增" icon="{AssetsFileLib.insertIcon}" click="onInsert()" />
+		<mx:Button id="deleteBtn" label="删除" icon="{AssetsFileLib.delete2Icon}" click="onDelete()" />
+		<mx:Button id="copyinsertBtn" label="复制新增" icon="{AssetsFileLib.subDatataskIcon}" click="oncopyInsert()" />
+	</fx:Declarations>
+	<fx:Script>
+	<![CDATA[
+		import mx.collections.ArrayCollection;
+		import mx.controls.Menu;
+		import mx.effects.Effect;
+		import mx.effects.EffectInstance;
+		import mx.events.ListEvent;
+		import mx.events.MenuEvent;
+		import mx.utils.ObjectUtil;
+		import mx.utils.OnDemandEventDispatcher;
+		
+		import org.efflex.mx.Papervision3DEffect;
+		import org.efflex.mx.pairViewStackEffects.PairViewStackEffect;
+		import org.efflex.mx.viewStackEffects.CoverFlowPapervision3D;
+		import org.efflex.mx.viewStackEffects.Papervision3DViewStackEffect;
+		
+		import smartx.flex.components.assets.AssetsFileLib;
+		import smartx.flex.components.event.BillCardPanelEvent;
+		import smartx.flex.components.event.StyleTemplateEvent;
+		import smartx.flex.components.styletemplate.ifc.ListButtonListener;
+		import smartx.flex.components.util.SmartXMessage;
+		import smartx.flex.components.vo.GlobalConst;
+		[Bindable]
+		public var templetCode:String;
+		[Bindable]
+		public var debugMode:Boolean = false;
+		[Bindable]
+		public var editable:Boolean = false;
+		//add by xuzhlin 20121229 允许禁用切换效果
+		public var disableEffect:Boolean = false;
+		
+		//add by zhangzy 20130106 对新建、删除按钮配置
+		public var isShowInsertBtn:Boolean = true;//显示新建按钮
+		public var isShowDelBtn:Boolean = true;// 是否显示删除按钮
+		[Bindable]
+		public var cardLayoutType:String = GlobalConst.LAYOUTTYPE_BILLCARDPANEL_VBOX;//卡片布局方式
+		[Bindable]
+		public var itemLabelWidth:int = 160;
+		
+		[Bindable]
+		public var switchEffect:Effect;
+		private var returnAfterSave:Boolean = false;
+		[Bindable]
+		public var showSystemButton:Boolean = true;
+		[Bindable]
+		public var destination:String = GlobalConst.SERVICE_FORM;
+		[Bindable]
+		public var endpoint:String;
+		[Bindable]
+		public var initQueryCondition:String;
+		[Bindable]
+		public var isShowAlert:Boolean = true;
+		[Bindable]
+		public var allowMultipleSelection:Boolean;
+		
+		[Bindable]
+		public var pageSize:Number = 40;
+		//add by zhangzz 20110402 begin
+		[Bindable]
+		public var insertbfIncCard:String;
+		[Bindable]
+		public var insertafIncCard:String;
+		[Bindable]
+		public var updatebfIncCard:String;
+		[Bindable]
+		public var updateafIncCard:String;
+		[Bindable]
+		public var deletebfIncCard:String;
+		[Bindable]
+		public var deleteafIncCard:String;
+		
+		[Bindable]
+		public var clientInsertBfIncCard:String;
+		[Bindable]
+		public var clientInsertAfIncCard:String;
+		[Bindable]
+		public var clientUpdateBfIncCard:String;
+		[Bindable]
+		public var clientUpdateAfIncCard:String;
+		[Bindable]
+		public var clientDeleteBfIncCard:String;
+		[Bindable]
+		public var clientDeleteAfIncCard:String;
+		
+		//add by zhangzz 20110402 end
+		
+		//add by zhangzz 20110427 begin
+		[Bindable]
+		public var bfIncList:String;
+		[Bindable]
+		public var afIncList:String;
+		[Bindable]
+		public var clientBfIncList:String;
+		[Bindable]
+		public var clientAfIncList:String;
+		//add by zhangzz 20110427 end
+		[Bindable]
+		public var operationList:ArrayCollection = new ArrayCollection();
+		[Bindable]
+		public var showDataAfterInit:Boolean = false;
+		
+		public var beforeInitFun:Function;
+		
+		//显示操作按钮的方式（默认为MENU）
+		public var showOperationButtonType:String;
+		
+		//add by zhangzz 2012-09-29 begin
+		[Bindable]
+		public var customDefineDataGridColumns:Array = [];//列表自定义列
+		//add by zhangzz 2012-09-29 end
+		
+		public var doubleClickHandler:ListButtonListener;
+		
+		private function preinit():void{
+			if(showOperationButtonType == null ||showOperationButtonType == "")
+				showOperationButtonType = GlobalConst.STYLETEMPLATE_OPERATION_MENU;
+			
+			//初始化操作按钮
+			if(!editable){
+				operationList.addItem(viewButton);
+				operationList.addItem(viewBtn);
+			}
+			else{
+				operationList.addItem(editButton);
+				operationList.addItem(editBtn);
+				
+				if(isShowInsertBtn){
+					operationList.addItem(insertButton);
+					operationList.addItem(insertBtn);
+					operationList.addItem(copyinsertButton);
+					operationList.addItem(copyinsertBtn);
+				}
+				
+				if(isShowDelBtn){
+					operationList.addItem(deleteButton);
+					operationList.addItem(deleteBtn);
+				}
+			}
+		}
+		
+		override protected function createChildren():void{
+			super.createChildren();
+			if(!showSystemButton){
+				//listBox.removeChild(listButtonBox);
+				operationList.removeAll();
+				cardBox.removeChild(cardButtonBox);
+			}
+			else{
+				if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_MENU){
+					operationList.filterFunction = function (item:*):Boolean{
+						if(item is Button)
+							return false;
+						else
+							return true;
+					}
+					operationList.refresh();
+				}
+				listPanel.topArea.addChild(listButtonBox);
+			}
+			if(!editable){
+				cardButtonBox.removeChild(saveAndReturnButton);
+				cardButtonBox.removeChild(cardSaveButton);
+			}
+			
+		}
+		
+		private function init():void{
+			if(beforeInitFun != null)
+				beforeInitFun();
+			if(templetCode == null)
+        		throw Error("元原模板编号不能为null");
+        	if(!disableEffect && switchEffect == null)
+        		switchEffect = new CoverFlowPapervision3D();
+        	if(showSystemButton){
+				if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_BUTTON){
+					if(operationButton && listButtonBox.contains(operationButton) )
+						listButtonBox.removeChild(operationButton);
+					for each(var operation:* in operationList){
+						if(operation is Button)
+							listButtonBox.addChild(operation);
+					}
+				}else if(showOperationButtonType == GlobalConst.STYLETEMPLATE_OPERATION_MENU){
+					var operationMenu:Menu = operationButton.popUp as Menu;
+					operationMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler);
+				}
+				
+				//添加右键菜单
+				
+				if(listPanel.rightClickMenu != null){
+					listPanel.rightClickMenu.addEventListener(MenuEvent.ITEM_CLICK,operationButton_itemClickHandler,false,0,true);
+					for each(var obj:* in operationList){
+						if(obj is Button)
+							continue;
+						if(obj.rightClick){
+							//需要添加到右键菜单
+							listPanel.rightClickMenuItems.push(obj);
+						}
+					}
+				}
+			}
+			//没有操作菜单是，去除操作按钮
+			if(operationList.length == 0){
+				if(operationButton && listButtonBox.contains(operationButton) )
+					listButtonBox.removeChild(operationButton);
+			}
+			
+			//设置双击事件
+			listPanel.addEventListener(MouseEvent.DOUBLE_CLICK,function(event:MouseEvent):void{
+				if(doubleClickHandler != null){
+					doubleClickHandler.buttonClick(listPanel);
+				}
+				else
+					onEdit();
+			});
+			
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.AFTERINIT));
+		}
+			
+		public function onReturn():void{
+			listPanel.refreshData();
+			
+			mainStack.selectedChild = listBox;
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.RETURN_TO_LIST));
+		}
+		
+		public function isListPanelShowing():Boolean{
+			return (mainStack.selectedChild == listBox);
+		}
+		
+		public function onEdit():void{
+			if(listPanel.getSelectedRowValue() != null){
+			 	var row:Object = listPanel.getSelectedRowValue();
+			 	cardPanel.editable = editable;
+			 	cardPanel.setDataValue(row);
+			 	mainStack.selectedChild = cardBox;
+			 	cardPanel.insertMode = false;
+			 	if(editable)
+			 		dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.EDIT));
+			 	else
+			 		dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.VIEW));
+			}
+			else
+				SmartXMessage.show("请选择一条记录");
+		}
+		
+		public function onInsert():void{
+		 	//cardPanel.editable = true;
+		 	cardPanel.setDataValue(new Object());
+		 	mainStack.selectedChild = cardBox;
+		 	cardPanel.insertMode = true;
+		 	dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.INSERT));
+		}
+		
+		public function oncopyInsert():void{
+            var o:Object=listPanel.getSelectedRowValue();
+			if(o==null){
+				SmartXMessage.show("请选择一条记录");
+				return;
+			}
+			var o2:Object=ObjectUtil.copy(o);
+			o2[this.listPanel.primaryKey]=null;
+			cardPanel.setDataValue(o2);
+			cardPanel.insertMode = true;
+			mainStack.selectedChild = cardBox;
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.INSERT));
+		}
+		
+		public function onDelete():void{
+			listPanel.deleteRow();
+		}
+		
+		public function onSave():void{
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.BEFORE_SAVE,cardPanel.getDataValue()));
+			cardPanel.save();
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.SAVE));
+		}
+		
+		public function onSaveAndReturn():void{
+			onSave();
+			returnAfterSave = true;
+		}
+		private function onSaveSuccessful():void{
+			//listPanel.query(false,false,true,null); 不能这样简单的查询，要判断是插入还是编辑模式，查询有限的数据，目前查询出了所有数据
+			
+			
+			dispatchEvent(new StyleTemplateEvent(StyleTemplateEvent.SAVESUCCESSFUL,cardPanel.getDataValue()));
+			if(returnAfterSave)
+				onReturn();
+			cardPanel.insertMode = false;
+			returnAfterSave = false;
+		}
+
+		protected function operationButton_itemClickHandler(event:MenuEvent):void
+		{
+			var item:* = event.item;
+			if(item.handler != null)
+				item.handler();
+		}
+		
+	]]>
+	</fx:Script>
+	<mx:ViewStack width="100%" height="100%" id="mainStack" creationPolicy="all" >
+	 	<mx:VBox width="100%" height="100%" id="listBox" verticalScrollPolicy="off" horizontalScrollPolicy="off" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+	    	    <core:BillListPanel 
+					allowMultipleSelection="{allowMultipleSelection}"
+					destination="{destination}" endpoint="{endpoint}" 
+					templetCode="{templetCode}" 
+					id="listPanel" editable="false" width="100%" height="100%" 
+					showEditBox="false" debugMode="{debugMode}" 
+					initQueryCondition="{initQueryCondition}" showDataAfterInit="{showDataAfterInit}" 
+					afInterceptor="{afIncList}" bfInterceptor="{bfIncList}"
+					clientBfIncList="{clientBfIncList}"
+					clientAfIncList="{clientAfIncList}"
+					rowCountPerPage="{pageSize}"
+					isShowAlert = "{isShowAlert}" customDefineDataGridColumns="{customDefineDataGridColumns}" />
+	     </mx:VBox>
+	 	  <mx:VBox label="" width="100%" height="100%" id="cardBox" showEffect="{switchEffect}" hideEffect="{switchEffect}">
+	 	  		<mx:HBox width="100%" id="cardButtonBox">
+	    	    	    <mx:Button id="returnButton" label="返回" toolTip="返回列表" click="onReturn()" icon="{AssetsFileLib.returnIcon}"/>
+	    	    	    <mx:Button id="saveAndReturnButton" label="保存并返回" toolTip="保存当前信息并返回列表" click="onSaveAndReturn()" icon="{AssetsFileLib.savereturnIcon}"/>
+	    	    	    <mx:Button id="cardSaveButton" label="保存" toolTip="保存当前信息" click="onSave()" icon="{AssetsFileLib.saveIcon}"/>
+	    	    </mx:HBox>
+	    	    <core:BillCardPanel insertBfInterceptor="{insertbfIncCard}" insertAfInterceptor="{insertafIncCard}"
+									updateBfInterceptor="{updatebfIncCard}" updateAfInterceptor="{updateafIncCard}"
+									deleteBfInterceptor="{deletebfIncCard}" deleteAfInterceptor="{deleteafIncCard}"
+									clientInsertBfIncCard="{clientInsertBfIncCard}" clientInsertAfIncCard="{clientInsertAfIncCard}"
+									clientUpdateBfIncCard="{clientUpdateBfIncCard}" clientUpdateAfIncCard="{clientUpdateAfIncCard}"
+									clientDeleteBfIncCard="{clientDeleteBfIncCard}" clientDeleteAfIncCard="{clientDeleteAfIncCard}"
+									isShowAlert="{isShowAlert}" destination="{destination}" endpoint="{endpoint}" 
+									templetCode="{templetCode}" id="cardPanel" width="100%" height="100%" title="详细信息" 
+									layoutType="{cardLayoutType}" defaultItemUIComponentLabelWidth="{itemLabelWidth}"
+									debugMode="{debugMode}" saveSuccessful="onSaveSuccessful()" showInitingWindow="false">
+	    	    </core:BillCardPanel>
+	 	  </mx:VBox>
+	 </mx:ViewStack>
+  
+	 
+</mx:Canvas>

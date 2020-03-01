@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" 
+				width="400" height="350" title="数据任务参数设置" 
+				close="PopUpManager.removePopUp(this)" showCloseButton="true">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.managers.PopUpManager;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.util.Hashtable;
+			
+			public var variableControlMap:Hashtable = new Hashtable();//动态变量控件MAP
+			
+			[Bindable]
+			public var confirmFunc:Function;
+			
+			[Bindable]
+			public var cancelFunc:Function = function():void{
+				PopUpManager.removePopUp(this);
+			};
+		]]>
+	</fx:Script>
+	<mx:VBox height="100%" id="controlBox" 
+			 verticalAlign="top" horizontalAlign="center" width="100%"
+			 paddingTop="5" paddingBottom="5" paddingLeft="5" paddingRight="5" 
+			 borderStyle="none"/>
+	<mx:HBox width="100%" paddingTop="5" paddingBottom="5" paddingLeft="8" paddingRight="8" horizontalAlign="center">
+		<mx:Button icon="{AssetsFileLib.okIcon}" label="确定"  click="confirmFunc()" height="22"/>
+		<mx:Button icon="{AssetsFileLib.clearIcon}" label="取消"  click="cancelFunc()"  height="22"/>
+	</mx:HBox>
+</mx:TitleWindow>

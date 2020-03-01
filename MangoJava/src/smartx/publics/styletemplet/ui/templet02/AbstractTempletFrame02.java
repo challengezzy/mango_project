@@ -1,0 +1,999 @@
+package smartx.publics.styletemplet.ui.templet02;
+
+
+import java.awt.BorderLayout;
+import java.awt.CardLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.HashMap;
+
+import javax.swing.Action;
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JToolBar;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+
+import smartx.framework.common.ui.NovaClientEnvironment;
+import smartx.framework.common.ui.NovaConstants;
+import smartx.framework.common.ui.NovaRemoteServiceFactory;
+import smartx.framework.common.ui.UIUtil;
+import smartx.framework.common.utils.Sys;
+import smartx.framework.common.vo.HashVO;
+import smartx.framework.metadata.ui.AbstractCustomerButtonBarPanel;
+import smartx.framework.metadata.ui.BillCardPanel;
+import smartx.framework.metadata.ui.BillListPanel;
+import smartx.framework.metadata.ui.CustomerCtrlIFC;
+import smartx.framework.metadata.ui.NovaEvent;
+import smartx.framework.metadata.ui.NovaEventListener;
+import smartx.framework.metadata.ui.NovaMessage;
+import smartx.framework.metadata.ui.QuickQueryActionPanel;
+import smartx.framework.metadata.ui.componentscard.QueryDialog;
+import smartx.framework.metadata.util.UIComponentUtil;
+import smartx.framework.metadata.vo.BillVO;
+import smartx.framework.metadata.vo.RowNumberItemVO;
+import smartx.publics.styletemplet.ui.AbstractStyleFrame;
+
+/**
+ * 风格模板02：单表列/卡
+ * @author 
+ *
+ */
+public abstract class AbstractTempletFrame02 extends AbstractStyleFrame implements NovaEventListener {
+    protected String templetcode = null;
+    protected String customerpanel = null;
+    protected AbstractCustomerButtonBarPanel panel_customer = null;
+    protected String[] menu = null;
+    
+    protected CardLayout cardlayout = null;
+    
+    protected boolean enablesave = false;           //卡片和列表切换处理
+    protected JPanel tablep = null;
+    protected BillListPanel table = null;
+    protected BillCardPanel card = null;
+    protected QuickQueryActionPanel querypanel = null;
+    protected IUIIntercept_02 uiIntercept = null; // ui端拦截器
+    protected String bsIntercept = null; // bs端拦截器
+    protected boolean showsystembutton = true;
+    protected JPanel systembtnpanel = null;
+    protected JPanel wfBtnPanel = null; //工作流按钮面板!!
+    
+    protected JButton btn_quick = null;
+    protected JButton btn_insert = null; // 新增
+    protected JButton btn_delete = null;
+    protected JButton btn_edit = null;
+    protected JButton btn_save_return = null;
+    protected JButton btn_cancel_return = null;
+    protected JButton btn_view = null;
+    protected JButton btn_search = null;    
+    protected JButton btn_return = null;
+    protected JButton btn_save = null;
+    protected JButton btn_back = null;
+    
+    
+    /**
+     * 风格模板2的构造方法
+     */
+    public AbstractTempletFrame02() {
+        super();
+        init(); //
+    }
+    /**
+     * 风格模板2的构造方法
+     * @param _title 标题
+     */
+    public AbstractTempletFrame02(String _title) {
+        super(_title);
+    }
+
+    
+
+    //////以下应该继承实现//////////////////////////////////
+    /**
+     * 抽象接口方法 获得元原模板编码
+     * @return
+     */
+    public abstract String getTempletcode();
+    
+    /**
+     * 获得自定义面板类定义
+     * @return
+     */
+    public String getCustomerpanel() {
+        return customerpanel;
+    }
+
+    /**
+     * 是否显示系统按钮
+     * @return
+     */
+    public boolean isShowsystembutton() {
+        return showsystembutton;
+    }
+
+    /**
+     * 获得UI拦截器定义
+     * @return
+     */
+    public String getUiinterceptor() {
+        return null;
+    }
+    
+    /**
+     * 获得BS拦截器定义
+     * @return
+     */
+    public String getBsinterceptor() {
+        return bsIntercept;
+    }
+    
+    /**
+     * 获得系统功能选择路径
+     * @return
+     */
+    public String[] getSys_Selection_Path(){
+    	return menu;
+    }
+
+    //////以上应该继承实现//////////////////////////////////
+    
+    /**
+     * 初始化.
+     */
+    protected void init() {
+        templetcode = getTempletcode(); //
+        customerpanel = getCustomerpanel();
+        menu = getSys_Selection_Path();
+        showsystembutton = isShowsystembutton();
+        /**
+         * 创建UI端拦截器
+         */
+        if (getUiinterceptor() != null && !getUiinterceptor().trim().equals("")) {
+            try {
+                uiIntercept = (IUIIntercept_02) Class.forName(getUiinterceptor().trim()).newInstance(); //
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        //初始化控件
+        initVars();
+        
+        this.setTitle(getTempletTitle());        
+        this.setSize(getTempletSize());
+
+        this.getContentPane().setLayout(new BorderLayout());
+        this.getContentPane().add(getNorthButtonsPanel(), BorderLayout.NORTH); // 按钮面板,包括系统按钮与用户自定义按钮
+        this.getContentPane().add(getBody(), BorderLayout.CENTER); // 内容栏
+
+    }
+    
+    /**
+     * 初始化本地变量
+     */
+    protected void initVars() {
+    	btn_quick = new JButton(Sys.getSysRes("edit.simplequery.msg"), UIUtil.getImage(Sys.getSysRes("edit.simplequery.icon")));
+        btn_save = new JButton(Sys.getSysRes("edit.save.msg"), UIUtil.getImage(Sys.getSysRes("edit.save.icon")));
+        btn_save_return = new JButton("保存并返回", UIUtil.getImage(Sys.getSysRes("edit.save.icon")));
+        btn_cancel_return = new JButton("放弃并返回");
+        btn_save.setVisible(false);
+        btn_return = new JButton("切换");
+        btn_insert = new JButton(Sys.getSysRes("edit.new.msg"), UIUtil.getImage(Sys.getSysRes("edit.new.icon")));
+        btn_delete = new JButton(Sys.getSysRes("edit.delete.msg"), UIUtil.getImage(Sys.getSysRes("edit.delete.icon")));
+        btn_edit = new JButton(Sys.getSysRes("edit.edit.msg"), UIUtil.getImage(Sys.getSysRes("edit.edit.icon")));
+        btn_view = new JButton(Sys.getSysRes("edit.view.msg"), UIUtil.getImage(Sys.getSysRes("edit.view.icon")));
+        btn_search = new JButton(Sys.getSysRes("edit.complexquery.msg"), UIUtil.getImage(Sys.getSysRes("edit.complexquery.icon")));
+        btn_back = new JButton("返回");
+
+        table = new BillListPanel(templetcode, true, false); // 创建列表!!
+        table.setLoadedFrame(this);
+        table.addNovaEventListener(this); //
+        table.initialize();
+        table.setAllItemValue("listiseditable", NovaConstants.BILLCOMPENTEDITABLE_NONE);
+        table.getTable().getSelectionModel().addListSelectionListener(new MyBillListPanelRowChangedListener()); //
+
+        card = new BillCardPanel(table.getTempletVO()); // 创建卡片!!!
+        card.setLoadedFrame(this);
+        card.addNovaEventListener(this); // 注册自己事件监听!!
+        // card.setBorderTitle("Test Border");
+        tablep = new JPanel();
+        cardlayout = new CardLayout();
+
+        tablep.setLayout(cardlayout);
+
+        tablep.add(table, "table");
+        tablep.add(card, "card");
+
+    }
+    
+    /**
+     * 获取窗口大小
+     *
+     * @return Dimension
+     */
+    protected Dimension getTempletSize() {    	
+        return UIComponentUtil.getInternalFrameDefaultSize();
+    }
+    
+    /**
+     * 获取窗口标题
+     *
+     * @return String
+     */
+    protected String getTempletTitle() {
+        return (menu==null)?templetcode:(menu[menu.length - 1]+" ["+getNavigation()+"]");        
+    }
+    
+    /**
+     * 获取系统导航
+     * @return String
+     */
+    protected String getNavigation() {        
+        if (menu == null) {
+            return "";
+        }
+        StringBuffer sbf=new StringBuffer();
+        sbf.append(NovaConstants.STRING_CURRENT_POSITION);
+        sbf.append(menu[0]);
+        for (int i = 1; i < menu.length; i++) {
+        	sbf.append("/");
+        	sbf.append(menu[i]);        	
+        }
+        return sbf.toString();        
+    }
+    
+    //TODO 整理按钮的响应，用如下方法进行控制更好
+//    protected void toEdit() {
+//    	
+//    }
+//    protected void toList() {
+//    	
+//    }
+//    protected void toShow() {
+//    	
+//    }
+    
+
+    private JPanel getBody() {
+        JPanel rpanel = new JPanel();
+        rpanel.setLayout(new BorderLayout());        
+        rpanel.add(getQueryPanel(), BorderLayout.NORTH); // 快速查询面板!!
+        rpanel.add(getTablePanel(), BorderLayout.CENTER); // 卡片与列表互相切换的面板!!!
+        return rpanel;
+    }
+    
+    /**
+     * 获取面板，包括系统按钮面板和用户自定义按钮面板
+     *
+     * @return JPanel
+     */
+    protected JComponent getNorthButtonsPanel() {
+    	JToolBar tbar = new JToolBar();
+    	tbar.setFloatable(false);
+        tbar.setBorderPainted(false);
+        tbar.add(new JLabel("操作："));
+        
+        
+        btn_quick = UIComponentUtil.getButton(
+            Sys.getSysRes("edit.simplequery.msg"), 
+            UIUtil.getImage(Sys.getSysRes("edit.simplequery.icon")),
+            UIComponentUtil.getButtonDefaultSize(),
+            true,false,
+            new ActionListener() {
+                public void actionPerformed(ActionEvent a) {
+                	onQuickQuery();
+                }
+            }
+        );
+        tbar.add(btn_quick);
+        
+        if (showsystembutton) {
+            getSysBtnPanel(tbar); //
+        }
+        
+        if (wfBtnPanel != null) {
+        	tbar.add(getWFBtnPanel()); //加入工作流按钮面板
+        }
+
+        //处理自定义面板
+        if (customerpanel != null) {
+        	CustomerCtrlIFC ctrl=getCustomerCtrl(customerpanel);
+        	ctrl.setParentCtrl(this);//设置所在控件
+        	Action[] acts=ctrl.getActionCtrls();
+        	if(acts!=null){
+        		UIComponentUtil.buildToolBar(acts ,tbar);
+        	}else{
+        		JComponent[] comps=ctrl.getJComponentCtrls();
+        		if(comps!=null){
+        			UIComponentUtil.buildToolBar(comps ,tbar);
+        		}else{
+        			if(ctrl instanceof AbstractCustomerButtonBarPanel){
+        				panel_customer=(AbstractCustomerButtonBarPanel)ctrl;
+        				panel_customer.setParentFrame(this); //设置所在控件
+        				panel_customer.initialize(); //
+        				tbar.add(panel_customer);
+        			}
+        		}
+        	}        	
+        }
+        return tbar;
+    }
+    
+    /**
+     * 用户自定义控制
+     *
+     * @return JPanel
+     */
+    protected CustomerCtrlIFC getCustomerCtrl(String cls) {
+        try {
+            return (CustomerCtrlIFC)Class.forName(cls).newInstance();            
+        } catch (Exception e) {
+        	NovaMessage.show(this, "初始化[" + customerpanel + "]失败，请检查", NovaConstants.MESSAGE_ERROR);
+            return null;
+        }        
+    }
+    
+    /**
+     * 执行快速检索
+     */
+    protected void onQuickQuery() {
+    	try{
+    		querypanel.onQuery();
+    	}catch(Exception ee){
+    		NovaMessage.show(ee.getMessage(),NovaConstants.MESSAGE_ERROR);
+    	}
+    }
+    
+
+    public BillListPanel getBillListPanel() {
+        return table;
+    }
+
+    public BillCardPanel getBillCarPanel() {
+        return card;
+    }
+
+    // 快速查询
+    protected JPanel getQueryPanel() {
+        if (querypanel != null) {
+            return querypanel;
+        }
+        querypanel = new QuickQueryActionPanel(table);
+        return querypanel;
+    }
+
+
+    /**
+     * 获取模板编码
+     *
+     * @return String
+     */
+    public String getTempletCode() {
+        return this.templetcode;
+    }
+
+    
+    /**
+     * 获取系统按钮面板
+     *
+     * @return Jpanel
+     */
+    protected void getSysBtnPanel(JToolBar tbar) {
+    	
+        btn_save.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_save.setFocusPainted(false);
+        btn_return.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_return.setVisible(false);
+        btn_return.setFocusPainted(false);
+        btn_save_return.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_save_return.setVisible(false);
+        btn_save_return.setFocusPainted(false);
+        btn_cancel_return.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_cancel_return.setVisible(false);
+        btn_cancel_return.setFocusPainted(false);        
+        btn_insert.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_insert.setFocusPainted(false);   
+        btn_delete.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_delete.setFocusPainted(false);   
+        btn_edit.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_edit.setFocusPainted(false);   
+        btn_view.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_view.setFocusPainted(false);   
+        btn_search.setPreferredSize(UIComponentUtil.getButtonDefaultSize());   
+        btn_search.setFocusPainted(false);   
+        btn_back.setPreferredSize(UIComponentUtil.getButtonDefaultSize());
+        btn_back.setVisible(false);        
+        btn_back.setFocusPainted(false);   
+        
+        
+        btn_insert.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onInsert();
+            }
+        });
+
+        btn_delete.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onDelete();
+            }
+        });
+
+        btn_edit.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onEdit();
+            }
+        });
+        btn_search.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onQuery();
+            }
+        });
+        btn_view.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onView();
+            }
+        });
+
+        btn_return.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onReturn();
+            }
+        });
+        btn_save.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onSave();
+            }
+        });
+        btn_save_return.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onSaveAndReturn();
+            }
+        });
+        btn_cancel_return.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onCancelAndReturn();
+            }
+        });
+        btn_back.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                onCancelAndReturn();
+                btn_back.setVisible(false);
+            }
+        });
+        
+        
+        tbar.add(btn_insert);
+        tbar.add(btn_edit);
+        tbar.add(btn_delete);
+        tbar.add(btn_save);
+        tbar.add(btn_save_return);
+        tbar.add(btn_cancel_return);
+        tbar.add(btn_search);
+        tbar.add(btn_view);
+        tbar.add(btn_return);
+        tbar.add(btn_back);
+    }
+
+    //	工作流按扭面板!!如果放按钮,则容易操作,但占地方!!如果换下拉框,则要多点一下!
+    //如是工作流按扭另起一行也是可以考虑的!!!
+    protected JPanel getWFBtnPanel() {
+        if (wfBtnPanel == null) {
+            wfBtnPanel = new JPanel();
+            wfBtnPanel.setLayout(new FlowLayout(FlowLayout.LEFT)); //设置布局,使用水平面局!
+        }
+        return wfBtnPanel;
+    }
+
+    protected void onSaveAndReturn() {
+        if (!onSave()) {
+            return;
+        }
+        card.setEditState(NovaConstants.BILLDATAEDITSTATE_INIT);
+        onReturn();
+    }
+
+    protected void onCancelAndReturn() {
+        card.reset();
+        card.setEditState(NovaConstants.BILLDATAEDITSTATE_INIT);
+        table.getTable().clearSelection();
+        onReturn();
+    }
+
+    /**
+     * 点击新增按钮做的动作!!
+     *
+     */
+    protected void onInsert() {
+        onReturn(); // 切换到卡片!!
+        card.createNewRecord(); // 调用卡片的方法创建创建新的一行!!!!一定要要这个方法做!!
+
+        // 执行拦截器操作!!
+        if (uiIntercept != null) {
+            try {
+                uiIntercept.actionAfterInsert(getBillCarPanel()); // 执行删除前的动作!!
+            } catch (Exception e) {
+                e.printStackTrace(); //
+                return; // 不往下走了!!
+            }
+        }
+
+    }
+
+    /**
+     * 点击删除做的动作!!
+     *
+     */
+    protected void onDelete() {
+        int li_row = table.getTable().getSelectedRow(); // 取得选中的行!!
+        if (table.getTable().getSelectedRowCount() != 1) {
+            NovaMessage.show(NovaConstants.STRING_DEL_SELECTION_NEED, NovaConstants.MESSAGE_ERROR);
+            return;
+        }
+        if (!NovaMessage.confirm(this, NovaConstants.STRING_DEL_CONFIRM)) {
+            return;
+        }
+        // 执行拦截器删除前操作!!
+        if (uiIntercept != null) {
+            try {
+                uiIntercept.actionBeforeDelete(getBillListPanel(), li_row); // 执行删除前的动作!!
+            } catch (Exception e) {
+                if (!e.getMessage().trim().equals("")) {
+                    JOptionPane.showMessageDialog(this, e.getMessage()); //
+                }
+                return; // 不往下走了!!
+            }
+        }
+
+        // 提交删除数据!!!
+        try {
+            BillVO vo = getBillListPanel().getBillVO(li_row); //
+            dealDelete(vo); // 真正删除
+            table.removeRow(li_row); // 如果成功
+        } catch (Exception ex) {
+            ex.printStackTrace(); //
+            // JOptionPane.showMessageDialog(this, "删除记录失败,原因:" +
+            // ex.getMessage());
+            NovaMessage.show(ex.getMessage(), NovaConstants.MESSAGE_ERROR);
+        }
+    }
+
+    /**
+     * 点击编辑做的动作!!
+     *
+     */
+    protected void onEdit() {
+        try {
+            if (table.getTable().getSelectedColumnCount() != 1) {
+                NovaMessage.show(AbstractTempletFrame02.this, "请选择一条记录", NovaConstants.MESSAGE_ERROR);
+                return;
+            } else {
+                onReturn(); //
+                card.setValue(table.getValueAtRowWithHashMap(table.getSelectedRow()));
+                card.setRowNumberItemVO( (RowNumberItemVO) table.getValueAt(table.getSelectedRow(), 0)); // 设置行号
+
+                card.setEditState(NovaConstants.BILLDATAEDITSTATE_UPDATE);
+            }
+        } catch (Exception ex) {
+            NovaMessage.show(AbstractTempletFrame02.this, NovaConstants.STRING_OPERATION_FAILED + ":" + ex.getMessage(),
+                             NovaConstants.MESSAGE_ERROR);
+        }
+    }
+
+    /**
+     * 点击保存做的动作!!
+     *
+     */
+    protected boolean onSave() {
+        if (!getBillCarPanel().checkValidate()) {
+            return false;
+        }
+
+        card.updateVersion();      
+        BillVO billVO = getBillCarPanel().getBillVO(); //
+        int _row=table.getSelectedRow();
+        try {	
+        	if (getBillCarPanel().getEditState() == NovaConstants.BILLDATAEDITSTATE_INSERT) { // 如果是新增提交
+                dealInsert(billVO); // 新增提交
+                card.setEditState(NovaConstants.BILLDATAEDITSTATE_UPDATE);
+                HashMap map = card.getAllObjectValuesWithHashMap();
+                table.insertRowWithInitStatus(_row, map);            
+        	} else if (getBillCarPanel().getEditState() == NovaConstants.BILLDATAEDITSTATE_UPDATE) { // 如果是修改提交
+                dealUpdate(billVO); // 修改提交                
+                table.setValueAtRow(_row, billVO);
+                table.setRowStatusAs(_row, "INIT");
+            }
+        	return true;
+        } catch (Exception e1) {
+            NovaMessage.show(e1.getMessage(), NovaConstants.MESSAGE_ERROR);
+            return false;
+        }
+        
+    }
+
+    /**
+     * 新增
+     *
+     */
+    protected void dealInsert(BillVO _insertVO) throws Exception {
+    	// 执行新增提交前的拦截器
+        if (this.uiIntercept != null) {
+            uiIntercept.dealCommitBeforeInsert(this, _insertVO);
+        }
+        BillVO returnVO = getService().style02_dealInsert(table.getDataSourceName(), getBsinterceptor(), _insertVO); // 直接提交数据库,这里可能抛异常!!
+        // 执行新增提交前的拦截器
+        if (this.uiIntercept != null) {
+            uiIntercept.dealCommitAfterInsert(this, returnVO); //            
+        }
+    }
+
+    /**
+     * 修改提交
+     *
+     */
+    protected void dealUpdate(BillVO _updateVO) throws Exception {
+        if (this.uiIntercept != null) {
+            uiIntercept.dealCommitBeforeUpdate(this, _updateVO); // 修改提交前拦截器
+        }
+        BillVO returnvo = getService().style02_dealUpdate(table.getDataSourceName(), getBsinterceptor(), _updateVO); //        
+        if (this.uiIntercept != null) {
+            uiIntercept.dealCommitAfterUpdate(this, returnvo); //
+        }
+    }
+
+    /**
+     * 删除提交
+     *
+     */
+    protected void dealDelete(BillVO _deleteVO) throws Exception {
+        if (this.uiIntercept != null) {
+            uiIntercept.dealCommitBeforeDelete(this, _deleteVO);
+        }
+
+        getService().style02_dealDelete(table.getDataSourceName(), getBsinterceptor(), _deleteVO); //
+        table.clearDeleteBillVOs();
+        if (this.uiIntercept != null) {
+            try {
+                uiIntercept.dealCommitAfterDelete(this, _deleteVO);
+            } catch (Exception ex) {
+                ex.printStackTrace(); //
+            }
+        }
+    }
+
+    protected void onQuery() {
+        QueryDialog queryDialog = new QueryDialog(AbstractTempletFrame02.this, table.getTempletVO());
+        if (queryDialog.getStr_return_sql() != null && queryDialog.getStr_return_sql().length() > 0) {
+            table.QueryDataByCondition(queryDialog.getStr_return_sql());
+        }
+
+    }
+
+    protected void onView() {
+        try {
+
+            if (table.getTable().getSelectedColumnCount() != 1) {
+                NovaMessage.show(AbstractTempletFrame02.this, "请选择一条记录！", NovaConstants.MESSAGE_ERROR);
+            } else {
+            	if(table.getSelectedRow()<0){
+            		NovaMessage.show(AbstractTempletFrame02.this, "没有选择记录行！", NovaConstants.MESSAGE_ERROR);
+            		return;
+            	}
+                onReturn(); //
+                btn_save.setVisible(false);
+                btn_save_return.setVisible(false);
+                btn_cancel_return.setVisible(false);
+                btn_return.setVisible(false);
+                btn_back.setVisible(true);
+                
+                card.setValue(table.getValueAtRowWithHashMap(table.getSelectedRow()));
+                card.setRowNumberItemVO( (RowNumberItemVO) table.getValueAt(table.getSelectedRow(), 0)); // 设置行号
+                card.setAllUnable();
+                card.setEditState(NovaConstants.BILLDATAEDITSTATE_INIT);
+            }
+        } catch (Exception ex) {
+            NovaMessage.show(AbstractTempletFrame02.this, NovaConstants.STRING_OPERATION_FAILED + ":" + ex.getMessage(),
+                             NovaConstants.MESSAGE_ERROR);
+        }
+    }
+    
+    
+
+    /**
+     * 在列表和卡片间切换
+     */
+    protected void onReturn() {
+        enablesave = !enablesave;
+        btn_quick.setVisible(!enablesave);
+        btn_return.setVisible(enablesave);
+        btn_insert.setVisible(!enablesave);
+        btn_edit.setVisible(!enablesave);
+        btn_delete.setVisible(!enablesave);
+        btn_search.setVisible(!enablesave);
+        btn_view.setVisible(!enablesave);
+        if (panel_customer != null) {
+            panel_customer.setVisible(!enablesave);
+        }
+        if (querypanel != null) {
+            querypanel.setVisible(!enablesave);
+        }
+        if (enablesave) {
+            btn_return.setText("切换列表");
+        } else {
+            if (card.getEditState().equals(NovaConstants.BILLDATAEDITSTATE_INSERT) ||
+                card.getEditState().equals(NovaConstants.BILLDATAEDITSTATE_UPDATE)) {
+                btn_return.setVisible(true);
+                btn_return.setText("切换卡片");
+            }
+        }
+        btn_save.setVisible(enablesave);
+        btn_save_return.setVisible(enablesave);
+        btn_cancel_return.setVisible(enablesave);
+        cardlayout.next(tablep); // 切换
+    }
+
+    /**
+     * 获取列表和卡片所在的面板，其布局为cardlayout
+     *
+     * @return JPanel
+     */
+    protected JPanel getTablePanel() {
+        if (tablep != null) {
+            return tablep;
+        }
+        return null;
+    }
+
+    
+
+    /**
+     * 卡片会调用这里
+     */
+    public void onValueChanged(NovaEvent _evt) {
+        if (_evt.getChangedType() == NovaEvent.CardChanged) {
+            if (uiIntercept != null) {
+                BillCardPanel card_tmp = (BillCardPanel) _evt.getSource(); //
+                String tmp_itemkey = _evt.getItemKey(); //
+                try {
+                    uiIntercept.actionAfterUpdate(card_tmp, tmp_itemkey);
+                } catch (Exception e) {
+                    if (!e.getMessage().trim().equals("")) {
+                        JOptionPane.showMessageDialog(this, e.getMessage()); //
+                    }
+                }
+            }
+        } else if (_evt.getChangedType() == NovaEvent.ListChanged) { // 如果是列表变化
+
+        }
+    }
+
+    public Object[] getNagivationPath() {
+        return menu;
+    }
+
+    public String getCustomerPanelNames() {
+        return this.customerpanel;
+    }
+
+    public void showInsertButton(boolean isshow) {
+        this.btn_insert.setVisible(isshow);
+    }
+
+    public void showDeleteButton(boolean isshow) {
+        this.btn_delete.setVisible(isshow);
+    }
+
+    public void showEditButton(boolean isshow) {
+        this.btn_edit.setVisible(isshow);
+    }
+
+    public void showSearchButton(boolean isshow) {
+        this.btn_search.setVisible(isshow);
+    }
+
+    public void showViewButton(boolean isshow) {
+        this.btn_view.setVisible(isshow);
+    }
+
+    public void setInsertButtonText(String text) {
+        this.btn_insert.setText(text);
+    }
+
+    public void setDeleteButtonText(String text) {
+        this.btn_delete.setText(text);
+    }
+
+    public void setSearchButtonText(String text) {
+        this.btn_search.setText(text);
+    }
+
+    public void setViewButtonText(String text) {
+        this.btn_view.setText(text);
+    }
+
+    public void setEditButtonText(String text) {
+        this.btn_edit.setText(text);
+    }
+
+    public void setSaveButtonText(String text) {
+        this.btn_save.setText(text);
+    }
+
+    public JButton getInsertButton() {
+        return this.btn_insert;
+    }
+
+    public JButton getDeleteButton() {
+        return this.btn_delete;
+    }
+
+    public JButton getSearchButton() {
+        return this.btn_search;
+    }
+
+    public JButton getViewButton() {
+        return this.btn_view;
+    }
+
+    public JButton getEditButton() {
+        return this.btn_edit;
+    }
+
+    public JButton getSaveButton() {
+        return this.btn_save;
+    }
+
+    public AbstractCustomerButtonBarPanel getPanel_customer() {
+        return panel_customer;
+    }
+
+    public void setPanel_customer(AbstractCustomerButtonBarPanel customerpanel) {
+        this.panel_customer = customerpanel;
+    }
+
+    private void onClickedStartBtn() {
+//        int li_row = table.getSelectedRow();
+//        if (li_row < 0) {
+//            JOptionPane.showMessageDialog(this, "请选择一行记录!!");
+//            return;
+//        }
+//
+//        ChooseProcessDialog dialog = new ChooseProcessDialog(this);
+//        dialog.setVisible(true);
+//        String str_processID = dialog.getProcessID();
+//
+//        if (str_processID != null) {
+//            String str_tableName = table.getTempletVO().getSavedtablename(); //得到需要保存的表名!!
+//            String str_billid = table.getRealValueAtModel(li_row, "ID"); //取得主键值
+//
+//            BillVO billVO = table.getBillVO(li_row); //
+//            startWFProcess(li_row, str_processID, str_tableName, str_billid, billVO);
+//        }
+    }
+
+    //点击工作流按钮所做事件!!
+    private void onClickedWFBtn(JButton _clickedBtn) {
+//        int li_row = table.getSelectedRow();
+//        if (li_row < 0) {
+//            JOptionPane.showMessageDialog(this, "请选择一行记录!!");
+//            return;
+//        }
+//
+//        String str_prInstanceID = (String) _clickedBtn.getClientProperty("prInstanceID"); //流程实例ID
+//        String str_processid = (String) _clickedBtn.getClientProperty("processid"); //流程定义ID
+//        String str_transitionID = (String) _clickedBtn.getClientProperty("transitionID"); //转移定义主键
+//
+//        BillVO billVO = table.getBillVO(li_row); //
+//        String str_billID = (String) billVO.getObject("ID");
+//        //由上面三个就能决定执行一个动作!!
+//        try {
+//            getWFService().execOneTransition(str_prInstanceID, str_processid, str_transitionID, billVO,
+//                                             (String)NovaClientEnvironment.getInstance().get("SYS_LOGINUSER_CODE"), "手工驱动", "UI带来的消息!");
+//
+//            String str_sql = "SELECT * FROM " + table.getTempletVO().getTablename() + " WHERE ID='" + str_billID + "'";
+//            HashVO[] vos = UIUtil.getHashVoArrayByDS(null, str_sql); //
+//            if (vos != null && vos.length > 0) {
+//                table.setValueAtRow(li_row, vos[0]); //
+//            }
+//            refreshWFBtnPanel(str_prInstanceID); //刷新一下页面!!
+//            NovaMessage.show(this, "执行流程动作成功!!!!");
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            NovaMessage.showException(this, e);
+//        }
+    }
+
+    private void onClickedRefreshWFPanelBtn() {
+        int li_row = table.getSelectedRow();
+        if (li_row < 0) {
+            JOptionPane.showMessageDialog(this, "请选择一行记录!!");
+            return;
+        }
+
+        if (table.getTempletVO().getItemVo("WFPRINSTANCEID") != null) {
+            String str_prInstanceID = table.getRealValueAtModel(li_row, "WFPRINSTANCEID"); //流程定义的主键!!
+            refreshWFBtnPanel(str_prInstanceID); //刷新面板
+        }
+    }
+
+    private void refreshWFBtnPanel(String _prInstanceID) {
+//        try {
+//            //先Remove所有按钮!!!!
+//            getWFBtnPanel().removeAll(); //先删除所有按钮!!
+//            getWFBtnPanel().updateUI(); //刷新UI
+//
+//            if (_prInstanceID == null) { //如果为空,则增加启动流程按钮
+//                JButton btn_1 = new JButton("启动流程");
+//                btn_1.setPreferredSize(new Dimension(85, 20));
+//                btn_1.addActionListener(new ActionListener() {
+//                    public void actionPerformed(ActionEvent e) {
+//                        onClickedStartBtn();
+//                    }
+//                });
+//                getWFBtnPanel().add(btn_1); //
+//            } else {
+//                HashVO[] vos = getWFService().getValidTransFromDealpool(_prInstanceID,
+//                		(String)NovaClientEnvironment.getInstance().get("SYS_LOGINUSER_CODE"));
+//                if (vos != null) {
+//                    JButton[] wfBtns = new JButton[vos.length];
+//                    for (int i = 0; i < vos.length; i++) {
+//                        String str_uiName = vos[i].getStringValue("transuiname"); //
+//                        wfBtns[i] = new JButton(str_uiName); //
+//                        wfBtns[i].putClientProperty("id", vos[i].getStringValue("id")); //待处理池中的ID,即主键
+//                        wfBtns[i].putClientProperty("prInstanceID", vos[i].getStringValue("prInstanceID")); //流程实例ID
+//                        wfBtns[i].putClientProperty("processid", vos[i].getStringValue("processid")); //流程定义ID
+//                        wfBtns[i].putClientProperty("transitionID", vos[i].getStringValue("transitionID")); //转移定义ID
+//                        wfBtns[i].putClientProperty("transcode", vos[i].getStringValue("transcode")); //转移定义Code
+//                        wfBtns[i].putClientProperty("transwfname", vos[i].getStringValue("transwfname")); //转移定义流程名称
+//                        wfBtns[i].putClientProperty("transuiname", vos[i].getStringValue("transuiname")); //转移定义页面名称
+//
+//                        wfBtns[i].setToolTipText("流程定义主键:" + vos[i].getStringValue("processid") + "\r\n转移编码:" +
+//                                                 vos[i].getStringValue("transcode")); //
+//
+//                        int li_wordcount = str_uiName.length();
+//                        int li_btnwidth = li_wordcount * 15 + 30;
+//                        wfBtns[i].setPreferredSize(new Dimension(li_btnwidth, 20));
+//                        wfBtns[i].addActionListener(new ActionListener() {
+//                            public void actionPerformed(ActionEvent e) {
+//                                JButton clickedBtn = (JButton) e.getSource(); //
+//                                onClickedWFBtn(clickedBtn); //
+//                            }
+//                        });
+//                        getWFBtnPanel().add(wfBtns[i]);
+//                    }
+//                }
+//            }
+//            getWFBtnPanel().updateUI();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+    }
+
+//    private WorkFlowServiceIfc getWFService() throws Exception {
+//        WorkFlowServiceIfc service = (WorkFlowServiceIfc) NovaRemoteServiceFactory.getInstance().lookUpService(
+//            WorkFlowServiceIfc.class);
+//        return service;
+//    }
+
+    class MyBillListPanelRowChangedListener implements ListSelectionListener {
+        public void valueChanged(ListSelectionEvent e) {
+            if (!e.getValueIsAdjusting()) {
+                int li_row = table.getSelectedRow();
+                if (li_row >= 0) {
+                    if (table.getTempletVO().getItemVo("WFPRINSTANCEID") != null) { //如果模板中定义了WFPRINSTANCEID列
+                        String str_prInstanceID = table.getRealValueAtModel(li_row, "WFPRINSTANCEID"); //流程定义的主键!!
+                        if (str_prInstanceID != null && !str_prInstanceID.trim().equals("")) { //如果值不为空
+                            refreshWFBtnPanel(str_prInstanceID); //刷新工作流面板
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+}

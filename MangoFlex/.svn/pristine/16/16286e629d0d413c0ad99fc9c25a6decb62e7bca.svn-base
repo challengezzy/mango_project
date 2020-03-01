@@ -1,0 +1,588 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:VBox xmlns="smartx.flex.components.core.chart.*" 
+		  xmlns:mx="http://www.adobe.com/2006/mxml"
+		  horizontalScrollPolicy="off"
+		  verticalScrollPolicy="off"
+		  width="100%" height="100%" initialize="init()">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.hurlant.eval.ast.ContinueStmt;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.DateField;
+			import mx.controls.dataGridClasses.DataGridColumn;
+			import mx.events.DataGridEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ScrollEvent;
+			import mx.events.ScrollEventDirection;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.utils.ObjectUtil;
+			
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.core.mtchart.vo.MTChartConst;
+			import smartx.flex.components.util.CompareUtil;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.util.LoadingWindow;
+			import smartx.flex.components.util.OperatingTipUtil;
+			import smartx.flex.components.util.SmartXMessage;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.util.export.ListDataExportUtil;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleHashVO;
+			
+			public static const SHOWDATA_FINISH:String = "showDataFinish";
+			
+			[Bindable]
+			public var minColumnWidth:int = 160;//默认最小列宽度
+			[Bindable]
+			private var _columns:Array;//列表头数据
+			public var queryColumns:Array = new Array();//查询字段列表
+			
+			public static const DATAMODE_VALUE:int = 0;
+			public static const DATAMODE_SQL:int = 1;
+			
+			private var formService:RemoteObject;
+			public var dataSource:String;
+			private var _sql:String;//查询数据的SQL语句
+			private var realQuerySql:String;//真正的查询SQL
+			private var listData:ArrayCollection = new ArrayCollection();//展示的所有数据
+			private var initListData:ArrayCollection= new ArrayCollection();//原始的所有数据
+			
+			[Bindable]
+			private var curPageData:ArrayCollection = new ArrayCollection();//当前页显示的记录
+			
+			public var dataMode:int;//数据提供方式,value或sql
+						
+			public var pageSize:int=20;//表示每页记录的条数,默认10条,可以由用户自行定义
+			public var curPage:int =1;//当前的页码
+			public var totalPage:int = 1;//一共的页数,页数从1开始，必须设置默认值
+			public var totalCount:int;//一共的记录条数
+			
+			private var expDataGrid:DataGrid = new DataGrid();//导出数据
+			private var expFileName:String;//导出文件名
+			private var fieldNameMap:Object = new Object();//字段映射，数据导出用
+			
+			private var verticalScrollPositionNum:Number = 0;
+			private var horizontalScrollPositionNum:Number = 0;
+			
+			public var statisticFields:Array= [];//统计字段映射(仅限数字类型字段)
+			
+			public var statisticType:String = MTChartConst.OLAP_MEASURE_SUM;//统计类型，默认为求和
+			
+			private static const STATISTIC_DATAFIELD:String = "STATISTIC";
+			[Bindable]
+			public var isAllowMultipleSelection:Boolean = false;//列表是否支持多选
+			
+			[Bindable]
+			public var gridEditable:Boolean = false;//datagrid是否可编辑，为编辑\COPY使用
+			
+			private function init():void{
+				formService = new RemoteObject(GlobalConst.SERVICE_FORM);
+				formService.endpoint = String(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT));
+				formService.getSimpleHashVOMapByPage.addEventListener(ResultEvent.RESULT,SimpleHashVOMapByPageHandler);					
+				formService.getSimpleHashVOMapByPage.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					OperatingTipUtil.endOperat();
+					SmartXMessage.show("获取分页列表数据错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				});
+				formService.generateExportCSVFile.addEventListener(ResultEvent.RESULT,generateExportCSVFileHandler);					
+				formService.generateExportCSVFile.addEventListener(FaultEvent.FAULT,function(event:FaultEvent):void{
+					SmartXMessage.show("获取列表CSV文件错误",SmartXMessage.MESSAGE_ERROR,event.fault.faultString);
+					OperatingTipUtil.endOperat();
+				});
+				
+				
+				curPage = 1;
+				totalPage = 1;
+			}
+			
+			//此列表可以由两种方式初始化数据，提供SQL或直接提供数据方式		
+			public function setPager(pageNum:int,showLoadWindow:Boolean=true):void
+			{
+				if(totalPage == 0)//总页数重新初始化
+					totalPage = 1;
+				
+				if(pageNum<1 || pageNum > totalPage) 
+					return;
+				
+				curPage = pageNum;
+				if(showLoadWindow ){
+					OperatingTipUtil.startOperat("正在查询....");
+				}
+				
+				if( AdvListChart.DATAMODE_VALUE == dataMode){					
+					curPageData.removeAll();//移出变量中的数据,以便插入新数据,页面中显示的是这个变量中的数据					
+					if(listData.length>0 && null!=listData)
+					{
+						totalCount = listData.length;
+						totalPage = (totalCount + pageSize - 1) / pageSize;
+						inputpage.minimum=1;
+						inputpage.maximum=totalPage;
+						
+						var curNum:int = (curPage-1)*pageSize;//计算出要跳转到的页面种的第一条记录在所有的记录种是第几条记录
+						for(var i:int=0;curNum<listData.length&&i<pageSize;i++,curNum++){
+							//循环的次数既要小于所有的记录数,也要小于每个页面能显示的记录数;并且curNum变量中的值也要增加
+							curPageData.addItem(listData.getItemAt(curNum));//依次抽取记录
+						}
+						statisticData();
+						expDataGrid.dataProvider = curPageData;
+						dataListGrid.invalidateList();						
+					}else{
+						totalCount = 0;
+						totalPage = 0;
+						curPage = 0;
+						inputpage.minimum = 0;
+						inputpage.maximum = 0;
+					}				
+					
+					pagedetail.text = "第"+curPage+"页/共"+totalPage+"页   共"+totalCount+"条记录";					
+					dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+					
+					OperatingTipUtil.endOperat();					
+				}else if(AdvListChart.DATAMODE_SQL == dataMode){
+					formService.getSimpleHashVOMapByPage(dataSource,realQuerySql,curPage,pageSize);
+				}
+					
+			}
+			
+			private function SimpleHashVOMapByPageHandler(event:ResultEvent):void{
+				OperatingTipUtil.endOperat();
+				var dataMap:Object = event.result;
+				totalCount = dataMap[GlobalConst.DATA_ROWCOUNT] as int;
+				totalPage = (totalCount + pageSize - 1) / pageSize;
+				
+				var dataArr:Array = dataMap[GlobalConst.DATA_SIMPLEHASHVOARRAY] as Array;
+				curPageData.removeAll();
+				for (var i:int=0;i<dataArr.length;i++){
+					curPageData.addItem(dataArr[i][GlobalConst.DATA_DATAMAP]);
+				}
+				statisticData();
+				expDataGrid.dataProvider = curPageData;
+				dataListGrid.invalidateList();
+				
+				dataListGrid.horizontalScrollPosition = horizontalScrollPositionNum;
+				dataListGrid.verticalScrollPosition = verticalScrollPositionNum;
+				
+				if(totalCount > 0){
+					inputpage.minimum=1;
+					inputpage.maximum=totalPage;
+					if(curPage > totalPage)
+						curPage = totalPage ;//对查询出的数据量变小的情况的显示处理
+				}else{
+					inputpage.minimum = 0;
+					inputpage.maximum = 0;
+					curPage = 0;
+				}
+				pagedetail.text = "第"+curPage+"页/共"+totalPage+"页   共"+totalCount+"条记录";
+				
+				dispatchEvent(new Event(AdvListChart.SHOWDATA_FINISH));
+				
+				OperatingTipUtil.endOperat();
+			}
+			
+			public function clear():void{
+				listData = new ArrayCollection();
+				curPageData.removeAll();
+			}
+			
+			public function refresh():void{
+				toolTipLabel.text = "";
+				realQuerySql = _sql;
+				
+				if(curPage < 1)
+					curPage = 1;
+				
+				setPager(curPage,false);
+			}
+			
+			public function set sql(value:String):void{
+				_sql = value;
+				realQuerySql = value;
+				dataMode = AdvListChart.DATAMODE_SQL;
+			}
+			
+			public function set dataArray(value:ArrayCollection):void{
+				initListData = new ArrayCollection(value.toArray());
+				listData = new ArrayCollection(value.toArray());
+				dataMode = AdvListChart.DATAMODE_VALUE;
+			}
+			
+			public function removeQueryPanel():void{
+				if(simpleQueryPanel != null && this.contains(simpleQueryPanel) ){
+					this.removeChild(simpleQueryPanel);
+				}
+			}
+			
+			private function filterListData(condition:String):void{
+				listData.removeAll();
+				for each(var temp:Object in initListData){
+					for each( var field2:String in queryColumns){//
+						var tempStr:String = temp[field2];
+						if(tempStr == null)
+							continue;
+						
+						//全文匹配和精确查询两种情况
+						if( isWholeWordCheckBox.selected){
+							if( condition == tempStr){
+								listData.addItem(temp);
+								continue;
+							}
+						}else{
+							if( tempStr.indexOf(condition) >= 0)
+							{
+								listData.addItem(temp);
+								continue;
+							}
+						}
+					}
+				}
+			}
+			
+			private function simpleQueryTextInput_enterHandler(event:FlexEvent):void
+			{
+				simpleQuery(simpleQueryTextInput.text);
+			}
+			
+			//快速查询
+			private function simpleQuery(text:String):void{
+				toolTipLabel.text = "";
+				if(text == null || "" == text){//无条件查询
+					realQuerySql = _sql;
+					listData = new ArrayCollection(initListData.toArray());
+					toolTipLabel.text = "查询条件值为空,按无条件查询";
+				}
+				else{
+					if(queryColumns != null && queryColumns.length > 0){
+						if(AdvListChart.DATAMODE_SQL == dataMode){
+							var condition:String = "where 1=2 ";//拼装查询条件
+							for each( var field:String in queryColumns){ 
+								if( isWholeWordCheckBox.selected)
+									condition = condition.concat(" or " + field + "='" + text +  "'" );
+								else
+									condition = condition.concat(" or " + field + " like '%" + text +  "%'" );
+							}
+							realQuerySql = "select * from (" + _sql + ")" + condition;
+						
+						}else if(AdvListChart.DATAMODE_VALUE == dataMode){//数据型，直接过滤数据
+							filterListData(text)
+						}
+					}else{//没有查询列的情况
+						realQuerySql = _sql;
+						listData = new ArrayCollection(initListData.toArray());
+						toolTipLabel.text = "未勾选有效查询列,按无条件查询";
+					}
+				}
+				//刷新数据
+				setPager(1);
+			}
+			
+			public function exportCurData(fileName:String):void{
+				
+				//只有在响应用户事件（例如，在鼠标单击或按键事件的事件处理函数中）时才能成功调用此方法
+				ListDataExportUtil.dataGridExport2CSV(expDataGrid,fileName);
+			}
+			
+			/**
+			 * 导出所有数据
+			 * */
+			public function exportAllData(fileName:String):void{
+				expFileName = fileName;
+				if(AdvListChart.DATAMODE_SQL == dataMode){
+					
+					var columnsStr:String ="";
+					for each(var dgCol:DataGridColumn in _columns){
+						if(columnsStr ==""){
+							columnsStr = dgCol.dataField.toUpperCase();
+						}else{
+							columnsStr = columnsStr+","+dgCol.dataField.toUpperCase();
+						}
+					}
+					//在服务端生成数据后再下载
+					formService.generateExportCSVFile(dataSource,"select "+columnsStr+" from ("+realQuerySql+")",GlobalConst.TEMPDATAFOLDER, fieldNameMap,fileName+".csv");
+					OperatingTipUtil.startOperat("正在生成CSV数据文件",this);
+					
+				}else if(AdvListChart.DATAMODE_VALUE == dataMode){
+					expDataGrid.dataProvider = initListData;
+					ListDataExportUtil.dataGridExport2CSV(expDataGrid,fileName);
+				}					
+			}
+			
+			private function generateExportCSVFileHandler(event:ResultEvent):void{
+				var fileUrl:String = event.result as String;				
+				navigateToURL(new URLRequest(encodeURI(fileUrl)));
+				OperatingTipUtil.endOperat();
+				//var fr:FileReference = new FileReference();
+				//fr.download(new URLRequest(GlobalConst.TEMPDATAFOLDER + fileUrl),expFileName);
+				//ListDataExportUtil.dataGridExport2CSV(expDataGrid,expFileName);
+			}
+			
+			public function set columns(columnArr:Array):void{
+				_columns = columnArr;
+				expDataGrid.columns = columnArr;
+				for each(var dgCol:DataGridColumn in _columns){
+					fieldNameMap[dgCol.dataField.toUpperCase()] = dgCol.headerText;
+					if(dgCol.width == 0){
+						dgCol.width = 160;
+					}
+				}
+					
+			}
+			
+			public function get columns():Array{
+				return _columns;
+			}
+			
+			public function getSelectedRowValue():Object{
+				if(curPageData.length < 1 || dataListGrid.selectedIndex < 0)
+					return null;
+				return dataListGrid.selectedItem;
+			}
+			
+			public function getSelectedRowValues():Array{
+				if(curPageData.length < 1)
+					return null;
+				return dataListGrid.selectedItems;
+			}
+			
+			protected function dataListGrid_scrollHandler(event:ScrollEvent):void
+			{
+				if(event.direction == ScrollEventDirection.HORIZONTAL){
+					horizontalScrollPositionNum = event.position;
+				}else if(event.direction == ScrollEventDirection.VERTICAL){
+					verticalScrollPositionNum = event.position;
+				}
+			}
+			
+			/**
+			 * 数据统计(当前页数据)
+			 **/
+			private function statisticData():void{
+				if(statisticFields.length == 0)
+					return;
+				var statisticData:Object = {};
+				switch(statisticType){
+					case MTChartConst.OLAP_MEASURE_COUNT:
+						calcSumStatisticData(statisticData);
+						break;
+					case MTChartConst.OLAP_MEASURE_SUM:
+						calcSumStatisticData(statisticData);
+						break;
+					case MTChartConst.OLAP_MEASURE_AVERAGE:
+						calcAvgStatisticData(statisticData);
+						break;
+					case MTChartConst.OLAP_MEASURE_MAX:
+						calcMaxStatisticData(statisticData);
+						break;
+					case MTChartConst.OLAP_MEASURE_MIN:
+						calcMinStatisticData(statisticData);
+						break;
+				}
+				curPageData.addItem(statisticData);
+			}
+			
+			private function calcCountStatisticData(statisticData:Object):void{
+				for each(var statisticField:String in statisticFields){
+					var count:Number = 0;
+					for each(var data:Object in curPageData){
+						if(data[statisticField] != null && data[statisticField] != "")
+							count++;
+					}
+					statisticData[statisticField] = MTChartConst.OLAP_MEASURE_COUNT_NAME.concat(":").concat(count);
+				}
+			}
+			
+			private function calcSumStatisticData(statisticData:Object):void{
+				for each(var statisticField:String in statisticFields){
+					var sumNum:Number = 0;
+					for each(var data:Object in curPageData){
+						sumNum += Number(data[statisticField]);
+					}
+					statisticData[statisticField] = MTChartConst.OLAP_MEASURE_SUM_NAME.concat(":").concat(sumNum);
+				}
+			}
+			
+			private function calcAvgStatisticData(statisticData:Object):void{
+				for each(var statisticField:String in statisticFields){
+					var sumNum:Number = 0;
+					for each(var data:Object in curPageData){
+						sumNum += Number(data[statisticField]);
+					}
+					var avgNum:Number = sumNum / (curPageData.length);
+					statisticData[statisticField] = MTChartConst.OLAP_MEASURE_AVERAGE_NAME.concat(":").concat(avgNum);
+				}
+			}
+			
+			private function calcMaxStatisticData(statisticData:Object):void{
+				for each(var statisticField:String in statisticFields){
+					var maxNum:Number = 0;
+					for each(var data:Object in curPageData){
+						if(Number(data[statisticField]) > maxNum)
+							maxNum = Number(data[statisticField]);
+					}
+					statisticData[statisticField] = MTChartConst.OLAP_MEASURE_MAX_NAME.concat(":").concat(maxNum);
+				}
+			}
+			
+			private function calcMinStatisticData(statisticData:Object):void{
+				for each(var statisticField:String in statisticFields){
+					var minNum:Number = 0;
+					for each(var data:Object in curPageData){
+						if(Number(data[statisticField]) < minNum)
+							minNum = Number(data[statisticField]);
+					}
+					statisticData[statisticField] = MTChartConst.OLAP_MEASURE_MIN_NAME.concat(":").concat(minNum);
+				}
+			}
+			
+			//add by caohenghui for issue SMARTX-286 --start
+			protected function dataListGrid_headerReleaseHandler(event:DataGridEvent):void{
+				var column:DataGridColumn = DataGridColumn(event.currentTarget.columns[event.columnIndex]);
+				var columnName:String = column.dataField;
+				
+				column.sortCompareFunction = function(obj1:Object,obj2:Object):int{
+					return sort(obj1,obj2,columnName,column);
+				};
+			}
+			
+			public function sort(obj1:Object,obj2:Object,columnName:String,column:DataGridColumn):int{
+				if(!isNaN(obj1[columnName])){
+					return sortNumber(obj1,obj2,columnName,column);
+				}
+//				if(isDate(obj1[columnName])){
+//					var inputFormat:String=getInputFormat(obj1[columnName]);
+//					return sortDate(obj1,obj2,columnName,inputFormat);
+//				}
+				return sortString(obj1,obj2,columnName,column);
+				
+			}     
+			
+			private function sortDate(obj1:Object, obj2:Object,columnName:String,inputFormat:String):int {
+				var date1:Date =DateField.stringToDate(obj1[columnName],inputFormat);
+				var date2:Date =DateField.stringToDate(obj2[columnName],inputFormat);
+				return ObjectUtil.dateCompare(date1, date2);
+			}
+			
+			private function sortString(obj1:Object, obj2:Object,columnName:String,column:DataGridColumn):int{
+				var str1:String=obj1[columnName];
+				var str2:String=obj2[columnName];
+				if(str1 != null && obj2 == null)
+					return -1;
+				if(obj1 == null && obj2 != null)
+					return 1;
+				if(obj1 && obj2){
+					if(CompareUtil.hashTotalColumn(obj1)){
+						return (column.sortDescending?-1:1)*1;
+					}else if(CompareUtil.hashTotalColumn(obj2)){
+						return (column.sortDescending?-1:1)*-1;
+					}else{
+						return ObjectUtil.stringCompare(CompareUtil.getFirstPinYin(str1),CompareUtil.getFirstPinYin(str2),true);
+					}
+				}
+				return 0;
+			}
+			
+			private function sortNumber(obj1:Object, obj2:Object,columnName:String,column:DataGridColumn):int{
+				var num1:Number=Number(obj1[columnName]);
+				var num2:Number=Number(obj2[columnName]);
+				if(CompareUtil.hashTotalColumn(obj1)){
+					return (column.sortDescending?-1:1)*1;
+				}else if(CompareUtil.hashTotalColumn(obj2)){
+					return (column.sortDescending?-1:1)*-1;
+				}else{
+					return ObjectUtil.numericCompare(num1,num2);
+				}
+			}
+			
+			private function isDate(str:String):Boolean{
+				var inputFormat:String=getInputFormat(str);
+				if(inputFormat==null){
+					return false;
+				}
+				var date:Date=DateField.stringToDate(str,inputFormat);
+				if(date!=null){
+					return true;
+				}else{
+					return false;
+				}
+			}     
+			
+			private function getInputFormat(str:String):String{
+				
+				if(str == null || str == ""){
+					return null;
+				}
+				
+				var tempStrArr:Array = str.split(" ");
+				
+				if(tempStrArr.length == 1){
+					
+					if(str.indexOf("-")!=-1){
+						return "YYYY-MM-DD";
+					}
+					if(str.indexOf("/")!=-1){
+						return "YYYY/MM/DD";
+					}
+					if(str.indexOf(".")!=-1){
+						return "YYYY.MM.DD";
+					}
+					
+				}else if(tempStrArr.length > 1){
+					
+					if(str.indexOf("-")!=-1){
+						return "YYYY-MM-DD JJ:NN:SS";
+					}
+					if(str.indexOf("/")!=-1){
+						return "YYYY/MM/DD JJ:NN:SS";
+					}
+					if(str.indexOf(".")!=-1){
+						return "YYYY.MM.DD JJ:NN:SS";
+					}
+				}
+				
+				return null;
+			}
+			//add by caohenghui for issue SMARTX-286 --end
+			
+			public function getRealSql():String{
+				return realQuerySql;
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%" id="simpleQueryPanel" horizontalAlign="right" paddingRight="20" 
+			 paddingTop="2" paddingBottom="2" horizontalGap="3" verticalAlign="middle">
+		<mx:HBox id="leftBtnBox" horizontalAlign="left" verticalAlign="middle" />
+		<mx:HBox width="100%" horizontalAlign="right" verticalAlign="middle" id="searchBox">
+			<mx:Label id="toolTipLabel" text="" color="red" paddingRight="20" />
+			<mx:CheckBox id="isWholeWordCheckBox" label="全文匹配" toolTip="勾选进行全文匹配查询" labelPlacement="right"/>
+			<mx:TextInput id="simpleQueryTextInput" width="150" borderStyle="solid" enter="simpleQueryTextInput_enterHandler(event)"/>
+			<mx:LinkButton icon="{AssetsFileLib.quicQueryIcon}" 
+						   toolTip="查询" width="20" height="20" click="simpleQuery(simpleQueryTextInput.text)"/>
+		</mx:HBox>
+		<mx:HBox id="buttonBox" horizontalAlign="right" verticalAlign="middle" />
+	</mx:HBox>
+	<mx:DataGrid id="dataListGrid" scroll="dataListGrid_scrollHandler(event)" dataProvider="{curPageData}" 
+				horizontalGridLines="true" verticalGridLines="true" allowMultipleSelection="{isAllowMultipleSelection}"
+				columns="{_columns}" width="{this.width}" height="100%"
+				draggableColumns="true" resizableColumns="true" sortableColumns="true"
+				headerRelease="dataListGrid_headerReleaseHandler(event)"
+				editable="{gridEditable}" 
+				verticalScrollPolicy="auto" horizontalScrollPolicy="auto"
+				>
+	</mx:DataGrid>
+	<mx:HBox width="100%" horizontalAlign="left" verticalAlign="middle" id="pageBox">
+		<mx:Spacer width="100%" height="1"></mx:Spacer>
+		<mx:Label text="第0页/共0页"  id="pagedetail"/>
+		<mx:Image toolTip="首页"  source="{AssetsFileLib.pageFirstIcon}" click="setPager(1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		<mx:Image toolTip="末页" source="{AssetsFileLib.pageLastIcon}" click="setPager(totalPage)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		<mx:Image toolTip="上一页" source="{AssetsFileLib.pagePrevIcon}" click="setPager(curPage-1)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+		<mx:Image toolTip="下一页" source="{AssetsFileLib.pageNextIcon}" click="setPager(curPage+1)" buttonMode="true" width="20" height="20" scaleContent="true"/> 
+		<mx:NumericStepper id="inputpage" stepSize="1" minimum="0" maximum="0" cornerRadius="0" height="20" width="60"/>
+		<mx:Image toolTip="跳转" source="{AssetsFileLib.pageJumpIcon}" click="setPager(inputpage.value)" buttonMode="true" scaleContent="true" width="20" height="20"/>
+	</mx:HBox>
+</mx:VBox>

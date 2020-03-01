@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:util="myreport.util.*"
+				layout="absolute" showCloseButton="true" horizontalAlign="center" verticalAlign="middle"
+				fontSize="12" fontFamily="Simsun" width="294" height="228" title="添加单元格"
+			    close="Close()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import hlib.MsgUtil;
+			
+			import mx.collections.ArrayCollection;
+ 
+			private static var g_Instance:NewCellsForm;
+			
+			public static function get Instance():NewCellsForm
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new NewCellsForm();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			private var _Callback:Function;
+			/**
+			 * callback=function(count:Number):void
+			 */ 
+			public function Show(callback:Function):void
+			{
+				_Callback = callback;
+				
+				PopUp();
+			}
+			
+			private function Confirm():void
+			{
+				var c:Number = Number(_Count.text);
+				if(isNaN(c)||c<1)
+				{
+					hlib.MsgUtil.ShowInfo("单元格数量必须大于等于1！");
+					return;
+				}
+				
+				if (_Callback != null)
+				{
+					
+					_Callback(c);
+				}
+				Close();
+			}
+ 
+		]]>
+	</mx:Script>
+	<mx:Label text="请输入单元格数量：" x="57" y="40"/>
+	<mx:TextInput id="_Count" text="1" width="160" x="57" y="66"/>
+	<mx:ControlBar horizontalAlign="right" x="0" y="196">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

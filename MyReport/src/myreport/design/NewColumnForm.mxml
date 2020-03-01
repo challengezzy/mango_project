@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<util:PopUpWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:util="myreport.util.*"
+				layout="vertical" showCloseButton="true" horizontalAlign="center" verticalAlign="middle"
+				fontSize="12" fontFamily="Simsun" width="320" height="240" title="添加表格列"
+			    close="Close()">
+	<!--
+	
+	Copyright (c) 2010 - 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import myreport.data.report.ReportSettings;
+			
+			private static var g_Instance:NewColumnForm;
+			
+			public static function get Instance():NewColumnForm
+			{
+				if (g_Instance == null)
+				{
+					g_Instance = new NewColumnForm();
+					g_Instance.visible = false;
+				}
+				return g_Instance;
+			}
+			//function(title:String, column:String, width:Number):void
+			private var _Callback:Function;
+			
+			public function Show(settings:ReportSettings, callback:Function):void
+			{
+				_Callback = callback;
+				
+				PopUp();
+ 
+				var columns:ArrayCollection = new ArrayCollection();
+				if (settings.TableData != null && settings.TableData.length > 0)
+				{
+					var obj:Object = settings.TableData[0];
+					for (var col:String in obj)
+					{
+						columns.addItem(col);
+					}
+				}
+				
+				_Title.dataProvider = columns;
+				_Title.selectedIndex = -1;
+				
+				_Column.dataProvider = columns;
+				_Column.selectedIndex = -1;
+				
+			}
+			
+			private function Confirm():void
+			{
+				if (_Callback != null)
+				{
+					var t:String = _Title.text;
+					var c:String = _Column.text;
+					var w:Number = Number(_Width.text);
+					_Callback(t, c, w);
+				}
+				Close();
+			}
+ 
+		]]>
+	</mx:Script>
+	<mx:Grid verticalGap="24">
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="列标题"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:ComboBox editable="true" id="_Title" width="160" textAlign="left" fontWeight="normal">
+				</mx:ComboBox>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="绑定列"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:ComboBox editable="true" id="_Column" width="160" textAlign="left" fontWeight="normal">
+				</mx:ComboBox>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%" height="100%">
+			<mx:GridItem width="100%" height="100%">
+				<mx:Label text="列宽度(单位：cm)"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%" height="100%">
+				<mx:TextInput id="_Width" text="2" width="160"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
+	<mx:ControlBar horizontalAlign="right">
+		<mx:Button label="确定" click="Confirm()"/>
+		<mx:Button label="取消" click="Close()"/>
+	</mx:ControlBar>
+</util:PopUpWindow>

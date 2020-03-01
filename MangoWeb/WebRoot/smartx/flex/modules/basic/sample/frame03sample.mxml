@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" width="100%" height="100%" xmlns:styletemplate="smartx.flex.components.styletemplate.*">
+	<styletemplate:StyleTemplate03 height="100%" width="100%" 
+		parentFieldName="PARENTREGIONID" labelFieldName="NAMECN" templetCode="PUB_REGION_CODE1" loadAll="false" debugMode="true"/>
+</mx:Module>

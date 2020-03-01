@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner 
+	     xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*" 
+		 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 xmlns:containers="flexlib.containers.*"
+		 creationComplete="init()" >
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.ResultEvent;
+			
+			[Bindable]
+			private var axisProvider:ArrayCollection = new ArrayCollection([
+				{name:"数值轴",data:"numeral"},
+				{name:"时间轴",data:"datetime"},
+				{name:"自定义轴",data:"userdefined"}
+			]);
+			[Bindable]
+			private var xyChartType:ArrayCollection = new ArrayCollection([
+				{label:"折线图",data:"linechart"},
+				{label:"区域图",data:"areachart"},
+				{label:"柱状图",data:"columnchart"},
+				{label:"分布图",data:"plotchart"}
+			]);
+			
+			private function init():void{
+				
+			}
+			
+			override public function generalFormComplete():void{
+				if(contentXml.extend.items.length() == 0)
+					contentXml.extend.appendChild(<items />);
+				if(contentXml.extend.items.item.length() == 0)
+					contentXml.extend.items.appendChild(<item />);
+			}
+			
+			private function initProperty():void{
+				for each(var ctItem:Object in chartTypeCbo.dataProvider){
+					if(ctItem.data == contentXml.charttype)
+						chartTypeCbo.selectedItem = ctItem;
+				}
+				
+				for each(var tmItem:Object in timeModeCbo.dataProvider){
+					if(tmItem.data == contentXml.extend.linemode)
+						timeModeCbo.selectedItem = tmItem;
+				}
+				
+				setField(String(contentXml.extend.items.item[0].@xfield),xFieldInput);
+				
+				setField(String(contentXml.extend.items.item[0].@yfield),yFieldInput);
+				
+				setField(String(contentXml.extend.items.item[0].@displayfield),displayFieldInput);
+				
+				setField(String(contentXml.extend.items.item[0].@verticalfield),xAxisFieldInput);
+				
+				setField(String(contentXml.extend.items.item[0].@horizontalfield),yAxisFieldInput);
+				
+				
+				xAxisId.selectedItem = getSelectedObjectByValue(contentXml.extend.items.item[0].@xAxisType);
+				yAxisId.selectedItem = getSelectedObjectByValue(contentXml.extend.items.item[0].@yAxisType);
+			}
+			
+			private function setField(value:String,cbo:ComboBox):void{
+				for each(data in fieldList){
+					if(data == value){
+						cbo.selectedItem = data;
+						break;
+					}else{
+						value == ""
+							?cbo.selectedIndex = -1
+							:cbo.text = value;
+					}
+				}
+			}
+			
+			private function getSelectedObjectByValue(value:String):Object{
+				var data:Object;
+				for each(data in axisProvider){
+					if( data.data==value)
+						break;
+				}
+				return data;
+			}
+			
+			override public function initTableStructComplete():void{
+				initProperty();
+			}
+			
+			private function colorPicker_changeHandler(event:ColorPickerEvent):void{
+				var colorStr:String = colorPicker.selectedColor.toString(16);
+				if(colorInput.text == null || colorInput.text == "")
+					colorInput.text = colorStr;
+				else
+					colorInput.text += ","+colorStr;
+				
+				contentXml.extend.items.item.@color = colorInput.text;
+			}
+			
+		]]>
+	</fx:Script>
+	<mx:VBox width="100%" height="100%"
+			 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:HBox width="100%">
+			<mx:Label text="类型" />
+			<mx:ComboBox id="chartTypeCbo" dataProvider="{xyChartType}" 
+						 change="{contentXml.charttype = chartTypeCbo.selectedItem.data}"/>
+		</mx:HBox>
+		<mx:HBox width="100%">
+			<mx:VBox width="100%" height="50%" horizontalAlign="center">
+				<mx:HBox width="100%">
+					<mx:Label text="X轴绑定字段" width="30%"/>
+					<mx:ComboBox id="xFieldInput" editable="true" width="70%" dataProvider="{fieldList}"
+								 change="{contentXml.extend.items.item[0].@xfield=xFieldInput.selectedItem}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="X轴说明" width="30%"/>
+					<mx:TextInput id="xFieldLabel" width="70%" text="{contentXml.extend.items.item[0].@xfieldlabel}"
+								  change="{contentXml.extend.items.item[0].@xfieldlabel=xFieldLabel.text}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="X轴类型" width="30%"/>
+					<mx:ComboBox id="xAxisId" dataProvider="{axisProvider}" width="70%" 
+								 labelField="name" change="{contentXml.extend.items.item[0].@xAxisType = xAxisId.selectedItem.data}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label id="xAxisFieldLabel" width="30%" text="X轴自定义绑定字段" />
+					<mx:ComboBox id="xAxisFieldInput" width="70%" editable="true" dataProvider="{fieldList}" 
+								 change="{contentXml.extend.items.item[0].@verticalfield=xAxisFieldInput.selectedItem}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="显示名称绑定字段" width="30%"/>
+					<mx:ComboBox id="displayFieldInput" width="70%" editable="true" dataProvider="{fieldList}"
+								 change="{contentXml.extend.items.item[0].@displayfield=displayFieldInput.selectedItem}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="系列名称" width="30%"/>
+					<mx:TextInput id="serialNameInput" width="70%" toolTip="多种系列名称用逗号分隔(中国,美国,加拿大...)"
+								  text="{contentXml.extend.items.item[0].@serialName}"
+								  change="{contentXml.extend.items.item[0].@serialName = serialNameInput.text}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="颜色指定" width="30%"/>
+					<mx:TextInput id="colorInput" width="70%" toolTip="多种颜色用逗号分隔(FF0000,0372AB,00000...)"
+								  text="{contentXml.extend.items.item[0].@color}"/>
+					<mx:ColorPicker id="colorPicker" change="colorPicker_changeHandler(event)"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:CheckBox id="isShowLabelsCbx" label="是否显示标签" 
+								 selected="{contentXml.extend.items.item[0].@isShowLabels=='true'?true:false}"
+								 click="{contentXml.extend.items.item[0].@isShowLabels = isShowLabelsCbx.selected?'true':'false'}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:CheckBox id="isHorizontalLegend" label="是否横向排列图例" 
+								 selected="{contentXml.isHorizontalLegend=='true'?true:false}"
+								 change="{contentXml.isHorizontalLegend=isHorizontalLegend.selected?true:false}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="时间轴类型" width="30%"/>
+					<mx:ComboBox id="timeModeCbo" width="70%" 
+								 change="{contentXml.extend.linemode = timeModeCbo.selectedItem.data}">
+						<mx:dataProvider>
+							<mx:ArrayCollection>
+								<fx:Object label="最近一天" data="timeD"/>
+								<fx:Object label="最近一小时" data="timeH"/>
+							</mx:ArrayCollection>
+						</mx:dataProvider>
+					</mx:ComboBox>
+				</mx:HBox>
+			</mx:VBox>
+			<mx:VBox width="100%" height="50%" horizontalAlign="center">
+				<mx:HBox width="100%">
+					<mx:Label text="Y轴绑定字段" width="30%"/>
+					<mx:ComboBox id="yFieldInput" width="70%" editable="true" dataProvider="{fieldList}"
+								 change="{contentXml.extend.items.item[0].@yfield=yFieldInput.selectedItem}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="Y轴说明" width="30%"/>
+					<mx:TextInput id="yFieldLabel" width="70%" text="{contentXml.extend.items.item[0].@yfieldlabel}"
+								  change="{contentXml.extend.items.item[0].@yfieldlabel=yFieldLabel.text}"/>
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label text="Y轴类型" width="30%"/>
+					<mx:ComboBox id="yAxisId" dataProvider="{axisProvider}" 
+								 width="70%"  labelField="name" 
+								 change="{contentXml.extend.items.item[0].@yAxisType = yAxisId.selectedItem.data}" />
+				</mx:HBox>
+				<mx:HBox width="100%">
+					<mx:Label id="yAxisFieldLabel" width="30%" text="Y轴自定义绑定字段" />
+					<mx:ComboBox id="yAxisFieldInput" width="70%" editable="true" dataProvider="{fieldList}"
+								 change="{contentXml.extend.items.item[0].@horizontalfield=yAxisFieldInput.selectedItem}"/>
+				</mx:HBox>
+			</mx:VBox>
+		</mx:HBox>
+	</mx:VBox>
+			
+</designer:BaseDesigner>

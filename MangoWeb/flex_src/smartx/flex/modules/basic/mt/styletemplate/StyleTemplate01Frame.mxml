@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx" layout="vertical" width="100%" height="100%"
+		   
+		   creationComplete="init()" removedFromStage="module1_removedFromStageHandler(event)">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			
+			import smartx.flex.components.basic.ClientEnviorment;
+			import smartx.flex.components.styletemplate.MTStyleTemplate01;
+			import smartx.flex.components.util.MetadataTempletUtil;
+			import smartx.flex.components.util.StringUtils;
+			import smartx.flex.components.vo.MetadataTemplet;
+			
+			private var debugMode:Boolean = false;
+			private var mtStyleTemplate01:MTStyleTemplate01;
+			
+			private function init():void{
+				var url:String = this.loaderInfo.url;
+				var parameters:Object = StringUtils.parseUrlParameters(url);
+				var mtcode:String = parameters.mtcode;
+				if(mtcode == null){
+					Alert.show("必须指定元数据模板编码(mtcode)");
+					return;
+				}
+				var metadataTemplet:MetadataTemplet = MetadataTempletUtil.getInstance().findMetadataTemplet(mtcode);
+				if(metadataTemplet == null){
+					Alert.show("不存在元数据模板[mtcode="+mtcode+"]");
+					return;
+				}
+				
+				if(metadataTemplet.contentXML.debugMode.length() == 0){
+					//如没指定debugMode，根据客户端变量设置
+					if(ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE) != null)
+						debugMode = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_GLOBAL_DEBUGMODE);
+					if(debugMode){
+						var xml:XML = metadataTemplet.contentXML;
+						xml.debugMode = "true";
+						metadataTemplet.contentXML = xml;
+					}
+				}
+				mtStyleTemplate01 = new MTStyleTemplate01();
+				mtStyleTemplate01.endpoint = ClientEnviorment.getInstance().getVar(ClientEnviorment.KEY_SERVICE_ENDPOINT) as String;
+				mtStyleTemplate01.metadataTemplet = metadataTemplet;
+				this.addChild(mtStyleTemplate01);
+			}
+			
+			protected function module1_removedFromStageHandler(event:Event):void
+			{
+				//在界面大小切换时也有removedFromStage事件发出，会出现白屏的现象，此处不应该destroy对象
+//				if(mtStyleTemplate01 != null){
+//					mtStyleTemplate01.destroy();
+//					mtStyleTemplate01 = null;
+//				}
+			}
+			
+		]]>
+	</fx:Script>
+</mx:Module>

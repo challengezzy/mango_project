@@ -1,0 +1,61 @@
+/**************************************************************************
+ * $RCSfile: ImageCellRender.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:21 $
+ **************************************************************************/
+package smartx.framework.metadata.ui.componentslist;
+
+import java.awt.*;
+import javax.swing.*;
+import javax.swing.table.*;
+
+import smartx.framework.metadata.vo.*;
+
+
+public class ImageCellRender extends DefaultTableCellRenderer {
+
+    private static final long serialVersionUID = 1L;
+
+    Pub_Templet_1_ItemVO itemVO;
+
+    public ImageCellRender(Pub_Templet_1_ItemVO _itemVO) {
+        this.itemVO = _itemVO;
+    }
+
+    public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+        int row, int column) {
+        JLabel label = (JLabel)super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+        if (value != null) {
+            label.setText(value.toString());
+        } else {
+            label.setText("");
+        }
+        if (itemVO.getListiseditable() != null && !itemVO.getListiseditable().equals("1")) {
+            label.setForeground(java.awt.Color.GRAY);
+        } else {
+            label.setForeground(java.awt.Color.BLACK);
+        }
+        if (itemVO.getItemtype().equals("数字框")) {
+            label.setHorizontalAlignment(JLabel.RIGHT);
+        }
+        return label;
+    }
+
+}
+/**************************************************************************
+ * $RCSfile: ImageCellRender.java,v $  $Revision: 1.2 $  $Date: 2007/05/31 07:38:21 $
+ *
+ * $Log: ImageCellRender.java,v $
+ * Revision 1.2  2007/05/31 07:38:21  qilin
+ * code format
+ *
+ * Revision 1.1  2007/05/17 06:02:00  qilin
+ * no message
+ *
+ * Revision 1.3  2007/01/31 08:56:04  shxch
+ * *** empty log message ***
+ *
+ * Revision 1.2  2007/01/30 05:05:40  lujian
+ * *** empty log message ***
+ *
+ *
+ **************************************************************************/

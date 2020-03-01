@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<ListDetails label="SWC Loading Details" projectName="MangoWeb">
+
+
+<LoadedSetList label="LoadedSet List">
+
+
+<LoadingSet label="LoadingSet1:">
+
+
+<item  label="as3corelib.swc790716241" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\as3corelib.swc790716241\library.swf"/>
+
+
+<item  label="DateTimeLibrary200903.swc-419688839" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\DateTimeLibrary200903.swc-419688839\library.swf"/>
+
+
+<item  label="Efflex_v0[1].03_fx3_fp9.swc-759592191" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\Efflex_v0[1].03_fx3_fp9.swc-759592191\library.swf"/>
+
+
+<item  label="IconUtility.swc1624527553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\IconUtility.swc1624527553\library.swf"/>
+
+
+<item  label="QaVis.swc-519468887" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\org\un\cava\birdeye\qavis\treemap\assets\Assets.swf"/>
+
+
+<item  label="RightClickLib.swc523073009" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\RightClickLib.swc523073009\library.swf"/>
+
+
+<item  label="superPanel.swc-1690787727" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\superPanel.swc-1690787727\library.swf"/>
+
+
+<item  label="flexiframe.swc-577014511" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\flexiframe.swc-577014511\library.swf"/>
+
+
+<item  label="SmartXVideoPlayer.swc689452433" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\SmartXVideoPlayer.swc689452433\library.swf"/>
+
+
+<item  label="MangoFlex.swc-1843859199" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\MangoFlex.swc-1843859199\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\callout_icons.swf"/>
+
+
+<item  label="agslib-1.2-2009-05-15.swc1819413185" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\navigation_icons.swf"/>
+
+
+<item  label="overview_map.swc1649614553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\overview_map.swc1649614553\library.swf"/>
+
+
+</LoadingSet>
+
+
+<LoadingSet label="LoadingSet2:">
+
+
+<item  label="DateTimeLibrary200903.swc-419688839" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\DateTimeLibrary200903.swc-419688839\library.swf"/>
+
+
+<item  label="Efflex_v0[1].03_fx3_fp9.swc-759592191" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\Efflex_v0[1].03_fx3_fp9.swc-759592191\library.swf"/>
+
+
+<item  label="IconUtility.swc1624527553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\IconUtility.swc1624527553\library.swf"/>
+
+
+<item  label="QaVis.swc-519468887" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\org\un\cava\birdeye\qavis\treemap\assets\Assets.swf"/>
+
+
+<item  label="RightClickLib.swc523073009" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\RightClickLib.swc523073009\library.swf"/>
+
+
+<item  label="superPanel.swc-1690787727" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\superPanel.swc-1690787727\library.swf"/>
+
+
+<item  label="flexiframe.swc-577014511" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\flexiframe.swc-577014511\library.swf"/>
+
+
+<item  label="SmartXVideoPlayer.swc689452433" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\SmartXVideoPlayer.swc689452433\library.swf"/>
+
+
+<item  label="MangoFlex.swc-1843859199" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\MangoFlex.swc-1843859199\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\callout_icons.swf"/>
+
+
+<item  label="agslib-1.2-2009-05-15.swc1819413185" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\navigation_icons.swf"/>
+
+
+<item  label="overview_map.swc1649614553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\overview_map.swc1649614553\library.swf"/>
+
+
+</LoadingSet>
+
+
+<LoadingSet label="LoadingSet3:">
+
+
+<item  label="DateTimeLibrary200903.swc-419688839" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\DateTimeLibrary200903.swc-419688839\library.swf"/>
+
+
+<item  label="IconUtility.swc1624527553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\IconUtility.swc1624527553\library.swf"/>
+
+
+<item  label="QaVis.swc-519468887" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\org\un\cava\birdeye\qavis\treemap\assets\Assets.swf"/>
+
+
+<item  label="RightClickLib.swc523073009" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\RightClickLib.swc523073009\library.swf"/>
+
+
+<item  label="superPanel.swc-1690787727" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\superPanel.swc-1690787727\library.swf"/>
+
+
+<item  label="flexiframe.swc-577014511" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\flexiframe.swc-577014511\library.swf"/>
+
+
+<item  label="SmartXVideoPlayer.swc689452433" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\SmartXVideoPlayer.swc689452433\library.swf"/>
+
+
+<item  label="MangoFlex.swc-1843859199" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\MangoFlex.swc-1843859199\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\callout_icons.swf"/>
+
+
+<item  label="agslib-1.2-2009-05-15.swc1819413185" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\navigation_icons.swf"/>
+
+
+<item  label="overview_map.swc1649614553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\overview_map.swc1649614553\library.swf"/>
+
+
+</LoadingSet>
+
+
+<LoadingSet label="LoadingSet4:">
+
+
+<item  label="DateTimeLibrary200903.swc-419688839" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\DateTimeLibrary200903.swc-419688839\library.swf"/>
+
+
+<item  label="IconUtility.swc1624527553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\IconUtility.swc1624527553\library.swf"/>
+
+
+<item  label="RightClickLib.swc523073009" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\RightClickLib.swc523073009\library.swf"/>
+
+
+<item  label="superPanel.swc-1690787727" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\superPanel.swc-1690787727\library.swf"/>
+
+
+<item  label="flexiframe.swc-577014511" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\flexiframe.swc-577014511\library.swf"/>
+
+
+<item  label="SmartXVideoPlayer.swc689452433" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\SmartXVideoPlayer.swc689452433\library.swf"/>
+
+
+<item  label="MangoFlex.swc-1843859199" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\MangoFlex.swc-1843859199\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\callout_icons.swf"/>
+
+
+<item  label="agslib-1.2-2009-05-15.swc1819413185" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\navigation_icons.swf"/>
+
+
+<item  label="overview_map.swc1649614553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\overview_map.swc1649614553\library.swf"/>
+
+
+</LoadingSet>
+
+
+<LoadingSet label="LoadingSet5:">
+
+
+<item  label="DateTimeLibrary200903.swc-419688839" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\DateTimeLibrary200903.swc-419688839\library.swf"/>
+
+
+<item  label="IconUtility.swc1624527553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\IconUtility.swc1624527553\library.swf"/>
+
+
+<item  label="RightClickLib.swc523073009" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\RightClickLib.swc523073009\library.swf"/>
+
+
+<item  label="flexiframe.swc-577014511" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\flexiframe.swc-577014511\library.swf"/>
+
+
+<item  label="SmartXVideoPlayer.swc689452433" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\SmartXVideoPlayer.swc689452433\library.swf"/>
+
+
+<item  label="MangoFlex.swc-1843859199" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\MangoFlex.swc-1843859199\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\callout_icons.swf"/>
+
+
+<item  label="agslib-1.2-2009-05-15.swc1819413185" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\agslib-1.2-2009-05-15.swc1819413185\assets\navigation_icons.swf"/>
+
+
+<item  label="overview_map.swc1649614553" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\overview_map.swc1649614553\library.swf"/>
+
+
+</LoadingSet>
+
+
+</LoadedSetList>
+
+
+<RemovedSetList label="RemovedSet List">
+
+
+<RemovedSet label="RemovedSet1:">
+
+
+<item  label="No Item present in this set"/>
+
+
+</RemovedSet>
+
+
+<RemovedSet label="RemovedSet2:">
+
+
+<item  label="as3corelib.swc790716241" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\as3corelib.swc790716241\library.swf"/>
+
+
+</RemovedSet>
+
+
+<RemovedSet label="RemovedSet3:">
+
+
+<item  label="as3corelib.swc790716241" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\as3corelib.swc790716241\library.swf"/>
+
+
+<item  label="Efflex_v0[1].03_fx3_fp9.swc-759592191" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\Efflex_v0[1].03_fx3_fp9.swc-759592191\library.swf"/>
+
+
+</RemovedSet>
+
+
+<RemovedSet label="RemovedSet4:">
+
+
+<item  label="as3corelib.swc790716241" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\as3corelib.swc790716241\library.swf"/>
+
+
+<item  label="Efflex_v0[1].03_fx3_fp9.swc-759592191" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\Efflex_v0[1].03_fx3_fp9.swc-759592191\library.swf"/>
+
+
+<item  label="QaVis.swc-519468887" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\org\un\cava\birdeye\qavis\treemap\assets\Assets.swf"/>
+
+
+</RemovedSet>
+
+
+<RemovedSet label="RemovedSet5:">
+
+
+<item  label="as3corelib.swc790716241" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\as3corelib.swc790716241\library.swf"/>
+
+
+<item  label="Efflex_v0[1].03_fx3_fp9.swc-759592191" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\Efflex_v0[1].03_fx3_fp9.swc-759592191\library.swf"/>
+
+
+<item  label="QaVis.swc-519468887" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\library.swf"/>
+
+
+<item  label="assets" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\QaVis.swc-519468887\org\un\cava\birdeye\qavis\treemap\assets\Assets.swf"/>
+
+
+<item  label="superPanel.swc-1690787727" path="D:\workspace_mango\.metadata\.plugins\com.adobe.flexbuilder.codemodel\SwcCache\superPanel.swc-1690787727\library.swf"/>
+
+
+</RemovedSet>
+
+
+</RemovedSetList>
+
+
+</ListDetails>
+
+

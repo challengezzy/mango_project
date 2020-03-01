@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<designer:BaseDesigner xmlns:designer="smartx.bam.flex.modules.dashboardobject.designer.*" 
+					  xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  xmlns:containers="flexlib.containers.*" 
+					  creationComplete="init()" width="100%" height="100%"
+					  xmlns:components="smartx.bam.flex.modules.dashboardobject.designer.components.*">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.XMLListCollection;
+			import mx.events.FlexEvent;
+			import mx.events.ListEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.ResultEvent;
+			
+			import smartx.bam.flex.utils.BAMUtil;
+			import smartx.flex.components.assets.AssetsFileLib;
+			import smartx.flex.components.basic.Datasource;
+			import smartx.flex.components.core.cep.CEPUtils;
+			import smartx.flex.components.event.UIComponentEvent;
+			import smartx.flex.components.itemcomponent.ItemRefPanel;
+			import smartx.flex.components.util.Hashtable;
+			import smartx.flex.components.vo.GlobalConst;
+			import smartx.flex.components.vo.SimpleRefItemVO;
+			import smartx.flex.components.vo.TempletItemVO;
+			
+			[Bindable]
+			private var dp:XMLListCollection = new XMLListCollection();
+			
+			private function init():void{
+				
+			}
+			
+			override public function generalFormComplete():void{
+				if(contentXml.extend.items.length() == 0)
+					contentXml.extend.appendChild(<items />);
+				dp.source = contentXml.extend.items.item;
+				
+				customBtnDesignVbox.customListButtonXml = contentXml.extend[0].copy();
+			}
+			
+			override public function propertyConvertXml():void{
+				delete contentXml.extend.customButton;
+				
+				if(customBtnDesignVbox.getContentXml())
+					contentXml.extend.appendChild(customBtnDesignVbox.getContentXml());
+			}
+			
+			private function addField():void{
+				dp.addItem(<item dataField={newFieldComboBox.selectedItem} 
+					labelField={newFieldComboBox.selectedItem} isShowField="Y"/>);
+			}
+			
+			private function deleteField():void{
+				var selectedIndex:int = dataGrid.selectedIndex;
+				if(selectedIndex < 0)
+					return;
+				dp.removeItemAt(selectedIndex);
+			}
+			
+			override public function initTableStructComplete():void{
+				
+				for each(var pkData:String in fieldList){
+					if(pkData == String(contentXml.extend.pkfieldname)){
+						pkFieldCbo.selectedItem = pkData;
+						break;
+					}else
+						pkFieldCbo.selectedIndex = -1;
+				}
+				
+				for each(var fkData:String in fieldList){
+					if(fkData == String(contentXml.extend.parentfieldname)){
+						fkFieldCbo.selectedItem = fkData;
+						break;
+					}else
+						fkFieldCbo.selectedIndex = -1;
+				}
+			}
+		]]>
+	</fx:Script>
+	
+	<mx:VBox width="100%" height="100%" paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+		<mx:TabNavigator width="100%" height="100%" creationPolicy="all">
+			<mx:VBox width="100%" height="100%" label="列表"
+					 paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5">
+				<mx:HBox width="100%" >
+					<mx:ComboBox id="newFieldComboBox" editable="true" dataProvider="{fieldList}"/>
+					<mx:LinkButton icon="{AssetsFileLib.addIcon}" width="22" height="22" toolTip="新建" click="addField()"/>
+					<mx:LinkButton icon="{AssetsFileLib.minuseIcon}" width="22" height="22" toolTip="删除" click="deleteField()"/>
+				</mx:HBox>
+				<mx:DataGrid id="dataGrid" width="100%" height="100%" editable="true" dataProvider="{dp}"
+							 dragEnabled="true" dropEnabled="true" dragMoveEnabled="true">
+					<mx:columns>
+						<mx:DataGridColumn headerText="数据字段" editable="false" dataField="@dataField" />
+						<mx:DataGridColumn headerText="显示名称" editable="true" dataField="@labelField" />
+						<mx:DataGridColumn headerText="是否在列表中显示" editable="true" dataField="@isShowField" rendererIsEditor="true">
+							<mx:itemRenderer>
+								<fx:Component>
+									<mx:HBox width="100%" horizontalAlign="center">
+										<fx:Script>
+											<![CDATA[
+												public function get text():String{
+													return data.@isShowField;
+												}
+											]]>
+										</fx:Script>
+										<mx:CheckBox id="isShowChk" selected="{String(data.@isShowField)=='Y'}" 
+													 change="{data.@isShowField=isShowChk.selected?'Y':'N'}" />
+									</mx:HBox>
+								</fx:Component>
+							</mx:itemRenderer>
+						</mx:DataGridColumn>
+					</mx:columns>
+				</mx:DataGrid>
+				<mx:HBox width="100%">
+					<mx:CheckBox label="是否显示自定义按钮控件" id="isShowDefineBtnChk" 
+								 selected="{contentXml.extend.showCustomButtonBox=='true'?true:false}"
+								 click="{contentXml.extend.showCustomButtonBox = isShowDefineBtnChk.selected?'true':'false'}"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="主键字段" height="100%"/>
+					<mx:ComboBox id="pkFieldCbo" dataProvider="{fieldList}" 
+								 change="{contentXml.extend.pkfieldname=pkFieldCbo.selectedItem}"/>
+				</mx:HBox>
+				<mx:HBox width="100%" >
+					<mx:Label text="外键字段" height="100%"/>
+					<mx:ComboBox id="fkFieldCbo" dataProvider="{fieldList}" 
+								 change="{contentXml.extend.parentfieldname = fkFieldCbo.selectedItem}"/>
+				</mx:HBox>
+			</mx:VBox>
+			<components:CustomButtonDesigner id="customBtnDesignVbox" width="100%" height="100%" label="自定义按钮" 
+											paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" />
+		</mx:TabNavigator>
+	</mx:VBox>
+</designer:BaseDesigner>

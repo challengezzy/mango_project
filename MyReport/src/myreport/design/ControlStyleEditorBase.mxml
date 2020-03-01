@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:HBox  xmlns:mx="http://www.adobe.com/2006/mxml" width="100%"
+		 implements="hlib.IDispose" >
+	<!--
+	
+	Copyright (c) 2011, Hunk.Cai
+	All rights reserved.
+	
+	创建人：Hunk.Cai
+	修改人：
+	
+	-->
+ 
+	<mx:Script>
+		<![CDATA[
+			import hlib.DisposeUtil;
+			import hlib.IDispose;
+			
+			import myreport.data.report.ControlSetting;
+ 
+			protected var Setting:ControlSetting;
+ 			protected var Name:String;
+			private var _Disposed:Boolean = false;	
+			protected function get Disposed():Boolean
+			{
+				return _Disposed;
+			}
+			protected function Disposing():void
+			{
+				
+			}
+ 
+			public function Dispose():void
+			{
+				if(_Disposed) return;
+				_Disposed = true;
+				Disposing();
+				DisposeUtil.Dispose(this);
+				Setting = null;
+ 
+			}
+			
+			public function SetData(setting:ControlSetting, name:String):void
+			{
+				Setting = setting;
+				Name = name;
+				OnSetData();
+			}
+			
+			protected function OnSetData():void
+			{
+				
+			}
+ 
+		]]>
+	</mx:Script>
+</mx:HBox>
